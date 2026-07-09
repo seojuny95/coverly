@@ -24,6 +24,9 @@ dist/
 # Logs
 *.log
 
+# Local editor settings
+.vscode/
+
 # Local test inputs with real PII
 sample-insurance-input/
 .local/
