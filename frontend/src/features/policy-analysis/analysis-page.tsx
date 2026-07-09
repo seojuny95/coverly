@@ -54,7 +54,7 @@ export function AnalysisPage() {
 
   if (analysis === undefined) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f4f7f2] px-5 text-[#152217]">
+      <main className="flex min-h-screen items-center justify-center bg-white px-5 text-[#111827]">
         <p className="text-sm font-medium">분석 결과를 불러오는 중입니다.</p>
       </main>
     );
@@ -62,20 +62,17 @@ export function AnalysisPage() {
 
   if (!analysis || policies.length === 0) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f4f7f2] px-5 text-[#152217]">
-        <section className="w-full max-w-lg rounded-[8px] border border-[#d7ddd8] bg-white px-6 py-8 text-center">
-          <p className="text-sm font-semibold tracking-[0.16em] text-[#58705f] uppercase">
-            No packet
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
+      <main className="flex min-h-screen items-center justify-center bg-white px-5 text-[#111827]">
+        <section className="w-full max-w-lg rounded-[8px] border border-[#111827]/15 bg-white px-6 py-8 text-center shadow-[0_18px_70px_rgba(17,24,39,0.08)]">
+          <h1 className="text-2xl font-semibold tracking-normal">
             분석할 증권이 없습니다
           </h1>
-          <p className="mt-3 text-sm leading-6 text-[#667269]">
+          <p className="mt-3 text-sm leading-6 text-[#111827]/70">
             업로드 화면에서 PDF를 선택하면 분석 결과가 여기에 표시됩니다.
           </p>
           <Link
             href="/upload"
-            className="mt-6 inline-flex rounded-[8px] bg-[#173d27] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#255436] focus:ring-2 focus:ring-[#173d27] focus:ring-offset-2 focus:outline-none"
+            className="mt-6 inline-flex rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#111827]/90 focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none"
           >
             증권 업로드
           </Link>
@@ -85,14 +82,14 @@ export function AnalysisPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f7f2] px-5 py-6 text-[#152217] sm:px-6">
+    <main className="min-h-screen bg-white px-5 py-6 text-[#111827] sm:px-6">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
-        <Link href="/" className="text-sm font-semibold text-[#152217]">
+        <Link href="/" className="text-sm font-semibold text-[#111827]">
           Coverly
         </Link>
         <Link
           href="/upload"
-          className="rounded-[8px] border border-[#bfcabf] px-3 py-2 text-sm font-medium text-[#294230] transition-colors hover:bg-white focus:ring-2 focus:ring-[#173d27] focus:ring-offset-2 focus:outline-none"
+          className="rounded-[8px] border border-[#111827]/15 px-3 py-2 text-sm font-medium text-[#111827] transition-colors hover:bg-[#111827]/5 focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none"
         >
           다시 업로드
         </Link>
@@ -101,16 +98,16 @@ export function AnalysisPage() {
       <section className="mx-auto mt-10 w-full max-w-6xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-normal text-[#152217] sm:text-4xl">
+            <h1 className="text-3xl font-semibold tracking-normal text-[#111827] sm:text-4xl">
               보험 분류별 분석
             </h1>
-            <p className="mt-3 text-sm leading-6 text-[#667269]">
+            <p className="mt-3 text-sm leading-6 text-[#111827]/70">
               {analysis.selectedName
                 ? `${analysis.selectedName} 피보험자의 ${policies.length}개 증권을 보험분류 기준으로 정리했습니다.`
                 : `${policies.length}개 증권을 보험분류 기준으로 정리했습니다.`}
             </p>
           </div>
-          <p className="text-sm text-[#667269]">
+          <p className="text-sm text-[#111827]/70">
             분석 시각 {formatDateTime(analysis.generatedAt)}
           </p>
         </div>
@@ -119,12 +116,12 @@ export function AnalysisPage() {
           {CLASSIFICATION_ORDER.map((classification) => (
             <div
               key={classification}
-              className="rounded-[8px] border border-[#d7ddd8] bg-white px-4 py-4"
+              className="rounded-[8px] border border-[#111827]/15 bg-white px-4 py-4"
             >
-              <dt className="text-xs font-medium text-[#667269]">
+              <dt className="text-xs font-medium text-[#111827]/70">
                 {classification}
               </dt>
-              <dd className="mt-3 text-3xl font-semibold text-[#173d27]">
+              <dd className="mt-3 text-3xl font-semibold text-[#2563EB]">
                 {counts[classification] ?? 0}
               </dd>
             </div>
@@ -140,18 +137,18 @@ export function AnalysisPage() {
             return (
               <section
                 key={classification}
-                className="overflow-hidden rounded-[8px] border border-[#d7ddd8] bg-white"
+                className="overflow-hidden rounded-[8px] border border-[#111827]/15 bg-white"
               >
-                <div className="border-b border-[#e3e8e1] bg-[#fbfcfa] px-5 py-4">
+                <div className="border-b border-[#111827]/10 bg-white px-5 py-4">
                   <h2 className="text-lg font-semibold tracking-normal">
                     {classification}
                   </h2>
-                  <p className="mt-1 text-sm text-[#667269]">
+                  <p className="mt-1 text-sm text-[#111827]/70">
                     {classificationPolicies.length}개 증권
                   </p>
                 </div>
 
-                <ul className="divide-y divide-[#e3e8e1]">
+                <ul className="divide-y divide-[#111827]/10">
                   {classificationPolicies.map((policy) => {
                     const isExpanded = expandedPolicyIds.has(policy.id);
                     const basicInfo = policy.result.기본정보;
@@ -162,18 +159,18 @@ export function AnalysisPage() {
                           type="button"
                           aria-expanded={isExpanded}
                           onClick={() => togglePolicy(policy.id)}
-                          className="flex w-full flex-col gap-3 px-5 py-4 text-left transition-colors hover:bg-[#f6f8f5] focus:ring-2 focus:ring-[#173d27] focus:outline-none focus:ring-inset sm:flex-row sm:items-center sm:justify-between"
+                          className="flex w-full flex-col gap-3 px-5 py-4 text-left transition-colors hover:bg-[#111827]/5 focus:ring-2 focus:ring-[#2563EB] focus:outline-none focus:ring-inset sm:flex-row sm:items-center sm:justify-between"
                         >
                           <span className="min-w-0">
-                            <span className="block truncate text-base font-semibold text-[#152217]">
+                            <span className="block truncate text-base font-semibold text-[#111827]">
                               {basicInfo?.상품명 ?? policy.fileName}
                             </span>
-                            <span className="mt-1 block truncate text-sm text-[#667269]">
+                            <span className="mt-1 block truncate text-sm text-[#111827]/70">
                               {basicInfo?.보험사 ?? "보험사 미확인"} ·{" "}
                               {policy.fileName}
                             </span>
                           </span>
-                          <span className="inline-flex shrink-0 items-center rounded-full border border-[#c9d7cc] px-3 py-1 text-xs font-medium text-[#294230]">
+                          <span className="inline-flex shrink-0 items-center rounded-full border border-[#2563EB]/20 px-3 py-1 text-xs font-medium text-[#2563EB]">
                             {isExpanded ? "접기" : "상세 보기"}
                           </span>
                         </button>
@@ -208,12 +205,12 @@ function PolicyDetail({ policy }: { policy: AnalyzedPolicy }) {
   ].filter((item): item is [string, string] => Boolean(item[1]));
 
   return (
-    <div className="border-t border-[#e3e8e1] bg-[#fbfcfa] px-5 py-5">
+    <div className="border-t border-[#111827]/10 bg-[#111827]/5 px-5 py-5">
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {detailItems.map(([label, value]) => (
           <div key={label}>
-            <dt className="text-xs font-medium text-[#667269]">{label}</dt>
-            <dd className="mt-1 text-sm font-medium break-words text-[#203226]">
+            <dt className="text-xs font-medium text-[#111827]/70">{label}</dt>
+            <dd className="mt-1 text-sm font-medium break-words text-[#111827]">
               {value}
             </dd>
           </div>

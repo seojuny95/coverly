@@ -184,12 +184,12 @@ export function UploadForm({
 
   return (
     <form className="w-full max-w-2xl" onSubmit={handleSubmit}>
-      <section className="rounded-[8px] border border-[#d7ddd8] bg-[#fbfcfa] shadow-[0_18px_70px_rgba(25,45,33,0.08)]">
+      <section className="rounded-[8px] border border-[#111827]/15 bg-white shadow-[0_18px_70px_rgba(17,24,39,0.08)]">
         <div className="px-5 pt-6 pb-5 sm:px-7 sm:pt-7">
-          <h1 className="text-2xl leading-8 font-semibold tracking-normal text-[#152217]">
+          <h1 className="text-2xl leading-8 font-semibold tracking-normal text-[#111827]">
             내 보험 분석
           </h1>
-          <p className="mt-2 text-sm leading-6 text-[#667269]">
+          <p className="mt-2 text-sm leading-6 text-[#111827]/70">
             보험증권 PDF를 올리면 내 보험을 분류해서 보여드려요.
           </p>
         </div>
@@ -212,14 +212,16 @@ export function UploadForm({
             onDrop={handleDrop}
             className={`flex min-h-48 flex-col items-center justify-center rounded-[8px] border border-dashed px-5 py-10 text-center transition-colors ${
               isDragging
-                ? "border-[#173d27] bg-[#eef8f1]"
-                : "border-[#bec9c0] bg-white"
+                ? "border-[#2563EB] bg-[#2563EB]/10"
+                : "border-[#111827]/20 bg-white"
             }`}
           >
-            <p className="text-base font-medium text-[#152217]">
+            <p className="text-base font-medium text-[#111827]">
               보험증권 PDF를 올려주세요
             </p>
-            <p className="mt-2 text-sm text-[#667269]">PDF · {fileSizeLabel}</p>
+            <p className="mt-2 text-sm text-[#111827]/70">
+              PDF · {fileSizeLabel}
+            </p>
 
             <input
               ref={inputRef}
@@ -236,7 +238,7 @@ export function UploadForm({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="mt-6 rounded-[8px] bg-[#173d27] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#255436] focus:ring-2 focus:ring-[#173d27] focus:ring-offset-2 focus:outline-none"
+              className="mt-6 rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#111827]/90 focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none"
             >
               PDF 불러오기
             </button>
@@ -247,7 +249,7 @@ export function UploadForm({
             <button
               type="submit"
               disabled={selectedFiles.length === 0 || isAnalyzing}
-              className="self-stretch rounded-[8px] bg-[#173d27] px-4 py-2.5 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-[#173d27] focus:ring-offset-2 focus:outline-none enabled:hover:bg-[#255436] disabled:cursor-not-allowed disabled:bg-[#dfe5df] disabled:text-[#77847b] sm:self-end"
+              className="self-stretch rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none enabled:hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-[#111827]/10 disabled:text-[#111827]/45 sm:self-end"
             >
               {isAnalyzing ? "분석 중" : "내 보험 분석하기"}
             </button>
@@ -256,10 +258,10 @@ export function UploadForm({
           {isAnalyzing ? (
             <div
               role="status"
-              className="mt-4 rounded-[8px] border border-[#cfe0d2] bg-[#eef8f1] px-4 py-3 text-sm leading-6 text-[#1f6f3f]"
+              className="mt-4 rounded-[8px] border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-3 text-sm leading-6 text-[#2563EB]"
             >
               <span className="font-medium">보험을 정리하고 있어요.</span>
-              <span className="block text-[#2f7f4e]">
+              <span className="block text-[#111827]/70">
                 끝나면 결과 화면으로 이동해요.
               </span>
             </div>
@@ -277,7 +279,7 @@ export function UploadForm({
           {error ? (
             <p
               role="alert"
-              className="mt-4 rounded-[8px] bg-red-50 px-4 py-3 text-sm leading-6 text-red-700"
+              className="mt-4 rounded-[8px] border border-[#2563EB]/20 bg-white px-4 py-3 text-sm leading-6 text-[#111827]"
             >
               {error}
             </p>
@@ -291,8 +293,8 @@ export function UploadForm({
 function SelectedFileList({ files }: { files: File[] }) {
   if (files.length === 0) {
     return (
-      <div className="rounded-[8px] border border-[#e0e7df] bg-white px-4 py-3">
-        <p className="text-sm text-[#667269]">선택된 PDF가 없어요.</p>
+      <div className="rounded-[8px] border border-[#111827]/10 bg-white px-4 py-3">
+        <p className="text-sm text-[#111827]/70">선택된 PDF가 없어요.</p>
       </div>
     );
   }
@@ -300,30 +302,32 @@ function SelectedFileList({ files }: { files: File[] }) {
   return (
     <section
       aria-label="선택한 PDF"
-      className="rounded-[8px] border border-[#d7ddd8] bg-white"
+      className="rounded-[8px] border border-[#111827]/15 bg-white"
     >
-      <div className="flex items-center justify-between border-b border-[#e5ebe3] px-4 py-3">
-        <p className="text-sm font-semibold text-[#152217]">선택한 PDF</p>
-        <p className="text-xs font-medium text-[#667269]">{files.length}개</p>
+      <div className="flex items-center justify-between border-b border-[#111827]/10 px-4 py-3">
+        <p className="text-sm font-semibold text-[#111827]">선택한 PDF</p>
+        <p className="text-xs font-medium text-[#111827]/70">
+          {files.length}개
+        </p>
       </div>
-      <ul className="max-h-48 divide-y divide-[#edf1eb] overflow-y-auto">
+      <ul className="max-h-48 divide-y divide-[#111827]/10 overflow-y-auto">
         {files.map((file, index) => (
           <li
             key={`${file.name}-${file.size}-${index}`}
             className="flex min-h-16 items-center gap-3 px-4 py-3"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[#eef8f1] text-xs font-semibold text-[#1f6f3f]">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[#2563EB]/10 text-xs font-semibold text-[#2563EB]">
               {index + 1}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-[#203226]">
+              <span className="block truncate text-sm font-medium text-[#111827]">
                 {file.name}
               </span>
-              <span className="mt-1 block text-xs text-[#667269]">
+              <span className="mt-1 block text-xs text-[#111827]/70">
                 {formatFileSize(file.size)}
               </span>
             </span>
-            <span className="shrink-0 rounded-full border border-[#d6e8db] px-2.5 py-1 text-xs font-medium text-[#2f7f4e]">
+            <span className="shrink-0 rounded-full border border-[#2563EB]/20 px-2.5 py-1 text-xs font-medium text-[#2563EB]">
               PDF
             </span>
           </li>
@@ -367,11 +371,11 @@ function NameSelectionPanel({
   onContinue: () => void;
 }) {
   return (
-    <div className="mt-4 rounded-[8px] border border-[#d7ddd8] bg-white px-4 py-4">
-      <p className="text-sm font-semibold text-[#152217]">
+    <div className="mt-4 rounded-[8px] border border-[#111827]/15 bg-white px-4 py-4">
+      <p className="text-sm font-semibold text-[#111827]">
         피보험자가 여러 명 발견되었습니다
       </p>
-      <p className="mt-1 text-sm leading-6 text-[#667269]">
+      <p className="mt-1 text-sm leading-6 text-[#111827]/70">
         분석에 포함할 피보험자를 선택하세요. 선택한 피보험자의 증권만 결과
         화면에 표시됩니다.
       </p>
@@ -385,8 +389,8 @@ function NameSelectionPanel({
               htmlFor={inputId}
               className={`flex cursor-pointer items-center justify-between rounded-[8px] border px-3 py-3 text-sm transition-colors ${
                 selectedName === option.name
-                  ? "border-[#173d27] bg-[#eef8f1]"
-                  : "border-[#d7ddd8] bg-white hover:bg-[#f6f8f5]"
+                  ? "border-[#2563EB] bg-[#2563EB]/10"
+                  : "border-[#111827]/15 bg-white hover:bg-[#111827]/5"
               }`}
             >
               <span className="flex items-center gap-3">
@@ -397,13 +401,13 @@ function NameSelectionPanel({
                   value={option.name}
                   checked={selectedName === option.name}
                   onChange={(event) => onSelectedNameChange(event.target.value)}
-                  className="h-4 w-4 accent-[#173d27]"
+                  className="h-4 w-4 accent-[#2563EB]"
                 />
-                <span className="font-medium text-[#203226]">
+                <span className="font-medium text-[#111827]">
                   {option.name}
                 </span>
               </span>
-              <span className="text-[#667269]">{option.count}개</span>
+              <span className="text-[#111827]/70">{option.count}개</span>
             </label>
           );
         })}
@@ -413,7 +417,7 @@ function NameSelectionPanel({
         type="button"
         onClick={onContinue}
         disabled={!selectedName}
-        className="mt-4 rounded-[8px] bg-[#173d27] px-4 py-2.5 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-[#173d27] focus:ring-offset-2 focus:outline-none enabled:hover:bg-[#255436] disabled:cursor-not-allowed disabled:bg-[#dfe5df] disabled:text-[#77847b]"
+        className="mt-4 rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none enabled:hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-[#111827]/10 disabled:text-[#111827]/45"
       >
         선택한 피보험자로 보기
       </button>

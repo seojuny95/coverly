@@ -35,6 +35,7 @@ src/
 - 기본은 **Server Components**; 상호작용이 필요할 때만 `"use client"`를 사용한다.
 - 파일명은 kebab-case, 컴포넌트는 PascalCase를 사용한다.
 - 마크다운은 한국어, 코드 코멘트는 영어. 사용자 대상 UI 카피는 한국어.
+- 사용자 대상 UI 카피를 작성하거나 수정할 때는 [UX_COPY.md](UX_COPY.md)를 먼저 확인한다.
 
 ## Testing Guidelines
 
