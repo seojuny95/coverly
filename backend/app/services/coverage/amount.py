@@ -15,6 +15,9 @@ AMOUNT_UNVERIFIED = "확인필요"
 
 _MAN_UNIT_HEADER = re.compile(r"\(\s*(?:단위\s*[:：]?\s*)?만원\s*\)|단위\s*[:：]\s*만원")
 _BARE_AMOUNT = re.compile(r"^\d[\d,]*$")
+# An amount that already carries an explicit unit (…원/억/만/천). Its presence in
+# the source means the source mixes units, so a bare value must not be assumed 만원.
+_EXPLICIT_UNIT_AMOUNT = re.compile(r"\d[\d,]*\s*(?:억|만|천|원)")
 
 
 def _digits(text: str) -> str:
@@ -29,6 +32,14 @@ def normalize_amount(value: str, source: str) -> str:
     digits = _digits(cleaned)
     if digits and digits not in _digits(source):
         return AMOUNT_UNVERIFIED
-    if _MAN_UNIT_HEADER.search(source) and _BARE_AMOUNT.match(cleaned):
+    # Bare number under a 만원 header → make the unit explicit (3,000 → 3,000만원),
+    # but only when the source's amounts are uniformly unit-less. If any amount
+    # already carries an explicit unit, the source mixes units and assuming 만원
+    # for a bare value would be 10,000x wrong (grounding violation) — keep verbatim.
+    if (
+        _MAN_UNIT_HEADER.search(source)
+        and _BARE_AMOUNT.match(cleaned)
+        and not _EXPLICIT_UNIT_AMOUNT.search(source)
+    ):
         return f"{int(cleaned.replace(',', '')):,}만원"
     return cleaned
