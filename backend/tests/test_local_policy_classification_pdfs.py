@@ -48,7 +48,6 @@ def test_local_sample_policy_pdfs_match_expected_classification() -> None:
         result = classify_policy(
             text=text,
             product_name=summary.get("상품명"),
-            insurer_name=summary.get("보험사"),
         )
 
         assert result["보험분류"] == expected["보험분류"], filename

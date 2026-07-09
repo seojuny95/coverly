@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import TypedDict
 
 
@@ -6,105 +8,60 @@ class PolicyClassification(TypedDict):
     상품태그: list[str]
 
 
-# Consumer-facing buckets are based on KNIA product guide groupings.
-# Sources checked 2026-07-09:
-# - KNIA FAQ product buckets:
-#   https://consumer.knia.or.kr/consumer/center/faq.do
-#   (자동차 / 상해·질병·실손 / 저축·연금 / 배상·화재·기타)
-# - KNIA long-term product guide:
-#   https://consumer.knia.or.kr/consumer/insurance-guide/0201.do
-#   (화재보험 / 종합보험 / 상해‧질병보험 / 간병보험 / 비용보험 / 실손의료보험)
-# - Insurance Business Act Article 2 and 4:
-#   https://www.law.go.kr/lsLinkProc.do?efYd=20140410&joNo=000200&lnkJoNo=undefined&lsClsCd=L&lsId=prec20140410&lsNm=%EB%B3%B4%ED%97%98%EC%97%85%EB%B2%95&mode=11
-#   https://www.law.go.kr/lsLawLinkInfo.do?chrClsCd=010202&lsJoLnkSeq=1000734825
-# Project-specific adaptation:
-# We keep a dedicated 생명·연금 bucket because life-product naming (종신/정기/연금)
-# is explicit in market practice even though KNIA's consumer buckets focus on
-# non-life products.
-CLASSIFICATION_AUTO = "자동차"
-CLASSIFICATION_HEALTH = "상해·질병·실손"
-CLASSIFICATION_LIFE = "생명·연금"
-CLASSIFICATION_OTHER = "배상·화재·기타"
 CLASSIFICATION_UNKNOWN = "미분류"
 
-TAG_ORDER = [
-    "자동차",
-    "실손",
-    "암",
-    "상해",
-    "질병",
-    "간병",
-    "운전자",
-    "화재",
-    "배상책임",
-    "종신",
-    "정기",
-    "연금",
-    "어린이",
-]
+_RULES_PATH = Path(__file__).with_name("policy_classification_rules.json")
+_RAW_RULES = json.loads(_RULES_PATH.read_text(encoding="utf-8"))
+TAG_ORDER: list[str] = _RAW_RULES["tag_order"]
 
-_AUTO_PRODUCT_TERMS = [
-    "자동차보험",
-    "개인용자동차보험",
-    "하이카",
-    "hicar",
-]
-_AUTO_COVERAGE_TERMS = [
-    "대인배상",
-    "대물배상",
-    "자기차량손해",
-    "무보험차상해",
-    "자기신체사고",
-    "자동차상해",
-]
+# The classification buckets are UI-oriented groupings for policy browsing.
+# They are not legal determinations.
+# Rules are based on recurring product and coverage terms in insurer documents.
+# Terminology follows public naming used by regulators, associations, product pages,
+# and statutes.
 
-_INDEMNITY_TERMS = [
-    "실손의료보험",
-    "실손의료비",
-    "실비보험",
-    "급여",
-    "비급여",
-    "자기부담금",
-]
 
-_DRIVER_PRODUCT_TERMS = ["운전자보험", "운전자"]
-_DRIVER_COVERAGE_TERMS = [
-    "벌금",
-    "변호사선임비용",
-    "교통사고처리지원금",
-]
+def _normalize_text(value: str) -> str:
+    return "".join(value.split()).lower()
 
-_FIRE_PRODUCT_TERMS = [
-    "화재보험",
-    "주택화재",
-]
-_FIRE_COVERAGE_TERMS = [
-    "화재손해",
-    "화재배상책임",
-]
-_FIRE_TERMS = [
-    "화재보험",
-    "화재손해",
-    "주택화재",
-    "화재배상책임",
-]
-_LIABILITY_TERMS = [
-    "배상책임",
-    "임차자배상책임",
-]
 
-_LIFE_TERMS = {
-    "종신": ["종신보험", "종신"],
-    "정기": ["정기보험", "정기"],
-    "연금": ["연금보험", "연금"],
-}
+def _normalize_terms(terms: list[str]) -> list[str]:
+    return [_normalize_text(term) for term in terms]
 
-_HEALTH_PRODUCT_TAG_TERMS = {
-    "암": ["암보험", "암진단비"],
-    "상해": ["상해보험", "상해", "후유장해"],
-    "질병": ["건강보험", "질병", "뇌혈관질환", "허혈성심질환", "질병입원일당"],
-    "간병": ["간병보험", "치매", "장기요양", "간병자금"],
-    "어린이": ["어린이보험", "자녀"],
+
+def _normalize_tag_terms(tag_terms: dict[str, list[str]]) -> dict[str, list[str]]:
+    return {tag: _normalize_terms(terms) for tag, terms in tag_terms.items()}
+
+
+_CLASSIFICATION_RULES = {
+    "auto": {
+        **_RAW_RULES["rules"]["auto"],
+        "product_terms": _normalize_terms(_RAW_RULES["rules"]["auto"]["product_terms"]),
+        "coverage_terms": _normalize_terms(_RAW_RULES["rules"]["auto"]["coverage_terms"]),
+    },
+    "driver": {
+        **_RAW_RULES["rules"]["driver"],
+        "product_terms": _normalize_terms(_RAW_RULES["rules"]["driver"]["product_terms"]),
+        "coverage_terms": _normalize_terms(_RAW_RULES["rules"]["driver"]["coverage_terms"]),
+    },
+    "indemnity": {
+        **_RAW_RULES["rules"]["indemnity"],
+        "terms": _normalize_terms(_RAW_RULES["rules"]["indemnity"]["terms"]),
+    },
+    "fire": {
+        **_RAW_RULES["rules"]["fire"],
+        "product_terms": _normalize_terms(_RAW_RULES["rules"]["fire"]["product_terms"]),
+        "coverage_terms": _normalize_terms(_RAW_RULES["rules"]["fire"]["coverage_terms"]),
+        "liability_terms": _normalize_terms(_RAW_RULES["rules"]["fire"]["liability_terms"]),
+    },
+    "life": {
+        **_RAW_RULES["rules"]["life"],
+        "tag_terms": _normalize_tag_terms(_RAW_RULES["rules"]["life"]["tag_terms"]),
+    },
+    "health": {
+        **_RAW_RULES["rules"]["health"],
+        "tag_terms": _normalize_tag_terms(_RAW_RULES["rules"]["health"]["tag_terms"]),
+    },
 }
 
 
@@ -124,75 +81,82 @@ def _add_tag(tags: list[str], tag: str) -> None:
 def classify_policy(
     text: str,
     product_name: str | None = None,
-    insurer_name: str | None = None,
 ) -> PolicyClassification:
-    del insurer_name
+    auto_rule = _CLASSIFICATION_RULES["auto"]
+    driver_rule = _CLASSIFICATION_RULES["driver"]
+    indemnity_rule = _CLASSIFICATION_RULES["indemnity"]
+    fire_rule = _CLASSIFICATION_RULES["fire"]
+    life_rule = _CLASSIFICATION_RULES["life"]
+    health_rule = _CLASSIFICATION_RULES["health"]
 
-    normalized_text = "".join(text.split()).lower()
-    normalized_product_name = (product_name or "").replace(" ", "").lower()
+    normalized_text = _normalize_text(text)
+    normalized_product_name = _normalize_text(product_name or "")
     search_space = f"{normalized_product_name}\n{normalized_text}".strip()
     tags: list[str] = []
 
     auto_strength = _count_matches(
         search_space,
-        [term.lower() for term in _AUTO_PRODUCT_TERMS],
+        auto_rule["product_terms"],
     )
     auto_strength += _count_matches(
         normalized_text,
-        [term.lower() for term in _AUTO_COVERAGE_TERMS],
+        auto_rule["coverage_terms"],
     )
 
     driver_product_hits = _count_matches(
-        normalized_product_name, [term.lower() for term in _DRIVER_PRODUCT_TERMS]
+        normalized_product_name,
+        driver_rule["product_terms"],
     )
-    driver_strength = driver_product_hits * 2
+    driver_strength = driver_product_hits * driver_rule["product_weight"]
     driver_strength += _count_matches(
         normalized_text,
-        [term.lower() for term in _DRIVER_COVERAGE_TERMS],
+        driver_rule["coverage_terms"],
     )
 
     indemnity_strength = _count_matches(
         normalized_text,
-        [term.lower() for term in _INDEMNITY_TERMS],
+        indemnity_rule["terms"],
     )
-    if normalized_product_name and _contains_any(
-        normalized_product_name, [term.lower() for term in _INDEMNITY_TERMS]
-    ):
-        indemnity_strength += 2
+    if normalized_product_name and _contains_any(normalized_product_name, indemnity_rule["terms"]):
+        indemnity_strength += indemnity_rule["product_bonus"]
 
     fire_product_hits = _count_matches(
-        normalized_product_name, [term.lower() for term in _FIRE_PRODUCT_TERMS]
+        normalized_product_name,
+        fire_rule["product_terms"],
     )
-    fire_strength = fire_product_hits * 2
+    fire_strength = fire_product_hits * fire_rule["product_weight"]
     fire_strength += _count_matches(
         normalized_text,
-        [term.lower() for term in _FIRE_COVERAGE_TERMS],
+        fire_rule["coverage_terms"],
     )
     liability_strength = _count_matches(
-        normalized_text, [term.lower() for term in _LIABILITY_TERMS]
+        normalized_text,
+        fire_rule["liability_terms"],
     )
 
     life_tags_found: list[str] = []
-    for tag, terms in _LIFE_TERMS.items():
-        if _contains_any(normalized_product_name, [term.lower() for term in terms]):
+    for tag, terms in life_rule["tag_terms"].items():
+        if _contains_any(normalized_product_name, terms):
             life_tags_found.append(tag)
 
     health_tags_found: list[str] = []
-    for tag, terms in _HEALTH_PRODUCT_TAG_TERMS.items():
-        if _contains_any(search_space, [term.lower() for term in terms]):
+    for tag, terms in health_rule["tag_terms"].items():
+        if _contains_any(search_space, terms):
             health_tags_found.append(tag)
 
-    if driver_strength >= 2:
-        _add_tag(tags, "운전자")
+    if driver_strength >= driver_rule["min_strength"]:
+        for tag in driver_rule["tags"]:
+            _add_tag(tags, tag)
         return {
-            "보험분류": CLASSIFICATION_OTHER,
+            "보험분류": driver_rule["classification"],
             "상품태그": tags,
         }
 
-    if auto_strength >= 3:
-        _add_tag(tags, "자동차")
+    if auto_strength >= auto_rule["min_strength"]:
+        for tag in auto_rule["tags"]:
+            _add_tag(tags, tag)
         return {
-            "보험분류": CLASSIFICATION_AUTO,
+            "보험분류": auto_rule["classification"],
             "상품태그": tags,
         }
 
@@ -201,30 +165,34 @@ def classify_policy(
             if tag in life_tags_found:
                 _add_tag(tags, tag)
         return {
-            "보험분류": CLASSIFICATION_LIFE,
+            "보험분류": life_rule["classification"],
             "상품태그": tags,
         }
 
-    if indemnity_strength >= 2:
-        _add_tag(tags, "실손")
+    if indemnity_strength >= indemnity_rule["min_strength"]:
+        for tag in indemnity_rule["tags"]:
+            _add_tag(tags, tag)
         return {
-            "보험분류": CLASSIFICATION_HEALTH,
+            "보험분류": indemnity_rule["classification"],
             "상품태그": tags,
         }
 
-    if fire_product_hits >= 1 or (fire_strength + liability_strength) >= 2:
-        _add_tag(tags, "화재")
+    if fire_product_hits >= fire_rule["min_product_hits"] or (
+        fire_strength + liability_strength
+    ) >= fire_rule["min_combined_strength"]:
+        for tag in fire_rule["base_tags"]:
+            _add_tag(tags, tag)
         if liability_strength >= 1:
-            _add_tag(tags, "배상책임")
+            _add_tag(tags, fire_rule["liability_tag"])
         return {
-            "보험분류": CLASSIFICATION_OTHER,
+            "보험분류": fire_rule["classification"],
             "상품태그": tags,
         }
 
     if liability_strength >= 2:
-        _add_tag(tags, "배상책임")
+        _add_tag(tags, fire_rule["liability_tag"])
         return {
-            "보험분류": CLASSIFICATION_OTHER,
+            "보험분류": fire_rule["classification"],
             "상품태그": tags,
         }
 
@@ -233,7 +201,7 @@ def classify_policy(
             if tag in health_tags_found:
                 _add_tag(tags, tag)
         return {
-            "보험분류": CLASSIFICATION_HEALTH,
+            "보험분류": health_rule["classification"],
             "상품태그": tags,
         }
 

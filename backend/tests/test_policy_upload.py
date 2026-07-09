@@ -50,25 +50,7 @@ def test_parse_rejects_unreadable_pdf_body() -> None:
     assert response.json()["error"]["message"] == "PDF에서 텍스트를 추출할 수 없습니다."
 
 
-def test_parse_rejects_pdf_without_insurance_policy_signals(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from app.routes import policies
-
-    client = TestClient(app)
-    monkeypatch.setattr(policies, "extract_pdf_text", lambda _data: "회의록 참석자 안건 결정사항")
-
-    response = client.post(
-        "/policies/parse",
-        files={"file": ("meeting.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-    )
-
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "POLICY_DOCUMENT_NOT_DETECTED"
-    assert response.json()["error"]["message"] == "보험증권으로 확인할 수 없습니다."
-
-
-def test_parse_accepts_pdf_with_insurance_policy_signals(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parse_accepts_pdf_and_returns_extracted_summary(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.routes import policies
 
     client = TestClient(app)
@@ -98,20 +80,6 @@ def test_parse_accepts_pdf_with_insurance_policy_signals(monkeypatch: pytest.Mon
     payload = response.json()
     assert payload["status"] == "accepted"
     assert payload["문자수"] == len(policy_text)
-    assert payload["문서판정"]["보험증권추정"] is True
-    assert payload["문서판정"]["점수"] >= 10
-    assert set(payload["문서판정"]["근거"]) >= {
-        "보험증권",
-        "증권번호",
-        "계약자",
-        "피보험자",
-        "보험기간",
-        "보험료",
-        "보험금액",
-        "증권번호값",
-        "보험기간값",
-        "보험료값",
-    }
     assert payload["기본정보"] == {
         "보험사": "삼성화재",
         "상품명": "건강보험",

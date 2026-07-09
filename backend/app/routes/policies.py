@@ -2,7 +2,6 @@ from fastapi import APIRouter, UploadFile
 
 from app.errors import ApiError
 from app.services.pdf_text import extract_pdf_text
-from app.services.policy_document import classify_policy_document
 from app.services.policy_summary import extract_policy_summary
 
 router = APIRouter(prefix="/policies", tags=["policies"])
@@ -41,21 +40,8 @@ async def parse_policy(file: UploadFile) -> dict[str, object]:
             message="PDF에서 텍스트를 추출할 수 없습니다.",
         )
 
-    document_signal = classify_policy_document(text)
-    if not document_signal.is_likely_policy:
-        raise ApiError(
-            status_code=422,
-            code="POLICY_DOCUMENT_NOT_DETECTED",
-            message="보험증권으로 확인할 수 없습니다.",
-        )
-
     return {
         "status": "accepted",
         "문자수": len(text),
-        "문서판정": {
-            "보험증권추정": document_signal.is_likely_policy,
-            "점수": document_signal.score,
-            "근거": document_signal.matched_terms,
-        },
         "기본정보": extract_policy_summary(text),
     }

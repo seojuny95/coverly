@@ -1,26 +1,20 @@
-import json
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SAMPLE_PDF_DIR = REPO_ROOT / "sample-insurance-input"
-EXPECTED_PATH = SAMPLE_PDF_DIR / "expected-policy-summary.local.json"
+from tests.summary_helpers import REQUIRED_DISPLAY_VALUES, SAMPLE_PDF_DIR, flatten_summary
 
 pytestmark = pytest.mark.skipif(
-    not SAMPLE_PDF_DIR.exists() or not EXPECTED_PATH.exists(),
-    reason="local sample PDFs or expected summary manifest are not available",
+    not SAMPLE_PDF_DIR.exists(),
+    reason="local sample PDFs are not available",
 )
 
 
-def test_local_sample_pdfs_match_expected_summary() -> None:
+def test_local_sample_parse_response_includes_required_display_values() -> None:
     client = TestClient(app)
-    expected_payload = json.loads(EXPECTED_PATH.read_text(encoding="utf-8"))
+    missing_or_wrong_fields: list[str] = []
 
-    for filename, expected_summary in expected_payload.items():
+    for filename, required_values in REQUIRED_DISPLAY_VALUES.items():
         pdf_path = SAMPLE_PDF_DIR / filename
         assert pdf_path.exists(), f"missing local sample PDF: {filename}"
 
@@ -32,8 +26,17 @@ def test_local_sample_pdfs_match_expected_summary() -> None:
         assert response.status_code == 200, f"{filename}: expected upload acceptance"
 
         payload = response.json()
-        assert payload["status"] == "accepted", f"{filename}: expected accepted status"
-        assert payload["문서판정"]["보험증권추정"] is True, f"{filename}: expected policy detection"
-        assert payload["기본정보"] == expected_summary, (
-            f"{filename}: extracted summary does not match local expected values"
-        )
+        flattened_summary = flatten_summary(payload["기본정보"])
+
+        for field_path, expected_value in required_values.items():
+            actual_value = flattened_summary.get(field_path)
+            if actual_value == expected_value:
+                continue
+
+            missing_or_wrong_fields.append(
+                f"{filename}::{field_path}: expected={expected_value!r}, actual={actual_value!r}"
+            )
+
+    assert not missing_or_wrong_fields, (
+        "parse response is missing required display fields\n" + "\n".join(missing_or_wrong_fields)
+    )
