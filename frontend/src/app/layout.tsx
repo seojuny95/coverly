@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Coverly",
-  description: "보험 보장 분석을 위한 근거 기반 앱",
+  description: "보험증권을 올리면 내 보험을 보기 쉽게 정리해주는 앱",
 };
 
 export default function RootLayout({

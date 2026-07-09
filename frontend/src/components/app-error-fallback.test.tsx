@@ -8,7 +8,7 @@ describe("AppErrorFallback", () => {
   test("shows a safe recovery message without raw error details", () => {
     render(<AppErrorFallback digest="digest-123" />);
 
-    expect(screen.getByText("화면을 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("화면을 불러오지 못했어요.")).toBeInTheDocument();
     expect(screen.getByText("오류 ID: digest-123")).toBeInTheDocument();
     expect(screen.queryByText("Traceback")).not.toBeInTheDocument();
   });
@@ -18,7 +18,7 @@ describe("AppErrorFallback", () => {
     const onRetry = vi.fn();
     render(<AppErrorFallback onRetry={onRetry} />);
 
-    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+    await user.click(screen.getByRole("button", { name: "다시 시도하기" }));
 
     expect(onRetry).toHaveBeenCalledOnce();
   });
