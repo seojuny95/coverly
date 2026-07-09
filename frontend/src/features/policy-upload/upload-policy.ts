@@ -9,11 +9,43 @@ export type PolicyUploadResult = {
 };
 
 type ApiErrorResponse = {
-  detail?: string;
+  error?: {
+    code?: string;
+    message?: string;
+    request_id?: string;
+  };
 };
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+const GENERIC_UPLOAD_MESSAGE = "업로드에 실패했습니다.";
+
+export class UploadPolicyError extends Error {
+  readonly code: string;
+  readonly requestId?: string;
+  readonly status?: number;
+  readonly userMessage: string;
+
+  constructor({
+    code,
+    requestId,
+    status,
+    userMessage,
+  }: {
+    code: string;
+    requestId?: string;
+    status?: number;
+    userMessage: string;
+  }) {
+    super(userMessage);
+    this.name = "UploadPolicyError";
+    this.code = code;
+    this.requestId = requestId;
+    this.status = status;
+    this.userMessage = userMessage;
+  }
+}
 
 export async function uploadPolicy(file: File): Promise<PolicyUploadResult> {
   const formData = new FormData();
@@ -26,20 +58,30 @@ export async function uploadPolicy(file: File): Promise<PolicyUploadResult> {
       body: formData,
     });
   } catch {
-    throw new Error(
-      "서버에 연결할 수 없습니다. 백엔드 실행 상태를 확인해주세요.",
-    );
+    throw new UploadPolicyError({
+      code: "UPLOAD_NETWORK_ERROR",
+      userMessage: "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+    });
   }
 
   if (!response.ok) {
-    let detail = "업로드에 실패했습니다.";
+    let code = "UPLOAD_FAILED";
+    let requestId = response.headers.get("x-request-id") ?? undefined;
+    let userMessage = GENERIC_UPLOAD_MESSAGE;
     try {
       const error = (await response.json()) as ApiErrorResponse;
-      detail = error.detail ?? detail;
+      code = error.error?.code ?? code;
+      requestId = error.error?.request_id ?? requestId;
+      userMessage = error.error?.message ?? userMessage;
     } catch {
       // Keep the generic message when the backend response is not JSON.
     }
-    throw new Error(detail);
+    throw new UploadPolicyError({
+      code,
+      requestId,
+      status: response.status,
+      userMessage,
+    });
   }
 
   return (await response.json()) as PolicyUploadResult;

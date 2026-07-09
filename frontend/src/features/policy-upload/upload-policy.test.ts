@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { uploadPolicy } from "./upload-policy";
+import { UploadPolicyError, uploadPolicy } from "./upload-policy";
 
 const policyFile = new File(["%PDF-1.7"], "policy.pdf", {
   type: "application/pdf",
@@ -36,12 +36,18 @@ describe("uploadPolicy", () => {
     expect(result.문서판정.근거).toEqual(["보험증권"]);
   });
 
-  test("throws backend detail when the parse endpoint rejects the file", async () => {
+  test("throws a typed user-facing error when the parse endpoint rejects the file", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
         new Response(
-          JSON.stringify({ detail: "보험증권으로 확인할 수 없습니다." }),
+          JSON.stringify({
+            error: {
+              code: "POLICY_DOCUMENT_NOT_DETECTED",
+              message: "보험증권으로 확인할 수 없습니다.",
+              request_id: "req_123",
+            },
+          }),
           {
             status: 422,
           },
@@ -49,9 +55,33 @@ describe("uploadPolicy", () => {
       ),
     );
 
-    await expect(uploadPolicy(policyFile)).rejects.toThrow(
-      "보험증권으로 확인할 수 없습니다.",
+    await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
+      code: "POLICY_DOCUMENT_NOT_DETECTED",
+      requestId: "req_123",
+      status: 422,
+      userMessage: "보험증권으로 확인할 수 없습니다.",
+      message: "보험증권으로 확인할 수 없습니다.",
+    });
+  });
+
+  test("does not expose unsafe backend details as the user-facing message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            detail: "Traceback: /tmp/raw-policy.pdf parse failed",
+          }),
+          { status: 500 },
+        ),
+      ),
     );
+
+    await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
+      code: "UPLOAD_FAILED",
+      status: 500,
+      userMessage: "업로드에 실패했습니다.",
+    });
   });
 
   test("throws a generic message when the backend error response is not JSON", async () => {
@@ -64,9 +94,14 @@ describe("uploadPolicy", () => {
         ),
     );
 
-    await expect(uploadPolicy(policyFile)).rejects.toThrow(
-      "업로드에 실패했습니다.",
-    );
+    const error = await uploadPolicy(policyFile).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(UploadPolicyError);
+    expect(error).toMatchObject({
+      code: "UPLOAD_FAILED",
+      status: 500,
+      userMessage: "업로드에 실패했습니다.",
+    });
   });
 
   test("throws a connection message when the backend cannot be reached", async () => {
@@ -75,8 +110,9 @@ describe("uploadPolicy", () => {
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
     );
 
-    await expect(uploadPolicy(policyFile)).rejects.toThrow(
-      "서버에 연결할 수 없습니다. 백엔드 실행 상태를 확인해주세요.",
-    );
+    await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
+      code: "UPLOAD_NETWORK_ERROR",
+      userMessage: "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+    });
   });
 });

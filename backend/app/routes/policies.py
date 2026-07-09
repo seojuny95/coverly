@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, UploadFile
 
+from app.errors import ApiError
 from app.services.pdf_text import extract_pdf_text
 from app.services.policy_document import classify_policy_document
 
@@ -14,9 +15,17 @@ async def _read_pdf(file: UploadFile) -> bytes:
     while chunk := await file.read(_CHUNK_SIZE):
         data += chunk
         if len(data) > MAX_PDF_BYTES:
-            raise HTTPException(status_code=413, detail="파일이 너무 큽니다 (최대 10MB).")
+            raise ApiError(
+                status_code=413,
+                code="PDF_TOO_LARGE",
+                message="파일이 너무 큽니다 (최대 10MB).",
+            )
     if not data.startswith(b"%PDF-"):
-        raise HTTPException(status_code=400, detail="유효한 PDF 파일이 아닙니다.")
+        raise ApiError(
+            status_code=400,
+            code="INVALID_PDF",
+            message="유효한 PDF 파일이 아닙니다.",
+        )
     return data
 
 
@@ -25,11 +34,19 @@ async def parse_policy(file: UploadFile) -> dict[str, object]:
     data = await _read_pdf(file)
     text = extract_pdf_text(data)
     if not text:
-        raise HTTPException(status_code=422, detail="PDF에서 텍스트를 추출할 수 없습니다.")
+        raise ApiError(
+            status_code=422,
+            code="PDF_TEXT_EXTRACTION_FAILED",
+            message="PDF에서 텍스트를 추출할 수 없습니다.",
+        )
 
     document_signal = classify_policy_document(text)
     if not document_signal.is_likely_policy:
-        raise HTTPException(status_code=422, detail="보험증권으로 확인할 수 없습니다.")
+        raise ApiError(
+            status_code=422,
+            code="POLICY_DOCUMENT_NOT_DETECTED",
+            message="보험증권으로 확인할 수 없습니다.",
+        )
 
     return {
         "status": "accepted",

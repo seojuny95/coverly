@@ -4,6 +4,7 @@ import { type DragEvent, type FormEvent, useRef, useState } from "react";
 
 import {
   type PolicyUploadResult,
+  UploadPolicyError,
   uploadPolicy as uploadPolicyRequest,
 } from "./upload-policy";
 
@@ -85,7 +86,11 @@ export function UploadForm({
     try {
       setResult(await uploadPolicy(selectedFile));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "업로드에 실패했습니다.");
+      if (err instanceof UploadPolicyError) {
+        setError(err.userMessage);
+      } else {
+        setError(err instanceof Error ? err.message : "업로드에 실패했습니다.");
+      }
     } finally {
       setIsUploading(false);
     }

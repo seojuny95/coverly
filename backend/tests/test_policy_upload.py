@@ -13,7 +13,13 @@ def test_parse_rejects_non_pdf_upload() -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "유효한 PDF 파일이 아닙니다."
+    assert response.json() == {
+        "error": {
+            "code": "INVALID_PDF",
+            "message": "유효한 PDF 파일이 아닙니다.",
+            "request_id": response.headers["x-request-id"],
+        },
+    }
 
 
 def test_parse_rejects_pdf_larger_than_limit() -> None:
@@ -26,7 +32,9 @@ def test_parse_rejects_pdf_larger_than_limit() -> None:
     )
 
     assert response.status_code == 413
-    assert response.json()["detail"] == "파일이 너무 큽니다 (최대 10MB)."
+    assert response.json()["error"]["code"] == "PDF_TOO_LARGE"
+    assert response.json()["error"]["message"] == "파일이 너무 큽니다 (최대 10MB)."
+    assert response.json()["error"]["request_id"] == response.headers["x-request-id"]
 
 
 def test_parse_rejects_unreadable_pdf_body() -> None:
@@ -38,7 +46,8 @@ def test_parse_rejects_unreadable_pdf_body() -> None:
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "PDF에서 텍스트를 추출할 수 없습니다."
+    assert response.json()["error"]["code"] == "PDF_TEXT_EXTRACTION_FAILED"
+    assert response.json()["error"]["message"] == "PDF에서 텍스트를 추출할 수 없습니다."
 
 
 def test_parse_rejects_pdf_without_insurance_policy_signals(
@@ -55,7 +64,8 @@ def test_parse_rejects_pdf_without_insurance_policy_signals(
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "보험증권으로 확인할 수 없습니다."
+    assert response.json()["error"]["code"] == "POLICY_DOCUMENT_NOT_DETECTED"
+    assert response.json()["error"]["message"] == "보험증권으로 확인할 수 없습니다."
 
 
 def test_parse_accepts_pdf_with_insurance_policy_signals(monkeypatch: pytest.MonkeyPatch) -> None:

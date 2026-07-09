@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.errors import ApiError, api_error_handler, request_id_middleware
 from app.routes.policies import router as policies_router
 
 app = FastAPI(title="Coverly API")
@@ -10,6 +11,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(request_id_middleware)
+app.add_exception_handler(ApiError, api_error_handler)
 app.include_router(policies_router)
 
 
