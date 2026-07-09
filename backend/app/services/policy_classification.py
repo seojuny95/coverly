@@ -177,9 +177,10 @@ def classify_policy(
             "상품태그": tags,
         }
 
-    if fire_product_hits >= fire_rule["min_product_hits"] or (
-        fire_strength + liability_strength
-    ) >= fire_rule["min_combined_strength"]:
+    if (
+        fire_product_hits >= fire_rule["min_product_hits"]
+        or (fire_strength + liability_strength) >= fire_rule["min_combined_strength"]
+    ):
         for tag in fire_rule["base_tags"]:
             _add_tag(tags, tag)
         if liability_strength >= 1:

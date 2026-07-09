@@ -52,6 +52,5 @@ def test_local_sample_policy_summary_field_accuracy() -> None:
     assert not mismatches, (
         "sample PDF summary mismatches detected\n"
         f"overall accuracy={matched_fields}/{total_fields} ({accuracy:.1%})\n"
-        f"field accuracy: {', '.join(field_accuracy_lines)}\n"
-        + "\n".join(mismatches)
+        f"field accuracy: {', '.join(field_accuracy_lines)}\n" + "\n".join(mismatches)
     )
