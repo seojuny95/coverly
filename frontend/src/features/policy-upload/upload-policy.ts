@@ -22,10 +22,19 @@ export type PolicyBasicInfo = {
   보험료?: PolicyPremium;
 };
 
+export type PolicyCoverage = {
+  담보명: string;
+  가입금액: string;
+  보장내용: string | null;
+  해설: string | null;
+};
+
 export type PolicyUploadResult = {
   status: "accepted";
   문자수: number;
   기본정보?: PolicyBasicInfo;
+  보장목록?: PolicyCoverage[];
+  분석상태?: "완료" | "부분";
 };
 
 type ApiErrorResponse = {
