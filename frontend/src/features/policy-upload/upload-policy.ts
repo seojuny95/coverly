@@ -14,6 +14,10 @@ type PolicyBasicInfo = {
   증권번호?: string;
   계약자?: string;
   피보험자?: string;
+  보험분류?: string;
+  상품태그?: string[];
+  납입기간?: string;
+  만기일?: string;
   보험기간?: PolicyPeriod;
   보험료?: PolicyPremium;
 };

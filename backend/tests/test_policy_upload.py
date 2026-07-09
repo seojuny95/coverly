@@ -122,8 +122,11 @@ def test_parse_accepts_pdf_with_insurance_policy_signals(monkeypatch: pytest.Mon
             "시작일": "2026-01-01",
             "종료일": "2027-01-01",
         },
+        "만기일": "2027-01-01",
         "보험료": {
             "금액": 120000,
             "납입주기": "월납",
         },
+        "보험분류": "상해·질병·실손",
+        "상품태그": ["질병"],
     }

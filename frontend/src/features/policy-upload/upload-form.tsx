@@ -226,7 +226,17 @@ function buildSummaryItems(result: PolicyUploadResult): Array<{
   const items = [
     { label: "보험사", value: basicInfo.보험사 },
     { label: "상품명", value: basicInfo.상품명 },
+    { label: "보험분류", value: basicInfo.보험분류 },
+    {
+      label: "상품태그",
+      value:
+        basicInfo.상품태그 && basicInfo.상품태그.length > 0
+          ? basicInfo.상품태그.join(", ")
+          : undefined,
+    },
     { label: "증권번호", value: basicInfo.증권번호 },
+    { label: "납입기간", value: basicInfo.납입기간 },
+    { label: "만기일", value: basicInfo.만기일 },
     {
       label: "보험기간",
       value:

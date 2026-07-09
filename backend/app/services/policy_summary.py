@@ -1,6 +1,8 @@
 import re
 from typing import TypedDict
 
+from app.services.policy_classification import classify_policy
+
 
 class CoveragePeriod(TypedDict, total=False):
     시작일: str
@@ -19,7 +21,11 @@ class PolicySummary(TypedDict, total=False):
     계약자: str
     피보험자: str
     보험기간: CoveragePeriod
+    만기일: str
+    납입기간: str
     보험료: PremiumSummary
+    보험분류: str
+    상품태그: list[str]
 
 
 _FIELD_LABELS: dict[str, list[str]] = {
@@ -376,6 +382,45 @@ def _extract_premium(text: str) -> PremiumSummary | None:
     return premium
 
 
+def _extract_payment_period(text: str) -> str | None:
+    patterns = [
+        r"\b(\d+년납)\b",
+        r"\b(전기납)\b",
+        r"\b(일시납)\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+
+    collapsed = " ".join(_normalized_lines(text))
+    contract_terms = _extract_between_markers(
+        collapsed,
+        ["계약사항"],
+        ["만기보험금수익자", "가입정보", "보험료", "담보정보"],
+    )
+    if contract_terms:
+        for pattern in patterns:
+            match = re.search(pattern, contract_terms)
+            if match:
+                return match.group(1)
+
+    return None
+
+
+def _extract_maturity_date(
+    text: str,
+    coverage_period: CoveragePeriod | None,
+) -> str | None:
+    if coverage_period and coverage_period.get("종료일"):
+        return coverage_period["종료일"]
+
+    if re.search(r"\b종신\b", text):
+        return None
+
+    return None
+
+
 def _apply_hyundai_auto_layout_overrides(text: str, summary: PolicySummary) -> None:
     lines = _normalized_lines(text)
     try:
@@ -449,10 +494,26 @@ def extract_policy_summary(text: str) -> PolicySummary:
     if coverage_period:
         summary["보험기간"] = coverage_period
 
+    maturity_date = _extract_maturity_date(text, coverage_period)
+    if maturity_date:
+        summary["만기일"] = maturity_date
+
     premium = _extract_premium(text)
     if premium:
         summary["보험료"] = premium
 
+    payment_period = _extract_payment_period(text)
+    if payment_period:
+        summary["납입기간"] = payment_period
+
     _apply_hyundai_auto_layout_overrides(text, summary)
+
+    classification = classify_policy(
+        text=text,
+        product_name=summary.get("상품명"),
+        insurer_name=summary.get("보험사"),
+    )
+    summary["보험분류"] = classification["보험분류"]
+    summary["상품태그"] = classification["상품태그"]
 
     return summary

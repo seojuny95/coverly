@@ -25,10 +25,13 @@ def test_extract_policy_summary_reads_core_fields() -> None:
             "시작일": "2026-01-01",
             "종료일": "2027-01-01",
         },
+        "만기일": "2027-01-01",
         "보험료": {
             "금액": 120000,
             "납입주기": "월납",
         },
+        "보험분류": "미분류",
+        "상품태그": [],
     }
 
 
@@ -47,6 +50,9 @@ def test_extract_policy_summary_handles_missing_fields_without_guessing() -> Non
             "시작일": "2026-02-03",
             "종료일": "2027-02-03",
         },
+        "만기일": "2027-02-03",
+        "보험분류": "미분류",
+        "상품태그": [],
     }
 
 
@@ -70,6 +76,8 @@ def test_extract_policy_summary_reads_multiline_labels() -> None:
             "금액": 98765,
             "납입주기": "연납",
         },
+        "보험분류": "미분류",
+        "상품태그": [],
     }
 
 
@@ -83,6 +91,8 @@ def test_extract_policy_summary_treats_contract_number_as_policy_number() -> Non
 
     assert result == {
         "증권번호": "POLICY-TEST-005",
+        "보험분류": "미분류",
+        "상품태그": [],
     }
 
 
@@ -108,8 +118,12 @@ def test_extract_policy_summary_reads_collapsed_pdf_text() -> None:
             "시작일": "2024-07-26",
             "종료일": "2044-07-26",
         },
+        "만기일": "2044-07-26",
+        "납입기간": "20년납",
         "보험료": {
             "금액": 11670,
             "납입주기": "월납",
         },
+        "보험분류": "배상·화재·기타",
+        "상품태그": ["운전자"],
     }

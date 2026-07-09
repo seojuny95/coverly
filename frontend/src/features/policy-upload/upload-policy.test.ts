@@ -22,6 +22,10 @@ describe("uploadPolicy", () => {
             보험사: "삼성화재",
             상품명: "건강보험",
             증권번호: "POLICY-TEST-001",
+            보험분류: "상해·질병·실손",
+            상품태그: ["질병"],
+            납입기간: "20년납",
+            만기일: "2027-01-01",
             보험기간: {
               시작일: "2026-01-01",
               종료일: "2027-01-01",
@@ -48,6 +52,7 @@ describe("uploadPolicy", () => {
     );
     expect(result.문서판정.근거).toEqual(["보험증권"]);
     expect(result.기본정보?.보험사).toBe("삼성화재");
+    expect(result.기본정보?.보험분류).toBe("상해·질병·실손");
   });
 
   test("throws a typed user-facing error when the parse endpoint rejects the file", async () => {

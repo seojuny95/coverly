@@ -126,7 +126,11 @@ describe("UploadForm", () => {
       기본정보: {
         보험사: "삼성화재",
         상품명: "건강보험",
+        보험분류: "상해·질병·실손",
+        상품태그: ["질병", "어린이"],
         증권번호: "POLICY-TEST-001",
+        납입기간: "20년납",
+        만기일: "2027-01-01",
         보험기간: {
           시작일: "2026-01-01",
           종료일: "2027-01-01",
@@ -151,7 +155,11 @@ describe("UploadForm", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("삼성화재")).toBeInTheDocument();
     expect(screen.getByText("건강보험")).toBeInTheDocument();
+    expect(screen.getByText("상해·질병·실손")).toBeInTheDocument();
+    expect(screen.getByText("질병, 어린이")).toBeInTheDocument();
     expect(screen.getByText("POLICY-TEST-001")).toBeInTheDocument();
+    expect(screen.getByText("20년납")).toBeInTheDocument();
+    expect(screen.getByText("2027-01-01")).toBeInTheDocument();
     expect(screen.getByText("2026-01-01 - 2027-01-01")).toBeInTheDocument();
     expect(screen.getByText("월납 120,000원")).toBeInTheDocument();
     expect(screen.queryByText("Verification")).not.toBeInTheDocument();
@@ -190,6 +198,9 @@ describe("UploadForm", () => {
                 },
                 기본정보: {
                   보험사: "삼성화재",
+                  보험분류: "상해·질병·실손",
+                  상품태그: ["질병"],
+                  만기일: "2027-01-01",
                 },
               }),
             50,
