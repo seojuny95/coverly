@@ -1,14 +1,14 @@
-type PolicyPeriod = {
+export type PolicyPeriod = {
   시작일?: string;
   종료일?: string;
 };
 
-type PolicyPremium = {
+export type PolicyPremium = {
   금액?: number;
   납입주기?: string;
 };
 
-type PolicyBasicInfo = {
+export type PolicyBasicInfo = {
   보험사?: string;
   상품명?: string;
   증권번호?: string;
