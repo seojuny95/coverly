@@ -20,6 +20,8 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 const GENERIC_UPLOAD_MESSAGE = "업로드에 실패했습니다.";
+const SERVER_UPLOAD_MESSAGE =
+  "서버에서 업로드를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.";
 
 export class UploadPolicyError extends Error {
   readonly code: string;
@@ -72,7 +74,11 @@ export async function uploadPolicy(file: File): Promise<PolicyUploadResult> {
       const error = (await response.json()) as ApiErrorResponse;
       code = error.error?.code ?? code;
       requestId = error.error?.request_id ?? requestId;
-      userMessage = error.error?.message ?? userMessage;
+      if (response.status >= 500) {
+        userMessage = SERVER_UPLOAD_MESSAGE;
+      } else {
+        userMessage = error.error?.message ?? userMessage;
+      }
     } catch {
       // Keep the generic message when the backend response is not JSON.
     }

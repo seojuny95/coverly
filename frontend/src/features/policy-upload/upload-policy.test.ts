@@ -80,7 +80,34 @@ describe("uploadPolicy", () => {
     await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
       code: "UPLOAD_FAILED",
       status: 500,
-      userMessage: "업로드에 실패했습니다.",
+      userMessage:
+        "서버에서 업로드를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
+    });
+  });
+
+  test("uses a stable user-facing message for structured 500 responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "PDF_PARSE_CRASHED",
+              message: "worker timeout at /tmp/policy.pdf",
+              request_id: "req_500",
+            },
+          }),
+          { status: 500 },
+        ),
+      ),
+    );
+
+    await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
+      code: "PDF_PARSE_CRASHED",
+      requestId: "req_500",
+      status: 500,
+      userMessage:
+        "서버에서 업로드를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
     });
   });
 
