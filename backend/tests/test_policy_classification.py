@@ -13,7 +13,7 @@ def test_classify_policy_detects_auto_policy_from_product_and_coverages() -> Non
 
     assert result == {
         "보험분류": "자동차",
-        "상품태그": [],
+        "상품태그": ["자동차"],
     }
 
 

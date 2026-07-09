@@ -29,7 +29,7 @@ def test_local_sample_policy_pdfs_match_expected_classification() -> None:
         },
         "현대해상자동차보험.pdf": {
             "보험분류": "자동차",
-            "상품태그포함": set(),
+            "상품태그포함": {"자동차"},
             "상품태그제외": {"운전자", "실손", "종신"},
         },
         "흥국보험증권.pdf": {

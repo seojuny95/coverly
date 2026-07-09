@@ -28,6 +28,7 @@ CLASSIFICATION_OTHER = "배상·화재·기타"
 CLASSIFICATION_UNKNOWN = "미분류"
 
 TAG_ORDER = [
+    "자동차",
     "실손",
     "암",
     "상해",
@@ -189,6 +190,7 @@ def classify_policy(
         }
 
     if auto_strength >= 3:
+        _add_tag(tags, "자동차")
         return {
             "보험분류": CLASSIFICATION_AUTO,
             "상품태그": tags,
