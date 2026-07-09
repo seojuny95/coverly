@@ -1219,6 +1219,8 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 이 태스크는 **기능 전체(PDF → 보장목록)를 실증권으로 검증**하는 회귀 게이트다. Task 2가 담보표 감지(마크다운 소스)를 이미 실샘플로 덮으므로, 여기서는 LLM까지 포함한 끝단 결과만 본다. LLM 비용이 있어 키가 있을 때만 실행(기존 `test_local_*` 정책과 동일).
 
+> **자동차 증권 제외 (품질 게이트 판정 결과)**: 실행 결과 자동차(현대해상) 증권은 개인보험 담보 모델과 구조가 근본적으로 달라(할인특약·특별요율·서비스특약이 담보로 섞이고, 금액이 전부 그라운딩 실패, 섹션 헤더 행이 담보로 전사됨) Phase 1 범위에서 제외한다. 이는 규제로 표준화된 자동차보험 문서 도메인 공통 특성이라 다른 손보사에서도 재현된다. 자동차 전용 경로(차량정보 + 담보/할인/서비스/요율 분리 + 표준약관 금액)는 후속 Phase. 따라서 이 게이트는 개인보험 3종만 검증하고, 런타임에서도 자동차 증권은 보장목록을 비워 반환한다(자동차 게이트 태스크 참조).
+
 - [ ] **Step 1: 테스트 작성**
 
 `backend/tests/test_local_coverage_pdfs.py`:
@@ -1245,10 +1247,13 @@ pytestmark = [
     ),
 ]
 
+# Personal-insurance policies only. Auto policies (자동차) are out of Phase 1
+# scope — their document structure (riders/rates as coverages, standard-clause
+# amounts) needs a dedicated path; the runtime returns an empty coverage list
+# for them (see the auto-gate task).
 SAMPLE_FILENAMES = [
     "DB운전자보험증권.pdf",
     "NH농협보험증권.pdf",
-    "현대해상자동차보험.pdf",
     "흥국보험증권.pdf",
 ]
 
@@ -1273,7 +1278,7 @@ def test_local_samples_extract_nonempty_coverages(filename: str) -> None:
 cd backend && uv run pytest tests/test_local_coverage_pdfs.py -v
 ```
 
-Expected: 실증권 4종의 보장목록이 비어있지 않고, 모든 담보가 보장내용 또는 해설을 가진다. 키가 없으면 skip. 실패하면 (Global Constraints에 따라) **멈추고 사용자에게 보고** — 헤더 어휘·프롬프트 조정은 사용자 확인 후.
+Expected: 개인보험 3종(DB·NH·흥국)의 보장목록이 비어있지 않고, 모든 담보가 보장내용 또는 해설을 가진다. 키가 없으면 skip. 실패하면 (Global Constraints에 따라) **멈추고 사용자에게 보고**.
 
 - [ ] **Step 3: Commit**
 
@@ -1518,16 +1523,20 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 import { PolicyCoverageList } from "./policy-coverage-list";
 ```
 
-`PolicyDetail` 컴포넌트의 `</dl>` 닫는 태그 바로 뒤(같은 래퍼 div 안)에 추가:
+`PolicyDetail` 컴포넌트의 `</dl>` 닫는 태그 바로 뒤(같은 래퍼 div 안)에 추가. **자동차 증권은 Phase 1에서 보장목록을 뽑지 않으므로(빈 값) 보장 섹션 자체를 렌더하지 않는다** — 자동차에 "보장 내용을 찾지 못했어요" 빈 상태를 보이면 오해를 주기 때문:
 
 ```tsx
-      <div className="mt-6">
-        <h3 className="text-xs font-medium text-[#111827]/70">보장 내용</h3>
-        <div className="mt-2 rounded-[8px] border border-[#111827]/10 bg-white px-5 py-4">
-          <PolicyCoverageList coverages={policy.result.보장목록} />
+      {basicInfo?.보험분류 !== "자동차" ? (
+        <div className="mt-6">
+          <h3 className="text-xs font-medium text-[#111827]/70">보장 내용</h3>
+          <div className="mt-2 rounded-[8px] border border-[#111827]/10 bg-white px-5 py-4">
+            <PolicyCoverageList coverages={policy.result.보장목록} />
+          </div>
         </div>
-      </div>
+      ) : null}
 ```
+
+(`basicInfo`는 `PolicyDetail`가 이미 `const basicInfo = policy.result.기본정보`로 참조하고 있다.)
 
 - [ ] **Step 2: 프론트 전체 게이트**
 
@@ -1560,6 +1569,120 @@ cd frontend && pnpm dev
 
 ```bash
 cd frontend && git add -A && git commit -m "feat: show coverage list in policy analysis detail
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 11: 자동차 증권 보장목록 게이트 (라우트)
+
+> **추가된 태스크** — Task 8 품질 게이트가 자동차 증권의 낮은 추출 품질을 드러내, 자동차를 Phase 1 범위에서 제외하기로 결정했다(Task 8 상단 노트 참조). 이 태스크는 런타임에서 자동차 증권의 비싼 담보 추출을 건너뛰고 빈 보장목록을 반환한다. 실행 순서는 프론트(Task 9·10)보다 먼저다.
+
+**Files:**
+- Modify: `backend/app/routes/policies.py` (`parse_policy`)
+- Test: `backend/tests/test_policy_upload.py` (기존 파일에 테스트 1개 추가)
+
+**Interfaces:**
+- Consumes: `extract_policy_summary` (보험분류 포함), `extract_coverages`, `STATUS_OK`, `Coverage`
+- 계약(응답 형태)은 Task 7과 동일. 자동차 분류일 때 `보장목록=[]`, `분석상태="완료"`.
+
+**설계 노트:** 분류는 요약(`extract_policy_summary`)이 만드는 `보험분류`가 authoritative다. 그래서 요약을 먼저 실행해 분류를 얻고, 자동차면 담보 파이프라인을 아예 호출하지 않는다(비용 절감 + 프론트가 보는 분류와 일관). 이 때문에 Task 7의 `asyncio.gather` 동시 실행은 순차 실행으로 바뀐다(요약은 대부분 로컬이라 지연 영향은 작고, 자동차는 오히려 담보 LLM 호출을 통째로 스킵해 빨라진다).
+
+- [ ] **Step 1: 실패하는 테스트 추가**
+
+`backend/tests/test_policy_upload.py` 끝에 추가. 실제 자동차 분류 로직에 의존하지 않도록 요약을 주입한다. 자동차인데도 `extract_coverages`가 (쓰이면) 쓰레기를 반환하도록 두고, **응답 보장목록이 빈 값인지**로 게이트를 검증한다(호출 여부가 아니라 결과로).
+
+```python
+def test_parse_skips_coverage_for_auto_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routes import policies
+
+    client = TestClient(app)
+    monkeypatch.setattr(policies, "extract_pdf_text", lambda _data: "자동차 증권 텍스트")
+    monkeypatch.setattr(
+        policies,
+        "extract_policy_summary",
+        lambda _text: {"보험분류": "자동차", "상품명": "Hicar 다이렉트개인용"},
+    )
+    # If the route wrongly ran coverage extraction for an auto policy, this junk
+    # would surface in the response; the gate must return an empty 보장목록 instead.
+    monkeypatch.setattr(
+        policies,
+        "extract_coverages",
+        lambda _data: (
+            [{"담보명": "잘못된담보", "가입금액": "1원", "보장내용": None, "해설": None}],
+            "완료",
+        ),
+    )
+
+    response = client.post(
+        "/policies/parse",
+        files={"file": ("auto.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["기본정보"]["보험분류"] == "자동차"
+    assert payload["보장목록"] == []
+    assert payload["분석상태"] == "완료"
+```
+
+- [ ] **Step 2: 실패 확인**
+
+```bash
+cd backend && uv run pytest tests/test_policy_upload.py::test_parse_skips_coverage_for_auto_policy -v
+```
+
+Expected: FAIL — 현재 라우트는 분류와 무관하게 `extract_coverages` 결과를 넣으므로 `보장목록`이 `[{"담보명": "잘못된담보", ...}]`가 되어 `== []` 단언이 깨진다.
+
+- [ ] **Step 3: 라우트 수정**
+
+`backend/app/routes/policies.py` — import에 `from app.services.coverage.extraction import STATUS_OK, extract_coverages`(기존 `extract_coverages` 임포트를 확장)와 `from app.services.coverage.types import Coverage`를 두고, `parse_policy`를 다음으로 교체:
+
+```python
+@router.post("/parse")
+async def parse_policy(file: UploadFile) -> dict[str, object]:
+    data = await _read_pdf(file)
+    text = extract_pdf_text(data)
+    if not text:
+        raise ApiError(
+            status_code=422,
+            code="PDF_TEXT_EXTRACTION_FAILED",
+            message="PDF에서 텍스트를 추출할 수 없습니다.",
+        )
+
+    # 보험분류 is authoritative from the summary, so run it first. Auto policies
+    # are out of Phase 1 coverage scope (their riders/rates don't fit the
+    # personal-coverage model), so skip the expensive coverage extraction for them.
+    summary = await asyncio.to_thread(extract_policy_summary, text)
+    if summary.get("보험분류") == "자동차":
+        coverages: list[Coverage] = []
+        analysis_status = STATUS_OK
+    else:
+        coverages, analysis_status = await asyncio.to_thread(extract_coverages, data)
+
+    return {
+        "status": "accepted",
+        "문자수": len(text),
+        "기본정보": summary,
+        "보장목록": coverages,
+        "분석상태": analysis_status,
+    }
+```
+
+- [ ] **Step 4: 통과 확인 + 전체 게이트**
+
+```bash
+cd backend && uv run pytest tests/test_policy_upload.py -v
+cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run pytest
+```
+
+Expected: 새 테스트 PASS, 기존 라우트 테스트(요약·부분·에러 경로)도 전부 PASS (그 텍스트들은 자동차로 분류되지 않아 else 분기로 간다).
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd backend && git add -A && git commit -m "feat: skip coverage extraction for auto policies
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
