@@ -218,9 +218,7 @@ export function UploadForm({
   const dropzoneTitle = fixedSelectedName
     ? `${fixedSelectedName}(피보험자)의 보험증권 PDF만 올릴 수 있어요`
     : "보험증권 PDF를 올려주세요";
-  const dropzoneDescription = isModal
-    ? ""
-    : `PDF · ${fileSizeLabel}`;
+  const dropzoneDescription = isModal ? "" : `PDF · ${fileSizeLabel}`;
 
   if (isAnalyzing) {
     return <AnalysisProgress progress={analysisProgress} surface={surface} />;
@@ -293,7 +291,7 @@ export function UploadForm({
               onClick={() => inputRef.current?.click()}
               className={`mt-6 rounded-[10px] px-4 py-2.5 text-sm font-medium transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none ${
                 isModal
-                  ? "bg-white text-[#111827] ring-1 ring-inset ring-[#111827]/15 hover:bg-[#111827]/5"
+                  ? "bg-white text-[#111827] ring-1 ring-[#111827]/15 ring-inset hover:bg-[#111827]/5"
                   : "bg-[#111827] text-white hover:bg-[#111827]/90"
               }`}
             >
@@ -427,35 +425,39 @@ function AnalysisProgress({
   return (
     <section
       role="status"
-      className={`flex w-full flex-col items-center text-center ${
-        surface === "modal" ? "max-w-none py-8" : "max-w-xl py-20"
+      className={`${
+        surface === "modal"
+          ? "flex w-full max-w-none flex-col items-center py-8 text-center"
+          : "fixed inset-0 z-50 flex items-center justify-center bg-white/90 px-6 py-10 text-center backdrop-blur-sm"
       }`}
     >
-      <div className="relative h-16 w-16">
-        <div className="absolute inset-0 rounded-full border-2 border-[#111827]/10" />
-        <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#2563EB]" />
-        <div className="absolute inset-4 rounded-full bg-[#2563EB]/10" />
-      </div>
-      <h1 className="mt-8 text-2xl font-semibold tracking-normal text-[#111827]">
-        보험을 정리하고 있어요
-      </h1>
-      <p className="mt-3 text-sm leading-6 text-[#111827]/70">
-        {progress.total > 0
-          ? `${progress.total}개 PDF 중 ${progress.completed}개를 확인했어요.`
-          : "PDF 내용을 확인하고 있어요."}
-      </p>
-      <div
-        role="progressbar"
-        aria-label="보험 분석 진행률"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        className="mt-8 h-2 w-full overflow-hidden rounded-full bg-[#111827]/10"
-      >
+      <div className="flex w-full max-w-[560px] flex-col items-center">
+        <div className="relative h-16 w-16">
+          <div className="absolute inset-0 rounded-full border-2 border-[#111827]/10" />
+          <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#2563EB]" />
+          <div className="absolute inset-4 rounded-full bg-[#2563EB]/10" />
+        </div>
+        <h1 className="mt-8 text-2xl font-semibold tracking-normal text-[#111827]">
+          보험을 정리하고 있어요
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-[#111827]/70">
+          {progress.total > 0
+            ? `${progress.total}개 PDF 중 ${progress.completed}개를 확인했어요.`
+            : "PDF 내용을 확인하고 있어요."}
+        </p>
         <div
-          className="h-full rounded-full bg-[#2563EB] transition-all duration-300"
-          style={{ width: `${Math.max(percent, 8)}%` }}
-        />
+          role="progressbar"
+          aria-label="보험 분석 진행률"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          className="mt-8 h-2 w-full overflow-hidden rounded-full bg-[#111827]/10"
+        >
+          <div
+            className="h-full rounded-full bg-[#2563EB] transition-all duration-300"
+            style={{ width: `${Math.max(percent, 8)}%` }}
+          />
+        </div>
       </div>
     </section>
   );

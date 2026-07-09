@@ -25,11 +25,6 @@ export type PolicyBasicInfo = {
 export type PolicyUploadResult = {
   status: "accepted";
   문자수: number;
-  문서판정: {
-    보험증권추정: boolean;
-    점수: number;
-    근거: string[];
-  };
   기본정보?: PolicyBasicInfo;
 };
 
@@ -44,7 +39,8 @@ type ApiErrorResponse = {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-const GENERIC_UPLOAD_MESSAGE = "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
+const GENERIC_UPLOAD_MESSAGE =
+  "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
 const SERVER_UPLOAD_MESSAGE =
   "서버에서 파일을 처리하지 못했어요. 잠시 후 다시 시도해주세요.";
 

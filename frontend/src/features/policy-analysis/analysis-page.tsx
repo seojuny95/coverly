@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import insurerLogos from "./insurer-logos.json";
 import {
   type AnalyzedPolicy,
   type PolicyAnalysis,
@@ -42,108 +43,7 @@ const TAG_STYLES: Record<string, string> = {
   어린이: "border-[#DB2777]/10 bg-[#DB2777]/[0.06] text-[#111827]/60",
 };
 
-const INSURER_LOGOS = [
-  {
-    aliases: ["AXA손해보험", "악사손해보험", "AXA다이렉트"],
-    src: "/insurers/axa-direct.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["DB손해보험", "디비손해보험"],
-    src: "/insurers/db-insurance.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["메리츠화재", "메리츠화재해상보험"],
-    src: "/insurers/meritz-fire.png",
-    imageClassName: "scale-[0.88]",
-  },
-  {
-    aliases: ["KDB생명", "KDB생명보험"],
-    src: "/insurers/kdb-life.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["한화손해보험"],
-    src: "/insurers/hanwha-general.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["교보생명", "교보생명보험"],
-    src: "/insurers/kyobo-life.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["삼성화재", "삼성화재해상보험"],
-    src: "/insurers/samsung-fire.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["흥국생명", "흥국생명보험", "흥국화재"],
-    src: "/insurers/heungkuk-life.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["현대해상", "현대해상화재보험"],
-    src: "/insurers/hyundai-marine.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["KB손해보험", "케이비손해보험"],
-    src: "/insurers/kb-insurance.png",
-    imageClassName: "scale-[0.88]",
-  },
-  {
-    aliases: ["미래에셋생명", "미래에셋생명보험"],
-    src: "/insurers/mirae-asset-life.png",
-    imageClassName: "scale-[0.88]",
-  },
-  {
-    aliases: ["더케이손해보험", "The-K손해보험"],
-    src: "/insurers/thek-insurance.png",
-    imageClassName: "scale-[0.88]",
-  },
-  {
-    aliases: ["롯데손해보험"],
-    src: "/insurers/lotte-insurance.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["캐롯손해보험"],
-    src: "/insurers/carrot.png",
-    imageClassName: "scale-[0.92]",
-  },
-  {
-    aliases: ["메트라이프", "메트라이프생명", "메트라이프생명보험"],
-    src: "/insurers/metlife.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["하나손해보험"],
-    src: "/insurers/hana-insurance.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["MG손해보험", "예별손해보험"],
-    src: "/insurers/yebyeol-insurance.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["NH농협생명", "농협생명", "NH농협손해보험", "농협손해보험"],
-    src: "/insurers/nh.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["AIA생명", "AIA생명보험"],
-    src: "/insurers/aia-life.png",
-    imageClassName: "scale-[0.9]",
-  },
-  {
-    aliases: ["ABL생명", "에이비엘생명"],
-    src: "/insurers/abl-life.png",
-    imageClassName: "scale-[0.9]",
-  },
-] as const;
+const INSURER_LOGOS = insurerLogos;
 
 type AnalysisPageProps = {
   uploadPolicy?: UploadPolicy;

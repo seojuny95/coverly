@@ -114,9 +114,7 @@ describe("UploadForm", () => {
       },
     });
 
-    expect(
-      screen.getByText("PDF 파일만 올릴 수 있어요."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("PDF 파일만 올릴 수 있어요.")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
     ).toBeDisabled();
@@ -150,11 +148,6 @@ describe("UploadForm", () => {
       .mockResolvedValueOnce({
         status: "accepted",
         문자수: 32,
-        문서판정: {
-          보험증권추정: true,
-          점수: 7,
-          근거: ["보험증권", "증권번호"],
-        },
         기본정보: {
           보험사: "삼성화재",
           상품명: "건강보험",
@@ -178,11 +171,6 @@ describe("UploadForm", () => {
       .mockResolvedValueOnce({
         status: "accepted",
         문자수: 20,
-        문서판정: {
-          보험증권추정: true,
-          점수: 6,
-          근거: ["보험증권"],
-        },
         기본정보: {
           보험사: "현대해상화재보험",
           상품명: "개인용자동차보험",
@@ -238,11 +226,6 @@ describe("UploadForm", () => {
     const uploadPolicy = vi.fn<UploadPolicy>().mockResolvedValue({
       status: "accepted",
       문자수: 20,
-      문서판정: {
-        보험증권추정: true,
-        점수: 6,
-        근거: ["보험증권"],
-      },
       기본정보: {
         보험사: "삼성화재",
         상품명: "건강보험",
@@ -271,11 +254,6 @@ describe("UploadForm", () => {
     const uploadPolicy = vi.fn<UploadPolicy>().mockResolvedValue({
       status: "accepted",
       문자수: 20,
-      문서판정: {
-        보험증권추정: true,
-        점수: 6,
-        근거: ["보험증권"],
-      },
       기본정보: {
         보험사: "삼성화재",
         상품명: "건강보험",
@@ -307,11 +285,6 @@ describe("UploadForm", () => {
       .mockResolvedValueOnce({
         status: "accepted",
         문자수: 32,
-        문서판정: {
-          보험증권추정: true,
-          점수: 7,
-          근거: ["보험증권"],
-        },
         기본정보: {
           보험사: "삼성화재",
           상품명: "건강보험",
@@ -324,11 +297,6 @@ describe("UploadForm", () => {
       .mockResolvedValueOnce({
         status: "accepted",
         문자수: 20,
-        문서판정: {
-          보험증권추정: true,
-          점수: 6,
-          근거: ["보험증권"],
-        },
         기본정보: {
           보험사: "현대해상화재보험",
           상품명: "개인용자동차보험",
@@ -380,14 +348,14 @@ describe("UploadForm", () => {
     const user = userEvent.setup();
     const uploadPolicy = vi
       .fn<UploadPolicy>()
-      .mockRejectedValue(new Error("보험증권으로 확인할 수 없습니다."));
+      .mockRejectedValue(new Error("파일을 분석할 수 없습니다."));
     renderForm({ uploadPolicy });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), policyFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
-      await screen.findByText("보험증권으로 확인할 수 없습니다."),
+      await screen.findByText("파일을 분석할 수 없습니다."),
     ).toBeInTheDocument();
   });
 
@@ -401,11 +369,6 @@ describe("UploadForm", () => {
               resolve({
                 status: "accepted",
                 문자수: 32,
-                문서판정: {
-                  보험증권추정: true,
-                  점수: 7,
-                  근거: ["보험증권"],
-                },
                 기본정보: {
                   보험사: "삼성화재",
                   피보험자: "테스트고객",

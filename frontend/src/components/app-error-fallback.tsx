@@ -14,8 +14,8 @@ export function AppErrorFallback({ digest, onRetry }: AppErrorFallbackProps) {
           화면을 불러오지 못했어요.
         </h1>
         <p className="mt-3 text-sm leading-6 text-zinc-500">
-          일시적인 오류일 수 있어요. 다시 시도해도 같은 문제가 계속되면 잠시
-          후 다시 접속해주세요.
+          일시적인 오류일 수 있어요. 다시 시도해도 같은 문제가 계속되면 잠시 후
+          다시 접속해주세요.
         </p>
         {digest ? (
           <p className="mt-4 rounded-[8px] bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-500">

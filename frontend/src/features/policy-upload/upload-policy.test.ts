@@ -17,7 +17,6 @@ describe("uploadPolicy", () => {
         JSON.stringify({
           status: "accepted",
           문자수: 32,
-          문서판정: { 보험증권추정: true, 점수: 7, 근거: ["보험증권"] },
           기본정보: {
             보험사: "삼성화재",
             상품명: "건강보험",
@@ -50,7 +49,6 @@ describe("uploadPolicy", () => {
         body: expect.any(FormData),
       },
     );
-    expect(result.문서판정.근거).toEqual(["보험증권"]);
     expect(result.기본정보?.보험사).toBe("삼성화재");
     expect(result.기본정보?.보험분류).toBe("상해·질병·실손");
   });
@@ -62,8 +60,8 @@ describe("uploadPolicy", () => {
         new Response(
           JSON.stringify({
             error: {
-              code: "POLICY_DOCUMENT_NOT_DETECTED",
-              message: "보험증권으로 확인할 수 없습니다.",
+              code: "POLICY_PARSE_FAILED",
+              message: "파일을 분석할 수 없습니다.",
               request_id: "req_123",
             },
           }),
@@ -75,11 +73,11 @@ describe("uploadPolicy", () => {
     );
 
     await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
-      code: "POLICY_DOCUMENT_NOT_DETECTED",
+      code: "POLICY_PARSE_FAILED",
       requestId: "req_123",
       status: 422,
-      userMessage: "보험증권으로 확인할 수 없습니다.",
-      message: "보험증권으로 확인할 수 없습니다.",
+      userMessage: "파일을 분석할 수 없습니다.",
+      message: "파일을 분석할 수 없습니다.",
     });
   });
 
