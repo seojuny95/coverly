@@ -1,6 +1,9 @@
+import asyncio
+
 from fastapi import APIRouter, UploadFile
 
 from app.errors import ApiError
+from app.services.coverage.extraction import extract_coverages
 from app.services.pdf_text import extract_pdf_text
 from app.services.policy.summary import extract_policy_summary
 
@@ -40,8 +43,16 @@ async def parse_policy(file: UploadFile) -> dict[str, object]:
             message="PDF에서 텍스트를 추출할 수 없습니다.",
         )
 
+    # Both pipelines are sync/blocking; run them concurrently off the event loop.
+    summary, (coverages, analysis_status) = await asyncio.gather(
+        asyncio.to_thread(extract_policy_summary, text),
+        asyncio.to_thread(extract_coverages, data),
+    )
+
     return {
         "status": "accepted",
         "문자수": len(text),
-        "기본정보": extract_policy_summary(text),
+        "기본정보": summary,
+        "보장목록": coverages,
+        "분석상태": analysis_status,
     }

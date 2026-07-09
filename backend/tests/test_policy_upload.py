@@ -70,6 +70,7 @@ def test_parse_accepts_pdf_and_returns_extracted_summary(monkeypatch: pytest.Mon
         "extract_pdf_text",
         lambda _data: policy_text,
     )
+    monkeypatch.setattr(policies, "extract_coverages", lambda _data: ([], "완료"))
 
     response = client.post(
         "/policies/parse",
@@ -98,3 +99,65 @@ def test_parse_accepts_pdf_and_returns_extracted_summary(monkeypatch: pytest.Mon
         "보험분류": "상해·질병·실손",
         "상품태그": ["질병"],
     }
+    assert payload["보장목록"] == []
+    assert payload["분석상태"] == "완료"
+
+
+def test_parse_returns_coverages_with_analysis_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routes import policies
+
+    client = TestClient(app)
+    monkeypatch.setattr(policies, "extract_pdf_text", lambda _data: "보험증권 계약자: 가나")
+    monkeypatch.setattr(
+        policies,
+        "extract_coverages",
+        lambda _data: (
+            [
+                {
+                    "담보명": "암진단비",
+                    "가입금액": "3,000만원",
+                    "보장내용": None,
+                    "해설": "암으로 진단받으면 약속된 금액을 드려요.",
+                }
+            ],
+            "완료",
+        ),
+    )
+
+    response = client.post(
+        "/policies/parse",
+        files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["보장목록"] == [
+        {
+            "담보명": "암진단비",
+            "가입금액": "3,000만원",
+            "보장내용": None,
+            "해설": "암으로 진단받으면 약속된 금액을 드려요.",
+        }
+    ]
+    assert payload["분석상태"] == "완료"
+
+
+def test_parse_keeps_summary_when_coverage_extraction_is_partial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.routes import policies
+
+    client = TestClient(app)
+    monkeypatch.setattr(policies, "extract_pdf_text", lambda _data: "보험사: 삼성화재")
+    monkeypatch.setattr(policies, "extract_coverages", lambda _data: ([], "부분"))
+
+    response = client.post(
+        "/policies/parse",
+        files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["기본정보"]["보험사"] == "삼성화재"
+    assert payload["보장목록"] == []
+    assert payload["분석상태"] == "부분"
