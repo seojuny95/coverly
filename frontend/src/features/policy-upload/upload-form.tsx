@@ -20,6 +20,8 @@ type UploadFormProps = {
   uploadPolicy?: UploadPolicy;
   onAnalysisComplete?: (analysis: PolicyAnalysis) => void;
   navigateToAnalysis?: () => void;
+  fixedSelectedName?: string;
+  surface?: "page" | "modal";
 };
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -27,8 +29,10 @@ const MAX_PDF_BYTES = 10 * 1024 * 1024;
 function validateFile(file: File): string | null {
   const isPdf =
     file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-  if (!isPdf) return "PDF 파일만 업로드할 수 있습니다.";
-  if (file.size > MAX_PDF_BYTES) return "파일이 너무 큽니다 (최대 10MB).";
+  if (!isPdf) return "PDF 파일만 올릴 수 있어요.";
+  if (file.size > MAX_PDF_BYTES) {
+    return "파일이 너무 커요. 최대 10MB까지 올릴 수 있어요.";
+  }
   return null;
 }
 
@@ -42,10 +46,16 @@ export function UploadForm({
   navigateToAnalysis = () => {
     window.location.assign("/analysis");
   },
+  fixedSelectedName,
+  surface = "page",
 }: UploadFormProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState({
+    completed: 0,
+    total: 0,
+  });
   const [pendingAnalysis, setPendingAnalysis] = useState<PolicyAnalysis | null>(
     null,
   );
@@ -59,7 +69,7 @@ export function UploadForm({
       setSelectedFiles([]);
       setPendingAnalysis(null);
       setSelectedName("");
-      setError("업로드할 파일을 찾을 수 없습니다.");
+      setError("올릴 파일을 찾지 못했어요. PDF를 다시 선택해주세요.");
       return;
     }
 
@@ -91,6 +101,7 @@ export function UploadForm({
     if (selectedFiles.length === 0 || isAnalyzing) return;
 
     setIsAnalyzing(true);
+    setAnalysisProgress({ completed: 0, total: selectedFiles.length });
     setError(null);
     setPendingAnalysis(null);
     setSelectedName("");
@@ -98,10 +109,15 @@ export function UploadForm({
       const policies = await Promise.all(
         selectedFiles.map(async (file, index) => {
           try {
+            const result = await uploadPolicy(file);
+            setAnalysisProgress((current) => ({
+              ...current,
+              completed: current.completed + 1,
+            }));
             return {
               id: `${Date.now()}-${index}-${file.name}`,
               fileName: file.name,
-              result: await uploadPolicy(file),
+              result,
             };
           } catch (err) {
             const message =
@@ -109,8 +125,8 @@ export function UploadForm({
                 ? err.userMessage
                 : err instanceof Error
                   ? err.message
-                  : "업로드에 실패했습니다.";
-            throw new Error(`${file.name}: ${message}`);
+                  : "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
+            throw new Error(message);
           }
         }),
       );
@@ -123,7 +139,11 @@ export function UploadForm({
       if (err instanceof UploadPolicyError) {
         setError(err.userMessage);
       } else {
-        setError(err instanceof Error ? err.message : "업로드에 실패했습니다.");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "업로드에 실패했어요. 잠시 후 다시 시도해주세요.",
+        );
       }
     } finally {
       setIsAnalyzing(false);
@@ -135,12 +155,24 @@ export function UploadForm({
       (policy) => !getPolicyPersonName(policy),
     );
     if (policiesWithoutName.length > 0) {
-      const fileNames = policiesWithoutName
-        .map((policy) => policy.fileName)
-        .join(", ");
       setError(
-        `피보험자를 확인할 수 없는 증권이 있습니다: ${fileNames}. 피보험자가 있는 증권만 분석할 수 있습니다.`,
+        "피보험자를 확인할 수 없는 증권이 있어요. 피보험자가 확인된 증권만 분석할 수 있어요.",
       );
+      return;
+    }
+
+    if (fixedSelectedName) {
+      const names = getPolicyNameOptions(analysis.policies).map(
+        (option) => option.name,
+      );
+      if (names.length > 1 || names[0] !== fixedSelectedName) {
+        setError(
+          `${fixedSelectedName}님의 보험증권만 추가할 수 있어요. 같은 피보험자의 증권만 선택해주세요.`,
+        );
+        return;
+      }
+
+      saveSelectedNameAnalysis(analysis, fixedSelectedName);
       return;
     }
 
@@ -180,21 +212,27 @@ export function UploadForm({
   const fileSizeLabel =
     selectedFiles.length > 0
       ? `${selectedFiles.length}개 · ${(selectedBytes / 1024 / 1024).toFixed(2)} MB`
-      : "파일당 최대 10 MB";
+      : "파일당 최대 10MB";
+  const isModal = surface === "modal";
+  const submitLabel = isModal ? "분석에 추가하기" : "내 보험 분석하기";
+  const dropzoneTitle = fixedSelectedName
+    ? `${fixedSelectedName}(피보험자)의 보험증권 PDF만 올릴 수 있어요`
+    : "보험증권 PDF를 올려주세요";
+  const dropzoneDescription = isModal
+    ? ""
+    : `PDF · ${fileSizeLabel}`;
+
+  if (isAnalyzing) {
+    return <AnalysisProgress progress={analysisProgress} surface={surface} />;
+  }
 
   return (
-    <form className="w-full max-w-2xl" onSubmit={handleSubmit}>
-      <section className="rounded-[8px] border border-[#111827]/15 bg-white shadow-[0_18px_70px_rgba(17,24,39,0.08)]">
-        <div className="px-5 pt-6 pb-5 sm:px-7 sm:pt-7">
-          <h1 className="text-2xl leading-8 font-semibold tracking-normal text-[#111827]">
-            내 보험 분석
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-[#111827]/70">
-            보험증권 PDF를 올리면 내 보험을 분류해서 보여드려요.
-          </p>
-        </div>
-
-        <div className="px-5 pb-5 sm:px-7 sm:pb-7">
+    <form
+      className={isModal ? "w-full max-w-none" : "w-full max-w-2xl"}
+      onSubmit={handleSubmit}
+    >
+      <section>
+        <div>
           <div
             data-testid="policy-upload-dropzone"
             onDragEnter={(event) => {
@@ -210,17 +248,32 @@ export function UploadForm({
               setIsDragging(false);
             }}
             onDrop={handleDrop}
-            className={`flex min-h-48 flex-col items-center justify-center rounded-[8px] border border-dashed px-5 py-10 text-center transition-colors ${
+            className={`flex flex-col items-center justify-center rounded-[12px] border border-dashed px-5 text-center transition-colors ${
               isDragging
                 ? "border-[#2563EB] bg-[#2563EB]/10"
-                : "border-[#111827]/20 bg-white"
-            }`}
+                : isModal
+                  ? "border-[#111827]/15 bg-[#FAFAFA]"
+                  : "border-[#111827]/20 bg-white"
+            } ${isModal ? "min-h-44 py-8" : "min-h-64 py-12"}`}
           >
-            <p className="text-base font-medium text-[#111827]">
-              보험증권 PDF를 올려주세요
+            <p
+              className={`font-medium text-[#111827] ${
+                isModal ? "text-base" : "text-base"
+              }`}
+            >
+              {dropzoneTitle}
             </p>
-            <p className="mt-2 text-sm text-[#111827]/70">
-              PDF · {fileSizeLabel}
+            {dropzoneDescription ? (
+              <p className="mt-2 text-sm leading-6 text-[#111827]/70">
+                {dropzoneDescription}
+              </p>
+            ) : null}
+            <p
+              className={`mt-1 text-xs text-[#111827]/55 ${
+                isModal ? "" : "hidden"
+              }`}
+            >
+              {fileSizeLabel}
             </p>
 
             <input
@@ -238,20 +291,28 @@ export function UploadForm({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="mt-6 rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#111827]/90 focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none"
+              className={`mt-6 rounded-[10px] px-4 py-2.5 text-sm font-medium transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none ${
+                isModal
+                  ? "bg-white text-[#111827] ring-1 ring-inset ring-[#111827]/15 hover:bg-[#111827]/5"
+                  : "bg-[#111827] text-white hover:bg-[#111827]/90"
+              }`}
             >
               PDF 불러오기
             </button>
           </div>
 
           <div className="mt-4 flex flex-col gap-4">
-            <SelectedFileList files={selectedFiles} />
+            <SelectedFileList files={selectedFiles} surface={surface} />
             <button
               type="submit"
               disabled={selectedFiles.length === 0 || isAnalyzing}
-              className="self-stretch rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none enabled:hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-[#111827]/10 disabled:text-[#111827]/45 sm:self-end"
+              className={`rounded-[10px] px-4 py-2.5 text-sm font-medium transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:bg-[#111827]/10 disabled:text-[#111827]/45 ${
+                isModal
+                  ? "self-stretch bg-[#2563EB] text-white enabled:hover:bg-[#1D4ED8]"
+                  : "self-stretch bg-[#111827] text-white enabled:hover:bg-[#111827]/90 sm:self-end"
+              }`}
             >
-              {isAnalyzing ? "분석 중" : "내 보험 분석하기"}
+              {isAnalyzing ? "보험 정리 중이에요" : submitLabel}
             </button>
           </div>
 
@@ -262,7 +323,7 @@ export function UploadForm({
             >
               <span className="font-medium">보험을 정리하고 있어요.</span>
               <span className="block text-[#111827]/70">
-                끝나면 결과 화면으로 이동해요.
+                끝나면 정리한 결과를 바로 보여드려요.
               </span>
             </div>
           ) : null}
@@ -290,49 +351,112 @@ export function UploadForm({
   );
 }
 
-function SelectedFileList({ files }: { files: File[] }) {
+function SelectedFileList({
+  files,
+  surface,
+}: {
+  files: File[];
+  surface: "page" | "modal";
+}) {
   if (files.length === 0) {
     return (
-      <div className="rounded-[8px] border border-[#111827]/10 bg-white px-4 py-3">
+      <div
+        className={
+          surface === "modal"
+            ? "rounded-[10px] border border-[#111827]/10 bg-white px-4 py-4"
+            : "border-y border-[#111827]/10 py-3"
+        }
+      >
         <p className="text-sm text-[#111827]/70">선택된 PDF가 없어요.</p>
       </div>
     );
   }
 
+  const visibleFiles = files.slice(0, 6);
+  const hiddenFileCount = Math.max(files.length - visibleFiles.length, 0);
+
   return (
     <section
       aria-label="선택한 PDF"
-      className="rounded-[8px] border border-[#111827]/15 bg-white"
+      className={
+        surface === "modal"
+          ? "rounded-[10px] border border-[#111827]/10 bg-white px-4 py-4"
+          : "border-y border-[#111827]/10 py-3"
+      }
     >
-      <div className="flex items-center justify-between border-b border-[#111827]/10 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-[#111827]">선택한 PDF</p>
-        <p className="text-xs font-medium text-[#111827]/70">
-          {files.length}개
+        <p className="text-xs text-[#111827]/70">
+          {files.length}개 ·{" "}
+          {formatFileSize(files.reduce((sum, file) => sum + file.size, 0))}
         </p>
       </div>
-      <ul className="max-h-48 divide-y divide-[#111827]/10 overflow-y-auto">
-        {files.map((file, index) => (
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {visibleFiles.map((file, index) => (
           <li
             key={`${file.name}-${file.size}-${index}`}
-            className="flex min-h-16 items-center gap-3 px-4 py-3"
+            className="max-w-full rounded-full border border-[#111827]/15 px-3 py-1.5 text-xs font-medium text-[#111827]"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[#2563EB]/10 text-xs font-semibold text-[#2563EB]">
-              {index + 1}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-[#111827]">
-                {file.name}
-              </span>
-              <span className="mt-1 block text-xs text-[#111827]/70">
-                {formatFileSize(file.size)}
-              </span>
-            </span>
-            <span className="shrink-0 rounded-full border border-[#2563EB]/20 px-2.5 py-1 text-xs font-medium text-[#2563EB]">
-              PDF
+            <span className="inline-block max-w-[220px] truncate align-bottom">
+              {file.name}
             </span>
           </li>
         ))}
+        {hiddenFileCount > 0 ? (
+          <li className="rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-3 py-1.5 text-xs font-medium text-[#2563EB]">
+            외 {hiddenFileCount}개
+          </li>
+        ) : null}
       </ul>
+    </section>
+  );
+}
+
+function AnalysisProgress({
+  progress,
+  surface,
+}: {
+  progress: { completed: number; total: number };
+  surface: "page" | "modal";
+}) {
+  const percent =
+    progress.total > 0
+      ? Math.round((progress.completed / progress.total) * 100)
+      : 0;
+
+  return (
+    <section
+      role="status"
+      className={`flex w-full flex-col items-center text-center ${
+        surface === "modal" ? "max-w-none py-8" : "max-w-xl py-20"
+      }`}
+    >
+      <div className="relative h-16 w-16">
+        <div className="absolute inset-0 rounded-full border-2 border-[#111827]/10" />
+        <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#2563EB]" />
+        <div className="absolute inset-4 rounded-full bg-[#2563EB]/10" />
+      </div>
+      <h1 className="mt-8 text-2xl font-semibold tracking-normal text-[#111827]">
+        보험을 정리하고 있어요
+      </h1>
+      <p className="mt-3 text-sm leading-6 text-[#111827]/70">
+        {progress.total > 0
+          ? `${progress.total}개 PDF 중 ${progress.completed}개를 확인했어요.`
+          : "PDF 내용을 확인하고 있어요."}
+      </p>
+      <div
+        role="progressbar"
+        aria-label="보험 분석 진행률"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="mt-8 h-2 w-full overflow-hidden rounded-full bg-[#111827]/10"
+      >
+        <div
+          className="h-full rounded-full bg-[#2563EB] transition-all duration-300"
+          style={{ width: `${Math.max(percent, 8)}%` }}
+        />
+      </div>
     </section>
   );
 }
@@ -373,11 +497,10 @@ function NameSelectionPanel({
   return (
     <div className="mt-4 rounded-[8px] border border-[#111827]/15 bg-white px-4 py-4">
       <p className="text-sm font-semibold text-[#111827]">
-        피보험자가 여러 명 발견되었습니다
+        피보험자가 여러 명 있어요
       </p>
       <p className="mt-1 text-sm leading-6 text-[#111827]/70">
-        분석에 포함할 피보험자를 선택하세요. 선택한 피보험자의 증권만 결과
-        화면에 표시됩니다.
+        결과로 볼 피보험자를 선택하세요. 선택한 피보험자의 증권만 보여드려요.
       </p>
 
       <div className="mt-4 grid gap-2">

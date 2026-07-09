@@ -100,7 +100,7 @@ describe("uploadPolicy", () => {
       code: "UPLOAD_FAILED",
       status: 500,
       userMessage:
-        "서버에서 업로드를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
+        "서버에서 파일을 처리하지 못했어요. 잠시 후 다시 시도해주세요.",
     });
   });
 
@@ -126,7 +126,7 @@ describe("uploadPolicy", () => {
       requestId: "req_500",
       status: 500,
       userMessage:
-        "서버에서 업로드를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
+        "서버에서 파일을 처리하지 못했어요. 잠시 후 다시 시도해주세요.",
     });
   });
 
@@ -146,7 +146,7 @@ describe("uploadPolicy", () => {
     expect(error).toMatchObject({
       code: "UPLOAD_FAILED",
       status: 500,
-      userMessage: "업로드에 실패했습니다.",
+      userMessage: "업로드에 실패했어요. 잠시 후 다시 시도해주세요.",
     });
   });
 
@@ -158,7 +158,7 @@ describe("uploadPolicy", () => {
 
     await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
       code: "UPLOAD_NETWORK_ERROR",
-      userMessage: "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+      userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
     });
   });
 });

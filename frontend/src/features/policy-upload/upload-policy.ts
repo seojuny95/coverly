@@ -44,9 +44,9 @@ type ApiErrorResponse = {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-const GENERIC_UPLOAD_MESSAGE = "업로드에 실패했습니다.";
+const GENERIC_UPLOAD_MESSAGE = "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
 const SERVER_UPLOAD_MESSAGE =
-  "서버에서 업로드를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.";
+  "서버에서 파일을 처리하지 못했어요. 잠시 후 다시 시도해주세요.";
 
 export class UploadPolicyError extends Error {
   readonly code: string;
@@ -87,7 +87,7 @@ export async function uploadPolicy(file: File): Promise<PolicyUploadResult> {
   } catch {
     throw new UploadPolicyError({
       code: "UPLOAD_NETWORK_ERROR",
-      userMessage: "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+      userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
     });
   }
 

@@ -81,7 +81,7 @@ describe("UploadForm", () => {
     });
 
     expect(
-      screen.getByText("업로드할 파일을 찾을 수 없습니다."),
+      screen.getByText("올릴 파일을 찾지 못했어요. PDF를 다시 선택해주세요."),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
@@ -99,6 +99,7 @@ describe("UploadForm", () => {
 
     expect(screen.getByText("policy.pdf")).toBeInTheDocument();
     expect(screen.getByText("second-policy.pdf")).toBeInTheDocument();
+    expect(screen.getByText("2개 · 0.02 KB")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
     ).toBeEnabled();
@@ -114,7 +115,7 @@ describe("UploadForm", () => {
     });
 
     expect(
-      screen.getByText("PDF 파일만 업로드할 수 있습니다."),
+      screen.getByText("PDF 파일만 올릴 수 있어요."),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
@@ -135,7 +136,7 @@ describe("UploadForm", () => {
     await user.upload(screen.getByLabelText("PDF 파일 선택"), largePdf);
 
     expect(
-      screen.getByText("파일이 너무 큽니다 (최대 10MB)."),
+      screen.getByText("파일이 너무 커요. 최대 10MB까지 올릴 수 있어요."),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
@@ -258,7 +259,7 @@ describe("UploadForm", () => {
 
     expect(
       await screen.findByText(
-        "피보험자를 확인할 수 없는 증권이 있습니다: policy.pdf. 피보험자가 있는 증권만 분석할 수 있습니다.",
+        "피보험자를 확인할 수 없는 증권이 있어요. 피보험자가 확인된 증권만 분석할 수 있어요.",
       ),
     ).toBeInTheDocument();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
@@ -292,7 +293,7 @@ describe("UploadForm", () => {
 
     expect(
       await screen.findByText(
-        "피보험자를 확인할 수 없는 증권이 있습니다: policy.pdf. 피보험자가 있는 증권만 분석할 수 있습니다.",
+        "피보험자를 확인할 수 없는 증권이 있어요. 피보험자가 확인된 증권만 분석할 수 있어요.",
       ),
     ).toBeInTheDocument();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
@@ -348,7 +349,7 @@ describe("UploadForm", () => {
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
-      await screen.findByText("피보험자가 여러 명 발견되었습니다"),
+      await screen.findByText("피보험자가 여러 명 있어요"),
     ).toBeInTheDocument();
     expect(screen.getByText("테스트고객")).toBeInTheDocument();
     expect(screen.getByText("테스트고객B")).toBeInTheDocument();
@@ -386,7 +387,7 @@ describe("UploadForm", () => {
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
-      await screen.findByText("policy.pdf: 보험증권으로 확인할 수 없습니다."),
+      await screen.findByText("보험증권으로 확인할 수 없습니다."),
     ).toBeInTheDocument();
   });
 
@@ -422,7 +423,10 @@ describe("UploadForm", () => {
     await user.upload(screen.getByLabelText("PDF 파일 선택"), policyFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
-    expect(screen.getByRole("button", { name: "분석 중" })).toBeDisabled();
-    expect(screen.getByText("보험을 정리하고 있어요.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "내 보험 분석하기" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("보험을 정리하고 있어요")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "보험 분석 진행률" }));
   });
 });
