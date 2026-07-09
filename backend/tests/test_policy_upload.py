@@ -161,3 +161,36 @@ def test_parse_keeps_summary_when_coverage_extraction_is_partial(
     assert payload["기본정보"]["보험사"] == "삼성화재"
     assert payload["보장목록"] == []
     assert payload["분석상태"] == "부분"
+
+
+def test_parse_skips_coverage_for_auto_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routes import policies
+
+    client = TestClient(app)
+    monkeypatch.setattr(policies, "extract_pdf_text", lambda _data: "자동차 증권 텍스트")
+    monkeypatch.setattr(
+        policies,
+        "extract_policy_summary",
+        lambda _text: {"보험분류": "자동차", "상품명": "Hicar 다이렉트개인용"},
+    )
+    # If the route wrongly ran coverage extraction for an auto policy, this junk
+    # would surface in the response; the gate must return an empty 보장목록 instead.
+    monkeypatch.setattr(
+        policies,
+        "extract_coverages",
+        lambda _data: (
+            [{"담보명": "잘못된담보", "가입금액": "1원", "보장내용": None, "해설": None}],
+            "완료",
+        ),
+    )
+
+    response = client.post(
+        "/policies/parse",
+        files={"file": ("auto.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["기본정보"]["보험분류"] == "자동차"
+    assert payload["보장목록"] == []
+    assert payload["분석상태"] == "완료"
