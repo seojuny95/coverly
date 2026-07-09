@@ -123,6 +123,19 @@ describe("UploadForm", () => {
         점수: 7,
         근거: ["보험증권", "증권번호"],
       },
+      기본정보: {
+        보험사: "삼성화재",
+        상품명: "건강보험",
+        증권번호: "POLICY-TEST-001",
+        보험기간: {
+          시작일: "2026-01-01",
+          종료일: "2027-01-01",
+        },
+        보험료: {
+          금액: 120000,
+          납입주기: "월납",
+        },
+      },
     });
     renderForm(uploadPolicy);
 
@@ -136,6 +149,11 @@ describe("UploadForm", () => {
     expect(
       screen.getByText("다음 단계에서 보장 내용을 읽습니다."),
     ).toBeInTheDocument();
+    expect(screen.getByText("삼성화재")).toBeInTheDocument();
+    expect(screen.getByText("건강보험")).toBeInTheDocument();
+    expect(screen.getByText("POLICY-TEST-001")).toBeInTheDocument();
+    expect(screen.getByText("2026-01-01 - 2027-01-01")).toBeInTheDocument();
+    expect(screen.getByText("월납 120,000원")).toBeInTheDocument();
     expect(screen.queryByText("Verification")).not.toBeInTheDocument();
     expect(screen.queryByText("보험증권, 증권번호")).not.toBeInTheDocument();
   });
@@ -169,6 +187,9 @@ describe("UploadForm", () => {
                   보험증권추정: true,
                   점수: 7,
                   근거: ["보험증권"],
+                },
+                기본정보: {
+                  보험사: "삼성화재",
                 },
               }),
             50,

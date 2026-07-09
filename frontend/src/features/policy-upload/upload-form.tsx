@@ -99,6 +99,7 @@ export function UploadForm({
   const fileSizeLabel = selectedFile
     ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`
     : "최대 10 MB";
+  const summaryItems = result ? buildSummaryItems(result) : [];
 
   return (
     <form className="w-full max-w-xl" onSubmit={handleSubmit}>
@@ -177,12 +178,28 @@ export function UploadForm({
           </div>
 
           {result ? (
-            <p className="mt-4 rounded-[8px] bg-[#eef8f1] px-4 py-3 text-sm leading-6 text-[#1f6f3f]">
-              <span className="font-medium">업로드가 완료되었습니다.</span>
-              <span className="block text-[#2f7f4e]">
-                다음 단계에서 보장 내용을 읽습니다.
-              </span>
-            </p>
+            <div className="mt-4 rounded-[8px] bg-[#eef8f1] px-4 py-3 text-sm leading-6 text-[#1f6f3f]">
+              <p>
+                <span className="font-medium">업로드가 완료되었습니다.</span>
+                <span className="block text-[#2f7f4e]">
+                  다음 단계에서 보장 내용을 읽습니다.
+                </span>
+              </p>
+              {summaryItems.length > 0 ? (
+                <dl className="mt-4 grid gap-3 border-t border-[#d6e8db] pt-4 text-zinc-700 sm:grid-cols-2">
+                  {summaryItems.map((item) => (
+                    <div key={item.label}>
+                      <dt className="text-xs tracking-[0.12em] text-zinc-500 uppercase">
+                        {item.label}
+                      </dt>
+                      <dd className="mt-1 text-sm font-medium text-zinc-900">
+                        {item.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+            </div>
           ) : null}
 
           {error ? (
@@ -196,5 +213,37 @@ export function UploadForm({
         </div>
       </section>
     </form>
+  );
+}
+
+function buildSummaryItems(result: PolicyUploadResult): Array<{
+  label: string;
+  value: string;
+}> {
+  const basicInfo = result.기본정보;
+  if (!basicInfo) return [];
+
+  const items = [
+    { label: "보험사", value: basicInfo.보험사 },
+    { label: "상품명", value: basicInfo.상품명 },
+    { label: "증권번호", value: basicInfo.증권번호 },
+    {
+      label: "보험기간",
+      value:
+        basicInfo.보험기간?.시작일 && basicInfo.보험기간?.종료일
+          ? `${basicInfo.보험기간.시작일} - ${basicInfo.보험기간.종료일}`
+          : undefined,
+    },
+    {
+      label: "보험료",
+      value:
+        basicInfo.보험료?.금액 !== undefined
+          ? `${basicInfo.보험료.납입주기 ? `${basicInfo.보험료.납입주기} ` : ""}${basicInfo.보험료.금액.toLocaleString("ko-KR")}원`
+          : undefined,
+    },
+  ];
+
+  return items.filter((item): item is { label: string; value: string } =>
+    Boolean(item.value),
   );
 }

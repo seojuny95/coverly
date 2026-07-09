@@ -23,3 +23,8 @@ dist/
 
 # Logs
 *.log
+
+# Local test inputs with real PII
+sample-insurance-input/
+.local/
+local-fixtures/

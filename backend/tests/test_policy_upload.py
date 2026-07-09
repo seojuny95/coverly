@@ -72,10 +72,21 @@ def test_parse_accepts_pdf_with_insurance_policy_signals(monkeypatch: pytest.Mon
     from app.routes import policies
 
     client = TestClient(app)
+    policy_text = """
+        보험증권
+        보험사: 삼성화재
+        상품명: 건강보험
+        증권번호: POLICY-TEST-001
+        계약자: 가나
+        피보험자: 가나
+        보험기간: 2026.01.01 ~ 2027.01.01
+        보험료: 월 120,000원
+        보험금액
+        """
     monkeypatch.setattr(
         policies,
         "extract_pdf_text",
-        lambda _data: "보험증권 증권번호 계약자 피보험자 보험기간 보험료 보험금액",
+        lambda _data: policy_text,
     )
 
     response = client.post(
@@ -86,7 +97,7 @@ def test_parse_accepts_pdf_with_insurance_policy_signals(monkeypatch: pytest.Mon
     assert response.status_code == 200
     assert response.json() == {
         "status": "accepted",
-        "문자수": 32,
+        "문자수": len(policy_text),
         "문서판정": {
             "보험증권추정": True,
             "점수": 7,
@@ -99,5 +110,20 @@ def test_parse_accepts_pdf_with_insurance_policy_signals(monkeypatch: pytest.Mon
                 "보험료",
                 "보험금액",
             ],
+        },
+        "기본정보": {
+            "보험사": "삼성화재",
+            "상품명": "건강보험",
+            "증권번호": "POLICY-TEST-001",
+            "계약자": "가나",
+            "피보험자": "가나",
+            "보험기간": {
+                "시작일": "2026-01-01",
+                "종료일": "2027-01-01",
+            },
+            "보험료": {
+                "금액": 120000,
+                "납입주기": "월납",
+            },
         },
     }

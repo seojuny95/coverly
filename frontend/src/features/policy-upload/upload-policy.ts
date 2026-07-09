@@ -1,3 +1,23 @@
+type PolicyPeriod = {
+  시작일?: string;
+  종료일?: string;
+};
+
+type PolicyPremium = {
+  금액?: number;
+  납입주기?: string;
+};
+
+type PolicyBasicInfo = {
+  보험사?: string;
+  상품명?: string;
+  증권번호?: string;
+  계약자?: string;
+  피보험자?: string;
+  보험기간?: PolicyPeriod;
+  보험료?: PolicyPremium;
+};
+
 export type PolicyUploadResult = {
   status: "accepted";
   문자수: number;
@@ -6,6 +26,7 @@ export type PolicyUploadResult = {
     점수: number;
     근거: string[];
   };
+  기본정보?: PolicyBasicInfo;
 };
 
 type ApiErrorResponse = {
