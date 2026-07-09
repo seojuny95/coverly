@@ -15,7 +15,7 @@ Coverly의 사용자 인터페이스를 담당한다. 현재는 스캐폴딩 단
 ```bash
 pnpm install
 pnpm dev
-pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
+pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
 pnpm format
 ```
 
@@ -38,8 +38,8 @@ src/
 
 ## Testing Guidelines
 
-- 현재 프론트엔드 테스트 러너는 도입하지 않는다.
-- 최소 검증은 `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build` 통과다.
+- 테스트는 **Vitest + Testing Library**를 사용한다.
+- 최소 검증은 `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build` 통과다.
 
 ## Configuration
 

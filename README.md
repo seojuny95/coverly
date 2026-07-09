@@ -28,9 +28,9 @@ uv run pytest
 
 ```bash
 cd frontend
+pnpm test
 pnpm lint
 pnpm typecheck
 pnpm format:check
 pnpm build
 ```
-

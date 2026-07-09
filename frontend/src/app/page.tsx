@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="bg-background text-foreground flex min-h-screen items-center justify-center px-6 py-16">
@@ -10,6 +12,12 @@ export default function Home() {
           증권 업로드, 보장 구조화, 진단 리포트, 약관 기반 Q&A를 위한 기본
           골격을 준비했습니다.
         </p>
+        <Link
+          href="/upload"
+          className="mt-8 inline-flex bg-zinc-950 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+        >
+          증권 업로드
+        </Link>
       </section>
     </main>
   );

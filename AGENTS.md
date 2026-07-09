@@ -25,7 +25,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run p
 
 # 프론트엔드 (Next.js, pnpm)
 cd frontend && pnpm dev
-pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
+pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
 ```
 
 ## Project Structure
@@ -44,4 +44,3 @@ pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
 - **PR 제목**: 영어로 작성한다. 예: `chore: scaffold Coverly apps and CI`
 - **PR 본문**: 한국어로 작성해도 된다. 요약 · 변경사항 · 결정 및 고민 · 검증 · 후속/범위 밖을 포함한다.
 - 혼자 개발하는 동안에는 `main` 직접 커밋을 기본으로 하고, 큰 변경이나 리뷰가 필요한 경우에만 브랜치/PR을 사용한다.
-
