@@ -1,9 +1,9 @@
 from collections.abc import Callable
 
-from app.services.policy_classification import classify_policy
-from app.services.policy_llm_extraction import LlmPolicySummary, extract_policy_summary_with_llm
-from app.services.policy_summary_local import extract_local_policy_summary
-from app.services.policy_summary_types import PolicySummary
+from app.services.policy.classification import classify_policy
+from app.services.policy.llm_extraction import LlmPolicySummary, extract_policy_summary_with_llm
+from app.services.policy.summary_local import extract_local_policy_summary
+from app.services.policy.summary_types import PolicySummary
 
 _LLM_FILLABLE_FIELDS = [
     "보험사",

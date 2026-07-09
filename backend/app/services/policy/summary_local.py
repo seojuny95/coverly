@@ -1,6 +1,6 @@
 import re
 
-from app.services.policy_summary_types import CoveragePeriod, PolicySummary, PremiumSummary
+from app.services.policy.summary_types import CoveragePeriod, PolicySummary, PremiumSummary
 
 _FIELD_LABELS: dict[str, list[str]] = {
     "보험사": ["보험사", "회사명", "발행회사"],

@@ -6,7 +6,7 @@ from typing import Any, cast
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 from openai.types.responses import EasyInputMessageParam, ResponseTextConfigParam
 
-from app.services.policy_summary_types import CoveragePeriod, PolicyCoreSummary, PremiumSummary
+from app.services.policy.summary_types import CoveragePeriod, PolicyCoreSummary, PremiumSummary
 from app.settings import get_settings
 
 LlmPolicySummary = PolicyCoreSummary

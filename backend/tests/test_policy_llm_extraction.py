@@ -1,4 +1,4 @@
-from app.services.policy_llm_extraction import _build_response_format, get_insurer_candidates
+from app.services.policy.llm_extraction import _build_response_format, get_insurer_candidates
 
 
 def test_llm_insurer_field_is_constrained_to_catalog() -> None:

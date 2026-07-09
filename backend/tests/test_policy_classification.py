@@ -1,4 +1,4 @@
-from app.services.policy_classification import classify_policy
+from app.services.policy.classification import classify_policy
 
 
 def test_classify_policy_detects_auto_policy_from_product_and_coverages() -> None:

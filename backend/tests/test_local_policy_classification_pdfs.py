@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 
 from app.services.pdf_text import extract_pdf_text
-from app.services.policy_classification import classify_policy
-from app.services.policy_summary import extract_policy_summary
+from app.services.policy.classification import classify_policy
+from app.services.policy.summary import extract_policy_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_PDF_DIR = REPO_ROOT / "sample-insurance-input"
