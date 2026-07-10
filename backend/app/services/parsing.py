@@ -20,15 +20,15 @@ def parse_document(pdf_bytes: bytes) -> ParsedDocument:
     """Parse a PDF to text and tables, degrading gracefully on corrupt input."""
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-            tables: tuple[Table, ...] = tuple(
-                tuple(tuple(row) for row in table)
-                for page in pdf.pages
-                for table in page.extract_tables()
-            )
+            tables: list[Table] = []
+            for page in pdf.pages:
+                for raw_table in page.extract_tables():
+                    rows = tuple(tuple(cell for cell in row) for row in raw_table)
+                    tables.append(rows)
             text = "\n".join(page.extract_text() or "" for page in pdf.pages).strip()
             layout_text = "\n".join(
                 page.extract_text(layout=True) or "" for page in pdf.pages
             ).strip()
     except Exception:
         return ParsedDocument(text="", layout_text="", tables=())
-    return ParsedDocument(text=text, layout_text=layout_text, tables=tables)
+    return ParsedDocument(text=text, layout_text=layout_text, tables=tuple(tables))

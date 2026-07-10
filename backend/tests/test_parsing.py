@@ -25,6 +25,7 @@ def test_parse_document_returns_parsed_document_shape() -> None:
 def test_parse_document_blank_pdf_has_empty_text_and_no_tables() -> None:
     result = parse_document(_blank_pdf())
     assert result.text == ""
+    assert result.layout_text == ""
     assert result.tables == ()
 
 
