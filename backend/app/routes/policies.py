@@ -6,7 +6,7 @@ from app.errors import ApiError
 from app.services.coverage.extraction import STATUS_OK, extract_coverages
 from app.services.coverage.types import Coverage
 from app.services.pdf_text import extract_pdf_text
-from app.services.policy.summary import extract_policy_summary
+from app.services.summary import extract_policy_summary
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 

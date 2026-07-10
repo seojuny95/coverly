@@ -3,7 +3,7 @@ import json
 import pytest
 
 from app.services.pdf_text import extract_pdf_text
-from app.services.policy.summary import extract_policy_summary
+from app.services.summary import extract_policy_summary
 from tests.summary_helpers import EXPECTED_PATH, SAMPLE_PDF_DIR, flatten_summary
 
 pytestmark = pytest.mark.skipif(

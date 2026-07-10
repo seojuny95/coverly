@@ -147,7 +147,7 @@ def test_parse_keeps_summary_when_coverage_extraction_is_partial(
 ) -> None:
     from app.routes import policies
     from app.services import classification as classification_module
-    from app.services.policy.summary import extract_policy_summary
+    from app.services.summary import extract_policy_summary
 
     # Two LLM seams must be stubbed to keep this test deterministic (the env
     # may carry a real OPENAI_API_KEY):
