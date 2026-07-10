@@ -22,6 +22,10 @@ import pdfplumber
 
 _TableRows = list[list[str | None]]
 
+# Upper bound on the source handed to the LLM. The tier-3 fallback can dump every
+# page's layout text, so cap it to bound model input and cost on large PDFs.
+_MAX_SOURCE_CHARS = 30_000
+
 # Header vocabulary observed across sample policies, kept intentionally wider
 # than the samples so unseen insurers still match tier 1.
 _NAME_HEADERS = ("보장명", "담보명", "담보종목", "보장상세", "특약명")
@@ -90,9 +94,10 @@ def extract_coverage_source(pdf_bytes: bytes) -> str:
         tables = [table for page in pdf.pages for table in page.extract_tables()]
         selected = _select_coverage_tables(tables)
         if selected:
-            parts = [md for table in selected if (md := _serialize_table(table))]
-            return "\n\n".join(parts)
-        # Tier 3: no coverage table detected — hand the LLM everything we have.
-        parts = [md for table in tables if (md := _serialize_table(table))]
-        parts.extend(page.extract_text(layout=True) or "" for page in pdf.pages)
-        return "\n".join(parts).strip()
+            source = "\n\n".join(md for table in selected if (md := _serialize_table(table)))
+        else:
+            # Tier 3: no coverage table detected — hand the LLM everything we have.
+            parts = [md for table in tables if (md := _serialize_table(table))]
+            parts.extend(page.extract_text(layout=True) or "" for page in pdf.pages)
+            source = "\n".join(parts).strip()
+    return source[:_MAX_SOURCE_CHARS]

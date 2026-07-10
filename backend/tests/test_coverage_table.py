@@ -8,6 +8,7 @@ markdown coverage-table source the LLM can map.
 
 import pytest
 
+from app.services.coverage import table as table_module
 from app.services.coverage.table import extract_coverage_source
 from tests.summary_helpers import SAMPLE_PDF_DIR
 
@@ -47,3 +48,13 @@ def test_wrapped_cell_lines_rejoined_with_a_space_not_merged_or_slashed() -> Non
     assert "수술을 받은" in source
     assert "수술을받은" not in source
     assert " / " not in source
+
+
+def test_source_is_capped_to_the_max_length(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The tier-3 fallback can dump every page's layout text, so the source fed to
+    # the LLM must be bounded — a large PDF must not blow up model input and cost.
+    monkeypatch.setattr(table_module, "_MAX_SOURCE_CHARS", 50)
+
+    source = extract_coverage_source((SAMPLE_PDF_DIR / "흥국보험증권.pdf").read_bytes())
+
+    assert len(source) == 50
