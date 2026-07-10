@@ -339,6 +339,36 @@ def test_extract_policy_summary_reads_labeled_table_layout_without_insurer_overr
     }
 
 
+def test_two_column_table_layout_defers_to_llm_fill() -> None:
+    text = """
+    보험증권 발행일
+    보험계약자 보험계약자주소
+    증권번호
+    발행일
+    가나(TESTBIRTH-D-1******) 테스트주소
+    기명피보험자 피보험자주소
+    다라(TESTBIRTH-F-1******) 테스트주소
+    """
+    local = extract_local_policy_summary(text)
+    assert "계약자" not in local or local["계약자"] not in {"보험계약자주소"}
+    assert "피보험자" not in local or local["피보험자"] not in {"피보험자주소"}
+    assert local.get("증권번호") != "발행일"
+    assert local.get("상품명") != "보험"
+
+    filled = extract_policy_summary(
+        text,
+        llm_extractor=lambda _t: {
+            "증권번호": "POLICY-TEST-003",
+            "계약자": "가나",
+            "피보험자": "다라",
+            "상품명": "다이렉트개인용자동차보험",
+        },
+    )
+    assert filled["계약자"] == "가나"
+    assert filled["피보험자"] == "다라"
+    assert filled["증권번호"] == "POLICY-TEST-003"
+
+
 def test_llm_insurer_field_is_constrained_to_catalog() -> None:
     candidates = get_insurer_candidates()
 

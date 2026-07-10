@@ -92,6 +92,27 @@ _POLICY_NUMBER_LABELS = _FIELD_LABELS["증권번호"]
 _POLICY_HOLDER_LABELS = _FIELD_LABELS["계약자"]
 _INSURED_PERSON_LABELS = _FIELD_LABELS["피보험자"]
 _GENERIC_PRODUCT_NAMES = {"보험", "보험증권"}
+_LABEL_LIKE_SUFFIXES = ("주소", "번호", "기간", "성명")
+_LABEL_LIKE_SUBSTRINGS = ("피보험자", "계약자")
+
+
+def _valid_person_name(candidate: str) -> bool:
+    """Reject label-echoing garbage; accept only shape-valid person names.
+
+    A value that itself looks like a table label (ends in 주소/번호/기간/성명,
+    or contains 피보험자/계약자) is a two-column-table mis-parse, not a name.
+    """
+    if not re.fullmatch(_PERSON_NAME_WITH_OPTIONAL_PAREN_PATTERN, candidate):
+        return False
+
+    bare_name = candidate.split("(")[0].strip()
+    if not bare_name or not re.fullmatch(_PERSON_NAME_VALUE_PATTERN, bare_name):
+        return False
+
+    if bare_name.endswith(_LABEL_LIKE_SUFFIXES):
+        return False
+
+    return all(token not in bare_name for token in _LABEL_LIKE_SUBSTRINGS)
 
 
 def extract_local_policy_summary(text: str) -> PolicySummary:
@@ -209,7 +230,7 @@ def _extract_product_name(text: str) -> str | None:
         _PRODUCT_NAME_LABELS,
         _POLICY_NUMBER_LABELS + ["계약자", "보험기간"],
     )
-    if inline_name:
+    if inline_name and inline_name not in _GENERIC_PRODUCT_NAMES:
         return inline_name
 
     lines = _normalized_lines(text)
@@ -227,6 +248,19 @@ def _extract_product_name(text: str) -> str | None:
             return candidate
 
     return None
+
+
+def _is_parenthesized_id_mask(line: str, match: re.Match[str]) -> bool:
+    """True when a policy-number-shaped match is actually a masked ID in parens.
+
+    Korean policy documents commonly show a name followed by a masked
+    resident-registration number, e.g. `가나(TESTBIRTH-D-1******)`. That value
+    is shape-compatible with a policy number but is wrapped tightly in
+    parentheses immediately after a name — a structural signal, not an
+    insurer-specific string, that distinguishes it from a real policy number.
+    """
+    start, end = match.start(), match.end()
+    return start > 0 and line[start - 1] == "(" and end < len(line) and line[end] == ")"
 
 
 def _extract_policy_number(text: str) -> str | None:
@@ -255,11 +289,17 @@ def _extract_policy_number(text: str) -> str | None:
             next_index = index + offset
             if next_index >= len(lines):
                 break
-            candidate_match = policy_number_pattern.search(lines[next_index])
-            if candidate_match:
+            candidate_line = lines[next_index]
+            candidate_match = policy_number_pattern.search(candidate_line)
+            if candidate_match and not _is_parenthesized_id_mask(candidate_line, candidate_match):
                 return _clean_value(candidate_match.group(0))
 
-    return _extract_labeled_value(text, _POLICY_NUMBER_LABELS)
+    labeled_value = _extract_labeled_value(text, _POLICY_NUMBER_LABELS)
+    if not labeled_value:
+        return None
+
+    labeled_match = policy_number_pattern.search(labeled_value)
+    return _clean_value(labeled_match.group(0)) if labeled_match else None
 
 
 def _extract_policy_holder(text: str) -> str | None:
@@ -267,7 +307,9 @@ def _extract_policy_holder(text: str) -> str | None:
     for pattern in _POLICY_HOLDER_EXTRACTION_PATTERNS:
         match = re.search(pattern, text)
         if match:
-            return _clean_value(match.group(1))
+            candidate = _clean_value(match.group(1))
+            if _valid_person_name(candidate):
+                return candidate.split("(")[0].strip()
 
     for index, line in enumerate(lines):
         if line not in {"보험계약자", "계약자", "◆ 계약자"}:
@@ -277,7 +319,7 @@ def _extract_policy_holder(text: str) -> str | None:
             if next_index >= len(lines):
                 break
             candidate = _clean_value(lines[next_index])
-            if re.fullmatch(_PERSON_NAME_WITH_OPTIONAL_PAREN_PATTERN, candidate):
+            if _valid_person_name(candidate):
                 return candidate.split("(")[0].strip()
 
     inline_value = _extract_between_markers(
@@ -287,10 +329,14 @@ def _extract_policy_holder(text: str) -> str | None:
     )
     if inline_value:
         holder_match = re.match(rf"({_PERSON_NAME_VALUE_PATTERN})", inline_value)
-        if holder_match:
+        if holder_match and _valid_person_name(holder_match.group(1)):
             return holder_match.group(1)
 
-    return _extract_labeled_value(text, _POLICY_HOLDER_LABELS)
+    labeled_value = _extract_labeled_value(text, _POLICY_HOLDER_LABELS)
+    if labeled_value and _valid_person_name(labeled_value):
+        return labeled_value.split("(")[0].strip()
+
+    return None
 
 
 def _extract_insured_person(text: str) -> str | None:
@@ -298,7 +344,9 @@ def _extract_insured_person(text: str) -> str | None:
     for pattern in _INSURED_PERSON_EXTRACTION_PATTERNS:
         match = re.search(pattern, text)
         if match:
-            return _clean_value(match.group(1))
+            candidate = _clean_value(match.group(1))
+            if _valid_person_name(candidate):
+                return candidate.split("(")[0].strip()
 
     for index, line in enumerate(lines):
         if line not in {"기명피보험자", "피보험자성명", "(주)피보험자", "피보험자"}:
@@ -308,7 +356,7 @@ def _extract_insured_person(text: str) -> str | None:
             if next_index >= len(lines):
                 break
             candidate = _clean_value(lines[next_index])
-            if re.fullmatch(_PERSON_NAME_WITH_OPTIONAL_PAREN_PATTERN, candidate):
+            if _valid_person_name(candidate):
                 return candidate.split("(")[0].strip()
 
     inline_value = _extract_between_markers(
@@ -318,10 +366,14 @@ def _extract_insured_person(text: str) -> str | None:
     )
     if inline_value:
         insured_match = re.match(rf"({_PERSON_NAME_VALUE_PATTERN})", inline_value)
-        if insured_match:
+        if insured_match and _valid_person_name(insured_match.group(1)):
             return insured_match.group(1)
 
-    return _extract_labeled_value(text, _INSURED_PERSON_LABELS)
+    labeled_value = _extract_labeled_value(text, _INSURED_PERSON_LABELS)
+    if labeled_value and _valid_person_name(labeled_value):
+        return labeled_value.split("(")[0].strip()
+
+    return None
 
 
 def _normalize_date(value: str) -> str | None:
