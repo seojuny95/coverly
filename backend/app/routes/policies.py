@@ -1,8 +1,12 @@
+import asyncio
+
 from fastapi import APIRouter, UploadFile
 
 from app.errors import ApiError
+from app.services.coverage.extraction import STATUS_OK, extract_coverages
+from app.services.coverage.types import Coverage
 from app.services.pdf_text import extract_pdf_text
-from app.services.policy_summary import extract_policy_summary
+from app.services.policy.summary import extract_policy_summary
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
@@ -40,8 +44,20 @@ async def parse_policy(file: UploadFile) -> dict[str, object]:
             message="PDF에서 텍스트를 추출할 수 없습니다.",
         )
 
+    # 보험분류 is authoritative from the summary, so run it first. Auto policies
+    # are out of Phase 1 coverage scope (their riders/rates don't fit the
+    # personal-coverage model), so skip the expensive coverage extraction for them.
+    summary = await asyncio.to_thread(extract_policy_summary, text)
+    if summary.get("보험분류") == "자동차":
+        coverages: list[Coverage] = []
+        analysis_status = STATUS_OK
+    else:
+        coverages, analysis_status = await asyncio.to_thread(extract_coverages, data)
+
     return {
         "status": "accepted",
         "문자수": len(text),
-        "기본정보": extract_policy_summary(text),
+        "기본정보": summary,
+        "보장목록": coverages,
+        "분석상태": analysis_status,
     }

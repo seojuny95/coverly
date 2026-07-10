@@ -18,6 +18,7 @@ import type {
   PolicyPeriod,
 } from "../policy-upload/upload-policy";
 import { UploadForm, type UploadPolicy } from "../policy-upload/upload-form";
+import { PolicyCoverageList } from "./policy-coverage-list";
 
 const CLASSIFICATION_ORDER = [
   "자동차",
@@ -299,6 +300,18 @@ function PolicyDetail({
           </div>
         ))}
       </dl>
+
+      {basicInfo?.보험분류 !== "자동차" ? (
+        <div className="mt-6">
+          <h3 className="text-xs font-medium text-[#111827]/70">보장 내용</h3>
+          <div className="mt-2 rounded-[8px] border border-[#111827]/10 bg-white px-5 py-4">
+            <PolicyCoverageList
+              coverages={policy.result.보장목록}
+              status={policy.result.분석상태}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

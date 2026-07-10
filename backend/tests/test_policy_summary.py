@@ -1,4 +1,4 @@
-from app.services.policy_summary import extract_policy_summary
+from app.services.policy.summary import extract_policy_summary
 
 
 def test_extract_policy_summary_reads_core_fields() -> None:

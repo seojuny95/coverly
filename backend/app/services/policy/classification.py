@@ -10,7 +10,7 @@ class PolicyClassification(TypedDict):
 
 CLASSIFICATION_UNKNOWN = "미분류"
 
-_RULES_PATH = Path(__file__).with_name("policy_classification_rules.json")
+_RULES_PATH = Path(__file__).with_name("classification_rules.json")
 _RAW_RULES = json.loads(_RULES_PATH.read_text(encoding="utf-8"))
 TAG_ORDER: list[str] = _RAW_RULES["tag_order"]
 
