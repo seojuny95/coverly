@@ -1,9 +1,11 @@
 """Amount grounding for extracted coverages (anti-hallucination).
 
-A digital policy has an exact text layer, so any amount we surface must appear
-in the extraction source verbatim (digit-sequence match, tolerant of commas and
-unit reformatting). An amount that does not is likely an LLM hallucination from
-layout confusion — demote it to 확인필요 instead of asserting it.
+A digital policy has an exact text layer, so any numeric amount we surface must
+appear in the extraction source — the value *with its unit*, compared
+whitespace/comma-insensitively. Matching the whole value (not a concatenated
+digit blob) stops a hallucinated amount from passing just because its digits are
+a substring of unrelated numbers (e.g. "23원" against "12원 34원"). An amount
+that does not appear is demoted to 확인필요 instead of asserted.
 
 Some tables declare the unit once in the header ("가입금액 (만원)") and print
 bare numbers in cells; make the unit explicit so the display is unambiguous.
@@ -20,8 +22,24 @@ _BARE_AMOUNT = re.compile(r"^\d[\d,]*$")
 _EXPLICIT_UNIT_AMOUNT = re.compile(r"\d[\d,]*\s*(?:억|만|천|원)")
 
 
-def _digits(text: str) -> str:
-    return re.sub(r"\D", "", text)
+def _norm(text: str) -> str:
+    """Drop whitespace and thousands separators; keep digits, units, and words."""
+    return re.sub(r"[\s,]", "", text)
+
+
+def _number_tokens(text: str) -> set[str]:
+    """Digit strings of each contiguous number in the text (commas removed)."""
+    return {match.replace(",", "") for match in re.findall(r"\d[\d,]*", text)}
+
+
+def _is_grounded(cleaned: str, source: str) -> bool:
+    """True if the amount's value+unit appears in the source, or its exact number
+    token does. Token match tolerates a unit char the LLM added/dropped; both
+    reject a value whose digits are only a substring across unrelated numbers."""
+    digits = cleaned.replace(",", "")
+    if not any(ch.isdigit() for ch in digits):
+        return True  # 무한·한도 … — nothing numeric to hallucinate
+    return _norm(cleaned) in _norm(source) or re.sub(r"\D", "", cleaned) in _number_tokens(source)
 
 
 def normalize_amount(value: str, source: str) -> str:
@@ -29,8 +47,7 @@ def normalize_amount(value: str, source: str) -> str:
     cleaned = value.strip()
     if not cleaned:
         return AMOUNT_UNVERIFIED
-    digits = _digits(cleaned)
-    if digits and digits not in _digits(source):
+    if not _is_grounded(cleaned, source):
         return AMOUNT_UNVERIFIED
     # Bare number under a 만원 header → make the unit explicit (3,000 → 3,000만원),
     # but only when the source's amounts are uniformly unit-less. If any amount

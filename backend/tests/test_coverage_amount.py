@@ -37,6 +37,21 @@ def test_grounding_ignores_commas_and_whitespace() -> None:
     assert normalize_amount("10,000,000원", source) == "10,000,000원"
 
 
+def test_amount_demoted_when_only_a_digit_substring_matches() -> None:
+    # The value's digits appear only as a substring across other amounts, never as
+    # a real amount. Grounding must compare the value+unit, not a concatenated
+    # digit blob, so these hallucinations are demoted (not shown as authoritative).
+    assert normalize_amount("23원", "가입금액 12원 34원") == AMOUNT_UNVERIFIED
+    assert normalize_amount("500원", "50원 00원") == AMOUNT_UNVERIFIED
+
+
+def test_amount_grounded_by_exact_number_token_despite_unit_difference() -> None:
+    # Source cell is bare "10,000,000"; the LLM returned it with a 원 unit. The
+    # exact number token still grounds it — don't over-demote a real amount just
+    # because the unit char differs from the source.
+    assert normalize_amount("10,000,000원", "| 상해사망 | 10,000,000 |") == "10,000,000원"
+
+
 def test_manwon_unit_applied_when_source_is_uniformly_manwon() -> None:
     # NH-style: 만원 header, bare cells, no explicitly-united amounts.
     source = (
