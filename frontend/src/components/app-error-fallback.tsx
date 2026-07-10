@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  CoverlyLogo,
+  PixelEyebrow,
+  primaryButtonClassName,
+} from "./coverly-brand";
+
 type AppErrorFallbackProps = {
   digest?: string;
   onRetry?: () => void;
@@ -7,10 +13,11 @@ type AppErrorFallbackProps = {
 
 export function AppErrorFallback({ digest, onRetry }: AppErrorFallbackProps) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f5f5f7] px-5 py-12 text-zinc-950">
-      <section className="w-full max-w-md rounded-[8px] border border-zinc-200 bg-white px-5 py-6 shadow-[0_16px_60px_rgba(0,0,0,0.06)] sm:px-7 sm:py-7">
-        <p className="text-sm font-semibold text-zinc-950">Coverly</p>
-        <h1 className="mt-5 text-2xl leading-8 font-semibold tracking-normal">
+    <main className="relative flex min-h-screen items-center justify-center bg-white px-5 py-12 text-zinc-950">
+      <CoverlyLogo className="absolute top-6 left-6" />
+      <section className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white px-6 py-8 shadow-[10px_10px_0_#e8edff] sm:px-8">
+        <PixelEyebrow>SYSTEM MESSAGE</PixelEyebrow>
+        <h1 className="mt-5 text-2xl leading-8 font-semibold tracking-[-0.04em]">
           화면을 불러오지 못했어요.
         </h1>
         <p className="mt-3 text-sm leading-6 text-zinc-500">
@@ -18,7 +25,7 @@ export function AppErrorFallback({ digest, onRetry }: AppErrorFallbackProps) {
           다시 접속해주세요.
         </p>
         {digest ? (
-          <p className="mt-4 rounded-[8px] bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-500">
+          <p className="mt-4 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 font-mono text-xs text-zinc-500">
             오류 ID: {digest}
           </p>
         ) : null}
@@ -26,7 +33,7 @@ export function AppErrorFallback({ digest, onRetry }: AppErrorFallbackProps) {
           <button
             type="button"
             onClick={onRetry}
-            className="mt-6 rounded-[8px] bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus:ring-2 focus:ring-zinc-950 focus:ring-offset-2 focus:outline-none"
+            className={`mt-6 ${primaryButtonClassName}`}
           >
             다시 시도하기
           </button>

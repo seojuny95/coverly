@@ -4,6 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  CoverlyLogo,
+  PixelEyebrow,
+  ghostButtonClassName,
+  primaryButtonClassName,
+} from "../../components/coverly-brand";
+
 import insurerLogos from "./insurer-logos.json";
 import {
   type AnalyzedPolicy,
@@ -94,26 +101,33 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
 
   if (analysis === undefined) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-white px-5 text-[#111827]">
-        <p className="text-sm font-medium">분석 결과를 불러오고 있어요.</p>
+      <main className="relative flex min-h-screen items-center justify-center bg-white px-5 text-zinc-950">
+        <CoverlyLogo className="absolute top-6 left-6" />
+        <div className="flex flex-col items-center gap-4">
+          <span className="size-2 animate-pulse bg-blue-600" />
+          <p className="text-sm font-medium text-zinc-500">
+            분석 결과를 불러오고 있어요.
+          </p>
+        </div>
       </main>
     );
   }
 
   if (!analysis || policies.length === 0) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-white px-5 text-[#111827]">
-        <section className="w-full max-w-lg rounded-[8px] border border-[#111827]/15 bg-white px-6 py-8 text-center shadow-[0_18px_70px_rgba(17,24,39,0.08)]">
-          <h1 className="text-2xl font-semibold tracking-normal">
+      <main className="relative flex min-h-screen items-center justify-center bg-white px-5 text-zinc-950">
+        <CoverlyLogo className="absolute top-6 left-6" />
+        <section className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white px-6 py-8 text-center shadow-[10px_10px_0_#e8edff]">
+          <div className="mb-5 flex justify-center">
+            <PixelEyebrow>분석 결과</PixelEyebrow>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-[-0.04em]">
             분석할 보험증권이 없어요
           </h1>
-          <p className="mt-3 text-sm leading-6 text-[#111827]/70">
+          <p className="mt-3 text-sm leading-6 text-zinc-500">
             보험증권 PDF를 올리면 정리한 결과를 여기에서 볼 수 있어요.
           </p>
-          <Link
-            href="/upload"
-            className="mt-6 inline-flex rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#111827]/90 focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none"
-          >
+          <Link href="/upload" className={`mt-6 ${primaryButtonClassName}`}>
             보험증권 올리기
           </Link>
         </section>
@@ -122,20 +136,21 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
   }
 
   return (
-    <main className="min-h-screen bg-white px-5 py-6 text-[#111827] sm:px-6">
+    <main className="min-h-screen bg-white px-5 py-6 text-zinc-950 sm:px-6">
       <header className="mx-auto flex w-full max-w-6xl items-center gap-4">
-        <Link href="/" className="text-sm font-semibold text-[#111827]">
-          Coverly
-        </Link>
+        <CoverlyLogo />
       </header>
 
       <section className="mx-auto mt-10 w-full max-w-6xl">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-normal text-[#111827] sm:text-4xl">
+            <div className="mb-4">
+              <PixelEyebrow>나의 보장 지도</PixelEyebrow>
+            </div>
+            <h1 className="text-3xl font-semibold tracking-[-0.05em] text-zinc-950 sm:text-4xl">
               내 보험을 종류별로 정리했어요
             </h1>
-            <p className="mt-3 text-sm leading-6 text-[#111827]/70">
+            <p className="mt-3 text-sm leading-6 text-zinc-500">
               {analysis.selectedName
                 ? `${analysis.selectedName}님의 보험 ${policies.length}개를 종류별로 보기 쉽게 정리했어요.`
                 : `보험 ${policies.length}개를 종류별로 보기 쉽게 정리했어요.`}
@@ -145,11 +160,11 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
             <button
               type="button"
               onClick={openUploadModal}
-              className="rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#111827]/90 focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none"
+              className={primaryButtonClassName}
             >
               보험증권 더 올리기
             </button>
-            <p className="text-sm text-[#111827]/70">
+            <p className="font-mono text-[10px] tracking-[0.04em] text-zinc-400">
               정리한 시각 {formatDateTime(analysis.generatedAt)}
             </p>
           </div>
@@ -159,12 +174,12 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
           {CLASSIFICATION_ORDER.map((classification) => (
             <div
               key={classification}
-              className="rounded-[8px] border border-[#111827]/15 bg-white px-4 py-4"
+              className="rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
             >
-              <dt className="text-xs font-medium text-[#111827]/70">
+              <dt className="text-xs font-medium text-zinc-500">
                 {classification}
               </dt>
-              <dd className="mt-3 text-3xl font-semibold text-[#2563EB]">
+              <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
                 {counts[classification] ?? 0}
               </dd>
             </div>
@@ -180,36 +195,36 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
             return (
               <section
                 key={classification}
-                className="overflow-hidden rounded-[8px] border border-[#111827]/15 bg-white"
+                className="overflow-hidden rounded-2xl border border-zinc-200 bg-white"
               >
-                <div className="border-b border-[#111827]/10 bg-white px-5 py-4">
-                  <h2 className="text-lg font-semibold tracking-normal">
+                <div className="border-b border-zinc-100 bg-zinc-50/60 px-5 py-4">
+                  <h2 className="text-lg font-semibold tracking-[-0.03em]">
                     {classification}
                   </h2>
-                  <p className="mt-1 text-sm text-[#111827]/70">
+                  <p className="mt-1 text-sm text-zinc-500">
                     보험 {classificationPolicies.length}개
                   </p>
                 </div>
 
-                <ul className="divide-y divide-[#111827]/10">
+                <ul className="divide-y divide-zinc-100">
                   {classificationPolicies.map((policy) => {
                     const isExpanded = expandedPolicyIds.has(policy.id);
                     const basicInfo = policy.result.기본정보;
 
                     return (
                       <li key={policy.id}>
-                        <div className="overflow-hidden rounded-[8px] focus-within:shadow-[inset_0_0_0_2px_#2563EB]">
+                        <div className="overflow-hidden focus-within:shadow-[inset_0_0_0_2px_#2563EB]">
                           <button
                             type="button"
                             aria-expanded={isExpanded}
                             onClick={() => togglePolicy(policy.id)}
-                            className="flex w-full flex-col gap-4 px-5 py-4 text-left transition-colors hover:bg-[#111827]/5 focus:outline-none sm:flex-row sm:items-center sm:justify-between"
+                            className="flex w-full flex-col gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50 focus:outline-none sm:flex-row sm:items-center sm:justify-between"
                           >
                             <span className="flex min-w-0 items-start gap-3">
                               <InsurerLogo insurerName={basicInfo?.보험사} />
                               <span className="min-w-0 flex-1">
                                 <span className="flex min-w-0 items-center gap-2">
-                                  <span className="truncate text-base font-semibold text-[#111827]">
+                                  <span className="truncate text-base font-semibold text-zinc-950">
                                     {basicInfo?.상품명 ?? policy.fileName}
                                   </span>
                                   {basicInfo?.상품태그?.length ? (
@@ -220,12 +235,12 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
                                     </span>
                                   ) : null}
                                 </span>
-                                <span className="mt-1 block truncate text-sm text-[#111827]/70">
+                                <span className="mt-1 block truncate text-sm text-zinc-500">
                                   {policy.fileName}
                                 </span>
                               </span>
                             </span>
-                            <span className="inline-flex shrink-0 items-center rounded-full border border-[#2563EB]/20 px-3 py-1 text-xs font-medium text-[#2563EB]">
+                            <span className="inline-flex shrink-0 items-center rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
                               {isExpanded ? "접기" : "자세히 보기"}
                             </span>
                           </button>
@@ -286,15 +301,15 @@ function PolicyDetail({
 
   return (
     <div
-      className={`border-t border-[#111827]/10 bg-[#111827]/5 px-5 py-5 transition-all duration-200 ease-out ${
+      className={`border-t border-zinc-100 bg-zinc-50/70 px-5 py-5 transition-all duration-200 ease-out ${
         isExpanded ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"
       }`}
     >
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {detailItems.map(([label, value]) => (
           <div key={label}>
-            <dt className="text-xs font-medium text-[#111827]/70">{label}</dt>
-            <dd className="mt-1 text-sm font-medium break-words text-[#111827]">
+            <dt className="text-xs font-medium text-zinc-500">{label}</dt>
+            <dd className="mt-1 text-sm font-medium break-words text-zinc-800">
               {value}
             </dd>
           </div>
@@ -303,8 +318,8 @@ function PolicyDetail({
 
       {basicInfo?.보험분류 !== "자동차" ? (
         <div className="mt-6">
-          <h3 className="text-xs font-medium text-[#111827]/70">보장 내용</h3>
-          <div className="mt-2 rounded-[8px] border border-[#111827]/10 bg-white px-5 py-4">
+          <h3 className="text-xs font-medium text-zinc-500">보장 내용</h3>
+          <div className="mt-2 rounded-xl border border-zinc-200 bg-white px-5 py-4">
             <PolicyCoverageList
               coverages={policy.result.보장목록}
               status={policy.result.분석상태}
@@ -320,7 +335,7 @@ function InsurerLogo({ insurerName }: { insurerName?: string }) {
   const logo = findInsurerLogo(insurerName);
 
   return (
-    <span className="flex h-10 min-w-[4.75rem] shrink-0 items-center justify-center rounded-[10px] border border-[#111827]/10 bg-white px-2.5">
+    <span className="flex h-10 min-w-[4.75rem] shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-2.5">
       {logo ? (
         <span className="relative flex h-7 w-full items-center justify-center overflow-hidden">
           <Image
@@ -333,7 +348,7 @@ function InsurerLogo({ insurerName }: { insurerName?: string }) {
           />
         </span>
       ) : (
-        <span className="text-xs font-semibold text-[#111827]/45">
+        <span className="text-xs font-semibold text-zinc-400">
           {(insurerName ?? "?").slice(0, 1)}
         </span>
       )}
@@ -432,17 +447,17 @@ function UploadPolicyModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#111827]/45 px-5 py-8"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/45 px-5 py-8 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="analysis-upload-modal-title"
     >
-      <div className="w-full max-w-2xl rounded-[12px] bg-white p-5 shadow-[0_24px_80px_rgba(17,24,39,0.22)] sm:p-6">
+      <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-[12px_12px_0_rgba(232,237,255,0.45)] sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2
               id="analysis-upload-modal-title"
-              className="text-xl font-semibold tracking-normal text-[#111827]"
+              className="text-xl font-semibold tracking-[-0.04em] text-zinc-950"
             >
               보험증권 더 올리기
             </h2>
@@ -450,7 +465,7 @@ function UploadPolicyModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[8px] px-3 py-2 text-sm font-medium text-[#111827]/60 transition-colors hover:bg-[#111827]/5 hover:text-[#111827] focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+            className={ghostButtonClassName}
           >
             닫기
           </button>

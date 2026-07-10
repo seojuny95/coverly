@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --coverly-blue: #2563eb;
+  --coverly-mist: #e8edff;
+  --coverly-line: #d4d4d8;
 }
 
 @theme inline {
@@ -12,14 +15,259 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+.upload-dropzone::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background-image: radial-gradient(#d4d4d8 0.7px, transparent 0.7px);
+  background-size: 12px 12px;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 28%,
+    black 72%,
+    transparent
+  );
+  opacity: 0.28;
+}
+
+.analysis-pixel-loader span {
+  background: #d4d4d8;
+  animation: analysis-pixel-pulse 1.6s steps(2, end) infinite;
+}
+
+.analysis-pixel-loader span:nth-child(2),
+.analysis-pixel-loader span:nth-child(4),
+.analysis-pixel-loader span:nth-child(8) {
+  animation-delay: -0.8s;
+}
+
+.analysis-pixel-loader span:nth-child(5) {
+  background: var(--coverly-blue);
+}
+
+@keyframes analysis-pixel-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.evidence-weave {
+  isolation: isolate;
+}
+
+.evidence-dot-grid {
+  background-image: radial-gradient(#d4d4d8 0.75px, transparent 0.75px);
+  background-size: 12px 12px;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 12%,
+    black 88%,
+    transparent
+  );
+  opacity: 0.28;
+}
+
+.evidence-source::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 22%;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(37 99 235 / 12%),
+    transparent
+  );
+  opacity: 0;
+  transform: translateX(-120%);
+  animation: evidence-scan 8s ease-in-out infinite;
+}
+
+.evidence-source-2::after {
+  animation-delay: 140ms;
+}
+
+.evidence-source-3::after {
+  animation-delay: 280ms;
+}
+
+.evidence-route {
+  stroke: var(--coverly-line);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.evidence-signal {
+  stroke: var(--coverly-blue);
+  stroke-width: 4;
+  stroke-linecap: square;
+  stroke-linejoin: round;
+  stroke-dasharray: 0.04 0.96;
+  stroke-dashoffset: 1.08;
+  opacity: 0;
+  vector-effect: non-scaling-stroke;
+  animation: evidence-signal 8s linear infinite;
+}
+
+.evidence-signal-2 {
+  animation-delay: 160ms;
+}
+
+.evidence-signal-3 {
+  animation-delay: 320ms;
+}
+
+.evidence-stitch {
+  stroke: #a1a1aa;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 2 4;
+  opacity: 0.65;
+  vector-effect: non-scaling-stroke;
+}
+
+.evidence-glow {
+  fill: var(--coverly-mist);
+  opacity: 0;
+  animation: evidence-glow 8s steps(4, end) infinite;
+}
+
+.evidence-result-row {
+  background: transparent;
+  opacity: 0.48;
+  animation: evidence-result-row 8s steps(1, end) infinite;
+}
+
+.evidence-result-row-2 {
+  animation-delay: 180ms;
+}
+
+.evidence-result-row-3 {
+  animation-delay: 360ms;
+}
+
+.evidence-complete {
+  animation: evidence-complete 8s steps(1, end) infinite;
+}
+
+@keyframes evidence-scan {
+  0%,
+  4% {
+    opacity: 0;
+    transform: translateX(-120%);
+  }
+  7% {
+    opacity: 1;
+  }
+  18% {
+    opacity: 1;
+    transform: translateX(460%);
+  }
+  21%,
+  100% {
+    opacity: 0;
+    transform: translateX(460%);
+  }
+}
+
+@keyframes evidence-signal {
+  0%,
+  13% {
+    opacity: 0;
+    stroke-dashoffset: 1.08;
+  }
+  16% {
+    opacity: 1;
+  }
+  47% {
+    opacity: 1;
+    stroke-dashoffset: -0.08;
+  }
+  50%,
+  100% {
+    opacity: 0;
+    stroke-dashoffset: -0.08;
+  }
+}
+
+@keyframes evidence-glow {
+  0%,
+  22%,
+  77%,
+  100% {
+    opacity: 0;
+  }
+  30%,
+  68% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes evidence-result-row {
+  0%,
+  42% {
+    background: transparent;
+    opacity: 0.48;
+    transform: translateX(0);
+  }
+  47%,
+  79% {
+    background: #f4f7ff;
+    opacity: 1;
+    transform: translateX(2px);
+  }
+  83%,
+  100% {
+    background: transparent;
+    opacity: 0.48;
+    transform: translateX(0);
+  }
+}
+
+@keyframes evidence-complete {
+  0%,
+  48%,
+  84%,
+  100% {
+    opacity: 0.3;
+  }
+  53%,
+  79% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analysis-pixel-loader span,
+  .evidence-source::after,
+  .evidence-signal,
+  .evidence-glow,
+  .evidence-result-row,
+  .evidence-complete {
+    animation: none;
+  }
+
+  .evidence-result-row,
+  .evidence-complete {
+    opacity: 1;
+  }
+
+  .evidence-result-row {
+    background: #f4f7ff;
+  }
 }

@@ -13,6 +13,10 @@ import {
   UploadPolicyError,
   uploadPolicy as uploadPolicyRequest,
 } from "./upload-policy";
+import {
+  primaryButtonClassName,
+  secondaryButtonClassName,
+} from "../../components/coverly-brand";
 
 export type UploadPolicy = (file: File) => Promise<PolicyUploadResult>;
 
@@ -246,28 +250,36 @@ export function UploadForm({
               setIsDragging(false);
             }}
             onDrop={handleDrop}
-            className={`flex flex-col items-center justify-center rounded-[12px] border border-dashed px-5 text-center transition-colors ${
+            className={`upload-dropzone relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed px-5 text-center transition-colors ${
               isDragging
-                ? "border-[#2563EB] bg-[#2563EB]/10"
+                ? "border-blue-600 bg-blue-50"
                 : isModal
-                  ? "border-[#111827]/15 bg-[#FAFAFA]"
-                  : "border-[#111827]/20 bg-white"
+                  ? "border-zinc-200 bg-zinc-50"
+                  : "border-zinc-200 bg-white"
             } ${isModal ? "min-h-44 py-8" : "min-h-64 py-12"}`}
           >
+            <span className="relative mb-5 grid size-11 place-items-center rounded-xl border border-zinc-200 bg-white shadow-[5px_5px_0_#e8edff]">
+              <span className="grid grid-cols-2 gap-1" aria-hidden="true">
+                <span className="size-1.5 bg-zinc-300" />
+                <span className="size-1.5 bg-blue-600" />
+                <span className="size-1.5 bg-zinc-300" />
+                <span className="size-1.5 bg-zinc-300" />
+              </span>
+            </span>
             <p
-              className={`font-medium text-[#111827] ${
+              className={`relative font-medium text-zinc-950 ${
                 isModal ? "text-base" : "text-base"
               }`}
             >
               {dropzoneTitle}
             </p>
             {dropzoneDescription ? (
-              <p className="mt-2 text-sm leading-6 text-[#111827]/70">
+              <p className="relative mt-2 text-sm leading-6 text-zinc-500">
                 {dropzoneDescription}
               </p>
             ) : null}
             <p
-              className={`mt-1 text-xs text-[#111827]/55 ${
+              className={`relative mt-1 text-xs text-zinc-400 ${
                 isModal ? "" : "hidden"
               }`}
             >
@@ -289,11 +301,7 @@ export function UploadForm({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className={`mt-6 rounded-[10px] px-4 py-2.5 text-sm font-medium transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none ${
-                isModal
-                  ? "bg-white text-[#111827] ring-1 ring-[#111827]/15 ring-inset hover:bg-[#111827]/5"
-                  : "bg-[#111827] text-white hover:bg-[#111827]/90"
-              }`}
+              className={`relative mt-6 ${secondaryButtonClassName}`}
             >
               PDF 불러오기
             </button>
@@ -304,11 +312,7 @@ export function UploadForm({
             <button
               type="submit"
               disabled={selectedFiles.length === 0 || isAnalyzing}
-              className={`rounded-[10px] px-4 py-2.5 text-sm font-medium transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:bg-[#111827]/10 disabled:text-[#111827]/45 ${
-                isModal
-                  ? "self-stretch bg-[#2563EB] text-white enabled:hover:bg-[#1D4ED8]"
-                  : "self-stretch bg-[#111827] text-white enabled:hover:bg-[#111827]/90 sm:self-end"
-              }`}
+              className={`${primaryButtonClassName} self-stretch ${isModal ? "" : "sm:self-end"}`}
             >
               {isAnalyzing ? "보험 정리 중이에요" : submitLabel}
             </button>
@@ -317,10 +321,10 @@ export function UploadForm({
           {isAnalyzing ? (
             <div
               role="status"
-              className="mt-4 rounded-[8px] border border-[#2563EB]/20 bg-[#2563EB]/10 px-4 py-3 text-sm leading-6 text-[#2563EB]"
+              className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-700"
             >
               <span className="font-medium">보험을 정리하고 있어요.</span>
-              <span className="block text-[#111827]/70">
+              <span className="block text-zinc-500">
                 끝나면 정리한 결과를 바로 보여드려요.
               </span>
             </div>
@@ -338,7 +342,7 @@ export function UploadForm({
           {error ? (
             <p
               role="alert"
-              className="mt-4 rounded-[8px] border border-[#2563EB]/20 bg-white px-4 py-3 text-sm leading-6 text-[#111827]"
+              className="mt-4 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm leading-6 text-zinc-700 shadow-[5px_5px_0_#f4f4f5]"
             >
               {error}
             </p>
@@ -361,11 +365,11 @@ function SelectedFileList({
       <div
         className={
           surface === "modal"
-            ? "rounded-[10px] border border-[#111827]/10 bg-white px-4 py-4"
-            : "border-y border-[#111827]/10 py-3"
+            ? "rounded-xl border border-zinc-200 bg-white px-4 py-4"
+            : "rounded-xl border border-zinc-200 bg-white px-4 py-4"
         }
       >
-        <p className="text-sm text-[#111827]/70">선택된 PDF가 없어요.</p>
+        <p className="text-sm text-zinc-500">선택된 PDF가 없어요.</p>
       </div>
     );
   }
@@ -378,13 +382,13 @@ function SelectedFileList({
       aria-label="선택한 PDF"
       className={
         surface === "modal"
-          ? "rounded-[10px] border border-[#111827]/10 bg-white px-4 py-4"
-          : "border-y border-[#111827]/10 py-3"
+          ? "rounded-xl border border-zinc-200 bg-white px-4 py-4"
+          : "rounded-xl border border-zinc-200 bg-white px-4 py-4"
       }
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-[#111827]">선택한 PDF</p>
-        <p className="text-xs text-[#111827]/70">
+        <p className="text-sm font-semibold text-zinc-950">선택한 PDF</p>
+        <p className="text-xs text-zinc-500">
           {files.length}개 ·{" "}
           {formatFileSize(files.reduce((sum, file) => sum + file.size, 0))}
         </p>
@@ -393,7 +397,7 @@ function SelectedFileList({
         {visibleFiles.map((file, index) => (
           <li
             key={`${file.name}-${file.size}-${index}`}
-            className="max-w-full rounded-full border border-[#111827]/15 px-3 py-1.5 text-xs font-medium text-[#111827]"
+            className="max-w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-700"
           >
             <span className="inline-block max-w-[220px] truncate align-bottom">
               {file.name}
@@ -401,7 +405,7 @@ function SelectedFileList({
           </li>
         ))}
         {hiddenFileCount > 0 ? (
-          <li className="rounded-full border border-[#2563EB]/20 bg-[#2563EB]/10 px-3 py-1.5 text-xs font-medium text-[#2563EB]">
+          <li className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">
             외 {hiddenFileCount}개
           </li>
         ) : null}
@@ -432,15 +436,15 @@ function AnalysisProgress({
       }`}
     >
       <div className="flex w-full max-w-[560px] flex-col items-center">
-        <div className="relative h-16 w-16">
-          <div className="absolute inset-0 rounded-full border-2 border-[#111827]/10" />
-          <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#2563EB]" />
-          <div className="absolute inset-4 rounded-full bg-[#2563EB]/10" />
+        <div className="analysis-pixel-loader grid size-16 grid-cols-3 gap-1.5 rounded-2xl border border-zinc-200 bg-white p-3 shadow-[7px_7px_0_#e8edff]">
+          {Array.from({ length: 9 }).map((_, index) => (
+            <span key={index} />
+          ))}
         </div>
-        <h1 className="mt-8 text-2xl font-semibold tracking-normal text-[#111827]">
+        <h1 className="mt-8 text-2xl font-semibold tracking-[-0.04em] text-zinc-950">
           보험을 정리하고 있어요
         </h1>
-        <p className="mt-3 text-sm leading-6 text-[#111827]/70">
+        <p className="mt-3 text-sm leading-6 text-zinc-500">
           {progress.total > 0
             ? `${progress.total}개 PDF 중 ${progress.completed}개를 확인했어요.`
             : "PDF 내용을 확인하고 있어요."}
@@ -451,10 +455,10 @@ function AnalysisProgress({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
-          className="mt-8 h-2 w-full overflow-hidden rounded-full bg-[#111827]/10"
+          className="mt-8 h-1.5 w-full overflow-hidden rounded-sm bg-zinc-100"
         >
           <div
-            className="h-full rounded-full bg-[#2563EB] transition-all duration-300"
+            className="h-full bg-blue-600 transition-all duration-300"
             style={{ width: `${Math.max(percent, 8)}%` }}
           />
         </div>
@@ -497,11 +501,11 @@ function NameSelectionPanel({
   onContinue: () => void;
 }) {
   return (
-    <div className="mt-4 rounded-[8px] border border-[#111827]/15 bg-white px-4 py-4">
-      <p className="text-sm font-semibold text-[#111827]">
+    <div className="mt-4 rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[5px_5px_0_#f4f4f5]">
+      <p className="text-sm font-semibold text-zinc-950">
         피보험자가 여러 명 있어요
       </p>
-      <p className="mt-1 text-sm leading-6 text-[#111827]/70">
+      <p className="mt-1 text-sm leading-6 text-zinc-500">
         결과로 볼 피보험자를 선택하세요. 선택한 피보험자의 증권만 보여드려요.
       </p>
 
@@ -512,10 +516,10 @@ function NameSelectionPanel({
             <label
               key={option.name}
               htmlFor={inputId}
-              className={`flex cursor-pointer items-center justify-between rounded-[8px] border px-3 py-3 text-sm transition-colors ${
+              className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-3 text-sm transition-colors ${
                 selectedName === option.name
-                  ? "border-[#2563EB] bg-[#2563EB]/10"
-                  : "border-[#111827]/15 bg-white hover:bg-[#111827]/5"
+                  ? "border-blue-600 bg-blue-50"
+                  : "border-zinc-200 bg-white hover:bg-zinc-50"
               }`}
             >
               <span className="flex items-center gap-3">
@@ -528,11 +532,9 @@ function NameSelectionPanel({
                   onChange={(event) => onSelectedNameChange(event.target.value)}
                   className="h-4 w-4 accent-[#2563EB]"
                 />
-                <span className="font-medium text-[#111827]">
-                  {option.name}
-                </span>
+                <span className="font-medium text-zinc-800">{option.name}</span>
               </span>
-              <span className="text-[#111827]/70">{option.count}개</span>
+              <span className="text-zinc-500">{option.count}개</span>
             </label>
           );
         })}
@@ -542,7 +544,7 @@ function NameSelectionPanel({
         type="button"
         onClick={onContinue}
         disabled={!selectedName}
-        className="mt-4 rounded-[8px] bg-[#111827] px-4 py-2.5 text-sm font-medium text-white transition-colors focus:ring-2 focus:ring-[#2563EB] focus:ring-offset-2 focus:outline-none enabled:hover:bg-[#111827]/90 disabled:cursor-not-allowed disabled:bg-[#111827]/10 disabled:text-[#111827]/45"
+        className={`mt-4 ${primaryButtonClassName}`}
       >
         선택한 피보험자로 보기
       </button>
