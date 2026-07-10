@@ -2,39 +2,42 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 
-import { UploadForm, type UploadPolicy } from "./upload-form";
-import type { PolicyAnalysis } from "../policy-analysis/analysis-store";
+import {
+  InsuranceUploadForm,
+  type UploadInsurance,
+} from "./insurance-upload-form";
+import type { InsuranceAnalysis } from "../insurance-analysis/insurance-analysis-store";
 
-const policyFile = new File(["%PDF-1.7"], "policy.pdf", {
+const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
   type: "application/pdf",
 });
 const textFile = new File(["hello"], "note.txt", {
   type: "text/plain",
 });
-const secondPolicyFile = new File(["%PDF-1.7"], "second-policy.pdf", {
+const secondInsuranceFile = new File(["%PDF-1.7"], "second-insurance.pdf", {
   type: "application/pdf",
 });
 
 function renderForm({
-  uploadPolicy = vi.fn(),
+  uploadInsurance = vi.fn(),
   onAnalysisComplete = vi.fn(),
   navigateToAnalysis = vi.fn(),
 }: {
-  uploadPolicy?: UploadPolicy;
-  onAnalysisComplete?: (analysis: PolicyAnalysis) => void;
+  uploadInsurance?: UploadInsurance;
+  onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
   navigateToAnalysis?: () => void;
 } = {}) {
   render(
-    <UploadForm
-      uploadPolicy={uploadPolicy}
+    <InsuranceUploadForm
+      uploadInsurance={uploadInsurance}
       onAnalysisComplete={onAnalysisComplete}
       navigateToAnalysis={navigateToAnalysis}
     />,
   );
-  return { uploadPolicy, onAnalysisComplete, navigateToAnalysis };
+  return { uploadInsurance, onAnalysisComplete, navigateToAnalysis };
 }
 
-describe("UploadForm", () => {
+describe("InsuranceUploadForm", () => {
   test("disables upload until a file is selected", () => {
     renderForm();
 
@@ -47,9 +50,9 @@ describe("UploadForm", () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.upload(screen.getByLabelText("PDF 파일 선택"), policyFile);
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
 
-    expect(screen.getByText("policy.pdf")).toBeInTheDocument();
+    expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
     ).toBeEnabled();
@@ -58,14 +61,14 @@ describe("UploadForm", () => {
   test("selects a PDF through drag and drop", async () => {
     renderForm();
 
-    const dropZone = screen.getByTestId("policy-upload-dropzone");
+    const dropZone = screen.getByTestId("insurance-upload-dropzone");
     fireEvent.drop(dropZone, {
       dataTransfer: {
-        files: [policyFile],
+        files: [insuranceFile],
       },
     });
 
-    expect(screen.getByText("policy.pdf")).toBeInTheDocument();
+    expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
     ).toBeEnabled();
@@ -74,7 +77,7 @@ describe("UploadForm", () => {
   test("shows a clear error when a drop contains no file", () => {
     renderForm();
 
-    fireEvent.drop(screen.getByTestId("policy-upload-dropzone"), {
+    fireEvent.drop(screen.getByTestId("insurance-upload-dropzone"), {
       dataTransfer: {
         files: [],
       },
@@ -91,14 +94,14 @@ describe("UploadForm", () => {
   test("selects multiple PDFs through drag and drop", () => {
     renderForm();
 
-    fireEvent.drop(screen.getByTestId("policy-upload-dropzone"), {
+    fireEvent.drop(screen.getByTestId("insurance-upload-dropzone"), {
       dataTransfer: {
-        files: [policyFile, secondPolicyFile],
+        files: [insuranceFile, secondInsuranceFile],
       },
     });
 
-    expect(screen.getByText("policy.pdf")).toBeInTheDocument();
-    expect(screen.getByText("second-policy.pdf")).toBeInTheDocument();
+    expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
+    expect(screen.getByText("second-insurance.pdf")).toBeInTheDocument();
     expect(screen.getByText("2개 · 0.02 KB")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
@@ -108,7 +111,7 @@ describe("UploadForm", () => {
   test("rejects non-PDF files before upload", async () => {
     renderForm();
 
-    fireEvent.drop(screen.getByTestId("policy-upload-dropzone"), {
+    fireEvent.drop(screen.getByTestId("insurance-upload-dropzone"), {
       dataTransfer: {
         files: [textFile],
       },
@@ -143,8 +146,8 @@ describe("UploadForm", () => {
 
   test("uploads selected files and navigates to the analysis page", async () => {
     const user = userEvent.setup();
-    const uploadPolicy = vi
-      .fn<UploadPolicy>()
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
       .mockResolvedValueOnce({
         status: "accepted",
         문자수: 32,
@@ -182,22 +185,22 @@ describe("UploadForm", () => {
       });
     const onAnalysisComplete = vi.fn();
     const navigateToAnalysis = vi.fn();
-    renderForm({ uploadPolicy, onAnalysisComplete, navigateToAnalysis });
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
-      policyFile,
-      secondPolicyFile,
+      insuranceFile,
+      secondInsuranceFile,
     ]);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
-    expect(uploadPolicy).toHaveBeenCalledWith(policyFile);
-    expect(uploadPolicy).toHaveBeenCalledWith(secondPolicyFile);
+    expect(uploadInsurance).toHaveBeenCalledWith(insuranceFile);
+    expect(uploadInsurance).toHaveBeenCalledWith(secondInsuranceFile);
     expect(onAnalysisComplete).toHaveBeenCalledWith(
       expect.objectContaining({
         generatedAt: expect.any(String),
-        policies: [
+        insuranceDocuments: [
           expect.objectContaining({
-            fileName: "policy.pdf",
+            fileName: "insurance.pdf",
             result: expect.objectContaining({
               기본정보: expect.objectContaining({
                 피보험자: "테스트고객",
@@ -206,7 +209,7 @@ describe("UploadForm", () => {
             }),
           }),
           expect.objectContaining({
-            fileName: "second-policy.pdf",
+            fileName: "second-insurance.pdf",
             result: expect.objectContaining({
               기본정보: expect.objectContaining({
                 피보험자: "테스트고객",
@@ -223,7 +226,7 @@ describe("UploadForm", () => {
 
   test("requires a name before saving the analysis", async () => {
     const user = userEvent.setup();
-    const uploadPolicy = vi.fn<UploadPolicy>().mockResolvedValue({
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
       문자수: 20,
       기본정보: {
@@ -235,9 +238,9 @@ describe("UploadForm", () => {
     });
     const onAnalysisComplete = vi.fn();
     const navigateToAnalysis = vi.fn();
-    renderForm({ uploadPolicy, onAnalysisComplete, navigateToAnalysis });
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
 
-    await user.upload(screen.getByLabelText("PDF 파일 선택"), policyFile);
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
@@ -249,9 +252,9 @@ describe("UploadForm", () => {
     expect(navigateToAnalysis).not.toHaveBeenCalled();
   });
 
-  test("does not fall back to the policy holder when insured person is missing", async () => {
+  test("does not fall back to the contract holder when insured person is missing", async () => {
     const user = userEvent.setup();
-    const uploadPolicy = vi.fn<UploadPolicy>().mockResolvedValue({
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
       문자수: 20,
       기본정보: {
@@ -264,9 +267,9 @@ describe("UploadForm", () => {
     });
     const onAnalysisComplete = vi.fn();
     const navigateToAnalysis = vi.fn();
-    renderForm({ uploadPolicy, onAnalysisComplete, navigateToAnalysis });
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
 
-    await user.upload(screen.getByLabelText("PDF 파일 선택"), policyFile);
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
@@ -278,10 +281,10 @@ describe("UploadForm", () => {
     expect(navigateToAnalysis).not.toHaveBeenCalled();
   });
 
-  test("lets the user choose one name when uploaded policies have different names", async () => {
+  test("lets the user choose one name when uploaded insuranceDocuments have different names", async () => {
     const user = userEvent.setup();
-    const uploadPolicy = vi
-      .fn<UploadPolicy>()
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
       .mockResolvedValueOnce({
         status: "accepted",
         문자수: 32,
@@ -308,11 +311,11 @@ describe("UploadForm", () => {
       });
     const onAnalysisComplete = vi.fn();
     const navigateToAnalysis = vi.fn();
-    renderForm({ uploadPolicy, onAnalysisComplete, navigateToAnalysis });
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
-      policyFile,
-      secondPolicyFile,
+      insuranceFile,
+      secondInsuranceFile,
     ]);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
@@ -331,9 +334,9 @@ describe("UploadForm", () => {
     expect(onAnalysisComplete).toHaveBeenCalledWith(
       expect.objectContaining({
         selectedName: "테스트고객B",
-        policies: [
+        insuranceDocuments: [
           expect.objectContaining({
-            fileName: "second-policy.pdf",
+            fileName: "second-insurance.pdf",
             result: expect.objectContaining({
               기본정보: expect.objectContaining({ 피보험자: "테스트고객B" }),
             }),
@@ -346,12 +349,12 @@ describe("UploadForm", () => {
 
   test("shows backend error details when upload fails", async () => {
     const user = userEvent.setup();
-    const uploadPolicy = vi
-      .fn<UploadPolicy>()
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
       .mockRejectedValue(new Error("파일을 분석할 수 없습니다."));
-    renderForm({ uploadPolicy });
+    renderForm({ uploadInsurance });
 
-    await user.upload(screen.getByLabelText("PDF 파일 선택"), policyFile);
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
@@ -361,7 +364,7 @@ describe("UploadForm", () => {
 
   test("disables upload while a request is pending", async () => {
     const user = userEvent.setup();
-    const uploadPolicy = vi.fn<UploadPolicy>().mockImplementation(
+    const uploadInsurance = vi.fn<UploadInsurance>().mockImplementation(
       () =>
         new Promise((resolve) => {
           setTimeout(
@@ -381,9 +384,9 @@ describe("UploadForm", () => {
           );
         }),
     );
-    renderForm({ uploadPolicy });
+    renderForm({ uploadInsurance });
 
-    await user.upload(screen.getByLabelText("PDF 파일 선택"), policyFile);
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(

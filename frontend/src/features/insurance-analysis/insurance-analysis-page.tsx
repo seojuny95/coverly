@@ -13,19 +13,22 @@ import {
 
 import insurerLogos from "./insurer-logos.json";
 import {
-  type AnalyzedPolicy,
-  type PolicyAnalysis,
-  getPolicyPersonName,
-  loadPolicyAnalysis,
-  savePolicyAnalysis,
-} from "./analysis-store";
+  type AnalyzedInsurance,
+  type InsuranceAnalysis,
+  getInsuredPersonName,
+  loadInsuranceAnalysis,
+  saveInsuranceAnalysis,
+} from "./insurance-analysis-store";
 import type {
-  PolicyBasicInfo,
-  PolicyPremium,
-  PolicyPeriod,
-} from "../policy-upload/upload-policy";
-import { UploadForm, type UploadPolicy } from "../policy-upload/upload-form";
-import { PolicyCoverageList } from "./policy-coverage-list";
+  InsuranceBasicInfo,
+  InsurancePremium,
+  InsurancePeriod,
+} from "../insurance-upload/upload-insurance";
+import {
+  InsuranceUploadForm,
+  type UploadInsurance,
+} from "../insurance-upload/insurance-upload-form";
+import { InsuranceCoverageList } from "./insurance-coverage-list";
 
 const CLASSIFICATION_ORDER = [
   "자동차",
@@ -53,31 +56,42 @@ const TAG_STYLES: Record<string, string> = {
 
 const INSURER_LOGOS = insurerLogos;
 
-type AnalysisPageProps = {
-  uploadPolicy?: UploadPolicy;
+type InsuranceAnalysisPageProps = {
+  uploadInsurance?: UploadInsurance;
 };
 
-export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
-  const [analysis, setAnalysis] = useState<PolicyAnalysis | null>();
+export function InsuranceAnalysisPage({
+  uploadInsurance,
+}: InsuranceAnalysisPageProps = {}) {
+  const [analysis, setAnalysis] = useState<InsuranceAnalysis | null>();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [expandedPolicyIds, setExpandedPolicyIds] = useState<Set<string>>(
+  const [expandedInsuranceIds, setExpandedInsuranceIds] = useState<Set<string>>(
     () => new Set(),
   );
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setAnalysis(loadPolicyAnalysis());
+      setAnalysis(loadInsuranceAnalysis());
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
   }, []);
 
-  const policies = useMemo(() => analysis?.policies ?? [], [analysis]);
-  const groupedPolicies = useMemo(() => groupPolicies(policies), [policies]);
-  const counts = useMemo(() => countPolicies(policies), [policies]);
+  const insuranceDocuments = useMemo(
+    () => analysis?.insuranceDocuments ?? [],
+    [analysis],
+  );
+  const groupedInsuranceDocuments = useMemo(
+    () => groupInsuranceDocuments(insuranceDocuments),
+    [insuranceDocuments],
+  );
+  const counts = useMemo(
+    () => countInsuranceDocuments(insuranceDocuments),
+    [insuranceDocuments],
+  );
 
-  const togglePolicy = (policyId: string) => {
-    setExpandedPolicyIds((current) => {
+  const toggleInsurance = (policyId: string) => {
+    setExpandedInsuranceIds((current) => {
       const next = new Set(current);
       if (next.has(policyId)) {
         next.delete(policyId);
@@ -91,11 +105,13 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
   const openUploadModal = () => setIsUploadModalOpen(true);
   const closeUploadModal = () => setIsUploadModalOpen(false);
 
-  const handleAdditionalAnalysisComplete = (nextAnalysis: PolicyAnalysis) => {
+  const handleAdditionalAnalysisComplete = (
+    nextAnalysis: InsuranceAnalysis,
+  ) => {
     if (!analysis) return;
 
-    const mergedAnalysis = mergePolicyAnalysis(analysis, nextAnalysis);
-    savePolicyAnalysis(mergedAnalysis);
+    const mergedAnalysis = mergeInsuranceAnalysis(analysis, nextAnalysis);
+    saveInsuranceAnalysis(mergedAnalysis);
     setAnalysis(mergedAnalysis);
   };
 
@@ -113,7 +129,7 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
     );
   }
 
-  if (!analysis || policies.length === 0) {
+  if (!analysis || insuranceDocuments.length === 0) {
     return (
       <main className="relative flex min-h-screen items-center justify-center bg-white px-5 text-zinc-950">
         <CoverlyLogo className="absolute top-6 left-6" />
@@ -152,8 +168,8 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
             </h1>
             <p className="mt-3 text-sm leading-6 text-zinc-500">
               {analysis.selectedName
-                ? `${analysis.selectedName}님의 보험 ${policies.length}개를 종류별로 보기 쉽게 정리했어요.`
-                : `보험 ${policies.length}개를 종류별로 보기 쉽게 정리했어요.`}
+                ? `${analysis.selectedName}님의 보험 ${insuranceDocuments.length}개를 종류별로 보기 쉽게 정리했어요.`
+                : `보험 ${insuranceDocuments.length}개를 종류별로 보기 쉽게 정리했어요.`}
             </p>
           </div>
           <div className="flex flex-col items-start gap-3 sm:items-end">
@@ -188,9 +204,9 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
 
         <div className="mt-8 space-y-5">
           {CLASSIFICATION_ORDER.map((classification) => {
-            const classificationPolicies =
-              groupedPolicies[classification] ?? [];
-            if (classificationPolicies.length === 0) return null;
+            const classificationInsuranceDocuments =
+              groupedInsuranceDocuments[classification] ?? [];
+            if (classificationInsuranceDocuments.length === 0) return null;
 
             return (
               <section
@@ -202,22 +218,26 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
                     {classification}
                   </h2>
                   <p className="mt-1 text-sm text-zinc-500">
-                    보험 {classificationPolicies.length}개
+                    보험 {classificationInsuranceDocuments.length}개
                   </p>
                 </div>
 
                 <ul className="divide-y divide-zinc-100">
-                  {classificationPolicies.map((policy) => {
-                    const isExpanded = expandedPolicyIds.has(policy.id);
-                    const basicInfo = policy.result.기본정보;
+                  {classificationInsuranceDocuments.map((insuranceDocument) => {
+                    const isExpanded = expandedInsuranceIds.has(
+                      insuranceDocument.id,
+                    );
+                    const basicInfo = insuranceDocument.result.기본정보;
 
                     return (
-                      <li key={policy.id}>
+                      <li key={insuranceDocument.id}>
                         <div className="overflow-hidden focus-within:shadow-[inset_0_0_0_2px_#2563EB]">
                           <button
                             type="button"
                             aria-expanded={isExpanded}
-                            onClick={() => togglePolicy(policy.id)}
+                            onClick={() =>
+                              toggleInsurance(insuranceDocument.id)
+                            }
                             className="flex w-full flex-col gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50 focus:outline-none sm:flex-row sm:items-center sm:justify-between"
                           >
                             <span className="flex min-w-0 items-start gap-3">
@@ -225,7 +245,8 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
                               <span className="min-w-0 flex-1">
                                 <span className="flex min-w-0 items-center gap-2">
                                   <span className="truncate text-base font-semibold text-zinc-950">
-                                    {basicInfo?.상품명 ?? policy.fileName}
+                                    {basicInfo?.상품명 ??
+                                      insuranceDocument.fileName}
                                   </span>
                                   {basicInfo?.상품태그?.length ? (
                                     <span className="flex shrink-0 flex-wrap gap-1.5">
@@ -236,7 +257,7 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
                                   ) : null}
                                 </span>
                                 <span className="mt-1 block truncate text-sm text-zinc-500">
-                                  {policy.fileName}
+                                  {insuranceDocument.fileName}
                                 </span>
                               </span>
                             </span>
@@ -251,8 +272,8 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
                             }`}
                           >
                             <div className="overflow-hidden">
-                              <PolicyDetail
-                                policy={policy}
+                              <InsuranceDetail
+                                insuranceDocument={insuranceDocument}
                                 isExpanded={isExpanded}
                               />
                             </div>
@@ -269,9 +290,9 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
       </section>
 
       {isUploadModalOpen ? (
-        <UploadPolicyModal
+        <UploadInsuranceModal
           selectedName={analysis.selectedName}
-          uploadPolicy={uploadPolicy}
+          uploadInsurance={uploadInsurance}
           onClose={closeUploadModal}
           onAnalysisComplete={handleAdditionalAnalysisComplete}
         />
@@ -280,14 +301,14 @@ export function AnalysisPage({ uploadPolicy }: AnalysisPageProps = {}) {
   );
 }
 
-function PolicyDetail({
-  policy,
+function InsuranceDetail({
+  insuranceDocument,
   isExpanded,
 }: {
-  policy: AnalyzedPolicy;
+  insuranceDocument: AnalyzedInsurance;
   isExpanded: boolean;
 }) {
-  const basicInfo = policy.result.기본정보;
+  const basicInfo = insuranceDocument.result.기본정보;
   const detailItems = [
     ["보험사", basicInfo?.보험사],
     ["증권번호", basicInfo?.증권번호],
@@ -320,9 +341,9 @@ function PolicyDetail({
         <div className="mt-6">
           <h3 className="text-xs font-medium text-zinc-500">보장 내용</h3>
           <div className="mt-2 rounded-xl border border-zinc-200 bg-white px-5 py-4">
-            <PolicyCoverageList
-              coverages={policy.result.보장목록}
-              status={policy.result.분석상태}
+            <InsuranceCoverageList
+              coverages={insuranceDocument.result.보장목록}
+              status={insuranceDocument.result.분석상태}
             />
           </div>
         </div>
@@ -381,28 +402,43 @@ function TagBadge({ tag }: { tag: string }) {
   );
 }
 
-function groupPolicies(policies: AnalyzedPolicy[]) {
-  return policies.reduce<Record<string, AnalyzedPolicy[]>>((groups, policy) => {
-    const classification = policy.result.기본정보?.보험분류 ?? "미분류";
-    groups[classification] = [...(groups[classification] ?? []), policy];
-    return groups;
-  }, {});
+function groupInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
+  return insuranceDocuments.reduce<Record<string, AnalyzedInsurance[]>>(
+    (groups, insuranceDocument) => {
+      const classification =
+        insuranceDocument.result.기본정보?.보험분류 ?? "미분류";
+      groups[classification] = [
+        ...(groups[classification] ?? []),
+        insuranceDocument,
+      ];
+      return groups;
+    },
+    {},
+  );
 }
 
-function countPolicies(policies: AnalyzedPolicy[]) {
-  return policies.reduce<Record<string, number>>((counts, policy) => {
-    const classification = policy.result.기본정보?.보험분류 ?? "미분류";
-    counts[classification] = (counts[classification] ?? 0) + 1;
-    return counts;
-  }, {});
+function countInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
+  return insuranceDocuments.reduce<Record<string, number>>(
+    (counts, insuranceDocument) => {
+      const classification =
+        insuranceDocument.result.기본정보?.보험분류 ?? "미분류";
+      counts[classification] = (counts[classification] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
 }
 
-function formatPeriod(period: PolicyPeriod | PolicyBasicInfo["보험기간"]) {
+function formatPeriod(
+  period: InsurancePeriod | InsuranceBasicInfo["보험기간"],
+) {
   if (!period?.시작일 || !period.종료일) return undefined;
   return `${period.시작일} - ${period.종료일}`;
 }
 
-function formatPremium(premium: PolicyPremium | PolicyBasicInfo["보험료"]) {
+function formatPremium(
+  premium: InsurancePremium | InsuranceBasicInfo["보험료"],
+) {
   if (premium?.금액 === undefined) return undefined;
   const cycle = premium.납입주기 ? `${premium.납입주기} ` : "";
   return `${cycle}${premium.금액.toLocaleString("ko-KR")}원`;
@@ -415,35 +451,39 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function mergePolicyAnalysis(
-  currentAnalysis: PolicyAnalysis,
-  nextAnalysis: PolicyAnalysis,
-): PolicyAnalysis {
+function mergeInsuranceAnalysis(
+  currentAnalysis: InsuranceAnalysis,
+  nextAnalysis: InsuranceAnalysis,
+): InsuranceAnalysis {
   const selectedName =
     currentAnalysis.selectedName ?? nextAnalysis.selectedName;
-  const policies = [...currentAnalysis.policies, ...nextAnalysis.policies];
+  const insuranceDocuments = [
+    ...currentAnalysis.insuranceDocuments,
+    ...nextAnalysis.insuranceDocuments,
+  ];
 
   return {
     generatedAt: nextAnalysis.generatedAt,
     selectedName,
-    policies: selectedName
-      ? policies.filter(
-          (policy) => getPolicyPersonName(policy) === selectedName,
+    insuranceDocuments: selectedName
+      ? insuranceDocuments.filter(
+          (insuranceDocument) =>
+            getInsuredPersonName(insuranceDocument) === selectedName,
         )
-      : policies,
+      : insuranceDocuments,
   };
 }
 
-function UploadPolicyModal({
+function UploadInsuranceModal({
   selectedName,
-  uploadPolicy,
+  uploadInsurance,
   onClose,
   onAnalysisComplete,
 }: {
   selectedName?: string;
-  uploadPolicy?: UploadPolicy;
+  uploadInsurance?: UploadInsurance;
   onClose: () => void;
-  onAnalysisComplete: (analysis: PolicyAnalysis) => void;
+  onAnalysisComplete: (analysis: InsuranceAnalysis) => void;
 }) {
   return (
     <div
@@ -472,8 +512,8 @@ function UploadPolicyModal({
         </div>
 
         <div className="mt-6">
-          <UploadForm
-            uploadPolicy={uploadPolicy}
+          <InsuranceUploadForm
+            uploadInsurance={uploadInsurance}
             fixedSelectedName={selectedName}
             onAnalysisComplete={onAnalysisComplete}
             navigateToAnalysis={onClose}

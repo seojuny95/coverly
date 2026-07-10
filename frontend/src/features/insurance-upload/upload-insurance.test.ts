@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { UploadPolicyError, uploadPolicy } from "./upload-policy";
+import { UploadInsuranceError, uploadInsurance } from "./upload-insurance";
 
-const policyFile = new File(["%PDF-1.7"], "policy.pdf", {
+const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
   type: "application/pdf",
 });
 
-describe("uploadPolicy", () => {
+describe("uploadInsurance", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -40,7 +40,7 @@ describe("uploadPolicy", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await uploadPolicy(policyFile);
+    const result = await uploadInsurance(insuranceFile);
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/policies/parse",
@@ -72,7 +72,7 @@ describe("uploadPolicy", () => {
       ),
     );
 
-    await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
+    await expect(uploadInsurance(insuranceFile)).rejects.toMatchObject({
       code: "POLICY_PARSE_FAILED",
       requestId: "req_123",
       status: 422,
@@ -87,14 +87,14 @@ describe("uploadPolicy", () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            detail: "Traceback: /tmp/raw-policy.pdf parse failed",
+            detail: "Traceback: /tmp/raw-insurance.pdf parse failed",
           }),
           { status: 500 },
         ),
       ),
     );
 
-    await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
+    await expect(uploadInsurance(insuranceFile)).rejects.toMatchObject({
       code: "UPLOAD_FAILED",
       status: 500,
       userMessage:
@@ -110,7 +110,7 @@ describe("uploadPolicy", () => {
           JSON.stringify({
             error: {
               code: "PDF_PARSE_CRASHED",
-              message: "worker timeout at /tmp/policy.pdf",
+              message: "worker timeout at /tmp/insurance.pdf",
               request_id: "req_500",
             },
           }),
@@ -119,7 +119,7 @@ describe("uploadPolicy", () => {
       ),
     );
 
-    await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
+    await expect(uploadInsurance(insuranceFile)).rejects.toMatchObject({
       code: "PDF_PARSE_CRASHED",
       requestId: "req_500",
       status: 500,
@@ -138,9 +138,11 @@ describe("uploadPolicy", () => {
         ),
     );
 
-    const error = await uploadPolicy(policyFile).catch((err: unknown) => err);
+    const error = await uploadInsurance(insuranceFile).catch(
+      (err: unknown) => err,
+    );
 
-    expect(error).toBeInstanceOf(UploadPolicyError);
+    expect(error).toBeInstanceOf(UploadInsuranceError);
     expect(error).toMatchObject({
       code: "UPLOAD_FAILED",
       status: 500,
@@ -154,7 +156,7 @@ describe("uploadPolicy", () => {
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
     );
 
-    await expect(uploadPolicy(policyFile)).rejects.toMatchObject({
+    await expect(uploadInsurance(insuranceFile)).rejects.toMatchObject({
       code: "UPLOAD_NETWORK_ERROR",
       userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
     });

@@ -1,4 +1,4 @@
-import { UploadForm } from "@/features/policy-upload/upload-form";
+import { InsuranceUploadForm } from "@/features/insurance-upload/insurance-upload-form";
 import { CoverlyLogo, PixelEyebrow } from "@/components/coverly-brand";
 
 export default function UploadPage() {
@@ -7,7 +7,7 @@ export default function UploadPage() {
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between">
         <CoverlyLogo />
         <p className="font-mono text-[10px] tracking-[0.08em] text-zinc-400">
-          CONNECT POLICY
+          CONNECT INSURANCE
         </p>
       </header>
 
@@ -25,7 +25,7 @@ export default function UploadPage() {
         </section>
 
         <div className="mx-auto mt-10 w-full max-w-2xl">
-          <UploadForm />
+          <InsuranceUploadForm />
         </div>
       </div>
     </main>

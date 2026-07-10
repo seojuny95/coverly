@@ -2,26 +2,26 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { AnalysisPage } from "./analysis-page";
-import { savePolicyAnalysis } from "./analysis-store";
-import type { UploadPolicy } from "../policy-upload/upload-form";
+import { InsuranceAnalysisPage } from "./insurance-analysis-page";
+import { saveInsuranceAnalysis } from "./insurance-analysis-store";
+import type { UploadInsurance } from "../insurance-upload/insurance-upload-form";
 
-const policyFile = new File(["%PDF-1.7"], "policy.pdf", {
+const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
   type: "application/pdf",
 });
 
-describe("AnalysisPage", () => {
+describe("InsuranceAnalysisPage", () => {
   afterEach(() => {
     window.sessionStorage.clear();
   });
 
-  test("shows policy counts by classification", async () => {
-    savePolicyAnalysis({
+  test("shows insurance counts by classification", async () => {
+    saveInsuranceAnalysis({
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객",
-      policies: [
+      insuranceDocuments: [
         {
-          id: "policy-1",
+          id: "insurance-1",
           fileName: "health.pdf",
           result: {
             status: "accepted",
@@ -36,7 +36,7 @@ describe("AnalysisPage", () => {
           },
         },
         {
-          id: "policy-2",
+          id: "insurance-2",
           fileName: "auto.pdf",
           result: {
             status: "accepted",
@@ -53,7 +53,7 @@ describe("AnalysisPage", () => {
       ],
     });
 
-    render(<AnalysisPage />);
+    render(<InsuranceAnalysisPage />);
 
     expect(
       await screen.findByText("내 보험을 종류별로 정리했어요"),
@@ -77,12 +77,12 @@ describe("AnalysisPage", () => {
     expect(screen.getAllByText("자동차").length).toBeGreaterThan(1);
   });
 
-  test("expands a policy row to show detail fields", async () => {
-    savePolicyAnalysis({
+  test("expands a insurance row to show detail fields", async () => {
+    saveInsuranceAnalysis({
       generatedAt: "2026-07-09T07:30:00.000Z",
-      policies: [
+      insuranceDocuments: [
         {
-          id: "policy-1",
+          id: "insurance-1",
           fileName: "health.pdf",
           result: {
             status: "accepted",
@@ -111,7 +111,7 @@ describe("AnalysisPage", () => {
       ],
     });
 
-    render(<AnalysisPage />);
+    render(<InsuranceAnalysisPage />);
 
     const row = await screen.findByRole("button", {
       name: /건강보험/,
@@ -130,13 +130,13 @@ describe("AnalysisPage", () => {
     expect(screen.queryByText("상품태그")).not.toBeInTheDocument();
   });
 
-  test("renders every display field and insurer logo when a policy has full data", async () => {
-    savePolicyAnalysis({
+  test("renders every display field and insurer logo when an insurance document has full data", async () => {
+    saveInsuranceAnalysis({
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객A",
-      policies: [
+      insuranceDocuments: [
         {
-          id: "policy-full",
+          id: "insurance-full",
           fileName: "db-driver.pdf",
           result: {
             status: "accepted",
@@ -165,7 +165,7 @@ describe("AnalysisPage", () => {
       ],
     });
 
-    const { container } = render(<AnalysisPage />);
+    const { container } = render(<InsuranceAnalysisPage />);
 
     const row = await screen.findByRole("button", {
       name: /마이헬스파트너/,
@@ -199,13 +199,13 @@ describe("AnalysisPage", () => {
     expect(screen.getByText("월납 120,000원")).toBeInTheDocument();
   });
 
-  test("renders DB insurer name and logo for a parsed driver policy", async () => {
-    savePolicyAnalysis({
+  test("renders DB insurer name and logo for a parsed driver insurance document", async () => {
+    saveInsuranceAnalysis({
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객A",
-      policies: [
+      insuranceDocuments: [
         {
-          id: "db-driver-policy",
+          id: "db-driver-insurance",
           fileName: "DB운전자보험증권.pdf",
           result: {
             status: "accepted",
@@ -234,7 +234,7 @@ describe("AnalysisPage", () => {
       ],
     });
 
-    const { container } = render(<AnalysisPage />);
+    const { container } = render(<InsuranceAnalysisPage />);
     const row = await screen.findByRole("button", {
       name: /무배당 프로미라이프 참좋은운전자상해보험/,
     });
@@ -256,7 +256,7 @@ describe("AnalysisPage", () => {
   });
 
   test("shows an empty state when no analysis exists", async () => {
-    render(<AnalysisPage />);
+    render(<InsuranceAnalysisPage />);
 
     expect(
       await screen.findByText("분석할 보험증권이 없어요"),
@@ -266,9 +266,9 @@ describe("AnalysisPage", () => {
     ).toHaveAttribute("href", "/upload");
   });
 
-  test("opens an upload modal and merges uploaded policies into the current analysis", async () => {
+  test("opens an upload modal and merges uploaded insuranceDocuments into the current analysis", async () => {
     const user = userEvent.setup();
-    const uploadPolicy = vi.fn<UploadPolicy>().mockResolvedValue({
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
       문자수: 80,
       기본정보: {
@@ -280,12 +280,12 @@ describe("AnalysisPage", () => {
       },
     });
 
-    savePolicyAnalysis({
+    saveInsuranceAnalysis({
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객",
-      policies: [
+      insuranceDocuments: [
         {
-          id: "policy-1",
+          id: "insurance-1",
           fileName: "health.pdf",
           result: {
             status: "accepted",
@@ -302,7 +302,7 @@ describe("AnalysisPage", () => {
       ],
     });
 
-    render(<AnalysisPage uploadPolicy={uploadPolicy} />);
+    render(<InsuranceAnalysisPage uploadInsurance={uploadInsurance} />);
 
     await user.click(
       await screen.findByRole("button", { name: "보험증권 더 올리기" }),
@@ -317,10 +317,10 @@ describe("AnalysisPage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("보험증권 PDF")).not.toBeInTheDocument();
 
-    await user.upload(screen.getByLabelText("PDF 파일 선택"), policyFile);
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "분석에 추가하기" }));
 
-    expect(uploadPolicy).toHaveBeenCalledWith(policyFile);
+    expect(uploadInsurance).toHaveBeenCalledWith(insuranceFile);
     expect(
       await screen.findByText(
         "테스트고객님의 보험 2개를 종류별로 보기 쉽게 정리했어요.",

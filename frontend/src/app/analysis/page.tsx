@@ -1,5 +1,5 @@
-import { AnalysisPage } from "@/features/policy-analysis/analysis-page";
+import { InsuranceAnalysisPage } from "@/features/insurance-analysis/insurance-analysis-page";
 
 export default function Page() {
-  return <AnalysisPage />;
+  return <InsuranceAnalysisPage />;
 }

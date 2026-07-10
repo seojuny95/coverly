@@ -1,28 +1,28 @@
 "use client";
 
 import {
-  type AnalyzedPolicy,
-  type PolicyAnalysis,
-  getPolicyPersonName,
-  savePolicyAnalysis,
-} from "../policy-analysis/analysis-store";
+  type AnalyzedInsurance,
+  type InsuranceAnalysis,
+  getInsuredPersonName,
+  saveInsuranceAnalysis,
+} from "../insurance-analysis/insurance-analysis-store";
 import { type DragEvent, type FormEvent, useRef, useState } from "react";
 
 import {
-  type PolicyUploadResult,
-  UploadPolicyError,
-  uploadPolicy as uploadPolicyRequest,
-} from "./upload-policy";
+  type InsuranceUploadResult,
+  UploadInsuranceError,
+  uploadInsurance as uploadInsuranceRequest,
+} from "./upload-insurance";
 import {
   primaryButtonClassName,
   secondaryButtonClassName,
 } from "../../components/coverly-brand";
 
-export type UploadPolicy = (file: File) => Promise<PolicyUploadResult>;
+export type UploadInsurance = (file: File) => Promise<InsuranceUploadResult>;
 
-type UploadFormProps = {
-  uploadPolicy?: UploadPolicy;
-  onAnalysisComplete?: (analysis: PolicyAnalysis) => void;
+type InsuranceUploadFormProps = {
+  uploadInsurance?: UploadInsurance;
+  onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
   navigateToAnalysis?: () => void;
   fixedSelectedName?: string;
   surface?: "page" | "modal";
@@ -44,15 +44,15 @@ function toFiles(files: FileList | File[]): File[] {
   return Array.from(files);
 }
 
-export function UploadForm({
-  uploadPolicy = uploadPolicyRequest,
-  onAnalysisComplete = savePolicyAnalysis,
+export function InsuranceUploadForm({
+  uploadInsurance = uploadInsuranceRequest,
+  onAnalysisComplete = saveInsuranceAnalysis,
   navigateToAnalysis = () => {
     window.location.assign("/analysis");
   },
   fixedSelectedName,
   surface = "page",
-}: UploadFormProps) {
+}: InsuranceUploadFormProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -60,9 +60,8 @@ export function UploadForm({
     completed: 0,
     total: 0,
   });
-  const [pendingAnalysis, setPendingAnalysis] = useState<PolicyAnalysis | null>(
-    null,
-  );
+  const [pendingAnalysis, setPendingAnalysis] =
+    useState<InsuranceAnalysis | null>(null);
   const [selectedName, setSelectedName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -110,10 +109,10 @@ export function UploadForm({
     setPendingAnalysis(null);
     setSelectedName("");
     try {
-      const policies = await Promise.all(
+      const insuranceDocuments = await Promise.all(
         selectedFiles.map(async (file, index) => {
           try {
-            const result = await uploadPolicy(file);
+            const result = await uploadInsurance(file);
             setAnalysisProgress((current) => ({
               ...current,
               completed: current.completed + 1,
@@ -125,7 +124,7 @@ export function UploadForm({
             };
           } catch (err) {
             const message =
-              err instanceof UploadPolicyError
+              err instanceof UploadInsuranceError
                 ? err.userMessage
                 : err instanceof Error
                   ? err.message
@@ -136,11 +135,11 @@ export function UploadForm({
       );
       const analysis = {
         generatedAt: new Date().toISOString(),
-        policies,
+        insuranceDocuments,
       };
       continueWithNameValidation(analysis);
     } catch (err) {
-      if (err instanceof UploadPolicyError) {
+      if (err instanceof UploadInsuranceError) {
         setError(err.userMessage);
       } else {
         setError(
@@ -154,11 +153,11 @@ export function UploadForm({
     }
   };
 
-  const continueWithNameValidation = (analysis: PolicyAnalysis) => {
-    const policiesWithoutName = analysis.policies.filter(
-      (policy) => !getPolicyPersonName(policy),
+  const continueWithNameValidation = (analysis: InsuranceAnalysis) => {
+    const insuranceDocumentsWithoutName = analysis.insuranceDocuments.filter(
+      (insuranceDocument) => !getInsuredPersonName(insuranceDocument),
     );
-    if (policiesWithoutName.length > 0) {
+    if (insuranceDocumentsWithoutName.length > 0) {
       setError(
         "피보험자를 확인할 수 없는 증권이 있어요. 피보험자가 확인된 증권만 분석할 수 있어요.",
       );
@@ -166,7 +165,7 @@ export function UploadForm({
     }
 
     if (fixedSelectedName) {
-      const names = getPolicyNameOptions(analysis.policies).map(
+      const names = getInsuranceNameOptions(analysis.insuranceDocuments).map(
         (option) => option.name,
       );
       if (names.length > 1 || names[0] !== fixedSelectedName) {
@@ -180,7 +179,7 @@ export function UploadForm({
       return;
     }
 
-    const names = getPolicyNameOptions(analysis.policies).map(
+    const names = getInsuranceNameOptions(analysis.insuranceDocuments).map(
       (option) => option.name,
     );
     if (names.length === 1) {
@@ -193,14 +192,15 @@ export function UploadForm({
   };
 
   const saveSelectedNameAnalysis = (
-    analysis: PolicyAnalysis,
+    analysis: InsuranceAnalysis,
     personName: string,
   ) => {
     const filteredAnalysis = {
       ...analysis,
       selectedName: personName,
-      policies: analysis.policies.filter(
-        (policy) => getPolicyPersonName(policy) === personName,
+      insuranceDocuments: analysis.insuranceDocuments.filter(
+        (insuranceDocument) =>
+          getInsuredPersonName(insuranceDocument) === personName,
       ),
     };
     onAnalysisComplete(filteredAnalysis);
@@ -236,7 +236,7 @@ export function UploadForm({
       <section>
         <div>
           <div
-            data-testid="policy-upload-dropzone"
+            data-testid="insurance-upload-dropzone"
             onDragEnter={(event) => {
               event.preventDefault();
               setIsDragging(true);
@@ -288,7 +288,7 @@ export function UploadForm({
 
             <input
               ref={inputRef}
-              id="policy-file"
+              id="insurance-file"
               className="sr-only"
               type="file"
               accept="application/pdf,.pdf"
@@ -332,7 +332,9 @@ export function UploadForm({
 
           {pendingAnalysis ? (
             <NameSelectionPanel
-              options={getPolicyNameOptions(pendingAnalysis.policies)}
+              options={getInsuranceNameOptions(
+                pendingAnalysis.insuranceDocuments,
+              )}
               selectedName={selectedName}
               onSelectedNameChange={setSelectedName}
               onContinue={handleNameSelectionSubmit}
@@ -475,10 +477,10 @@ function formatFileSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(2)} MB`;
 }
 
-function getPolicyNameOptions(policies: AnalyzedPolicy[]) {
+function getInsuranceNameOptions(insuranceDocuments: AnalyzedInsurance[]) {
   const counts = new Map<string, number>();
-  for (const policy of policies) {
-    const personName = getPolicyPersonName(policy);
+  for (const insuranceDocument of insuranceDocuments) {
+    const personName = getInsuredPersonName(insuranceDocument);
     if (!personName) continue;
     counts.set(personName, (counts.get(personName) ?? 0) + 1);
   }
@@ -511,7 +513,7 @@ function NameSelectionPanel({
 
       <div className="mt-4 grid gap-2">
         {options.map((option, index) => {
-          const inputId = `policy-person-name-${index}`;
+          const inputId = `insurance-person-name-${index}`;
           return (
             <label
               key={option.name}
@@ -526,7 +528,7 @@ function NameSelectionPanel({
                 <input
                   id={inputId}
                   type="radio"
-                  name="policy-person-name"
+                  name="insurance-person-name"
                   value={option.name}
                   checked={selectedName === option.name}
                   onChange={(event) => onSelectedNameChange(event.target.value)}

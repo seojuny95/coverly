@@ -1,20 +1,20 @@
-import type { PolicyCoverage } from "../policy-upload/upload-policy";
+import type { InsuranceCoverage } from "../insurance-upload/upload-insurance";
 
 const GENERATED_NOTICE =
   "일반적인 설명이에요. 정확한 보장 내용은 가입한 상품의 약관에서 확인할 수 있어요.";
 
-type PolicyCoverageListProps = {
-  coverages?: PolicyCoverage[];
+type InsuranceCoverageListProps = {
+  coverages?: InsuranceCoverage[];
   status?: "완료" | "부분";
 };
 
-export function PolicyCoverageList({
+export function InsuranceCoverageList({
   coverages,
   status,
-}: PolicyCoverageListProps) {
+}: InsuranceCoverageListProps) {
   if (!coverages || coverages.length === 0) {
     // A partial analysis (e.g. an LLM error) must not look like a genuinely
-    // empty policy — tell the user it failed and what they can do.
+    // empty insuranceDocument — tell the user it failed and what they can do.
     if (status === "부분") {
       return (
         <p className="text-sm leading-6 text-[#111827]/60">
