@@ -1,11 +1,15 @@
 """Normalize a coverage-table source into the unified Coverage shape.
 
 Insurers print the coverage table with different columns; one structured-output
-LLM call maps any layout into the same fields. The LLM only transcribes rows
-that exist in the source — amounts it returns are then grounded against the
-source and demoted to 확인필요 when unverifiable (see amount.normalize_amount).
+LLM call maps any layout into the same fields. Everything the LLM returns is
+grounded against the source before we present it as authoritative 증권 원문:
+amounts are demoted to 확인필요 (see amount.normalize_amount), and 보장내용 that
+does not appear in the source is dropped to None so the coverage falls through
+to a clearly-labeled generated 해설 instead of a paraphrase shown as the policy's
+own wording.
 """
 
+import re
 from functools import lru_cache
 
 from pydantic import BaseModel, ValidationError
@@ -45,6 +49,16 @@ def _default_completer() -> JsonCompleter:
     return structured_completer(_CoverageList)
 
 
+def _wording_grounded(detail: str, source: str) -> bool:
+    """True if the wording appears in the source (whitespace-insensitive).
+
+    A cell's text is a contiguous run in the source, so a verbatim transcription
+    matches once whitespace (the markdown's spaces/newlines) is removed; a
+    paraphrase or hallucination does not.
+    """
+    return re.sub(r"\s", "", detail) in re.sub(r"\s", "", source)
+
+
 def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> list[Coverage]:
     """Map a coverage-table source into Coverages (one structured LLM call)."""
     if not source.strip():
@@ -61,6 +75,8 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
         except ValidationError:
             continue
         detail = parsed.보장내용.strip() if parsed.보장내용 else None
+        if detail and not _wording_grounded(detail, source):
+            detail = None  # not the policy's own wording — don't present it as 원문
         coverages.append(
             Coverage(
                 담보명=parsed.담보명.strip(),

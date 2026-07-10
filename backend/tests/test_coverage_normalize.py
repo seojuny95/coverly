@@ -8,6 +8,44 @@ SOURCE = (
 )
 
 
+def test_normalize_drops_policy_wording_absent_from_source() -> None:
+    # The LLM returned 보장내용 that does not appear in the source — a paraphrase or
+    # hallucination. It must not be shown as authoritative 증권 원문; drop it to None
+    # so the coverage falls through to a clearly-labeled generated 해설 downstream.
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {
+                    "담보명": "암진단비",
+                    "보장내용": "모든 암에 무조건 1억원을 지급",
+                    "가입금액": "30,000,000원",
+                }
+            ]
+        }
+
+    result = normalize_coverages(SOURCE, complete=fake_complete)
+
+    assert result[0]["보장내용"] is None
+
+
+def test_normalize_keeps_policy_wording_present_in_source() -> None:
+    # Verbatim wording (whitespace aside) grounds and is kept as authoritative.
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {
+                    "담보명": "암진단비",
+                    "보장내용": "암 진단 확정 시 최초 1회 지급",
+                    "가입금액": "30,000,000원",
+                }
+            ]
+        }
+
+    result = normalize_coverages(SOURCE, complete=fake_complete)
+
+    assert result[0]["보장내용"] == "암 진단 확정 시 최초 1회 지급"
+
+
 def test_normalize_maps_rows_into_coverages() -> None:
     def fake_complete(system: str, user: str) -> dict[str, object]:
         return {
