@@ -37,13 +37,13 @@ def test_extracts_markdown_coverage_source_from_real_policy(filename: str) -> No
     )
 
 
-def test_korean_midword_line_wraps_rejoined_without_a_stray_slash() -> None:
-    # NH's coverage cells wrap mid-word (e.g. "한\n하여", "최\n초"). The source must
-    # rejoin them tightly — Korean has no intra-word spaces — instead of inserting
-    # the old " / " marker, which leaked into 보장내용 as a stray slash the user
-    # could not tell apart from a real "/". Only "\n" is rewritten, so a genuine
-    # "/" in the policy text is never touched.
+def test_wrapped_cell_lines_rejoined_with_a_space_not_merged_or_slashed() -> None:
+    # NH cells wrap across visual lines (e.g. "수술을\n받은 경우"). Rejoin with a
+    # space so distinct words are not merged ("수술을받은"), and never with the old
+    # " / " marker, which leaked into 보장내용 as a stray slash. Only "\n" is
+    # rewritten, so a genuine "/" in the policy text is never touched.
     source = extract_coverage_source((SAMPLE_PDF_DIR / "NH농협보험증권.pdf").read_bytes())
 
-    assert "한하여" in source
-    assert "한 / 하여" not in source
+    assert "수술을 받은" in source
+    assert "수술을받은" not in source
+    assert " / " not in source

@@ -22,8 +22,6 @@ import pdfplumber
 
 _TableRows = list[list[str | None]]
 
-_HANGUL = re.compile(r"[가-힣]")
-
 # Header vocabulary observed across sample policies, kept intentionally wider
 # than the samples so unseen insurers still match tier 1.
 _NAME_HEADERS = ("보장명", "담보명", "담보종목", "보장상세", "특약명")
@@ -53,24 +51,16 @@ def _select_coverage_tables(tables: list[_TableRows]) -> list[_TableRows]:
 def _join_cell_lines(cell: str) -> str:
     """Rejoin a cell that pdfplumber split across visual lines.
 
-    A markdown cell must be one line, so cell-internal newlines are removed. A
-    break between two Hangul syllables is a mid-word wrap (Korean has no
-    intra-word spaces), so it joins with nothing — '한'+'하여' -> '한하여', not
-    '한 하여'. Any other break (before a number, punctuation, '※', or across a
-    space) joins with a single space so notes/items don't run together. This
-    replaces the old ' / ' marker, which leaked into 보장내용 as a stray slash
-    indistinguishable from a real '/'.
+    A markdown cell must be one line, so cell-internal newlines are rejoined with
+    a single space. pdfplumber drops the wrap space inconsistently and a mid-word
+    wrap ('한'+'하여') is indistinguishable from a word-boundary wrap
+    ('수술을'+'받은'), so a space is the safe default: it never merges distinct
+    words (a rare mid-word wrap only gains a harmless space). This replaces the
+    old ' / ' marker, which leaked into 보장내용 as a stray slash the reader could
+    not tell apart from a real '/'. Only whitespace is rewritten, so a genuine
+    '/' in the policy text is untouched.
     """
-    parts = cell.split("\n")
-    text = parts[0]
-    for nxt in parts[1:]:
-        glue = (
-            ""
-            if (text[-1:] and nxt[:1] and _HANGUL.match(text[-1]) and _HANGUL.match(nxt[0]))
-            else " "
-        )
-        text += glue + nxt
-    return re.sub(r"[ \t]+", " ", text).strip()
+    return re.sub(r"\s+", " ", cell.replace("\n", " ")).strip()
 
 
 def _serialize_table(rows: _TableRows) -> str:
