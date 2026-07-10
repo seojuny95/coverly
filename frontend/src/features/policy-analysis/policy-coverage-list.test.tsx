@@ -90,4 +90,34 @@ describe("PolicyCoverageList", () => {
       screen.getByText("이 증권에서 보장 내용을 찾지 못했어요."),
     ).toBeInTheDocument();
   });
+
+  test("distinguishes a partial-analysis failure from a genuinely empty result", () => {
+    render(<PolicyCoverageList coverages={[]} status="부분" />);
+
+    expect(
+      screen.getByText(
+        "보장 내용을 다 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("이 증권에서 보장 내용을 찾지 못했어요."),
+    ).not.toBeInTheDocument();
+  });
+
+  test("notes a partial analysis when some coverages did load", () => {
+    render(<PolicyCoverageList coverages={[withDetail]} status="부분" />);
+
+    expect(screen.getByText("암진단비")).toBeInTheDocument();
+    expect(
+      screen.getByText("일부 정보를 분석하지 못했어요."),
+    ).toBeInTheDocument();
+  });
+
+  test("shows no partial note when analysis completed", () => {
+    render(<PolicyCoverageList coverages={[withDetail]} status="완료" />);
+
+    expect(
+      screen.queryByText("일부 정보를 분석하지 못했어요."),
+    ).not.toBeInTheDocument();
+  });
 });
