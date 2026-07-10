@@ -35,3 +35,15 @@ def test_extracts_markdown_coverage_source_from_real_policy(filename: str) -> No
     assert any(header in source for header in _AMOUNT_HEADERS), (
         f"{filename}: detected table has no amount column"
     )
+
+
+def test_korean_midword_line_wraps_rejoined_without_a_stray_slash() -> None:
+    # NH's coverage cells wrap mid-word (e.g. "한\n하여", "최\n초"). The source must
+    # rejoin them tightly — Korean has no intra-word spaces — instead of inserting
+    # the old " / " marker, which leaked into 보장내용 as a stray slash the user
+    # could not tell apart from a real "/". Only "\n" is rewritten, so a genuine
+    # "/" in the policy text is never touched.
+    source = extract_coverage_source((SAMPLE_PDF_DIR / "NH농협보험증권.pdf").read_bytes())
+
+    assert "한하여" in source
+    assert "한 / 하여" not in source

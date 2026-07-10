@@ -16,10 +16,13 @@ real sample policies).
 """
 
 import io
+import re
 
 import pdfplumber
 
 _TableRows = list[list[str | None]]
+
+_HANGUL = re.compile(r"[가-힣]")
 
 # Header vocabulary observed across sample policies, kept intentionally wider
 # than the samples so unseen insurers still match tier 1.
@@ -47,13 +50,36 @@ def _select_coverage_tables(tables: list[_TableRows]) -> list[_TableRows]:
     return [table for table in tables if _is_coverage_table(table, require_amount=False)]
 
 
+def _join_cell_lines(cell: str) -> str:
+    """Rejoin a cell that pdfplumber split across visual lines.
+
+    A markdown cell must be one line, so cell-internal newlines are removed. A
+    break between two Hangul syllables is a mid-word wrap (Korean has no
+    intra-word spaces), so it joins with nothing — '한'+'하여' -> '한하여', not
+    '한 하여'. Any other break (before a number, punctuation, '※', or across a
+    space) joins with a single space so notes/items don't run together. This
+    replaces the old ' / ' marker, which leaked into 보장내용 as a stray slash
+    indistinguishable from a real '/'.
+    """
+    parts = cell.split("\n")
+    text = parts[0]
+    for nxt in parts[1:]:
+        glue = (
+            ""
+            if (text[-1:] and nxt[:1] and _HANGUL.match(text[-1]) and _HANGUL.match(nxt[0]))
+            else " "
+        )
+        text += glue + nxt
+    return re.sub(r"[ \t]+", " ", text).strip()
+
+
 def _serialize_table(rows: _TableRows) -> str:
     """Render a pdfplumber table as markdown so column-row associations survive.
 
-    Cell-internal newlines become ' / ' (cells often pack several line items).
-    Returns '' for non-tables (<2 rows or <2 columns).
+    Cell-internal line wraps are rejoined (see _join_cell_lines). Returns '' for
+    non-tables (<2 rows or <2 columns).
     """
-    clean = [[(cell or "").replace("\n", " / ").strip() for cell in row] for row in rows]
+    clean = [[_join_cell_lines(cell or "") for cell in row] for row in rows]
     clean = [row for row in clean if any(row)]
     if len(clean) < 2 or len(clean[0]) < 2:
         return ""
