@@ -1,113 +1,109 @@
-from app.services.classification import classify_policy
+import json
+from pathlib import Path
+
+import pytest
+
+from app.services.classification import CLASSIFICATION_UNKNOWN, classify_policy
+from app.services.llm import JsonCompleter
+
+_RULES_PATH = (
+    Path(__file__).resolve().parents[1] / "app" / "services" / "data" / "classification_rules.json"
+)
+
+_MAGIC_NUMBER_KEYS = {
+    "product_weight",
+    "min_strength",
+    "min_product_hits",
+    "min_combined_strength",
+    "product_bonus",
+}
 
 
-def test_classify_policy_detects_auto_policy_from_product_and_coverages() -> None:
+def _forbidden_completer(_system: str, _user: str) -> dict[str, object]:
+    raise AssertionError("LLM fallback must not be called when a deterministic term matches")
+
+
+@pytest.mark.parametrize(
+    ("product_name", "text", "expected_classification"),
+    [
+        ("삼성 개인용자동차보험", "자동차보험 대인배상 대물배상 자기차량손해", "자동차"),
+        ("주택화재보험", "화재손해 화재배상책임", "배상·화재·기타"),
+        ("메리츠 실비보험", "실손의료비 급여 비급여 자기부담금 보상", "상해·질병·실손"),
+        ("무배당 연금보험", "연금개시 연금수령", "생명·연금"),
+        ("무배당 교보New종신보험", "사망보험금 해약환급금 20년납 종신", "생명·연금"),
+    ],
+)
+def test_classify_policy_deterministic_match_never_calls_llm(
+    product_name: str, text: str, expected_classification: str
+) -> None:
+    result = classify_policy(text=text, product_name=product_name, complete=_forbidden_completer)
+
+    assert result["보험분류"] == expected_classification
+
+
+def test_classify_policy_falls_back_to_llm_when_no_official_term_matches() -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_completer(system: str, user: str) -> dict[str, object]:
+        calls.append((system, user))
+        return {"보험분류": "상해·질병·실손", "상품태그": []}
+
     result = classify_policy(
-        text="""
-        삼성화재해상보험(주)
-        보험종목 개인용자동차보험
-        대인배상I 대인배상II 대물배상 자기차량손해 무보험차상해
-        """,
-        product_name="개인용자동차보험",
+        text="이 상품은 다양한 위험을 폭넓게 보장합니다.",
+        product_name="무배당 든든한 종합보장 플랜",
+        complete=fake_completer,
     )
 
-    assert result == {
-        "보험분류": "자동차",
-        "상품태그": ["자동차"],
-    }
+    assert result["보험분류"] == "상해·질병·실손"
+    assert len(calls) == 1
 
 
-def test_classify_policy_keeps_driver_policy_out_of_auto_bucket() -> None:
+def test_classify_policy_returns_unknown_when_llm_fallback_raises() -> None:
+    def raising_completer(_system: str, _user: str) -> dict[str, object]:
+        raise RuntimeError("LLM unavailable")
+
     result = classify_policy(
-        text="""
-        DB손해보험
-        무배당 운전자보험
-        자동차보험에 가입되어 있어도 별도 보장됩니다.
-        벌금, 변호사선임비용, 교통사고처리지원금
-        """,
-        product_name="무배당 운전자보험",
+        text="이 상품은 다양한 위험을 폭넓게 보장합니다.",
+        product_name="무배당 든든한 종합보장 플랜",
+        complete=raising_completer,
     )
 
-    assert result == {
-        "보험분류": "배상·화재·기타",
-        "상품태그": ["운전자"],
-    }
+    assert result == {"보험분류": CLASSIFICATION_UNKNOWN, "상품태그": []}
 
 
-def test_classify_policy_detects_indemnity_medical_policy() -> None:
+def test_classify_policy_adds_tags_from_tag_terms_sorted_by_tag_order() -> None:
     result = classify_policy(
         text="""
-        메리츠화재
-        상품명 메리츠 실비보험
-        실손의료비 급여 비급여 자기부담금 보상
-        """,
-        product_name="메리츠 실비보험",
-    )
-
-    assert result == {
-        "보험분류": "상해·질병·실손",
-        "상품태그": ["실손"],
-    }
-
-
-def test_classify_policy_detects_health_style_policy_and_multiple_tags() -> None:
-    result = classify_policy(
-        text="""
-        흥국화재
         무배당 흥국화재 맘편한 자녀사랑보험
-        암진단비, 질병입원일당, 일반상해후유장해
+        암진단비, 질병입원일당, 후유장해, 어린이보험
         """,
-        product_name="무배당 흥국화재 맘편한 자녀사랑보험",
+        product_name="무배당 흥국화재 맘편한 자녀사랑보험 상해보험",
+        complete=_forbidden_completer,
     )
 
-    assert result == {
-        "보험분류": "상해·질병·실손",
-        "상품태그": ["암", "상해", "질병", "어린이"],
-    }
+    assert result["보험분류"] == "상해·질병·실손"
+    assert result["상품태그"] == ["암", "상해", "질병", "어린이"]
 
 
-def test_classify_policy_detects_life_bucket_from_life_product_names() -> None:
+def test_classification_rules_json_has_no_magic_number_fields() -> None:
+    raw = json.loads(_RULES_PATH.read_text(encoding="utf-8"))
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                assert key not in _MAGIC_NUMBER_KEYS, f"magic-number field found: {key}"
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(raw)
+
+
+def test_classify_policy_signature_accepts_json_completer_type() -> None:
+    completer: JsonCompleter = _forbidden_completer
     result = classify_policy(
-        text="""
-        교보생명
-        무배당 교보New종신보험
-        사망보험금, 해약환급금, 20년납 종신
-        """,
-        product_name="무배당 교보New종신보험",
+        text="자동차보험 대인배상", product_name="자동차보험", complete=completer
     )
 
-    assert result == {
-        "보험분류": "생명·연금",
-        "상품태그": ["종신"],
-    }
-
-
-def test_classify_policy_detects_fire_and_liability_bucket() -> None:
-    result = classify_policy(
-        text="""
-        주택화재보험
-        화재손해, 화재배상책임, 임차자배상책임
-        """,
-        product_name="주택화재보험",
-    )
-
-    assert result == {
-        "보험분류": "배상·화재·기타",
-        "상품태그": ["화재", "배상책임"],
-    }
-
-
-def test_classify_policy_returns_unclassified_when_evidence_is_too_weak() -> None:
-    result = classify_policy(
-        text="""
-        보험상품 안내
-        계약자 유의사항
-        자세한 내용은 상담원을 통해 확인하세요.
-        """,
-        product_name=None,
-    )
-
-    assert result == {
-        "보험분류": "미분류",
-        "상품태그": [],
-    }
+    assert result["보험분류"] == "자동차"

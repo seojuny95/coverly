@@ -1,70 +1,24 @@
 {
-  "tag_order": [
-    "자동차",
-    "실손",
-    "암",
-    "상해",
-    "질병",
-    "간병",
-    "운전자",
-    "화재",
-    "배상책임",
-    "종신",
-    "정기",
-    "연금",
-    "어린이"
+  "categories": [
+    {"classification": "자동차", "tags": ["자동차"], "terms": ["자동차보험"]},
+    {"classification": "배상·화재·기타", "tags": ["운전자"], "terms": ["운전자보험"]},
+    {"classification": "상해·질병·실손", "tags": ["실손"], "terms": ["실손의료보험", "실손의료비", "실비보험"]},
+    {"classification": "배상·화재·기타", "tags": ["화재"], "terms": ["화재보험", "주택화재보험"]},
+    {"classification": "생명·연금", "tags": ["연금"], "terms": ["연금보험"]},
+    {"classification": "생명·연금", "tags": ["종신"], "terms": ["종신보험"]},
+    {"classification": "생명·연금", "tags": ["정기"], "terms": ["정기보험"]},
+    {"classification": "상해·질병·실손", "tags": ["간병"], "terms": ["간병보험", "장기요양보험"]},
+    {"classification": "상해·질병·실손", "tags": ["암"], "terms": ["암보험"]},
+    {"classification": "상해·질병·실손", "tags": ["상해"], "terms": ["상해보험"]},
+    {"classification": "상해·질병·실손", "tags": ["질병"], "terms": ["질병보험", "건강보험"]}
   ],
-  "rules": {
-    "auto": {
-      "classification": "자동차",
-      "tags": ["자동차"],
-      "min_strength": 3,
-      "product_terms": ["자동차보험", "개인용자동차보험", "하이카", "hicar"],
-      "coverage_terms": ["대인배상", "대물배상", "자기차량손해", "무보험차상해", "자기신체사고", "자동차상해"]
-    },
-    "driver": {
-      "classification": "배상·화재·기타",
-      "tags": ["운전자"],
-      "min_strength": 2,
-      "product_weight": 2,
-      "product_terms": ["운전자보험", "운전자"],
-      "coverage_terms": ["벌금", "변호사선임비용", "교통사고처리지원금"]
-    },
-    "indemnity": {
-      "classification": "상해·질병·실손",
-      "tags": ["실손"],
-      "min_strength": 2,
-      "product_bonus": 2,
-      "terms": ["실손의료보험", "실손의료비", "실비보험", "급여", "비급여", "자기부담금"]
-    },
-    "fire": {
-      "classification": "배상·화재·기타",
-      "base_tags": ["화재"],
-      "liability_tag": "배상책임",
-      "product_weight": 2,
-      "min_product_hits": 1,
-      "min_combined_strength": 2,
-      "product_terms": ["화재보험", "주택화재"],
-      "coverage_terms": ["화재손해", "화재배상책임"],
-      "liability_terms": ["배상책임", "임차자배상책임"]
-    },
-    "life": {
-      "classification": "생명·연금",
-      "tag_terms": {
-        "종신": ["종신보험", "종신"],
-        "정기": ["정기보험", "정기"],
-        "연금": ["연금보험", "연금"]
-      }
-    },
-    "health": {
-      "classification": "상해·질병·실손",
-      "tag_terms": {
-        "암": ["암보험", "암진단비"],
-        "상해": ["상해보험", "상해", "후유장해"],
-        "질병": ["건강보험", "질병", "뇌혈관질환", "허혈성심질환", "질병입원일당"],
-        "간병": ["간병보험", "치매", "장기요양", "간병자금"],
-        "어린이": ["어린이보험", "자녀"]
-      }
-    }
+  "tag_order": ["자동차", "실손", "암", "상해", "질병", "간병", "운전자", "화재", "배상책임", "종신", "정기", "연금", "어린이"],
+  "tag_terms": {
+    "암": ["암보험", "암진단비"],
+    "상해": ["상해보험", "후유장해"],
+    "질병": ["건강보험", "뇌혈관질환", "허혈성심질환", "질병입원일당"],
+    "간병": ["간병보험", "치매", "장기요양"],
+    "어린이": ["어린이보험"],
+    "배상책임": ["배상책임"]
   }
 }
