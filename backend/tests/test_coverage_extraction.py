@@ -9,6 +9,20 @@ def _coverage(name: str, detail: str | None) -> Coverage:
     return {"담보명": name, "가입금액": "1,000원", "보장내용": detail, "해설": None}
 
 
+def test_partial_when_source_is_nonempty_but_yields_no_coverages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A non-empty source we could not turn into any coverage (empty structured
+    # output, or every row failing validation) is a silent extraction failure —
+    # surface it as 부분 so the UI does not show it as a clean empty result.
+    monkeypatch.setattr(extraction_module, "extract_coverage_source", lambda _b: "| 담보표 | ... |")
+
+    coverages, status = extract_coverages(b"%PDF-", normalize=lambda _s: [])
+
+    assert coverages == []
+    assert status == STATUS_PARTIAL
+
+
 def test_generates_explanation_for_coverage_missing_policy_wording(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

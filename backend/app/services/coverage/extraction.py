@@ -28,9 +28,16 @@ def extract_coverages(
 ) -> tuple[list[Coverage], str]:
     """Extract the coverage list from a policy PDF, best-effort."""
     try:
-        coverages = normalize(extract_coverage_source(pdf_bytes))
+        source = extract_coverage_source(pdf_bytes)
+        coverages = normalize(source)
     except Exception:
         return [], STATUS_PARTIAL
+
+    if not coverages:
+        # A non-empty source that produced no coverages (empty structured output
+        # or every row failing validation) is a silent failure, not a clean empty
+        # result — surface 부분. A blank source means there was nothing to analyze.
+        return [], STATUS_PARTIAL if source.strip() else STATUS_OK
 
     missing = [c["담보명"] for c in coverages if not c["보장내용"]]
     if not missing:
