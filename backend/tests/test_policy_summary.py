@@ -1,4 +1,26 @@
+import pytest
+
+from app.services import classification as classification_module
 from app.services.policy.summary import extract_policy_summary
+
+
+@pytest.fixture(autouse=True)
+def _stub_classification_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make classification tier 2 (LLM fallback) deterministic in tests.
+
+    Several fixtures below use product names with no official 보험종목 term
+    (e.g. "마이헬스파트너"), so `classify_policy` falls through to the LLM
+    fallback. Without stubbing it, these tests would make real OpenAI API
+    calls whenever OPENAI_API_KEY is configured, making them slow and
+    non-deterministic. Stubbing to 미분류 matches every expectation below;
+    cases that hit a deterministic term (e.g. 운전자상해보험) never reach the
+    LLM fallback in the first place, so this stub is a no-op for them.
+    """
+
+    def stub_completer(_system: str, _user: str) -> dict[str, object]:
+        return {"보험분류": "미분류"}
+
+    monkeypatch.setattr(classification_module, "_default_completer", lambda: stub_completer)
 
 
 def test_extract_policy_summary_reads_core_fields() -> None:

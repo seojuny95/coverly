@@ -146,6 +146,27 @@ def test_parse_keeps_summary_when_coverage_extraction_is_partial(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from app.routes import policies
+    from app.services import classification as classification_module
+    from app.services.policy.summary import extract_policy_summary
+
+    # Two LLM seams must be stubbed to keep this test deterministic (the env
+    # may carry a real OPENAI_API_KEY):
+    # 1. The summary LLM fill would otherwise invent fields (a real call once
+    #    hallucinated 상품명 '자동차보험' from this fixture, flipping the
+    #    route's auto-policy gate) — disable it via llm_extractor=None.
+    # 2. Classification falls through to its LLM fallback tier for this text —
+    #    stub it to 미분류 so the auto gate stays closed and the mocked
+    #    extract_coverages below actually runs.
+    monkeypatch.setattr(
+        policies,
+        "extract_policy_summary",
+        lambda text: extract_policy_summary(text, llm_extractor=None),
+    )
+    monkeypatch.setattr(
+        classification_module,
+        "_default_completer",
+        lambda: lambda _system, _user: {"보험분류": "미분류"},
+    )
 
     client = TestClient(app)
     monkeypatch.setattr(policies, "extract_pdf_text", lambda _data: "보험사: 삼성화재")

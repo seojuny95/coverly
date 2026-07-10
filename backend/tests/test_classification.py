@@ -31,6 +31,11 @@ def _forbidden_completer(_system: str, _user: str) -> dict[str, object]:
         ("메리츠 실비보험", "실손의료비 급여 비급여 자기부담금 보상", "상해·질병·실손"),
         ("무배당 연금보험", "연금개시 연금수령", "생명·연금"),
         ("무배당 교보New종신보험", "사망보험금 해약환급금 20년납 종신", "생명·연금"),
+        (
+            "무배당 참좋은운전자상해보험",
+            "교통사고처리지원금 자동차부상치료비 벌금",
+            "배상·화재·기타",
+        ),
     ],
 )
 def test_classify_policy_deterministic_match_never_calls_llm(
@@ -39,6 +44,17 @@ def test_classify_policy_deterministic_match_never_calls_llm(
     result = classify_policy(text=text, product_name=product_name, complete=_forbidden_completer)
 
     assert result["보험분류"] == expected_classification
+
+
+def test_classify_policy_matches_driver_accident_product_without_llm() -> None:
+    result = classify_policy(
+        text="교통사고처리지원금 자동차부상치료비 벌금",
+        product_name="무배당 참좋은운전자상해보험",
+        complete=_forbidden_completer,
+    )
+
+    assert result["보험분류"] == "배상·화재·기타"
+    assert "운전자" in result["상품태그"]
 
 
 def test_classify_policy_falls_back_to_llm_when_no_official_term_matches() -> None:

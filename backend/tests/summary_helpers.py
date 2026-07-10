@@ -19,7 +19,8 @@ REQUIRED_DISPLAY_VALUES = {
         "보험료.납입주기": "월납",
         "납입기간": "20년납",
         "보험분류": "배상·화재·기타",
-        "상품태그": ["운전자"],
+        # 상해 is evidence-based: the policy's head lists 상해 benefits (후유장해 등).
+        "상품태그": ["상해", "운전자"],
     },
     "NH농협보험증권.pdf": {
         "보험사": "NH농협손해보험",
