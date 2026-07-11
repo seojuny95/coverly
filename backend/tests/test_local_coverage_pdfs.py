@@ -8,7 +8,8 @@ and either policy wording or a generated explanation.
 
 import pytest
 
-from app.services.coverage.extraction import STATUS_OK, extract_coverages
+from app.services.coverage import STATUS_OK, extract_coverages
+from app.services.parsing import parse_document
 from app.settings import get_settings
 from tests.summary_helpers import SAMPLE_PDF_DIR
 
@@ -32,7 +33,8 @@ SAMPLE_FILENAMES = [
 
 @pytest.mark.parametrize("filename", SAMPLE_FILENAMES)
 def test_local_samples_extract_nonempty_coverages(filename: str) -> None:
-    coverages, status = extract_coverages((SAMPLE_PDF_DIR / filename).read_bytes())
+    doc = parse_document((SAMPLE_PDF_DIR / filename).read_bytes())
+    coverages, status = extract_coverages(doc)
 
     assert status == STATUS_OK
     assert coverages, f"no coverages extracted from {filename}"

@@ -1,14 +1,18 @@
-"""Amount grounding for extracted coverages (anti-hallucination).
+"""Anti-hallucination grounding shared by coverage extraction.
 
-A digital policy has an exact text layer, so any numeric amount we surface must
-appear in the extraction source — the value *with its unit*, compared
-whitespace/comma-insensitively. Matching the whole value (not a concatenated
-digit blob) stops a hallucinated amount from passing just because its digits are
-a substring of unrelated numbers (e.g. "23원" against "12원 34원"). An amount
-that does not appear is demoted to 확인필요 instead of asserted.
+A digital policy has an exact text layer, so anything we present as the
+policy's own content must appear in the extraction source:
 
-Some tables declare the unit once in the header ("가입금액 (만원)") and print
-bare numbers in cells; make the unit explicit so the display is unambiguous.
+- Amounts: the value *with its unit*, compared whitespace/comma-insensitively.
+  Matching the whole value (not a concatenated digit blob) stops a hallucinated
+  amount from passing just because its digits are a substring of unrelated
+  numbers (e.g. "23원" against "12원 34원"). An amount that does not appear is
+  demoted to 확인필요 instead of asserted. Some tables declare the unit once in
+  the header ("가입금액 (만원)") and print bare numbers in cells; make the unit
+  explicit so the display is unambiguous.
+- Wording (보장내용): a cell's text is a contiguous run in the source, so a
+  verbatim transcription matches once whitespace is removed; a paraphrase or
+  hallucination does not.
 """
 
 import re
@@ -20,6 +24,11 @@ _BARE_AMOUNT = re.compile(r"^\d[\d,]*$")
 # An amount that already carries an explicit unit (…원/억/만/천). Its presence in
 # the source means the source mixes units, so a bare value must not be assumed 만원.
 _EXPLICIT_UNIT_AMOUNT = re.compile(r"\d[\d,]*\s*(?:억|만|천|원)")
+
+
+def wording_grounded(detail: str, source: str) -> bool:
+    """True if the wording appears in the source (whitespace-insensitive)."""
+    return re.sub(r"\s", "", detail) in re.sub(r"\s", "", source)
 
 
 def _norm(text: str) -> str:

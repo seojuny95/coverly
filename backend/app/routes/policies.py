@@ -3,10 +3,11 @@ import asyncio
 from fastapi import APIRouter, UploadFile
 
 from app.errors import ApiError
-from app.services.coverage.extraction import STATUS_OK, extract_coverages
-from app.services.coverage.types import Coverage
+from app.services.coverage import STATUS_OK, extract_coverages
+from app.services.parsing import parse_document
 from app.services.pdf_text import extract_pdf_text
 from app.services.summary import extract_policy_summary
+from app.services.types import Coverage
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
@@ -52,7 +53,11 @@ async def parse_policy(file: UploadFile) -> dict[str, object]:
         coverages: list[Coverage] = []
         analysis_status = STATUS_OK
     else:
-        coverages, analysis_status = await asyncio.to_thread(extract_coverages, data)
+        # Interim double-parse (pypdf text above, pdfplumber here); the pipeline
+        # task collapses both onto a single parse_document call.
+        coverages, analysis_status = await asyncio.to_thread(
+            lambda: extract_coverages(parse_document(data))
+        )
 
     return {
         "status": "accepted",
