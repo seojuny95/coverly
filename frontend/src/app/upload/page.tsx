@@ -20,7 +20,8 @@ export default function UploadPage() {
             내 보험을 한눈에 정리해요
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-zinc-500">
-            보험증권 PDF를 올리면 흩어진 보험 정보를 보기 쉽게 정리해드려요.
+            보험증권 PDF만 올리면 돼요. 어려운 약관은 저희가 대신 읽고
+            정리해드려요.
           </p>
         </section>
 

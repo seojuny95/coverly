@@ -6,7 +6,13 @@ import {
   getInsuredPersonName,
   saveInsuranceAnalysis,
 } from "../insurance-analysis/insurance-analysis-store";
-import { type DragEvent, type FormEvent, useRef, useState } from "react";
+import {
+  type DragEvent,
+  type FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   type InsuranceUploadResult,
@@ -29,6 +35,8 @@ type InsuranceUploadFormProps = {
 };
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
+
+type FileReadStatus = "reading" | "done";
 
 function validateFile(file: File): string | null {
   const isPdf =
@@ -60,6 +68,7 @@ export function InsuranceUploadForm({
     completed: 0,
     total: 0,
   });
+  const [fileStatuses, setFileStatuses] = useState<FileReadStatus[]>([]);
   const [pendingAnalysis, setPendingAnalysis] =
     useState<InsuranceAnalysis | null>(null);
   const [selectedName, setSelectedName] = useState("");
@@ -105,6 +114,7 @@ export function InsuranceUploadForm({
 
     setIsAnalyzing(true);
     setAnalysisProgress({ completed: 0, total: selectedFiles.length });
+    setFileStatuses(selectedFiles.map(() => "reading"));
     setError(null);
     setPendingAnalysis(null);
     setSelectedName("");
@@ -117,6 +127,11 @@ export function InsuranceUploadForm({
               ...current,
               completed: current.completed + 1,
             }));
+            setFileStatuses((current) =>
+              current.map((status, statusIndex) =>
+                statusIndex === index ? "done" : status,
+              ),
+            );
             return {
               id: `${Date.now()}-${index}-${file.name}`,
               fileName: file.name,
@@ -225,7 +240,16 @@ export function InsuranceUploadForm({
   const dropzoneDescription = isModal ? "" : `PDF · ${fileSizeLabel}`;
 
   if (isAnalyzing) {
-    return <AnalysisProgress progress={analysisProgress} surface={surface} />;
+    return (
+      <AnalysisProgress
+        progress={analysisProgress}
+        files={selectedFiles.map((file, index) => ({
+          name: file.name,
+          status: fileStatuses[index] ?? "reading",
+        }))}
+        surface={surface}
+      />
+    );
   }
 
   return (
@@ -307,6 +331,19 @@ export function InsuranceUploadForm({
             </button>
           </div>
 
+          {isModal ? null : (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-zinc-400">
+              <span className="flex items-center gap-1.5">
+                <ReassuranceCheckIcon />
+                개인정보는 가려서 처리해요
+              </span>
+              <span className="flex items-center gap-1.5">
+                <ReassuranceCheckIcon />
+                가입 권유 전화가 가지 않아요
+              </span>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-col gap-4">
             <SelectedFileList files={selectedFiles} surface={surface} />
             <button
@@ -317,18 +354,6 @@ export function InsuranceUploadForm({
               {isAnalyzing ? "보험 정리 중이에요" : submitLabel}
             </button>
           </div>
-
-          {isAnalyzing ? (
-            <div
-              role="status"
-              className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-700"
-            >
-              <span className="font-medium">보험을 정리하고 있어요.</span>
-              <span className="block text-zinc-500">
-                끝나면 정리한 결과를 바로 보여드려요.
-              </span>
-            </div>
-          ) : null}
 
           {pendingAnalysis ? (
             <NameSelectionPanel
@@ -416,17 +441,69 @@ function SelectedFileList({
   );
 }
 
+const ANALYSIS_STEP_MESSAGES = [
+  "증권에서 보장 내용을 찾고 있어요",
+  "보장마다 확인한 근거를 붙이고 있어요",
+];
+
+const LONG_WAIT_MESSAGE = "파일이 길수록 조금 더 걸려요. 지금도 읽고 있어요.";
+const ALMOST_DONE_MESSAGE = "거의 다 왔어요. 조금만 더 기다려주세요.";
+
 function AnalysisProgress({
   progress,
+  files,
   surface,
 }: {
   progress: { completed: number; total: number };
+  files: Array<{ name: string; status: FileReadStatus }>;
   surface: "page" | "modal";
 }) {
-  const percent =
+  const milestonePercent =
+    progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
+  // Trickle only fills up to 90% of the in-flight file's share; real
+  // completions move the milestone, so the bar never fakes a finish.
+  const trickleCapPercent =
     progress.total > 0
-      ? Math.round((progress.completed / progress.total) * 100)
-      : 0;
+      ? Math.min(((progress.completed + 0.9) / progress.total) * 100, 100)
+      : 90;
+  const [displayPercent, setDisplayPercent] = useState(0);
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDisplayPercent(
+        (current) => current + (trickleCapPercent - current) * 0.04,
+      );
+    }, 250);
+    return () => clearInterval(timer);
+  }, [trickleCapPercent]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setMessageIndex((current) => current + 1);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedSeconds((current) => current + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const statusMessages = [
+    ...ANALYSIS_STEP_MESSAGES,
+    ...(elapsedSeconds >= 90
+      ? [ALMOST_DONE_MESSAGE]
+      : elapsedSeconds >= 30
+        ? [LONG_WAIT_MESSAGE]
+        : []),
+  ];
+  const statusMessage = statusMessages[messageIndex % statusMessages.length];
+  // Real milestones floor the trickle so completed files always show through.
+  const percent = Math.round(Math.max(displayPercent, milestonePercent));
 
   return (
     <section
@@ -444,12 +521,10 @@ function AnalysisProgress({
           ))}
         </div>
         <h1 className="mt-8 text-2xl font-semibold tracking-[-0.04em] text-zinc-950">
-          보험을 정리하고 있어요
+          증권을 한 장씩 읽고 있어요
         </h1>
-        <p className="mt-3 text-sm leading-6 text-zinc-500">
-          {progress.total > 0
-            ? `${progress.total}개 PDF 중 ${progress.completed}개를 확인했어요.`
-            : "PDF 내용을 확인하고 있어요."}
+        <p className="mt-2 text-sm leading-6 text-zinc-500">
+          보통 1~2분 정도 걸려요
         </p>
         <div
           role="progressbar"
@@ -457,15 +532,66 @@ function AnalysisProgress({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
-          className="mt-8 h-1.5 w-full overflow-hidden rounded-sm bg-zinc-100"
+          className="mt-7 h-1.5 w-full overflow-hidden rounded-sm bg-zinc-100"
         >
           <div
             className="h-full bg-blue-600 transition-all duration-300"
-            style={{ width: `${Math.max(percent, 8)}%` }}
+            style={{ width: `${Math.max(percent, 4)}%` }}
           />
         </div>
+        {files.length > 0 ? (
+          <ul
+            aria-label="파일별 진행 상태"
+            className="mt-5 max-h-40 w-full space-y-1.5 overflow-y-auto text-left"
+          >
+            {files.map((file, index) => (
+              <li
+                key={`${file.name}-${index}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-100 bg-white px-3 py-2 text-xs text-zinc-600"
+              >
+                <span className="truncate">{file.name}</span>
+                {file.status === "done" ? (
+                  <span className="shrink-0 font-medium text-blue-600">
+                    완료
+                  </span>
+                ) : (
+                  <span className="shrink-0 animate-pulse text-zinc-400">
+                    읽는 중
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <p
+          key={statusMessage}
+          className="analysis-status-message mt-6 text-sm leading-6 text-zinc-500"
+        >
+          {statusMessage}
+        </p>
+        <p className="mt-1 text-xs text-zinc-400">
+          확인이 안 되는 내용은 추측하지 않아요.
+        </p>
       </div>
     </section>
+  );
+}
+
+function ReassuranceCheckIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-3 text-blue-600"
+      viewBox="0 0 14 14"
+      fill="none"
+    >
+      <path
+        d="m3 7 2.5 2.5L11 4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="square"
+      />
+    </svg>
   );
 }
 

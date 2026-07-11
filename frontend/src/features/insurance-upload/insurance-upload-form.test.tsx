@@ -392,7 +392,60 @@ describe("InsuranceUploadForm", () => {
     expect(
       screen.queryByRole("button", { name: "내 보험 분석하기" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("보험을 정리하고 있어요")).toBeInTheDocument();
+    expect(screen.getByText("증권을 한 장씩 읽고 있어요")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "보험 분석 진행률" }));
+  });
+
+  test("shows reassurance notes next to the dropzone", () => {
+    renderForm();
+
+    expect(screen.getByText("개인정보는 가려서 처리해요")).toBeInTheDocument();
+    expect(
+      screen.getByText("가입 권유 전화가 가지 않아요"),
+    ).toBeInTheDocument();
+  });
+
+  test("shows per-file reading status and grounding note while analyzing", async () => {
+    const user = userEvent.setup();
+    let resolveFirstUpload: (() => void) | undefined;
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstUpload = () =>
+              resolve({
+                status: "accepted",
+                문자수: 32,
+                기본정보: {
+                  보험사: "삼성화재",
+                  피보험자: "테스트고객",
+                  보험분류: "상해·질병·실손",
+                  상품태그: ["질병"],
+                },
+              });
+          }),
+      )
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderForm({ uploadInsurance });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      secondInsuranceFile,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(screen.getByText("보통 1~2분 정도 걸려요")).toBeInTheDocument();
+    expect(
+      screen.getByText("확인이 안 되는 내용은 추측하지 않아요."),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("읽는 중")).toHaveLength(2);
+
+    resolveFirstUpload?.();
+
+    expect(await screen.findByText("완료")).toBeInTheDocument();
+    expect(screen.getAllByText("읽는 중")).toHaveLength(1);
+    expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
+    expect(screen.getByText("second-insurance.pdf")).toBeInTheDocument();
   });
 });
