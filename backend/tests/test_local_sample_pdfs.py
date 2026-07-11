@@ -43,10 +43,11 @@ def test_local_sample_parse_response_includes_required_display_values() -> None:
         assert payload["보장목록"], f"{filename}: expected non-empty coverage list"
         for coverage in payload["보장목록"]:
             assert coverage["담보명"], f"{filename}: coverage row missing 담보명"
-            assert coverage["가입금액"], f"{filename}: coverage row missing 가입금액"
-            # 부가 rows (auto policy riders) are name-only by design — no
-            # generated 해설. Every other row needs policy wording or 해설.
+            # 부가 rows (auto policy riders) are name-only by design — an empty
+            # 가입금액 is their expected shape and no 해설 is generated. Every
+            # 담보 row needs an amount plus policy wording or 해설.
             if coverage.get("유형", "담보") == "담보":
+                assert coverage["가입금액"], f"{filename}: coverage row missing 가입금액"
                 assert coverage["보장내용"] or coverage["해설"], (
                     f"{filename}::{coverage['담보명']} has neither policy wording nor explanation"
                 )

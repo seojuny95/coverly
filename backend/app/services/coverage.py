@@ -213,9 +213,16 @@ def normalize_coverages(
         detail = parsed.보장내용.strip() if parsed.보장내용 else None
         if detail and not wording_grounded(detail, source):
             detail = None  # not the policy's own wording — don't present it as 원문
+        if parsed.유형 != "담보" and not parsed.가입금액.strip():
+            # 부가 rows are name-only riders/rates: an empty amount is the expected
+            # shape, not a verification gap — don't stamp them with 확인필요. A
+            # non-empty rider amount still goes through grounding below.
+            amount = ""
+        else:
+            amount = normalize_amount(parsed.가입금액, source)
         coverage = Coverage(
             담보명=parsed.담보명.strip(),
-            가입금액=normalize_amount(parsed.가입금액, source),
+            가입금액=amount,
             보장내용=detail or None,
             해설=None,
         )

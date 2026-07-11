@@ -189,6 +189,26 @@ def test_normalize_skips_invalid_rows() -> None:
     assert result[0]["가입금액"] == "확인필요"  # empty cell -> nothing to show
 
 
+def test_normalize_keeps_rider_amount_empty_not_unverified() -> None:
+    # 부가 rows are name-only: an empty amount is their expected shape, so it
+    # must stay "" instead of being demoted to 확인필요 (which would imply an
+    # amount exists but could not be verified).
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": "안전운전할인특약", "보장내용": None, "가입금액": "", "유형": "부가"},
+                {"담보명": "대인배상Ⅰ", "보장내용": None, "가입금액": "", "유형": "담보"},
+            ]
+        }
+
+    result = normalize_coverages(
+        "대인배상Ⅰ 안전운전할인특약", category="자동차", complete=fake_complete
+    )
+
+    assert result[0]["가입금액"] == ""  # rider: empty stays empty
+    assert result[1]["가입금액"] == "확인필요"  # core: empty is a verification gap
+
+
 def test_normalize_returns_no_coverages_for_blank_source() -> None:
     # Even if the model would return rows, a blank source has no coverages to show.
     def fake_complete(system: str, user: str) -> dict[str, object]:
