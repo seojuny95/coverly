@@ -404,6 +404,9 @@ function InsuranceDetail({
     ["만기일", basicInfo?.만기일],
     ["납입기간", basicInfo?.납입기간],
     ["보험료", formatPremium(basicInfo?.보험료)],
+    ["차량명", basicInfo?.차량정보?.차량명],
+    ["차량번호", basicInfo?.차량정보?.차량번호],
+    ["연식", basicInfo?.차량정보?.연식],
   ].filter((item): item is [string, string] => Boolean(item[1]));
 
   return (
@@ -423,17 +426,15 @@ function InsuranceDetail({
         ))}
       </dl>
 
-      {basicInfo?.보험분류 !== "자동차" ? (
-        <div className="mt-6">
-          <h3 className="text-xs font-medium text-zinc-500">보장 내용</h3>
-          <div className="mt-2 rounded-xl border border-zinc-200 bg-white px-5 py-4">
-            <InsuranceCoverageList
-              coverages={insuranceDocument.result.보장목록}
-              status={insuranceDocument.result.분석상태}
-            />
-          </div>
+      <div className="mt-6">
+        <h3 className="text-xs font-medium text-zinc-500">보장 내용</h3>
+        <div className="mt-2 rounded-xl border border-zinc-200 bg-white px-5 py-4">
+          <InsuranceCoverageList
+            coverages={insuranceDocument.result.보장목록}
+            status={insuranceDocument.result.분석상태}
+          />
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

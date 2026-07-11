@@ -22,7 +22,13 @@ from app.services.demographics import (
     mask_demographic_identifiers,
 )
 from app.services.grounding import wording_grounded
-from app.services.types import CoveragePeriod, PolicyCoreSummary, PolicySummary, PremiumSummary
+from app.services.types import (
+    CoveragePeriod,
+    PolicyCoreSummary,
+    PolicySummary,
+    PremiumSummary,
+    VehicleInfo,
+)
 from app.settings import get_settings
 
 LlmPolicySummary = PolicyCoreSummary
@@ -610,6 +616,7 @@ _SUMMARY_REQUIRED_FIELDS = [
     "만기일",
     "납입기간",
     "보험료",
+    "차량정보",
 ]
 _SYSTEM_PROMPT = (
     "너는 한국 보험증권 PDF에서 표시용 핵심 필드만 추출한다. "
@@ -677,6 +684,7 @@ def _build_messages(text: str, insurer_candidates: tuple[str, ...]) -> list[Easy
                 f"{insurer_list}\n\n"
                 "보험사에는 후보 목록에 없는 상품명이나 브랜드명을 넣지 마. "
                 "후보 목록의 실제 보험회사와 명확히 연결되는 경우에만 후보명을 선택해.\n\n"
+                "차량정보(차량명·차량번호·연식)도 추출해. 자동차보험이 아니면 null로 둬.\n\n"
                 f"{truncated_text}"
             ),
         },
@@ -705,6 +713,7 @@ def _build_response_format(insurer_candidates: tuple[str, ...]) -> JsonObject:
                     "만기일": _STRING_OR_NULL_SCHEMA,
                     "납입기간": _STRING_OR_NULL_SCHEMA,
                     "보험료": _build_premium_schema(),
+                    "차량정보": _build_vehicle_info_schema(),
                 },
                 "required": _SUMMARY_REQUIRED_FIELDS,
             },
@@ -733,6 +742,19 @@ def _build_premium_schema() -> JsonObject:
             "납입주기": _STRING_OR_NULL_SCHEMA,
         },
         "required": ["금액", "납입주기"],
+    }
+
+
+def _build_vehicle_info_schema() -> JsonObject:
+    return {
+        "type": ["object", "null"],
+        "additionalProperties": False,
+        "properties": {
+            "차량명": _STRING_OR_NULL_SCHEMA,
+            "차량번호": _STRING_OR_NULL_SCHEMA,
+            "연식": _STRING_OR_NULL_SCHEMA,
+        },
+        "required": ["차량명", "차량번호", "연식"],
     }
 
 
@@ -808,6 +830,10 @@ def _coerce_policy_summary(
     if premium:
         summary["보험료"] = premium
 
+    vehicle_info = _coerce_vehicle_info(raw_summary.get("차량정보"))
+    if vehicle_info:
+        summary["차량정보"] = vehicle_info
+
     return summary
 
 
@@ -843,6 +869,26 @@ def _coerce_premium_summary(value: object) -> PremiumSummary | None:
     return premium or None
 
 
+def _coerce_vehicle_info(value: object) -> VehicleInfo | None:
+    if not isinstance(value, dict):
+        return None
+
+    vehicle_info: VehicleInfo = {}
+    vehicle_name = _coerce_non_empty_string(value.get("차량명"))
+    if vehicle_name is not None:
+        vehicle_info["차량명"] = vehicle_name
+
+    plate_number = _coerce_non_empty_string(value.get("차량번호"))
+    if plate_number is not None:
+        vehicle_info["차량번호"] = plate_number
+
+    model_year = _coerce_non_empty_string(value.get("연식"))
+    if model_year is not None:
+        vehicle_info["연식"] = model_year
+
+    return vehicle_info or None
+
+
 def _coerce_non_empty_string(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -865,6 +911,7 @@ _LLM_FILLABLE_FIELDS = [
     "만기일",
     "납입기간",
     "보험료",
+    "차량정보",
 ]
 
 
@@ -965,6 +1012,20 @@ def _merge_missing_llm_fields(
                 _insurer_grounded(value, text) if key == "보험사" else wording_grounded(value, text)
             )
             if not grounded:
+                continue
+
+        # 차량정보 is a dict, not a plain string, so it can't share the
+        # str-only grounding check above. Grounding target is the plate
+        # (차량번호): if the LLM supplied one, it must appear in the source
+        # text or the whole 차량정보 is dropped (cite-or-refuse). 차량명/연식
+        # are lookup-style info (looked up from the plate, not copied verbatim
+        # from the document), so a policy with no plate on file is accepted
+        # as-is — there is nothing in the source text to ground them against.
+        if key == "차량정보":
+            if not isinstance(value, dict):
+                continue
+            plate_number = value.get("차량번호")
+            if isinstance(plate_number, str) and not wording_grounded(plate_number, text):
                 continue
 
         summary[key] = value  # type: ignore[literal-required]

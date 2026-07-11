@@ -235,12 +235,190 @@ def test_normalize_skips_invalid_rows() -> None:
     assert result[0]["가입금액"] == "확인필요"  # empty cell -> nothing to show
 
 
+def test_normalize_drops_wording_that_merely_repeats_the_amount() -> None:
+    # Auto tables have no 보장내용 column, so the LLM copies the limit phrase
+    # into both fields. A wording identical to the amount (whitespace aside)
+    # describes the amount, not the coverage — drop it to None so the
+    # explanation pass can say what the coverage actually covers.
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {
+                    "담보명": "대인배상Ⅱ",
+                    "보장내용": "1인당 무 한",
+                    "가입금액": "1인당 무한",
+                    "유형": "담보",
+                },
+                {
+                    "담보명": "암진단비",
+                    "보장내용": "암 진단 확정 시 최초 1회 지급",
+                    "가입금액": "30,000,000원",
+                },
+            ]
+        }
+
+    source = "| 담보종목 |  |\n| --- | --- |\n| 대인배상Ⅱ | 1인당 무 한 |\n" + SOURCE
+    result = normalize_coverages(source, complete=fake_complete)
+
+    assert result[0]["보장내용"] is None  # duplicate of the amount → dropped
+    assert result[0]["가입금액"] == "1인당 무한"
+    assert result[1]["보장내용"] == "암 진단 확정 시 최초 1회 지급"  # real wording kept
+
+
+def test_normalize_recovers_amount_from_titled_amount_column() -> None:
+    # The LLM sometimes files the amount cell under 보장내용 and leaves 가입금액
+    # empty. The table structure is authoritative — the amount is recovered from
+    # the column whose header names an amount, and the duplicated wording is
+    # dropped so the explanation pass can fill 해설.
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {
+                    "담보명": "대인배상Ⅰ",
+                    "보장내용": "자배법에서 정한 금액",
+                    "가입금액": "",
+                    "유형": "담보",
+                }
+            ]
+        }
+
+    source = "| 담보종목 | 보험가입금액 |\n| --- | --- |\n| 대인배상Ⅰ | 자배법에서 정한 금액 |"
+    result = normalize_coverages(source, complete=fake_complete)
+
+    assert result[0]["가입금액"] == "자배법에서 정한 금액"  # recovered from the table
+    assert result[0]["보장내용"] is None  # duplicate of the amount → 해설 대상
+
+
+def test_normalize_never_recovers_from_a_titled_description_column() -> None:
+    # Recovery must not stuff a description into the amount: when the adjacent
+    # column has a non-amount title (보장상세), there is nothing to recover —
+    # the missing amount stays a verification gap (확인필요).
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {"보장목록": [{"담보명": "암진단비", "보장내용": None, "가입금액": ""}]}
+
+    source = "| 담보명 | 보장상세 |\n| --- | --- |\n| 암진단비 | 암 진단 확정 시 지급 |"
+    result = normalize_coverages(source, complete=fake_complete)
+
+    assert result[0]["가입금액"] == "확인필요"
+
+
+def test_normalize_recovers_amount_from_untitled_adjacent_column() -> None:
+    # Auto-style tables print the limit in an untitled cell right next to the
+    # name. An untitled adjacent column is safe to recover from — it cannot be
+    # a description column (those carry a header).
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [{"담보명": "대인배상Ⅰ", "보장내용": None, "가입금액": "", "유형": "담보"}]
+        }
+
+    source = "| 담보종목 |  |\n| --- | --- |\n| 대인배상Ⅰ | 자배법에서 정한 금액 |"
+    result = normalize_coverages(source, complete=fake_complete)
+
+    assert result[0]["가입금액"] == "자배법에서 정한 금액"
+
+
+def test_normalize_recovers_amount_from_continuation_row() -> None:
+    # pdfplumber sometimes wraps the amount onto a continuation row (empty name
+    # cell, value in the adjacent cell) — recovery looks one row ahead.
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": "긴급출동특약", "보장내용": None, "가입금액": "", "유형": "부가"}
+            ]
+        }
+
+    source = (
+        "| 담보종목 |  |\n| --- | --- |\n"
+        "| 긴급출동특약 |  |\n"
+        "|  | 하이카서비스 총 6회 (견인 100km한도) |"
+    )
+    result = normalize_coverages(source, complete=fake_complete)
+
+    assert result[0]["가입금액"] == "하이카서비스 총 6회 (견인 100km한도)"
+    # A row with its own amount cell is a coverage, whatever the LLM called it.
+    assert result[0].get("유형", "담보") == "담보"
+
+
+def test_normalize_keeps_rider_amount_empty_not_unverified() -> None:
+    # 부가 rows are name-only: an empty amount is their expected shape, so it
+    # must stay "" instead of being demoted to 확인필요 (which would imply an
+    # amount exists but could not be verified).
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": "안전운전할인특약", "보장내용": None, "가입금액": "", "유형": "부가"},
+                {"담보명": "대인배상Ⅰ", "보장내용": None, "가입금액": "", "유형": "담보"},
+            ]
+        }
+
+    result = normalize_coverages("대인배상Ⅰ 안전운전할인특약", complete=fake_complete)
+
+    assert result[0]["가입금액"] == ""  # rider: empty stays empty
+    assert result[1]["가입금액"] == "확인필요"  # core: empty is a verification gap
+
+
 def test_normalize_returns_no_coverages_for_blank_source() -> None:
     # Even if the model would return rows, a blank source has no coverages to show.
     def fake_complete(system: str, user: str) -> dict[str, object]:
         return {"보장목록": [{"담보명": "지어낸담보", "보장내용": None, "가입금액": "1원"}]}
 
     assert normalize_coverages("   ", complete=fake_complete) == []
+
+
+def test_prompt_carries_structural_type_rules_for_every_policy() -> None:
+    # One prompt for all policies: the structural 담보/부가 rules are not
+    # category-gated — an unfriendly non-auto policy gets them too.
+    captured: dict[str, str] = {}
+
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        captured["system"] = system
+        return {"보장목록": []}
+
+    normalize_coverages(
+        "| 담보명 | 가입금액 |\n| --- | --- |\n| 암진단비 | 1억원 |",
+        complete=fake_complete,
+    )
+    assert "부가" in captured["system"]
+    assert "담보" in captured["system"]
+
+
+def test_normalize_carries_유형_from_llm() -> None:
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": "대인배상Ⅰ", "보장내용": None, "가입금액": "무한", "유형": "담보"},
+                {"담보명": "안전운전할인특약", "보장내용": None, "가입금액": "", "유형": "부가"},
+            ]
+        }
+
+    result = normalize_coverages("대인배상Ⅰ 무한 안전운전할인특약", complete=fake_complete)
+    assert result[0].get("유형", "담보") == "담보"
+    assert result[1]["유형"] == "부가"
+
+
+def test_extract_skips_explanation_for_부가_rows() -> None:
+    explained: list[str] = []
+
+    def fake_explain(names: list[str]) -> tuple[dict[str, str], bool]:
+        explained.extend(names)
+        return {name: "설명" for name in names}, True
+
+    rows: list[Coverage] = [
+        {"담보명": "대인배상Ⅰ", "가입금액": "무한", "보장내용": None, "해설": None, "유형": "담보"},
+        {
+            "담보명": "안전운전할인특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+    ]
+    coverages, status = extract_coverages(
+        _doc(tables=(COVERAGE_TABLE,)), normalize=lambda _s: rows, explain=fake_explain
+    )
+    assert explained == ["대인배상Ⅰ"]
+    assert coverages[1]["해설"] is None
+    assert status == STATUS_OK
 
 
 # ---------------------------------------------------------------------------

@@ -32,7 +32,7 @@ def test_auto_policy_is_not_skipped() -> None:
     # 자동차 분류여도 보장추출을 호출한다(스킵 없음).
     calls: list[str] = []
 
-    def extract(_doc: ParsedDocument) -> tuple[list[Coverage], str]:
+    def extract(doc: ParsedDocument) -> tuple[list[Coverage], str]:
         calls.append("extract")
         return [], "완료"
 

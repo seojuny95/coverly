@@ -25,3 +25,24 @@ def test_coverage_shape() -> None:
         "해설": None,
     }
     assert set(coverage) == {"담보명", "가입금액", "보장내용", "해설"}
+
+
+def test_coverage_optional_type_field() -> None:
+    tagged: Coverage = {
+        "담보명": "안전운전할인특약",
+        "가입금액": "",
+        "보장내용": None,
+        "해설": None,
+        "유형": "부가",
+    }
+    untagged: Coverage = {"담보명": "암진단비", "가입금액": "1억원", "보장내용": None, "해설": None}
+    assert tagged["유형"] == "부가"
+    assert untagged.get("유형", "담보") == "담보"
+
+
+def test_vehicle_info_shape() -> None:
+    from app.services.types import PolicyCoreSummary, VehicleInfo
+
+    vehicle: VehicleInfo = {"차량명": "아이오닉5", "차량번호": "TEST-PLATE-001", "연식": "2024"}
+    summary: PolicyCoreSummary = {"차량정보": vehicle}
+    assert summary["차량정보"]["차량번호"] == "TEST-PLATE-001"
