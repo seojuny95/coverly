@@ -71,7 +71,7 @@ export function InsuranceCoverageList({
               <p className="mt-2 text-sm">
                 {coverage.가입금액 === "확인필요" ? (
                   <span className="text-[#111827]/60">
-                    가입금액은 확인이 필요해요
+                    보장 금액은 가입하신 상품의 약관에서 자세히 확인할 수 있어요
                   </span>
                 ) : (
                   <span className="font-medium text-[#111827]">

@@ -51,12 +51,12 @@ def test_local_samples_extract_nonempty_coverages(filename: str) -> None:
 
 def test_local_auto_sample_extracts_detailed_coverages() -> None:
     """자동차 policy: no golden 담보 list to assert against, so this checks the
-    category-conditioned prompt behavior instead — core coverages carry
+    structural field-completeness policy instead — core coverages carry
     verbatim table limits and detail, section headers aren't mistaken for
     rows, and rider rows are tagged 부가 with no generated 해설.
     """
     doc = parse_document((SAMPLE_PDF_DIR / "현대해상자동차보험.pdf").read_bytes())
-    coverages, status = extract_coverages(doc, category="자동차")
+    coverages, status = extract_coverages(doc)
 
     assert status == STATUS_OK
     core = [c for c in coverages if c.get("유형", "담보") == "담보"]
