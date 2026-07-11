@@ -147,9 +147,7 @@ describe("portfolio features", () => {
     expect(
       within(treatmentGroup).getByText("합산 보장금액"),
     ).toBeInTheDocument();
-    expect(
-      within(treatmentGroup).getByText("실손형 보장"),
-    ).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("실손형 보장")).toBeInTheDocument();
     expect(
       within(treatmentGroup).getByText("그대로 보는 보장"),
     ).toBeInTheDocument();
