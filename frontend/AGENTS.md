@@ -8,7 +8,7 @@ Next.js App Router + TypeScript 프론트엔드. 전체 프로젝트 가이드: 
 
 ## 프로젝트 소개
 
-Coverly의 사용자 인터페이스를 담당한다. 현재는 스캐폴딩 단계이므로 기본 랜딩 화면만 제공한다.
+Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 종류별 정리·보험금 합계·상담 전 검토·근거 기반 Q&A를 보여준다.
 
 ## Development Commands
 
@@ -21,13 +21,25 @@ pnpm format
 
 ## Project Structure
 
+라우트는 얇게 유지하고 화면 로직은 `features/`의 기능 폴더로 분리한다.
+
 ```text
 src/
-└── app/
-    ├── globals.css
-    ├── layout.tsx
-    └── page.tsx
+├── app/                        # App Router 페이지 (얇은 진입점)
+│   ├── page.tsx                # 랜딩
+│   ├── upload/page.tsx         # 업로드
+│   ├── analysis/page.tsx       # 분석 결과
+│   ├── layout.tsx / globals.css
+│   └── error.tsx / global-error.tsx / not-found.tsx
+├── components/                 # 공용 UI (coverly-brand, app-error-fallback)
+└── features/
+    ├── insurance-upload/       # 업로드 폼 + upload-insurance API
+    ├── insurance-analysis/     # 분석 페이지, 보장 목록, sessionStorage store, 보험사 로고
+    └── portfolio/              # 보험금 합계표, 상담 전 검토 패널, Q&A 챗봇, portfolio API
 ```
+
+- 화면 상태는 `insurance-analysis-store.ts`가 sessionStorage로 관리한다(업로드 → 분석 전달).
+- 백엔드 호출은 `features/*/*-api.ts`에 모으고, base URL은 `NEXT_PUBLIC_API_BASE_URL`을 쓴다.
 
 ## Coding Style & Naming Conventions
 
