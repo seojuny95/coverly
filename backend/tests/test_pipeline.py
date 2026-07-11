@@ -15,7 +15,7 @@ def test_empty_text_raises() -> None:
         return {"보험분류": "", "상품태그": []}
 
     def fake_extract(
-        doc: ParsedDocument,
+        doc: ParsedDocument, *, category: str | None = None
     ) -> tuple[list[Coverage], str]:
         return [], "완료"
 
@@ -32,7 +32,7 @@ def test_auto_policy_is_not_skipped() -> None:
     # 자동차 분류여도 보장추출을 호출한다(스킵 없음).
     calls: list[str] = []
 
-    def extract(_doc: ParsedDocument) -> tuple[list[Coverage], str]:
+    def extract(doc: ParsedDocument, *, category: str | None = None) -> tuple[list[Coverage], str]:
         calls.append("extract")
         return [], "완료"
 
@@ -55,7 +55,7 @@ def test_result_shape() -> None:
         return {"보험분류": "실손", "상품태그": []}
 
     def fake_extract(
-        doc: ParsedDocument,
+        doc: ParsedDocument, *, category: str | None = None
     ) -> tuple[list[Coverage], str]:
         return [], "완료"
 
@@ -66,3 +66,21 @@ def test_result_shape() -> None:
         extract=fake_extract,
     )
     assert set(result) == {"기본정보", "보장목록", "분석상태", "문자수"}
+
+
+def test_pipeline_passes_classification_category_to_extract() -> None:
+    seen: dict[str, object] = {}
+
+    def fake_extract(
+        doc: ParsedDocument, *, category: str | None = None
+    ) -> tuple[list[Coverage], str]:
+        seen["category"] = category
+        return [], "완료"
+
+    run_pipeline(
+        b"%PDF-x",
+        parse=_fake_parse("자동차보험 증권"),
+        summarize=lambda _t: {"보험분류": "자동차", "상품태그": []},
+        extract=fake_extract,
+    )
+    assert seen["category"] == "자동차"

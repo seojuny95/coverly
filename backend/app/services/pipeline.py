@@ -10,12 +10,23 @@ coverage failures degrade to 부분 inside extract_coverages.
 """
 
 from collections.abc import Callable
-from typing import TypedDict
+from typing import Protocol, TypedDict
 
 from app.services.coverage import extract_coverages
 from app.services.parsing import parse_document
 from app.services.summary import extract_policy_summary
 from app.services.types import Coverage, ParsedDocument, PolicySummary
+
+
+class _Extractor(Protocol):
+    """Protocol for coverage extraction functions.
+
+    Accepts a parsed document and optional policy category to guide extraction.
+    """
+
+    def __call__(
+        self, doc: ParsedDocument, *, category: str | None = None
+    ) -> tuple[list[Coverage], str]: ...
 
 
 class PipelineResult(TypedDict):
@@ -34,13 +45,13 @@ def run_pipeline(
     *,
     parse: Callable[[bytes], ParsedDocument] = parse_document,
     summarize: Callable[[str], PolicySummary] = extract_policy_summary,
-    extract: Callable[[ParsedDocument], tuple[list[Coverage], str]] = extract_coverages,
+    extract: _Extractor = extract_coverages,
 ) -> PipelineResult:
     doc = parse(pdf_bytes)
     if not doc.text:
         raise EmptyTextError
     summary = summarize(doc.text)
-    coverages, status = extract(doc)
+    coverages, status = extract(doc, category=summary.get("보험분류"))
     return {
         "기본정보": summary,
         "보장목록": coverages,
