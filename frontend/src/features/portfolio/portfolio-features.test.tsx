@@ -50,6 +50,7 @@ describe("portfolio features", () => {
               totals: [
                 {
                   category: "암 진단비",
+                  majorCategory: "진단비",
                   totalAmount: 10_000_000,
                   coverageCount: 1,
                   normalizedName: "암진단비",
@@ -90,6 +91,12 @@ describe("portfolio features", () => {
             indemnity_coverage_count: 0,
             excluded_coverage_count: 0,
             excluded_auto_policy_count: 0,
+            age: 35,
+            gender: "여성",
+            life_stage: "성인",
+            prepared_coverages: ["암 진단"],
+            coverage_gaps: [{ category: "뇌혈관 진단", reason: "확인 필요" }],
+            baseline_notice: "참고 정보예요.",
             classifications: [
               {
                 classification: "상해·질병·실손",
@@ -127,6 +134,9 @@ describe("portfolio features", () => {
     render(<InsuranceAnalysisPage />);
 
     await user.click(await screen.findByRole("tab", { name: "보험 분석" }));
+    await user.type(screen.getByLabelText("나이"), "35");
+    await user.selectOptions(screen.getByLabelText("성별"), "여성");
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
     expect((await screen.findAllByText("10,000,000원")).length).toBeGreaterThan(
       0,
     );

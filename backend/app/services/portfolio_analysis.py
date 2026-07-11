@@ -6,20 +6,26 @@ from typing import Literal
 from app.schemas.analysis import (
     AnalysisSource,
     ClassificationAnalysis,
+    CoverageGap,
     PortfolioAnalysisResponse,
 )
 from app.schemas.portfolio import PolicyInput
+from app.services.coverage_taxonomy import check_life_stage
 from app.services.portfolio_summary import PortfolioFacts, build_portfolio_facts
 
 _UNCLASSIFIED = "미분류"
 
 
-def analyze_portfolio(policies: list[PolicyInput]) -> PortfolioAnalysisResponse:
+def analyze_portfolio(
+    policies: list[PolicyInput], *, age: int, gender: str
+) -> PortfolioAnalysisResponse:
     """Return descriptive facts; never infer whether coverage is sufficient."""
 
     facts = build_portfolio_facts(policies)
     classifications = _analyze_classifications(facts)
     summary = facts.coverage_summary
+    coverage_names = [coverage.담보명 for policy in policies for coverage in policy.보장목록]
+    life_stage_check = check_life_stage(age, coverage_names)
     excluded_count = len(summary.excluded_coverages)
     notices: list[str] = []
 
@@ -40,6 +46,24 @@ def analyze_portfolio(policies: list[PolicyInput]) -> PortfolioAnalysisResponse:
         indemnity_coverage_count=len(summary.indemnity_coverages),
         excluded_coverage_count=excluded_count,
         excluded_auto_policy_count=summary.excluded_auto_policy_count,
+        age=age,
+        gender=gender,
+        life_stage=life_stage_check.life_stage,
+        prepared_coverages=list(life_stage_check.held),
+        coverage_gaps=[
+            CoverageGap(
+                category=category,
+                reason=(
+                    f"{life_stage_check.life_stage} 참고 항목에서 현재 증권에 확인되지 않았어요."
+                ),
+            )
+            for category in life_stage_check.missing
+        ],
+        baseline_notice=(
+            "나이대별 일반 확인 항목과 비교한 참고 정보예요. "
+            "성별은 분석 대상 정보로 보관하지만, 공식 근거가 없는 성별별 가입 기준은 적용하지 "
+            "않았어요. 보장금액의 적정성이나 가입 권유를 의미하지 않아요."
+        ),
         classifications=classifications,
         sources=[_source(policy) for policy in facts.policies],
         notices=notices,

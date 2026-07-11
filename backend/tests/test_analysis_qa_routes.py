@@ -13,7 +13,9 @@ def _client() -> TestClient:
 
 
 def test_analysis_route_contract() -> None:
-    response = _client().post("/portfolio/analysis", json={"policies": []})
+    response = _client().post(
+        "/portfolio/analysis", json={"policies": [], "age": 35, "gender": "여성"}
+    )
 
     assert response.status_code == 200
     assert response.json()["status"] == "empty"

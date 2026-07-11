@@ -5,6 +5,7 @@ const API_BASE_URL =
 
 export type CoverageTotal = {
   category: string;
+  majorCategory: string;
   totalAmount: number;
   coverageCount: number;
   normalizedName: string;
@@ -54,6 +55,12 @@ export type PortfolioAnalysisResult = {
   indemnity_coverage_count: number;
   excluded_coverage_count: number;
   excluded_auto_policy_count: number;
+  age: number;
+  gender: string;
+  life_stage: string;
+  prepared_coverages: string[];
+  coverage_gaps: Array<{ category: string; reason: string }>;
+  baseline_notice: string;
   classifications: ClassificationAnalysis[];
   notices: string[];
 };
@@ -103,11 +110,12 @@ export function requestPortfolioSummary(
 
 export function requestPortfolioAnalysis(
   insuranceDocuments: AnalyzedInsurance[],
+  demographics: { age: number; gender: string },
   signal?: AbortSignal,
 ) {
   return post<PortfolioAnalysisResult>(
     "/portfolio/analysis",
-    { policies: toPolicies(insuranceDocuments) },
+    { policies: toPolicies(insuranceDocuments), ...demographics },
     signal,
   );
 }

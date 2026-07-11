@@ -27,6 +27,17 @@ _UNITS = {
     "천만원": 10_000_000,
     "억원": 100_000_000,
 }
+MAJOR_CATEGORY_ORDER = (
+    "진단비",
+    "수술비",
+    "치료비",
+    "입원",
+    "통원",
+    "후유장해",
+    "사망",
+    "간병",
+    "기타",
+)
 
 
 @dataclass(frozen=True)
@@ -41,6 +52,29 @@ def normalize_coverage_name(name: str) -> str:
     """Normalize formatting only, avoiding semantic aliases that can over-group."""
 
     return re.sub(r"[^0-9A-Za-z가-힣]", "", name).casefold()
+
+
+def major_category(name: str) -> str:
+    """Return a display-only group without changing coverage identity."""
+
+    normalized = normalize_coverage_name(name)
+    if "후유장해" in normalized:
+        return "후유장해"
+    if "입원" in normalized:
+        return "입원"
+    if "통원" in normalized:
+        return "통원"
+    if "수술" in normalized:
+        return "수술비"
+    if "간병" in normalized or "요양" in normalized:
+        return "간병"
+    if "진단" in normalized or "악성신생물" in normalized:
+        return "진단비"
+    if "사망" in normalized:
+        return "사망"
+    if "치료비" in normalized or "의료비" in normalized:
+        return "치료비"
+    return "기타"
 
 
 def _is_auto_policy(policy: PolicyInput) -> bool:
@@ -171,6 +205,7 @@ def _build_fixed_totals(
                 CoverageTotalItem(
                     normalized_name=name,
                     display_name=display_names[name],
+                    major_category=major_category(display_names[name]),
                     total_amount=sum(source.amount for source in group),
                     coverage_count=len(group),
                     composition=group,

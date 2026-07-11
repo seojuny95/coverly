@@ -28,7 +28,7 @@ def test_analysis_returns_overall_and_classification_facts() -> None:
         _policy("p2", "상해", "상해수술비", "100만원"),
     ]
 
-    result = analyze_portfolio(policies)
+    result = analyze_portfolio(policies, age=35, gender="여성")
 
     assert result.status == "complete"
     assert result.policy_count == 2
@@ -50,8 +50,8 @@ def test_analysis_honestly_reports_partial_and_empty_states() -> None:
         }
     )
 
-    partial_result = analyze_portfolio([partial])
-    empty_result = analyze_portfolio([])
+    partial_result = analyze_portfolio([partial], age=35, gender="여성")
+    empty_result = analyze_portfolio([], age=35, gender="여성")
 
     assert partial_result.status == "partial"
     assert partial_result.excluded_coverage_count == 1
@@ -64,15 +64,37 @@ def test_analysis_inherits_partial_parse_status() -> None:
     policy = _policy("p1", "질병", "암진단비", "3,000만원")
     policy.분석상태 = "부분"
 
-    result = analyze_portfolio([policy])
+    result = analyze_portfolio([policy], age=35, gender="여성")
 
     assert result.status == "partial"
 
 
 def test_analysis_does_not_make_adequacy_claims() -> None:
-    result = analyze_portfolio([_policy("p1", "질병", "암진단비", "3,000만원")])
-    serialized = result.model_dump_json()
+    result = analyze_portfolio(
+        [_policy("p1", "질병", "암진단비", "3,000만원")],
+        age=35,
+        gender="여성",
+    )
 
-    assert "충분" not in serialized
-    assert "부족" not in serialized
-    assert "적정" not in serialized
+    rendered = result.model_dump_json()
+    assert "충분합니다" not in rendered
+    assert "가입하세요" not in rendered
+
+
+def test_analysis_compares_held_coverages_with_life_stage_checklist() -> None:
+    policies = [
+        _policy("p1", "질병", "암진단비", "3,000만원"),
+        _policy("p2", "실손", "실손의료비", "5,000만원"),
+    ]
+
+    result = analyze_portfolio(policies, age=35, gender="여성")
+
+    assert result.life_stage == "성인"
+    assert result.gender == "여성"
+    assert result.prepared_coverages == ["암 진단", "실손의료"]
+    assert {gap.category for gap in result.coverage_gaps} == {
+        "뇌혈관 진단",
+        "심장질환 진단",
+        "사망",
+        "상해 후유장해",
+    }

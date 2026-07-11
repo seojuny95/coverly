@@ -53,6 +53,7 @@ def test_sums_safe_fixed_benefits_and_exposes_composition() -> None:
 
     cancer = next(item for item in result.totals if item.normalized_name == "암진단비")
     assert cancer.total_amount == 30_000_000
+    assert cancer.major_category == "진단비"
     assert [item.policy_id for item in cancer.composition] == ["p1", "p2"]
     assert cancer.composition[0].original_amount == "1,000만원"
 
@@ -137,6 +138,28 @@ def test_indemnity_is_listed_and_flagged_only_across_insurers() -> None:
 def test_name_normalization_does_not_apply_semantic_aliases() -> None:
     assert normalize_coverage_name(" 암-진단비(일반) ") == "암진단비일반"
     assert normalize_coverage_name("암진단금") != normalize_coverage_name("암진단비")
+
+
+def test_major_category_does_not_merge_distinct_coverage_names() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {"담보명": "암진단비", "가입금액": "3천만원", "지급유형": "정액"},
+            {"담보명": "유사암진단비", "가입금액": "1천만원", "지급유형": "정액"},
+            {"담보명": "암수술비", "가입금액": "5백만원", "지급유형": "정액"},
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    actual = [(item.display_name, item.major_category, item.total_amount) for item in result.totals]
+    assert actual == [
+        ("암수술비", "수술비", 5_000_000),
+        ("암진단비", "진단비", 30_000_000),
+        ("유사암진단비", "진단비", 10_000_000),
+    ]
 
 
 def test_repeated_name_from_one_insurer_is_not_summed() -> None:

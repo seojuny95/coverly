@@ -54,6 +54,7 @@ class CoverageTotalItem(BaseModel):
 
     normalized_name: str = Field(serialization_alias="normalizedName")
     display_name: str = Field(serialization_alias="category")
+    major_category: str = Field(serialization_alias="majorCategory")
     total_amount: int = Field(serialization_alias="totalAmount")
     coverage_count: int = Field(serialization_alias="coverageCount")
     composition: list[CoverageSourceItem]

@@ -55,33 +55,48 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {summary.totals.map((total, index) => (
-                <tr key={`${total.normalizedName}-${index}`}>
-                  <th className="px-6 py-4 font-medium text-zinc-800">
-                    <details>
-                      <summary className="cursor-pointer marker:text-zinc-400">
-                        {total.category}
-                      </summary>
-                      <ul className="mt-3 space-y-1.5 text-xs font-normal text-zinc-500">
-                        {total.composition.map((source, index) => (
-                          <li key={`${source.policy_id ?? "policy"}-${index}`}>
-                            {source.insurer ?? "보험사 확인 필요"} ·{" "}
-                            {source.coverage_name} · {source.original_amount}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
+            {groupTotals(summary.totals).map(([majorCategory, totals]) => (
+              <tbody
+                key={majorCategory}
+                className="divide-y divide-zinc-100 border-t border-zinc-200"
+              >
+                <tr className="bg-blue-50/50">
+                  <th
+                    colSpan={3}
+                    className="px-6 py-3 text-xs font-semibold text-blue-700"
+                  >
+                    {majorCategory}
                   </th>
-                  <td className="px-6 py-4 text-right font-semibold text-blue-600">
-                    {formatWon(total.totalAmount)}
-                  </td>
-                  <td className="px-6 py-4 text-right text-zinc-500">
-                    {total.coverageCount}개
-                  </td>
                 </tr>
-              ))}
-            </tbody>
+                {totals.map((total, index) => (
+                  <tr key={`${total.normalizedName}-${index}`}>
+                    <th className="px-6 py-4 font-medium text-zinc-800">
+                      <details>
+                        <summary className="cursor-pointer marker:text-zinc-400">
+                          {total.category}
+                        </summary>
+                        <ul className="mt-3 space-y-1.5 text-xs font-normal text-zinc-500">
+                          {total.composition.map((source, sourceIndex) => (
+                            <li
+                              key={`${source.policy_id ?? "policy"}-${sourceIndex}`}
+                            >
+                              {source.insurer ?? "보험사 확인 필요"} ·{" "}
+                              {source.coverage_name} · {source.original_amount}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </th>
+                    <td className="px-6 py-4 text-right font-semibold text-blue-600">
+                      {formatWon(total.totalAmount)}
+                    </td>
+                    <td className="px-6 py-4 text-right text-zinc-500">
+                      {total.coverageCount}개
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
           </table>
         </div>
       ) : (
@@ -123,4 +138,29 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
 
 function formatWon(amount: number) {
   return `${amount.toLocaleString("ko-KR")}원`;
+}
+
+const MAJOR_CATEGORY_ORDER = [
+  "진단비",
+  "수술비",
+  "치료비",
+  "입원",
+  "통원",
+  "후유장해",
+  "사망",
+  "간병",
+  "기타",
+];
+
+function groupTotals(totals: PortfolioSummary["totals"]) {
+  const groups = new Map<string, typeof totals>();
+  for (const total of totals) {
+    const group = groups.get(total.majorCategory) ?? [];
+    group.push(total);
+    groups.set(total.majorCategory, group);
+  }
+  return [...groups.entries()].sort(
+    ([left], [right]) =>
+      MAJOR_CATEGORY_ORDER.indexOf(left) - MAJOR_CATEGORY_ORDER.indexOf(right),
+  );
 }

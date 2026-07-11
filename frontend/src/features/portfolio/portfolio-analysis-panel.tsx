@@ -14,6 +14,12 @@ export function PortfolioAnalysisPanel({
   active: boolean;
   documents: AnalyzedInsurance[];
 }) {
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("미상");
+  const [demographics, setDemographics] = useState<{
+    age: number;
+    gender: string;
+  } | null>(null);
   const [state, setState] = useState<{
     status: "idle" | "loading" | "success" | "error";
     result?: PortfolioAnalysisResult;
@@ -25,19 +31,41 @@ export function PortfolioAnalysisPanel({
     .join("|");
 
   useEffect(() => {
-    const requestKey = `${portfolioKey}:${attempt}`;
+    if (!demographics) return;
+    const requestKey = `${portfolioKey}:${demographics.age}:${demographics.gender}:${attempt}`;
     if (!active || requestedKey.current === requestKey) return;
     requestedKey.current = requestKey;
     setState({ status: "loading" });
     const controller = new AbortController();
-    void requestPortfolioAnalysis(documents, controller.signal)
+    void requestPortfolioAnalysis(documents, demographics, controller.signal)
       .then((result) => setState({ status: "success", result }))
       .catch((error: unknown) => {
         if ((error as { name?: string }).name !== "AbortError")
           setState({ status: "error" });
       });
     // The request intentionally continues while another tab is visible.
-  }, [active, attempt, documents, portfolioKey]);
+  }, [active, attempt, demographics, documents, portfolioKey]);
+
+  if (!demographics) {
+    return (
+      <DemographicsForm
+        age={age}
+        gender={gender}
+        onAgeChange={setAge}
+        onGenderChange={setGender}
+        onSubmit={() => {
+          const parsedAge = Number(age);
+          if (
+            Number.isInteger(parsedAge) &&
+            parsedAge >= 0 &&
+            parsedAge <= 120
+          ) {
+            setDemographics({ age: parsedAge, gender });
+          }
+        }}
+      />
+    );
+  }
 
   if (state.status === "idle" || state.status === "loading")
     return <AnalysisLoading />;
@@ -70,6 +98,9 @@ export function PortfolioAnalysisPanel({
       ) : null}
       <section className="rounded-2xl border border-zinc-200 p-6">
         <h2 className="text-xl font-semibold">내 보험을 전체로 살펴봤어요</h2>
+        <p className="mt-2 text-sm text-zinc-500">
+          {result.age}세 · {result.gender} · {result.life_stage} 기준
+        </p>
         <dl className="mt-5 grid gap-4 sm:grid-cols-3">
           <AnalysisMetric label="보험" value={`${result.policy_count}개`} />
           <AnalysisMetric
@@ -82,6 +113,19 @@ export function PortfolioAnalysisPanel({
           />
         </dl>
       </section>
+      <div className="grid gap-4 md:grid-cols-2">
+        <CoverageCheckCard
+          title="현재 증권에서 확인한 준비 항목"
+          items={result.prepared_coverages}
+          emptyMessage="참고 기준과 일치하는 담보를 확인하지 못했어요."
+        />
+        <CoverageCheckCard
+          title="추가 확인이 필요한 항목"
+          items={result.coverage_gaps.map((gap) => gap.category)}
+          emptyMessage="참고 기준에서 빠진 항목을 찾지 못했어요."
+          warning
+        />
+      </div>
       <div className="grid gap-4 md:grid-cols-2">
         {result.classifications.map((section) => (
           <section
@@ -112,7 +156,100 @@ export function PortfolioAnalysisPanel({
           {notice}
         </p>
       ))}
+      <p className="text-xs leading-5 text-zinc-500">
+        {result.baseline_notice}
+      </p>
     </div>
+  );
+}
+
+function DemographicsForm({
+  age,
+  gender,
+  onAgeChange,
+  onGenderChange,
+  onSubmit,
+}: {
+  age: string;
+  gender: string;
+  onAgeChange: (value: string) => void;
+  onGenderChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 p-6 sm:p-8">
+      <h2 className="text-xl font-semibold">나이와 성별을 알려주세요</h2>
+      <p className="mt-2 text-sm leading-6 text-zinc-500">
+        현재 가입한 담보를 나이대별 일반 확인 항목과 비교해요.
+      </p>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-medium">
+          나이
+          <input
+            type="number"
+            min={0}
+            max={120}
+            value={age}
+            onChange={(event) => onAgeChange(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-zinc-300 px-4 py-3 font-normal outline-none focus:border-blue-600"
+            placeholder="예: 35"
+          />
+        </label>
+        <label className="text-sm font-medium">
+          성별
+          <select
+            value={gender}
+            onChange={(event) => onGenderChange(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 font-normal outline-none focus:border-blue-600"
+          >
+            <option value="미상">선택하지 않음</option>
+            <option value="여성">여성</option>
+            <option value="남성">남성</option>
+            <option value="기타">기타</option>
+          </select>
+        </label>
+      </div>
+      <button
+        type="button"
+        disabled={!age}
+        onClick={onSubmit}
+        className="mt-6 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        내 보험 분석하기
+      </button>
+    </section>
+  );
+}
+
+function CoverageCheckCard({
+  title,
+  items,
+  emptyMessage,
+  warning = false,
+}: {
+  title: string;
+  items: string[];
+  emptyMessage: string;
+  warning?: boolean;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 p-6">
+      <h2 className="font-semibold">{title}</h2>
+      {items.length ? (
+        <ul className="mt-4 space-y-2 text-sm">
+          {items.map((item) => (
+            <li
+              key={item}
+              className={warning ? "text-amber-800" : "text-zinc-700"}
+            >
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-4 text-sm text-zinc-500">{emptyMessage}</p>
+      )}
+    </section>
   );
 }
 
