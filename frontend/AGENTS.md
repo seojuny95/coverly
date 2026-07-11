@@ -8,7 +8,7 @@ Next.js App Router + TypeScript 프론트엔드. 전체 프로젝트 가이드: 
 
 ## 프로젝트 소개
 
-Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 종류별 정리·보험금 합계·상담 전 검토·근거 기반 Q&A를 보여준다.
+Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 종류별 정리·보험금 합계·상담 전 검토·근거 기반 Q&A를 보여준다. "보험을 팔지 않는 내 편 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
 
 ## Development Commands
 
@@ -44,6 +44,10 @@ src/
 ## Coding Style & Naming Conventions
 
 - 포맷은 **Prettier**(+ tailwindcss 플러그인), 린팅은 **ESLint**에 위임한다.
+- **가독성 (한눈에 흐름이 잡히게)**: 컴포넌트는 훑기만 해도 흐름이 보이게 쓴다.
+  - 깊은 삼항·중첩 대신 이른 반환(early return)과 이름 있는 헬퍼·하위 컴포넌트로 편다.
+  - 상태 계산 → 파생 값 → JSX 순서로 두고, 그 사이를 빈 줄로 나눈다.
+  - JSX도 논리 블록마다 줄바꿈으로 구분한다.
 - 기본은 **Server Components**; 상호작용이 필요할 때만 `"use client"`를 사용한다.
 - 파일명은 kebab-case, 컴포넌트는 PascalCase를 사용한다.
 - 마크다운은 한국어, 코드 코멘트는 영어. 사용자 대상 UI 카피는 한국어.
