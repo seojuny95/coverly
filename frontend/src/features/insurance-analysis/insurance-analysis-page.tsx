@@ -29,6 +29,10 @@ import {
   type UploadInsurance,
 } from "../insurance-upload/insurance-upload-form";
 import { InsuranceCoverageList } from "./insurance-coverage-list";
+import { CoverageTotalTable } from "../portfolio/coverage-total-table";
+import { InsuranceChatbot } from "../portfolio/insurance-chatbot";
+import { PortfolioAnalysisPanel } from "../portfolio/portfolio-analysis-panel";
+import { usePortfolioSummary } from "../portfolio/use-portfolio-summary";
 
 const CLASSIFICATION_ORDER = [
   "자동차",
@@ -65,6 +69,9 @@ export function InsuranceAnalysisPage({
 }: InsuranceAnalysisPageProps = {}) {
   const [analysis, setAnalysis] = useState<InsuranceAnalysis | null>();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"insurance" | "analysis">(
+    "insurance",
+  );
   const [expandedInsuranceIds, setExpandedInsuranceIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -89,6 +96,7 @@ export function InsuranceAnalysisPage({
     () => countInsuranceDocuments(insuranceDocuments),
     [insuranceDocuments],
   );
+  const portfolioSummary = usePortfolioSummary(insuranceDocuments);
 
   const toggleInsurance = (policyId: string) => {
     setExpandedInsuranceIds((current) => {
@@ -158,136 +166,191 @@ export function InsuranceAnalysisPage({
       </header>
 
       <section className="mx-auto mt-10 w-full max-w-6xl">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="mb-4">
-              <PixelEyebrow>나의 보장 지도</PixelEyebrow>
-            </div>
-            <h1 className="text-3xl font-semibold tracking-[-0.05em] text-zinc-950 sm:text-4xl">
-              내 보험을 종류별로 정리했어요
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-zinc-500">
-              {analysis.selectedName
-                ? `${analysis.selectedName}님의 보험 ${insuranceDocuments.length}개를 종류별로 보기 쉽게 정리했어요.`
-                : `보험 ${insuranceDocuments.length}개를 종류별로 보기 쉽게 정리했어요.`}
-            </p>
-          </div>
-          <div className="flex flex-col items-start gap-3 sm:items-end">
-            <button
-              type="button"
-              onClick={openUploadModal}
-              className={primaryButtonClassName}
-            >
-              보험증권 더 올리기
-            </button>
-            <p className="font-mono text-[10px] tracking-[0.04em] text-zinc-400">
-              정리한 시각 {formatDateTime(analysis.generatedAt)}
-            </p>
-          </div>
-        </div>
-
-        <dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {CLASSIFICATION_ORDER.map((classification) => (
-            <div
-              key={classification}
-              className="rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
-            >
-              <dt className="text-xs font-medium text-zinc-500">
-                {classification}
-              </dt>
-              <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
-                {counts[classification] ?? 0}
-              </dd>
-            </div>
-          ))}
-        </dl>
-
-        <div className="mt-8 space-y-5">
-          {CLASSIFICATION_ORDER.map((classification) => {
-            const classificationInsuranceDocuments =
-              groupedInsuranceDocuments[classification] ?? [];
-            if (classificationInsuranceDocuments.length === 0) return null;
-
-            return (
-              <section
-                key={classification}
-                className="overflow-hidden rounded-2xl border border-zinc-200 bg-white"
-              >
-                <div className="border-b border-zinc-100 bg-zinc-50/60 px-5 py-4">
-                  <h2 className="text-lg font-semibold tracking-[-0.03em]">
-                    {classification}
-                  </h2>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    보험 {classificationInsuranceDocuments.length}개
-                  </p>
+        <nav
+          aria-label="보험 정보 보기"
+          className="mb-8 flex gap-1 border-b border-zinc-200"
+        >
+          <TabButton
+            active={activeTab === "insurance"}
+            onClick={() => setActiveTab("insurance")}
+          >
+            내 보험
+          </TabButton>
+          <TabButton
+            active={activeTab === "analysis"}
+            onClick={() => setActiveTab("analysis")}
+          >
+            보험 분석
+          </TabButton>
+        </nav>
+        {activeTab === "insurance" ? (
+          <>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="mb-4">
+                  <PixelEyebrow>나의 보장 지도</PixelEyebrow>
                 </div>
+                <h1 className="text-3xl font-semibold tracking-[-0.05em] text-zinc-950 sm:text-4xl">
+                  내 보험을 종류별로 정리했어요
+                </h1>
+                <p className="mt-3 text-sm leading-6 text-zinc-500">
+                  {analysis.selectedName
+                    ? `${analysis.selectedName}님의 보험 ${insuranceDocuments.length}개를 종류별로 보기 쉽게 정리했어요.`
+                    : `보험 ${insuranceDocuments.length}개를 종류별로 보기 쉽게 정리했어요.`}
+                </p>
+              </div>
+              <div className="flex flex-col items-start gap-3 sm:items-end">
+                <button
+                  type="button"
+                  onClick={openUploadModal}
+                  className={primaryButtonClassName}
+                >
+                  보험증권 더 올리기
+                </button>
+                <p className="font-mono text-[10px] tracking-[0.04em] text-zinc-400">
+                  정리한 시각 {formatDateTime(analysis.generatedAt)}
+                </p>
+              </div>
+            </div>
 
-                <ul className="divide-y divide-zinc-100">
-                  {classificationInsuranceDocuments.map((insuranceDocument) => {
-                    const isExpanded = expandedInsuranceIds.has(
-                      insuranceDocument.id,
-                    );
-                    const basicInfo = insuranceDocument.result.기본정보;
+            <dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {CLASSIFICATION_ORDER.map((classification) => (
+                <div
+                  key={classification}
+                  className="rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
+                >
+                  <dt className="text-xs font-medium text-zinc-500">
+                    {classification}
+                  </dt>
+                  <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
+                    {counts[classification] ?? 0}
+                  </dd>
+                </div>
+              ))}
+            </dl>
 
-                    return (
-                      <li key={insuranceDocument.id}>
-                        <div className="overflow-hidden focus-within:shadow-[inset_0_0_0_2px_#2563EB]">
-                          <button
-                            type="button"
-                            aria-expanded={isExpanded}
-                            onClick={() =>
-                              toggleInsurance(insuranceDocument.id)
-                            }
-                            className="flex w-full flex-col gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50 focus:outline-none sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <span className="flex min-w-0 items-start gap-3">
-                              <InsurerLogo insurerName={basicInfo?.보험사} />
-                              <span className="min-w-0 flex-1">
-                                <span className="flex min-w-0 items-center gap-2">
-                                  <span className="truncate text-base font-semibold text-zinc-950">
-                                    {basicInfo?.상품명 ??
-                                      insuranceDocument.fileName}
-                                  </span>
-                                  {basicInfo?.상품태그?.length ? (
-                                    <span className="flex shrink-0 flex-wrap gap-1.5">
-                                      {basicInfo.상품태그.map((tag) => (
-                                        <TagBadge key={tag} tag={tag} />
-                                      ))}
+            <CoverageTotalTable
+              status={portfolioSummary.state.status}
+              summary={
+                portfolioSummary.state.status === "success"
+                  ? portfolioSummary.state.summary
+                  : undefined
+              }
+              onRetry={portfolioSummary.retry}
+            />
+
+            <div className="mt-8 space-y-5">
+              {CLASSIFICATION_ORDER.map((classification) => {
+                const classificationInsuranceDocuments =
+                  groupedInsuranceDocuments[classification] ?? [];
+                if (classificationInsuranceDocuments.length === 0) return null;
+
+                return (
+                  <section
+                    key={classification}
+                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white"
+                  >
+                    <div className="border-b border-zinc-100 bg-zinc-50/60 px-5 py-4">
+                      <h2 className="text-lg font-semibold tracking-[-0.03em]">
+                        {classification}
+                      </h2>
+                      <p className="mt-1 text-sm text-zinc-500">
+                        보험 {classificationInsuranceDocuments.length}개
+                      </p>
+                    </div>
+
+                    <ul className="divide-y divide-zinc-100">
+                      {classificationInsuranceDocuments.map(
+                        (insuranceDocument) => {
+                          const isExpanded = expandedInsuranceIds.has(
+                            insuranceDocument.id,
+                          );
+                          const basicInfo = insuranceDocument.result.기본정보;
+
+                          return (
+                            <li key={insuranceDocument.id}>
+                              <div className="overflow-hidden focus-within:shadow-[inset_0_0_0_2px_#2563EB]">
+                                <button
+                                  type="button"
+                                  aria-expanded={isExpanded}
+                                  onClick={() =>
+                                    toggleInsurance(insuranceDocument.id)
+                                  }
+                                  className="flex w-full flex-col gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50 focus:outline-none sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                  <span className="flex min-w-0 items-start gap-3">
+                                    <InsurerLogo
+                                      insurerName={basicInfo?.보험사}
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                      <span className="flex min-w-0 items-center gap-2">
+                                        <span className="truncate text-base font-semibold text-zinc-950">
+                                          {basicInfo?.상품명 ??
+                                            insuranceDocument.fileName}
+                                        </span>
+                                        {basicInfo?.상품태그?.length ? (
+                                          <span className="flex shrink-0 flex-wrap gap-1.5">
+                                            {basicInfo.상품태그.map((tag) => (
+                                              <TagBadge key={tag} tag={tag} />
+                                            ))}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                      <span className="mt-1 block truncate text-sm text-zinc-500">
+                                        {insuranceDocument.fileName}
+                                      </span>
                                     </span>
-                                  ) : null}
-                                </span>
-                                <span className="mt-1 block truncate text-sm text-zinc-500">
-                                  {insuranceDocument.fileName}
-                                </span>
-                              </span>
-                            </span>
-                            <span className="inline-flex shrink-0 items-center rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                              {isExpanded ? "접기" : "자세히 보기"}
-                            </span>
-                          </button>
+                                  </span>
+                                  <span className="inline-flex shrink-0 items-center rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                                    {isExpanded ? "접기" : "자세히 보기"}
+                                  </span>
+                                </button>
 
-                          <div
-                            className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                              isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                            }`}
-                          >
-                            <div className="overflow-hidden">
-                              <InsuranceDetail
-                                insuranceDocument={insuranceDocument}
-                                isExpanded={isExpanded}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
+                                <div
+                                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                                    isExpanded
+                                      ? "grid-rows-[1fr]"
+                                      : "grid-rows-[0fr]"
+                                  }`}
+                                >
+                                  <div className="overflow-hidden">
+                                    <InsuranceDetail
+                                      insuranceDocument={insuranceDocument}
+                                      isExpanded={isExpanded}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        },
+                      )}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <div>
+            <div className="mb-7">
+              <PixelEyebrow>내 보험 분석</PixelEyebrow>
+              <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
+                내 보험을 함께 살펴봐요
+              </h1>
+              <p className="mt-3 text-sm leading-6 text-zinc-500">
+                업로드한 증권에서 확인한 내용을 전체와 보험 종류별로 정리해요.
+              </p>
+            </div>
+            <PortfolioAnalysisPanel
+              active={activeTab === "analysis"}
+              documents={insuranceDocuments}
+            />
+          </div>
+        )}
       </section>
+
+      <InsuranceChatbot documents={insuranceDocuments} />
 
       {isUploadModalOpen ? (
         <UploadInsuranceModal
@@ -298,6 +361,28 @@ export function InsuranceAnalysisPage({
         />
       ) : null}
     </main>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${active ? "border-blue-600 text-blue-600" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
+    >
+      {children}
+    </button>
   );
 }
 

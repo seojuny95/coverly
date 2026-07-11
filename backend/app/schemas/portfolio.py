@@ -1,0 +1,82 @@
+"""Typed contracts for deterministic portfolio calculations."""
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class CoverageInput(BaseModel):
+    """Coverage fields accepted from the current and extended parse response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    담보명: str
+    가입금액: str = ""
+    보장내용: str | None = None
+    해설: str | None = None
+    지급유형: str | None = None
+    가입금액숫자: int | None = Field(default=None, ge=0)
+    보장분류: str | None = None
+
+
+class PolicyInfoInput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    보험사: str | None = None
+    상품명: str | None = None
+    보험분류: str | None = None
+
+
+class PolicyInput(BaseModel):
+    """One stored parse result; unknown upload metadata is intentionally allowed."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str | None = None
+    기본정보: PolicyInfoInput
+    보장목록: list[CoverageInput] = Field(default_factory=list)
+    분석상태: str | None = None
+
+
+class PortfolioSummaryRequest(BaseModel):
+    policies: list[PolicyInput] = Field(default_factory=list)
+
+
+class CoverageSourceItem(BaseModel):
+    policy_id: str | None
+    insurer: str | None
+    product_name: str | None
+    coverage_name: str
+    amount: int
+    original_amount: str
+
+
+class CoverageTotalItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    normalized_name: str = Field(serialization_alias="normalizedName")
+    display_name: str = Field(serialization_alias="category")
+    total_amount: int = Field(serialization_alias="totalAmount")
+    coverage_count: int = Field(serialization_alias="coverageCount")
+    composition: list[CoverageSourceItem]
+
+
+class IndemnityItem(BaseModel):
+    policy_id: str | None
+    insurer: str | None
+    product_name: str | None
+    coverage_name: str
+    normalized_name: str
+    cross_insurer_duplicate: bool
+
+
+class ExcludedCoverageItem(BaseModel):
+    policy_id: str | None
+    coverage_name: str
+    original_amount: str
+    reason: str
+
+
+class PortfolioCoverageSummary(BaseModel):
+    totals: list[CoverageTotalItem]
+    indemnity_coverages: list[IndemnityItem]
+    excluded_coverages: list[ExcludedCoverageItem]
+    excluded_auto_policy_count: int
