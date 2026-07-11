@@ -29,6 +29,40 @@ def _stub_classification_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(classification_module, "_default_completer", lambda: stub_completer)
 
 
+def test_llm_filled_vehicle_info_merged_when_plate_grounded() -> None:
+    result = extract_policy_summary(
+        """
+        자동차보험증권
+        차량번호 TEST-PLATE-001 차명 아이오닉5
+        보험기간: 2026.01.01 ~ 2027.01.01
+        """,
+        llm_extractor=lambda _t: {
+            "차량정보": {"차량명": "아이오닉5", "차량번호": "TEST-PLATE-001", "연식": "2024"}
+        },
+    )
+    assert result["차량정보"]["차량번호"] == "TEST-PLATE-001"
+
+
+def test_llm_filled_vehicle_info_dropped_when_plate_absent() -> None:
+    # cite-or-refuse: 차량번호가 원문에 없으면 차량정보 전체를 버린다.
+    result = extract_policy_summary(
+        "자동차보험증권\n보험기간: 2026.01.01 ~ 2027.01.01",
+        llm_extractor=lambda _t: {
+            "차량정보": {"차량명": "아이오닉5", "차량번호": "TEST-PLATE-999", "연식": "2024"}
+        },
+    )
+    assert "차량정보" not in result
+
+
+def test_llm_vehicle_info_without_plate_is_kept() -> None:
+    # 차량명/연식만 있으면(번호 미기재 증권) grounding 대상이 없어 수용.
+    result = extract_policy_summary(
+        "자동차보험증권\n차명 아이오닉5\n보험기간: 2026.01.01 ~ 2027.01.01",
+        llm_extractor=lambda _t: {"차량정보": {"차량명": "아이오닉5"}},
+    )
+    assert result["차량정보"] == {"차량명": "아이오닉5"}
+
+
 def test_no_insurer_specific_identifiers_in_module() -> None:
     # 보험사·상품 전용 로직 금지: 소스에 특정 보험사 이름이 남아 있으면 실패.
     import inspect
@@ -514,4 +548,5 @@ def test_llm_response_format_uses_strict_json_schema() -> None:
         "만기일",
         "납입기간",
         "보험료",
+        "차량정보",
     }

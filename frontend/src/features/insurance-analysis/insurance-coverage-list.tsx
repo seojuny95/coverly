@@ -29,6 +29,14 @@ export function InsuranceCoverageList({
     );
   }
 
+  // Absent 유형 defaults to 담보 (existing non-auto documents never set it).
+  const mainCoverages = coverages.filter(
+    (coverage) => (coverage.유형 ?? "담보") === "담보",
+  );
+  const riderCoverages = coverages.filter(
+    (coverage) => coverage.유형 === "부가",
+  );
+
   return (
     <>
       {status === "부분" ? (
@@ -36,43 +44,62 @@ export function InsuranceCoverageList({
           일부 정보를 분석하지 못했어요.
         </p>
       ) : null}
-      <ul className="divide-y divide-[#111827]/10">
-        {coverages.map((coverage, index) => (
-          <li
-            key={`${coverage.담보명}-${index}`}
-            className="py-4 first:pt-0 last:pb-0"
-          >
-            <p className="text-sm font-semibold break-words text-[#111827]">
-              {coverage.담보명}
-            </p>
-            {coverage.보장내용 ? (
-              <p className="mt-1.5 text-sm leading-6 break-words whitespace-pre-line text-[#111827]/75">
-                {coverage.보장내용}
+      {mainCoverages.length > 0 ? (
+        <ul className="divide-y divide-[#111827]/10">
+          {mainCoverages.map((coverage, index) => (
+            <li
+              key={`${coverage.담보명}-${index}`}
+              className="py-4 first:pt-0 last:pb-0"
+            >
+              <p className="text-sm font-semibold break-words text-[#111827]">
+                {coverage.담보명}
               </p>
-            ) : coverage.해설 ? (
-              <>
+              {coverage.보장내용 ? (
                 <p className="mt-1.5 text-sm leading-6 break-words whitespace-pre-line text-[#111827]/75">
-                  {coverage.해설}
+                  {coverage.보장내용}
                 </p>
-                <p className="mt-1 text-xs leading-5 text-[#111827]/50">
-                  {GENERATED_NOTICE}
-                </p>
-              </>
-            ) : null}
-            <p className="mt-2 text-sm">
-              {coverage.가입금액 === "확인필요" ? (
-                <span className="text-[#111827]/60">
-                  가입금액은 확인이 필요해요
-                </span>
-              ) : (
-                <span className="font-medium text-[#111827]">
-                  {coverage.가입금액}
-                </span>
-              )}
-            </p>
-          </li>
-        ))}
-      </ul>
+              ) : coverage.해설 ? (
+                <>
+                  <p className="mt-1.5 text-sm leading-6 break-words whitespace-pre-line text-[#111827]/75">
+                    {coverage.해설}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[#111827]/50">
+                    {GENERATED_NOTICE}
+                  </p>
+                </>
+              ) : null}
+              <p className="mt-2 text-sm">
+                {coverage.가입금액 === "확인필요" ? (
+                  <span className="text-[#111827]/60">
+                    가입금액은 확인이 필요해요
+                  </span>
+                ) : (
+                  <span className="font-medium text-[#111827]">
+                    {coverage.가입금액}
+                  </span>
+                )}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {riderCoverages.length > 0 ? (
+        <div className={mainCoverages.length > 0 ? "mt-4" : undefined}>
+          <p className="text-xs font-medium text-[#111827]/50">
+            부가 특약·요율
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5">
+            {riderCoverages.map((coverage, index) => (
+              <li
+                key={`${coverage.담보명}-${index}`}
+                className="text-sm break-words text-[#111827]/75"
+              >
+                {coverage.담보명}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </>
   );
 }

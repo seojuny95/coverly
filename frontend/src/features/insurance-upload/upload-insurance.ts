@@ -8,6 +8,12 @@ export type InsurancePremium = {
   납입주기?: string;
 };
 
+export type InsuranceVehicleInfo = {
+  차량명?: string;
+  차량번호?: string;
+  연식?: string;
+};
+
 export type InsuranceBasicInfo = {
   보험사?: string;
   상품명?: string;
@@ -20,6 +26,7 @@ export type InsuranceBasicInfo = {
   만기일?: string;
   보험기간?: InsurancePeriod;
   보험료?: InsurancePremium;
+  차량정보?: InsuranceVehicleInfo;
 };
 
 export type InsuranceCoverage = {
@@ -27,6 +34,8 @@ export type InsuranceCoverage = {
   가입금액: string;
   보장내용: string | null;
   해설: string | null;
+  // Absent means "담보" (a real coverage row); "부가" marks name-only rider/rate rows.
+  유형?: "담보" | "부가";
 };
 
 export type InsuranceUploadResult = {

@@ -120,4 +120,45 @@ describe("InsuranceCoverageList", () => {
       screen.queryByText("일부 정보를 분석하지 못했어요."),
     ).not.toBeInTheDocument();
   });
+
+  test("renders 유형: 부가 rows compactly, separated from 담보 rows", () => {
+    const rider: InsuranceCoverage = {
+      담보명: "마일리지 특약",
+      가입금액: "",
+      보장내용: null,
+      해설: null,
+      유형: "부가",
+    };
+
+    render(<InsuranceCoverageList coverages={[withDetail, rider]} />);
+
+    expect(screen.getByText("부가 특약·요율")).toBeInTheDocument();
+    expect(screen.getByText("마일리지 특약")).toBeInTheDocument();
+    // No description/explanation/amount area for a rider row.
+    expect(
+      screen.queryByText("가입금액은 확인이 필요해요"),
+    ).not.toBeInTheDocument();
+  });
+
+  test("treats missing 유형 as 담보, unaffected by rider grouping", () => {
+    render(<InsuranceCoverageList coverages={[withDetail]} />);
+
+    expect(screen.queryByText("부가 특약·요율")).not.toBeInTheDocument();
+  });
+
+  test("renders only the rider group when every coverage is 부가", () => {
+    const rider: InsuranceCoverage = {
+      담보명: "긴급출동 요율",
+      가입금액: "",
+      보장내용: null,
+      해설: null,
+      유형: "부가",
+    };
+
+    render(<InsuranceCoverageList coverages={[rider]} />);
+
+    expect(screen.getByText("부가 특약·요율")).toBeInTheDocument();
+    expect(screen.getByText("긴급출동 요율")).toBeInTheDocument();
+    expect(screen.queryByRole("list")).not.toBeNull();
+  });
 });

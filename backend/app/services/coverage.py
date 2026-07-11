@@ -24,7 +24,8 @@ explanation failure keeps the extracted coverages (해설 stays None).
 
 import re
 from collections.abc import Callable
-from functools import lru_cache
+from functools import lru_cache, partial
+from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -55,7 +56,7 @@ _SYSTEM = (
     "입력은 증권에서 추출한 담보표 마크다운(또는 레이아웃 텍스트)이다. "
     "열 제목(보장명·담보명·담보종목·보장상세·보장내용·가입금액 등)을 보고 각 값을 정확히 매핑하라. "
     "표에 실제로 있는 담보만 옮기고 새로 지어내지 마라. "
-    "담보명은 증권 표기를 살리되, 보장 대상·사고를 바꾸지 않는 순수 부가어는 "
+    "담보명은 증권 표기를 살리되, 보장 대상·사고를 바꾸지 않는 순수 수식어는 "
     "괄호 안이라도 제거한다 "
     "— '감액없음'·'감액'·'기본계약'·'주계약'·'선택'·'무배당' 같은 지급방식·계약형태 표시. "
     "예: '암진단비(유사암제외)(감액없음)'→'암진단비(유사암제외)'. "
@@ -63,6 +64,30 @@ _SYSTEM = (
     "반대로 '유사암제외'·'80%이상'·'1~5종'처럼 보장 범위·지급조건을 가르는 수식어는 반드시 남긴다. "
     "보장내용은 증권 원문 그대로 옮긴다(요약·축약 금지, '※'로 시작하는 단서 포함). 없으면 null. "
     "가입금액이 없으면 빈 문자열로 둔다."
+)
+
+# Appended to _SYSTEM for non-자동차 policies only: they have no rider/rate rows,
+# so 유형 is pinned to the schema default. Kept out of _SYSTEM itself so it never
+# contradicts _AUTO_GUIDANCE, which tags rider rows 유형='부가'.
+_DEFAULT_TYPE_GUIDANCE = "유형은 항상 '담보'로 표시한다."
+
+# Appended to _SYSTEM only for 자동차 policies — their coverage tables mix real
+# coverages with rate/discount riders and section headers, which the default
+# prompt has no vocabulary for.
+_AUTO_GUIDANCE = (
+    "이 증권은 자동차보험이다. 다음 지침을 추가로 따른다: "
+    "한도 열은 제목 없이 담보종목 바로 옆 칸에 올 수 있다 — 그 칸의 문구가 가입금액이다. "
+    "금액·한도 칸의 문구는 아무리 길어도 설명이 아니라 가입금액이다 — 요약하지 말고 "
+    "그대로 가입금액에 옮긴다 ('1인당 무한', '자배법에서 정한 금액'처럼 "
+    "한도를 서술하는 문구도 포함). 유형이 '담보'인 행의 가입금액을 빈 문자열로 두지 마라. "
+    "한도 문구를 보장내용에 중복해 넣지 말고, 표에 별도의 보장 설명이 없으면 "
+    "보장내용은 null로 둔다. "
+    "유형은 이름의 의미가 아니라 표의 구조로 판정한다 — "
+    "행에 금액·한도 칸 내용이 있으면(이름이 특약이라도) 유형을 '담보'로 하고, "
+    "금액·한도 없이 이름만 나열된 항목이면(별도 특약·요율 목록) 유형을 '부가'로 한다. "
+    "여러 이름을 묶는 섹션·그룹 표제(예: '기본계약', '보험료 할인특약', "
+    "'보장확대 및 기타 특약', '특별요율')는 담보도 특약도 아니므로 행으로 만들지 마라. "
+    "'부가' 항목은 이름만 정확히 옮긴다."
 )
 
 
@@ -152,10 +177,50 @@ def build_coverage_source(doc: ParsedDocument) -> str:
 # LLM normalization: any column layout -> the unified Coverage shape
 
 
+def _same_ignoring_whitespace(left: str, right: str) -> bool:
+    return re.sub(r"\s", "", left) == re.sub(r"\s", "", right)
+
+
+def _amount_from_source_row(name: str, source: str) -> str | None:
+    """Recover a coverage's amount from its markdown source row.
+
+    Auto tables carry the limit in an untitled cell right next to the coverage
+    name, and the LLM sometimes files that phrase under 보장내용 leaving
+    가입금액 empty. The table structure is authoritative: find the row whose
+    first cell is the coverage name and return the adjacent cell verbatim —
+    grounded by construction since it comes straight from the source.
+    """
+    target = re.sub(r"\s", "", name)
+    if not target:
+        return None
+
+    rows: list[list[str]] = []
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("|"):
+            rows.append([cell.strip() for cell in stripped.strip("|").split("|")])
+
+    for index, cells in enumerate(rows):
+        if len(cells) < 2 or re.sub(r"\s", "", cells[0]) != target:
+            continue
+        if cells[1]:
+            return cells[1]
+        # pdfplumber sometimes wraps the value onto a continuation row (empty
+        # name cell, value in the adjacent cell) — look one row ahead.
+        if index + 1 < len(rows):
+            next_cells = rows[index + 1]
+            if len(next_cells) >= 2 and not next_cells[0] and next_cells[1]:
+                return next_cells[1]
+        return None
+
+    return None
+
+
 class _CoverageRow(BaseModel):
     담보명: str
     보장내용: str | None
     가입금액: str
+    유형: Literal["담보", "부가"] = "담보"
 
 
 class _CoverageList(BaseModel):
@@ -167,12 +232,18 @@ def _default_completer() -> JsonCompleter:
     return structured_completer(_CoverageList)
 
 
-def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> list[Coverage]:
+def normalize_coverages(
+    source: str, category: str | None = None, complete: JsonCompleter | None = None
+) -> list[Coverage]:
     """Map a coverage-table source into Coverages (one structured LLM call)."""
     if not source.strip():
         return []
     completer = complete or _default_completer()
-    rows = completer(_SYSTEM, source).get("보장목록", [])
+    if category == "자동차":
+        system = _SYSTEM + " " + _AUTO_GUIDANCE
+    else:
+        system = _SYSTEM + " " + _DEFAULT_TYPE_GUIDANCE
+    rows = completer(system, source).get("보장목록", [])
     if not isinstance(rows, list):
         return []
 
@@ -182,17 +253,45 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
             parsed = _CoverageRow.model_validate(row)
         except ValidationError:
             continue
+        row_type = parsed.유형
+        raw_amount = parsed.가입금액.strip()
+        if category == "자동차" and not raw_amount:
+            # The auto table's structure is authoritative: a row with its own
+            # amount cell is a coverage regardless of what the LLM called it
+            # (긴급출동특약-style rows), and an empty 가입금액 on a 담보 row
+            # usually means the LLM filed the untitled limit cell under
+            # 보장내용 instead — recover it from the source row.
+            recovered = _amount_from_source_row(parsed.담보명, source)
+            if recovered:
+                raw_amount = recovered
+                row_type = "담보"
+
         detail = parsed.보장내용.strip() if parsed.보장내용 else None
         if detail and not wording_grounded(detail, source):
             detail = None  # not the policy's own wording — don't present it as 원문
-        coverages.append(
-            Coverage(
-                담보명=parsed.담보명.strip(),
-                가입금액=normalize_amount(parsed.가입금액, source),
-                보장내용=detail or None,
-                해설=None,
-            )
+        if detail and _same_ignoring_whitespace(detail, raw_amount):
+            # A wording that merely repeats the amount cell (auto tables have no
+            # 보장내용 column — the limit phrase gets copied into both fields)
+            # describes the amount, not the coverage. Drop it so the explanation
+            # pass can supply what the coverage actually covers.
+            detail = None
+
+        if row_type != "담보" and not raw_amount:
+            # 부가 rows are name-only riders/rates: an empty amount is the expected
+            # shape, not a verification gap — don't stamp them with 확인필요. A
+            # non-empty rider amount still goes through grounding below.
+            amount = ""
+        else:
+            amount = normalize_amount(raw_amount, source)
+        coverage = Coverage(
+            담보명=parsed.담보명.strip(),
+            가입금액=amount,
+            보장내용=detail or None,
+            해설=None,
         )
+        if row_type != "담보":
+            coverage["유형"] = row_type  # omit for 담보 rows — preserve response shape
+        coverages.append(coverage)
     return coverages
 
 
@@ -200,16 +299,24 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
 # Orchestrator
 
 
+def _needs_explanation(coverage: Coverage) -> bool:
+    """Only 담보 rows without policy wording get a generated 해설 — 부가 rows are
+    name-only riders/rates with nothing substantive to explain."""
+    return not coverage["보장내용"] and coverage.get("유형", "담보") == "담보"
+
+
 def extract_coverages(
     doc: ParsedDocument,
     *,
-    normalize: Normalizer = normalize_coverages,
+    category: str | None = None,
+    normalize: Normalizer | None = None,
     explain: Explainer = explain_coverages,
 ) -> tuple[list[Coverage], str]:
     """Extract the coverage list from a parsed policy document, best-effort."""
+    resolve_normalizer = normalize or partial(normalize_coverages, category=category)
     try:
         source = build_coverage_source(doc)
-        coverages = normalize(source)
+        coverages = resolve_normalizer(source)
     except Exception:
         return [], STATUS_PARTIAL
 
@@ -219,12 +326,12 @@ def extract_coverages(
         # result — surface 부분. A blank source means there was nothing to analyze.
         return [], STATUS_PARTIAL if source.strip() else STATUS_OK
 
-    missing = [c["담보명"] for c in coverages if not c["보장내용"]]
+    missing = [c["담보명"] for c in coverages if _needs_explanation(c)]
     if not missing:
         return coverages, STATUS_OK
 
     explanations, ok = explain(missing)
     for coverage in coverages:
-        if coverage["보장내용"] is None:
+        if _needs_explanation(coverage):
             coverage["해설"] = explanations.get(coverage["담보명"])
     return coverages, STATUS_OK if ok else STATUS_PARTIAL
