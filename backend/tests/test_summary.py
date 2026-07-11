@@ -206,6 +206,7 @@ def test_extract_policy_summary_fills_missing_display_fields_from_llm_without_ov
     result = extract_policy_summary(
         """
         보험증권
+        삼성화재에서 발행한 증권입니다.
         상품명: 건강보험
         증권번호: POLICY-TEST-001
         피보험자: 가나
@@ -262,6 +263,31 @@ def test_extract_policy_summary_reads_payment_period_and_maturity_date() -> None
         "금액": 120000,
         "납입주기": "월납",
     }
+
+
+def test_extract_local_policy_summary_reads_premium_from_doubled_bold_glyphs() -> None:
+    # pdfplumber renders some bold table labels/amounts with every character
+    # doubled back-to-back (a rendering artifact, e.g. "납입보험료" ->
+    # "납납입입보보험험료료"); this mirrors a real NH농협보험증권 fragment.
+    result = extract_local_policy_summary(
+        "계계약약자자주주소소 (자택)테스트주소\n"
+        "납납입입보보험험료료 42,615원 납납입입주주기기 월납\n"
+        "보보장장보보험험료료 42,615원 적적립립보보험험료료 해당 없음"
+    )
+
+    assert result["보험료"] == {"금액": 42615, "납입주기": "월납"}
+
+
+def test_extract_local_policy_summary_truncates_product_name_at_glued_policy_number() -> None:
+    # Some layouts squeeze multiple fields onto one text line, e.g.
+    # "보험종목 <상품명> 증권번호 <번호>" with no newline between them; mirrors a
+    # real DB운전자보험증권 fragment.
+    result = extract_local_policy_summary(
+        "보험종목 무배당 프로미라이프 참좋은운전자상해보험(TM)2404 증권번호 POLICY-TEST-MASKED-001\n"
+        "테스트고객A (TESTBIRTH-A-1******) 보험기간 2024년 07월 26일 ~ 2044년 07월 26일\n"
+    )
+
+    assert result["상품명"] == "무배당 프로미라이프 참좋은운전자상해보험(TM)2404"
 
 
 def test_extract_policy_summary_keeps_payment_cycle_stable_with_autopay_text() -> None:
@@ -340,6 +366,9 @@ def test_extract_policy_summary_reads_labeled_table_layout_without_insurer_overr
 
 
 def test_two_column_table_layout_defers_to_llm_fill() -> None:
+    # POLICY-TEST-003 / 다이렉트개인용자동차보험 appear here only in this unlabeled
+    # footer line, so the LLM-filled values below stay grounded even though the
+    # two-column table above defeats local extraction for them.
     text = """
     보험증권 발행일
     보험계약자 보험계약자주소
@@ -348,6 +377,7 @@ def test_two_column_table_layout_defers_to_llm_fill() -> None:
     가나(TESTBIRTH-D-1******) 테스트주소
     기명피보험자 피보험자주소
     다라(TESTBIRTH-F-1******) 테스트주소
+    안내: 다이렉트개인용자동차보험 POLICY-TEST-003
     """
     local = extract_local_policy_summary(text)
     assert "계약자" not in local or local["계약자"] not in {"보험계약자주소"}
@@ -367,6 +397,38 @@ def test_two_column_table_layout_defers_to_llm_fill() -> None:
     assert filled["계약자"] == "가나"
     assert filled["피보험자"] == "다라"
     assert filled["증권번호"] == "POLICY-TEST-003"
+
+
+def test_llm_filled_insurer_absent_from_text_is_not_set() -> None:
+    # Cite-or-refuse: the enum only constrains the LLM to a catalog insurer, it
+    # does not guarantee that insurer is the one named in this document. A value
+    # that never appears in the source text must be dropped, not surfaced.
+    result = extract_policy_summary(
+        """
+        보험증권
+        상품명: 건강보험
+        증권번호: POLICY-TEST-001
+        피보험자: 가나
+        """,
+        llm_extractor=lambda _text: {"보험사": "AXA손해보험"},
+    )
+
+    assert "보험사" not in result
+
+
+def test_llm_filled_insurer_present_in_text_is_set() -> None:
+    result = extract_policy_summary(
+        """
+        보험증권
+        AXA손해보험에서 발행한 증권입니다.
+        상품명: 건강보험
+        증권번호: POLICY-TEST-001
+        피보험자: 가나
+        """,
+        llm_extractor=lambda _text: {"보험사": "AXA손해보험"},
+    )
+
+    assert result["보험사"] == "AXA손해보험"
 
 
 def test_llm_insurer_field_is_constrained_to_catalog() -> None:

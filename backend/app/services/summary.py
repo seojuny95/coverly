@@ -17,6 +17,7 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 from openai.types.responses import EasyInputMessageParam, ResponseTextConfigParam
 
 from app.services.classification import classify_policy
+from app.services.grounding import wording_grounded
 from app.services.types import CoveragePeriod, PolicyCoreSummary, PolicySummary, PremiumSummary
 from app.settings import get_settings
 
@@ -74,11 +75,25 @@ _INSURED_PERSON_EXTRACTION_PATTERNS = [
     r"피보험자\s+([가-힣A-Za-z]+)\s+주민등록번호",
     rf"피보험자\s*({_PERSON_NAME_VALUE_PATTERN})\s*\(",
 ]
+
+
+def _doubled_glyph_pattern(label: str) -> str:
+    """Match a label where each character may render doubled.
+
+    Some PDFs synthesize bold Korean text by drawing each glyph twice at a
+    near-identical position; pdfplumber's text extraction then emits every
+    character back-to-back twice (e.g. "납입보험료" -> "납납입입보보험험료료").
+    This is a rendering/layout artifact, not an insurer-specific string, so
+    every label lookup that might land on bold table text should tolerate it.
+    """
+    return "".join(f"{re.escape(char)}{{1,2}}" for char in label)
+
+
 _PREMIUM_AMOUNT_PATTERNS = [
-    r"납입보험료\s*[:：]?\s*([\d,]+)원",
+    rf"{_doubled_glyph_pattern('납입보험료')}\s*[:：]?\s*([\d,]+)원",
     r"1회 보험료\s*([\d,\s]+)원",
     r"납입한 보험료\s*(?:\(총보험료\)\s*)?([\d,]+)원",
-    r"보험료\s*([\d,]+)원",
+    rf"{_doubled_glyph_pattern('보험료')}\s*([\d,]+)원",
 ]
 _PAYMENT_PERIOD_PATTERNS = [
     r"\b(\d+년납)\b",
@@ -211,8 +226,34 @@ def _extract_insurer_name(text: str) -> str | None:
     return _extract_labeled_value(text, _INSURER_LABELS)
 
 
+_PRODUCT_NAME_TRAILING_LABELS = _POLICY_NUMBER_LABELS + ["계약자", "보험기간"]
+
+
+def _truncate_before_trailing_label(value: str, labels: list[str]) -> str:
+    """Cut a same-line value at the next field label glued onto it.
+
+    Some layouts squeeze several fields onto one text line (e.g.
+    "<상품명> 증권번호 <번호>"), so a naive "rest of line" capture pulls the
+    next field's label and value in too. This is a generic same-line-fields
+    layout shape, not an insurer-specific pattern.
+    """
+    earliest_index: int | None = None
+    for label in labels:
+        match = re.search(rf"\s+{re.escape(label)}\b", value)
+        if match and (earliest_index is None or match.start() < earliest_index):
+            earliest_index = match.start()
+
+    if earliest_index is None:
+        return value
+    return _clean_value(value[:earliest_index])
+
+
 def _extract_product_name(text: str) -> str | None:
     explicit_name = _extract_labeled_value(text, _PRODUCT_NAME_LABELS)
+    if explicit_name:
+        explicit_name = _truncate_before_trailing_label(
+            explicit_name, _PRODUCT_NAME_TRAILING_LABELS
+        )
     if explicit_name and explicit_name not in _GENERIC_PRODUCT_NAMES:
         return explicit_name
 
@@ -831,7 +872,7 @@ def extract_policy_summary(
     summary = extract_local_policy_summary(text)
 
     if llm_extractor and _needs_llm_fill(summary):
-        _merge_missing_llm_fields(summary, llm_extractor(text))
+        _merge_missing_llm_fields(summary, llm_extractor(text), text)
 
     classification = classify_policy(
         text=text,
@@ -847,10 +888,30 @@ def _needs_llm_fill(summary: PolicySummary) -> bool:
     return any(field not in summary for field in _LLM_FILLABLE_FIELDS)
 
 
-def _merge_missing_llm_fields(summary: PolicySummary, llm_summary: LlmPolicySummary | None) -> None:
+# Identity fields whose value must be traceable back to the source document.
+# 보험기간/만기일/납입기간/보험료 are structured/derived (dates, amounts, periods)
+# rather than free-text spans copied from the document, so they are excluded here.
+_GROUNDED_LLM_FIELDS = {"보험사", "증권번호", "계약자", "피보험자", "상품명"}
+
+
+def _merge_missing_llm_fields(
+    summary: PolicySummary, llm_summary: LlmPolicySummary | None, text: str
+) -> None:
     if not llm_summary:
         return
 
     for key in _LLM_FILLABLE_FIELDS:
-        if key not in summary and key in llm_summary:
-            summary[key] = llm_summary[key]  # type: ignore[literal-required]
+        if key in summary or key not in llm_summary:
+            continue
+
+        value = llm_summary[key]  # type: ignore[literal-required]
+        # Cite-or-refuse: an LLM-filled identity field must actually appear in the
+        # source text. Without this check, a hallucinated value (e.g. an insurer
+        # the enum permits but the document never names) would be surfaced as if
+        # it were extracted from the policy itself.
+        if key in _GROUNDED_LLM_FIELDS and (
+            not isinstance(value, str) or not wording_grounded(value, text)
+        ):
+            continue
+
+        summary[key] = value  # type: ignore[literal-required]
