@@ -3,11 +3,7 @@ import asyncio
 from fastapi import APIRouter, UploadFile
 
 from app.errors import ApiError
-from app.services.coverage import STATUS_OK, extract_coverages
-from app.services.parsing import parse_document
-from app.services.pdf_text import extract_pdf_text
-from app.services.summary import extract_policy_summary
-from app.services.types import Coverage
+from app.services.pipeline import EmptyTextError, run_pipeline
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
@@ -37,36 +33,12 @@ async def _read_pdf(file: UploadFile) -> bytes:
 @router.post("/parse")
 async def parse_policy(file: UploadFile) -> dict[str, object]:
     data = await _read_pdf(file)
-    text = extract_pdf_text(data)
-    if not text:
+    try:
+        result = await asyncio.to_thread(run_pipeline, data)
+    except EmptyTextError:
         raise ApiError(
             status_code=422,
             code="PDF_TEXT_EXTRACTION_FAILED",
             message="PDF에서 텍스트를 추출할 수 없습니다.",
-        )
-
-    # 보험분류 is authoritative from the summary, so run it first. Auto policies
-    # are out of Phase 1 coverage scope (their riders/rates don't fit the
-    # personal-coverage model), so skip the expensive coverage extraction for them.
-    summary = await asyncio.to_thread(extract_policy_summary, text)
-    if summary.get("보험분류") == "자동차":
-        coverages: list[Coverage] = []
-        analysis_status = STATUS_OK
-    else:
-        # Interim double-parse (pypdf text above, pdfplumber here); the pipeline
-        # task collapses both onto a single parse_document call. Known interim gap
-        # (accepted): a PDF that pypdf reads but pdfplumber rejects degrades to an
-        # empty ParsedDocument -> blank source -> 완료, whereas it used to surface
-        # 부분. Once parse_document's text becomes the 422 gate, such a PDF fails
-        # fast instead.
-        coverages, analysis_status = await asyncio.to_thread(
-            lambda: extract_coverages(parse_document(data))
-        )
-
-    return {
-        "status": "accepted",
-        "문자수": len(text),
-        "기본정보": summary,
-        "보장목록": coverages,
-        "분석상태": analysis_status,
-    }
+        ) from None
+    return {"status": "accepted", **result}

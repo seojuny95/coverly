@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.services.classification import classify_policy
-from app.services.pdf_text import extract_pdf_text
+from app.services.parsing import parse_document
 from app.services.summary import extract_policy_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -43,7 +43,7 @@ def test_local_sample_policy_pdfs_match_expected_classification() -> None:
         pdf_path = SAMPLE_PDF_DIR / filename
         assert pdf_path.exists(), f"missing local sample PDF: {filename}"
 
-        text = extract_pdf_text(pdf_path.read_bytes())
+        text = parse_document(pdf_path.read_bytes()).text
         summary = extract_policy_summary(text)
         result = classify_policy(
             text=text,
