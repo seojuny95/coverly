@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { PortfolioSummary } from "./portfolio-api";
 
 type SummedCoverageRow = {
@@ -71,7 +73,7 @@ export function CoverageSummaryTable({
               금액
             </th>
             <th scope="col" className="px-6 py-3 text-right font-medium">
-              표시 기준
+              금액 보는 법
             </th>
           </tr>
         </thead>
@@ -110,10 +112,7 @@ function SummedCoverage({ row }: { row: SummedCoverageRow }) {
   return (
     <tr>
       <th scope="row" className="px-6 py-4 font-medium text-zinc-800">
-        <details>
-          <summary className="cursor-pointer marker:text-zinc-400">
-            {row.displayName}
-          </summary>
+        <CoverageDisclosure label={row.displayName}>
           <ul className="mt-3 space-y-1.5 text-xs font-normal text-zinc-500">
             {row.composition.map((source, index) => (
               <li key={`${source.policy_id ?? "policy"}-${index}`}>
@@ -122,14 +121,14 @@ function SummedCoverage({ row }: { row: SummedCoverageRow }) {
               </li>
             ))}
           </ul>
-        </details>
+        </CoverageDisclosure>
       </th>
       <td className="px-6 py-4 text-right font-semibold text-blue-600">
         {formatWon(row.totalAmount)}
       </td>
       <td className="px-6 py-4 text-right">
         <CoverageBasis tone="summed">
-          {`합계 ${row.coverageCount}개`}
+          {summedBasisLabel(row.coverageCount)}
         </CoverageBasis>
       </td>
     </tr>
@@ -140,20 +139,25 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
   return (
     <tr>
       <th scope="row" className="px-6 py-4 font-medium text-zinc-800">
-        <p>{row.displayName}</p>
-        <p className="mt-1 text-xs font-normal text-zinc-500">
-          {coverageSourceLabel({
-            insurer: row.insurer,
-            product_name: row.productName,
-          })}
-          {row.crossInsurerDuplicate ? " · 중복 확인 필요" : ""}
-        </p>
+        <CoverageDisclosure label={row.displayName}>
+          <p className="mt-3 text-xs font-normal text-zinc-500">
+            {coverageSourceLabel({
+              insurer: row.insurer,
+              product_name: row.productName,
+            })}
+          </p>
+          {row.crossInsurerDuplicate ? (
+            <p className="mt-1 text-xs font-normal text-amber-700">
+              다른 보험사에도 같은 담보가 있어 중복 여부를 확인해보세요.
+            </p>
+          ) : null}
+        </CoverageDisclosure>
       </th>
       <td className="px-6 py-4 text-right font-medium text-zinc-700">
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right">
-        <CoverageBasis tone="indemnity">실손·비례형</CoverageBasis>
+        <CoverageBasis tone="indemnity">실제 손해 기준</CoverageBasis>
       </td>
     </tr>
   );
@@ -163,22 +167,38 @@ function IndividualCoverage({ row }: { row: IndividualCoverageRow }) {
   return (
     <tr>
       <th scope="row" className="px-6 py-4 font-medium text-zinc-800">
-        <p>{row.displayName}</p>
-        <p className="mt-1 text-xs font-normal text-zinc-500">
-          {coverageSourceLabel({
-            insurer: row.insurer,
-            product_name: row.productName,
-          })}
-        </p>
-        <p className="mt-1 text-xs font-normal text-zinc-400">{row.reason}</p>
+        <CoverageDisclosure label={row.displayName}>
+          <p className="mt-3 text-xs font-normal text-zinc-500">
+            {coverageSourceLabel({
+              insurer: row.insurer,
+              product_name: row.productName,
+            })}
+          </p>
+          <p className="mt-1 text-xs font-normal text-zinc-400">{row.reason}</p>
+        </CoverageDisclosure>
       </th>
       <td className="px-6 py-4 text-right font-medium text-zinc-700">
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right">
-        <CoverageBasis tone="individual">개별 표시</CoverageBasis>
+        <CoverageBasis tone="individual">가입금액 그대로</CoverageBasis>
       </td>
     </tr>
+  );
+}
+
+function CoverageDisclosure({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <details>
+      <summary className="cursor-pointer marker:text-zinc-400">{label}</summary>
+      {children}
+    </details>
   );
 }
 
@@ -272,4 +292,8 @@ function coverageSourceLabel(source: {
 
 function formatWon(amount: number) {
   return `${amount.toLocaleString("ko-KR")}원`;
+}
+
+function summedBasisLabel(coverageCount: number) {
+  return coverageCount === 1 ? "확인한 금액" : `${coverageCount}개 금액 합침`;
 }

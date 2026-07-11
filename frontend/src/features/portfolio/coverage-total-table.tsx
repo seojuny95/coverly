@@ -27,7 +27,8 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
           보험금 합계
         </h2>
         <p className="mt-1 text-sm leading-6 text-zinc-500">
-          같은 정액형 담보는 합산하고, 그 외 담보는 가입금액 그대로 보여드려요.
+          같은 보장으로 확인된 금액은 합치고, 따로 봐야 하는 금액은 증권 그대로
+          보여드려요.
         </p>
       </div>
 

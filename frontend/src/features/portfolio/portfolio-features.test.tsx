@@ -144,9 +144,20 @@ describe("portfolio features", () => {
       within(treatmentGroup).getByText(/질병실손의료비/),
     ).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("특정치료비")).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("합계 1개")).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("실손·비례형")).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("개별 표시")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("확인한 금액")).toBeInTheDocument();
+    expect(
+      within(treatmentGroup).getByText("실제 손해 기준"),
+    ).toBeInTheDocument();
+    expect(
+      within(treatmentGroup).getByText("가입금액 그대로"),
+    ).toBeInTheDocument();
+    for (const coverageName of ["암치료비", "질병실손의료비", "특정치료비"]) {
+      const disclosure = within(treatmentGroup)
+        .getByText(coverageName)
+        .closest("details");
+      expect(disclosure).toBeInTheDocument();
+      expect(disclosure).not.toHaveAttribute("open");
+    }
     expect(within(otherGroup).getByText("생활보장")).toBeInTheDocument();
     expect(
       within(otherGroup).getByText(/보험사 확인 필요/),
