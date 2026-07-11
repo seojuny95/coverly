@@ -189,6 +189,36 @@ def test_normalize_skips_invalid_rows() -> None:
     assert result[0]["가입금액"] == "확인필요"  # empty cell -> nothing to show
 
 
+def test_normalize_drops_wording_that_merely_repeats_the_amount() -> None:
+    # Auto tables have no 보장내용 column, so the LLM copies the limit phrase
+    # into both fields. A wording identical to the amount (whitespace aside)
+    # describes the amount, not the coverage — drop it to None so the
+    # explanation pass can say what the coverage actually covers.
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {
+                    "담보명": "대인배상Ⅱ",
+                    "보장내용": "1인당 무 한",
+                    "가입금액": "1인당 무한",
+                    "유형": "담보",
+                },
+                {
+                    "담보명": "암진단비",
+                    "보장내용": "암 진단 확정 시 최초 1회 지급",
+                    "가입금액": "30,000,000원",
+                },
+            ]
+        }
+
+    source = "| 담보종목 |  |\n| --- | --- |\n| 대인배상Ⅱ | 1인당 무 한 |\n" + SOURCE
+    result = normalize_coverages(source, category="자동차", complete=fake_complete)
+
+    assert result[0]["보장내용"] is None  # duplicate of the amount → dropped
+    assert result[0]["가입금액"] == "1인당 무한"
+    assert result[1]["보장내용"] == "암 진단 확정 시 최초 1회 지급"  # real wording kept
+
+
 def test_normalize_keeps_rider_amount_empty_not_unverified() -> None:
     # 부가 rows are name-only: an empty amount is their expected shape, so it
     # must stay "" instead of being demoted to 확인필요 (which would imply an

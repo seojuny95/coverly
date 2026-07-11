@@ -80,6 +80,8 @@ _AUTO_GUIDANCE = (
     "금액·한도 칸의 문구는 요약하지 말고 그대로 가입금액에 옮긴다 "
     "('1인당 무한', '자배법에서 정한 금액'처럼 한도를 서술하는 문구도 포함). "
     "실제 보장 담보의 가입금액을 빈 문자열로 두지 마라. "
+    "한도 문구는 가입금액에만 넣는다 — 보장내용에 같은 문구를 중복해 넣지 말고, "
+    "표에 별도의 보장 설명이 없으면 보장내용은 null로 둔다. "
     "여러 담보를 묶는 섹션·그룹 표제(예: '대인배상', '기본계약')는 담보 자체가 아니므로 "
     "별도 행으로 만들지 마라. "
     "보험료 할인·서비스·요율·기타 부가 특약은 이름만 정확히 옮기고 유형을 '부가'로 표시한다. "
@@ -173,6 +175,10 @@ def build_coverage_source(doc: ParsedDocument) -> str:
 # LLM normalization: any column layout -> the unified Coverage shape
 
 
+def _same_ignoring_whitespace(left: str, right: str) -> bool:
+    return re.sub(r"\s", "", left) == re.sub(r"\s", "", right)
+
+
 class _CoverageRow(BaseModel):
     담보명: str
     보장내용: str | None
@@ -213,6 +219,12 @@ def normalize_coverages(
         detail = parsed.보장내용.strip() if parsed.보장내용 else None
         if detail and not wording_grounded(detail, source):
             detail = None  # not the policy's own wording — don't present it as 원문
+        if detail and _same_ignoring_whitespace(detail, parsed.가입금액):
+            # A wording that merely repeats the amount cell (auto tables have no
+            # 보장내용 column — the limit phrase gets copied into both fields)
+            # describes the amount, not the coverage. Drop it so the explanation
+            # pass can supply what the coverage actually covers.
+            detail = None
         if parsed.유형 != "담보" and not parsed.가입금액.strip():
             # 부가 rows are name-only riders/rates: an empty amount is the expected
             # shape, not a verification gap — don't stamp them with 확인필요. A
