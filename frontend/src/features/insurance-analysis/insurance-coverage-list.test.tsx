@@ -71,7 +71,11 @@ describe("InsuranceCoverageList", () => {
   test("renders unverified amounts as a soft ask instead of 확인필요", () => {
     render(<InsuranceCoverageList coverages={[unverifiedAmount]} />);
 
-    expect(screen.getByText("가입금액은 확인이 필요해요")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "보장 금액은 가입하신 상품의 약관에서 자세히 확인할 수 있어요",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText("확인필요")).not.toBeInTheDocument();
   });
 
@@ -136,7 +140,9 @@ describe("InsuranceCoverageList", () => {
     expect(screen.getByText("마일리지 특약")).toBeInTheDocument();
     // No description/explanation/amount area for a rider row.
     expect(
-      screen.queryByText("가입금액은 확인이 필요해요"),
+      screen.queryByText(
+        "보장 금액은 가입하신 상품의 약관에서 자세히 확인할 수 있어요",
+      ),
     ).not.toBeInTheDocument();
   });
 
