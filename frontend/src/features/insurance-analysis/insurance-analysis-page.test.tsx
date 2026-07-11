@@ -199,6 +199,68 @@ describe("InsuranceAnalysisPage", () => {
     expect(screen.getByText("월납 120,000원")).toBeInTheDocument();
   });
 
+  test("shows vehicle info and separates rider rows for an auto policy", async () => {
+    saveInsuranceAnalysis({
+      generatedAt: "2026-07-09T07:30:00.000Z",
+      selectedName: "테스트고객",
+      insuranceDocuments: [
+        {
+          id: "auto-insurance",
+          fileName: "auto.pdf",
+          result: {
+            status: "accepted",
+            문자수: 150,
+            기본정보: {
+              보험사: "현대해상화재보험",
+              상품명: "개인용자동차보험",
+              피보험자: "테스트고객",
+              보험분류: "자동차",
+              상품태그: ["자동차"],
+              차량정보: {
+                차량명: "아반떼",
+                차량번호: "TEST-PLATE-001",
+                연식: "2024",
+              },
+            },
+            보장목록: [
+              {
+                담보명: "대인배상Ⅰ",
+                가입금액: "무한",
+                보장내용: "법률상 손해배상책임을 짐으로써 입은 손해를 보상",
+                해설: null,
+              },
+              {
+                담보명: "마일리지 특약",
+                가입금액: "",
+                보장내용: null,
+                해설: null,
+                유형: "부가",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    render(<InsuranceAnalysisPage />);
+
+    const row = await screen.findByRole("button", {
+      name: /개인용자동차보험/,
+    });
+    fireEvent.click(row);
+
+    expect(screen.getByText("차량명")).toBeInTheDocument();
+    expect(screen.getByText("아반떼")).toBeInTheDocument();
+    expect(screen.getByText("차량번호")).toBeInTheDocument();
+    expect(screen.getByText("TEST-PLATE-001")).toBeInTheDocument();
+    expect(screen.getByText("연식")).toBeInTheDocument();
+    expect(screen.getByText("2024")).toBeInTheDocument();
+
+    expect(screen.getByText("대인배상Ⅰ")).toBeInTheDocument();
+    expect(screen.getByText("부가 특약·요율")).toBeInTheDocument();
+    expect(screen.getByText("마일리지 특약")).toBeInTheDocument();
+  });
+
   test("renders DB insurer name and logo for a parsed driver insurance document", async () => {
     saveInsuranceAnalysis({
       generatedAt: "2026-07-09T07:30:00.000Z",
