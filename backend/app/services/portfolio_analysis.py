@@ -82,8 +82,8 @@ def analyze_portfolio(
             for category in life_stage_check.missing
         ],
         baseline_notice=(
-            "확인된 가입 사실과 일반적인 상담 준비 가이드를 구분해 보여드려요. "
-            "금액 범위와 우선순위는 공식 기준이나 가입 권유가 아닌 상담 전 검토 제안입니다."
+            "확인된 가입 사실과 일반적인 검토 가이드를 구분해 보여드려요. "
+            "금액 범위와 우선순위는 공식 기준이나 가입 권유가 아닌 참고용 검토 제안입니다."
         ),
         classifications=classifications,
         sources=[_source(policy) for policy in facts.policies],
@@ -105,7 +105,7 @@ def _fallback_counselor(
         return CounselorAnalysis(
             overview=(
                 "분석할 비자동차 보험이 아직 없어요. "
-                "증권을 올리면 상담 전에 볼 항목을 정리해드릴게요."
+                "증권을 올리면 함께 살펴볼 항목을 정리해드릴게요."
             ),
             strengths=[],
             gaps=[],
@@ -116,7 +116,7 @@ def _fallback_counselor(
 
     profile = _profile_label(demographics)
     overview = (
-        f"{profile} 기준으로 비자동차 보험 {len(facts.policies)}건을 상담 전 관점에서 살펴봤어요. "
+        f"{profile} 기준으로 비자동차 보험 {len(facts.policies)}건을 당신 편에서 살펴봤어요. "
         "확인된 보장과 추가로 점검할 항목을 나눠 정리했습니다."
     )
     strengths: list[CounselorInsight] = []
@@ -140,7 +140,7 @@ def _fallback_counselor(
                 title=f"{category} 항목을 확인해 보세요",
                 detail=(
                     "현재 증권에서는 확인되지 않았어요. 필요 여부는 건강 상태, 예산, "
-                    "기존 자산을 함께 놓고 상담에서 검토하는 것이 좋아요."
+                    "기존 자산을 함께 놓고 살펴보는 것이 좋아요."
                 ),
                 evidence_ids=[evidence.id],
             )
@@ -160,7 +160,7 @@ def _fallback_counselor(
                     "부양 책임과 가용 예산을 함께 봐야 합니다."
                 ),
                 rationale=(
-                    "증권만으로는 개인별 필요 금액을 확정할 수 없어 상담 검토 항목으로 분류했어요."
+                    "증권만으로는 개인별 필요 금액을 확정할 수 없어 검토 항목으로 분류했어요."
                 ),
                 suggested_range=None,
                 confidence="low",
@@ -186,7 +186,7 @@ def _fallback_counselor(
         ],
         next_steps=[
             "확인되지 않은 담보가 다른 증권에 있는지 먼저 점검해 보세요.",
-            "현재 가입금액을 소득·생활비·부양 책임과 함께 상담에서 비교해 보세요.",
+            "현재 가입금액을 소득·생활비·부양 책임과 함께 비교해 보세요.",
             "보상 조건과 면책은 해당 약관 원문을 추가로 확인해 주세요.",
         ],
     )

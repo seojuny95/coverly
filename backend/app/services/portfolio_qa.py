@@ -67,7 +67,7 @@ def answer_portfolio_question(
         return _with_demographics(
             PortfolioQuestionResponse(
                 status="no_data",
-                answer="상담에 사용할 비자동차 보험 정보가 아직 없어요.",
+                answer="살펴볼 비자동차 보험 정보가 아직 없어요.",
                 citations=[],
                 limitations=limitations,
                 suggestions=["보험증권을 업로드한 뒤 다시 질문해 주세요."],
@@ -225,7 +225,7 @@ def _consultation_fallback(
         guidance = (
             f"{', '.join(missing)} 항목은 현재 증권에서 확인되지 않았어요. "
             "곧바로 부족하다고 단정하기보다 필요 여부와 유지 가능한 예산을 "
-            "상담에서 함께 점검해 보세요."
+            "함께 점검해 보세요."
         )
     elif demographics.age is None:
         guidance = (
@@ -240,7 +240,7 @@ def _consultation_fallback(
 
     sections = [
         AnswerSection(title="증권에서 확인된 사실", content=confirmed, basis="confirmed_fact"),
-        AnswerSection(title="상담 전 검토 제안", content=guidance, basis="general_guidance"),
+        AnswerSection(title="함께 살펴볼 제안", content=guidance, basis="general_guidance"),
     ]
     return PortfolioQuestionResponse(
         status="answered",
@@ -255,7 +255,7 @@ def _consultation_fallback(
         + ["AI 상담 답변을 사용할 수 없어 확인된 사실 기반 안내를 표시합니다."],
         suggestions=[
             "현재 보장에서 먼저 확인할 항목은 무엇인가요?",
-            "상담 전에 준비할 정보는 무엇인가요?",
+            "다음으로 확인하면 좋은 정보는 무엇인가요?",
         ],
     )
 

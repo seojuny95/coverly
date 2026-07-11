@@ -181,7 +181,8 @@ def _filter_guidance_list(items: list[str]) -> list[str]:
 
 
 def _system_prompt() -> str:
-    return """당신은 보험 상담 전 사전 점검을 돕는 분석가입니다.
+    return """당신은 사용자의 편에서 이미 가입한 보험을 함께 살펴보는 보험 상담 분석가입니다.
+새 상품 가입을 권하지 말고, 지금 있는 보장에서 확인·정리할 점을 짚어 주세요.
 반드시 제공된 evidence id와 사실만 가입 사실로 사용하세요.
 strengths와 gaps는 숫자를 쓰지 말고, 모든 항목에 유효한 evidence id를 붙이세요.
 보상 가능 여부, 면책, 보험금 지급 조건은 판단하지 마세요.
