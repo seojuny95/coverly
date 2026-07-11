@@ -66,4 +66,3 @@ def test_result_shape() -> None:
         extract=fake_extract,
     )
     assert set(result) == {"기본정보", "보장목록", "분석상태", "문자수"}
-
