@@ -91,6 +91,27 @@ def test_source_is_capped_to_the_max_length(monkeypatch: pytest.MonkeyPatch) -> 
 # normalize_coverages (structured LLM call + grounding)
 
 
+def test_normalize_requests_and_keeps_the_verbatim_coverage_name() -> None:
+    captured: dict[str, str] = {}
+
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        captured["system"] = system
+        return {
+            "보장목록": [
+                {
+                    "담보명": "암진단비(감액없음)",
+                    "보장내용": "암 진단 확정 시 최초 1회 지급",
+                    "가입금액": "30,000,000원",
+                }
+            ]
+        }
+
+    result = normalize_coverages(SOURCE, complete=fake_complete)
+
+    assert "증권 표기 그대로" in captured["system"]
+    assert result[0]["담보명"] == "암진단비(감액없음)"
+
+
 def test_normalize_drops_policy_wording_absent_from_source() -> None:
     # The LLM returned 보장내용 that does not appear in the source — a paraphrase or
     # hallucination. It must not be shown as authoritative 증권 원문; drop it to None

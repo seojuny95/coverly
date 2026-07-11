@@ -11,6 +11,10 @@ from app.schemas.qa import (
     ConversationMessage,
     PortfolioQuestionResponse,
 )
+from app.services.coverage_name_matching import (
+    canonicalize_coverage_name,
+    query_contains_canonical_name,
+)
 from app.services.coverage_taxonomy import LifeStageCheck, check_life_stage
 from app.services.llm import JsonCompleter
 from app.services.portfolio_consultation import (
@@ -22,7 +26,6 @@ from app.services.portfolio_qa_generation import generate_consultation_answer
 from app.services.portfolio_summary import (
     PortfolioFacts,
     build_portfolio_facts,
-    normalize_coverage_name,
 )
 
 _CLAIM_TERMS = (
@@ -113,14 +116,24 @@ def _answer_amount(
 ) -> PortfolioQuestionResponse:
     selected_totals = facts.coverage_summary.totals
     if not _is_overall_amount_question(question):
-        normalized_question = normalize_coverage_name(question)
         matches = [
             total
             for total in facts.coverage_summary.totals
-            if total.normalized_name in normalized_question
+            if query_contains_canonical_name(question, total.normalized_name)
         ]
         matches.sort(key=lambda total: len(total.normalized_name), reverse=True)
-        selected_totals = matches[:1]
+        if len(matches) > 1:
+            return PortfolioQuestionResponse(
+                status="no_data",
+                answer=(
+                    "질문과 일치하는 담보가 여러 개라 하나의 가입금액으로 답하기 어려워요. "
+                    "증권에 적힌 담보명 하나를 지정해 주세요."
+                ),
+                citations=[],
+                limitations=_standard_limitations(facts),
+                suggestions=["확인할 담보명 하나와 함께 가입금액을 질문해 주세요."],
+            )
+        selected_totals = matches
 
     if not selected_totals:
         return PortfolioQuestionResponse(
@@ -138,7 +151,7 @@ def _answer_amount(
         for evidence in catalog.items
         if evidence.amount is not None
         and evidence.coverage_name is not None
-        and normalize_coverage_name(evidence.coverage_name) in selected_names
+        and canonicalize_coverage_name(evidence.coverage_name).normalized_key in selected_names
     ]
     if len(selected_totals) == 1:
         content = (

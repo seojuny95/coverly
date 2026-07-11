@@ -30,6 +30,33 @@ def _policies() -> list[PolicyInput]:
     ]
 
 
+def _alias_policies() -> list[PolicyInput]:
+    rows = [
+        ("p1", "보험사A", "허혈성심장질환진단비", 10_000_000),
+        ("p2", "보험사B", "허혈성심질환진단비(감액없음)", 20_000_000),
+    ]
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": policy_id,
+                "기본정보": {
+                    "보험사": insurer,
+                    "상품명": f"건강보험-{policy_id}",
+                    "보험분류": "질병",
+                },
+                "보장목록": [
+                    {
+                        "담보명": coverage_name,
+                        "가입금액숫자": amount,
+                        "지급유형": "정액",
+                    }
+                ],
+            }
+        )
+        for policy_id, insurer, coverage_name, amount in rows
+    ]
+
+
 def test_qa_answers_holdings_with_policy_citation() -> None:
     result = answer_portfolio_question("가입한 보험 목록 알려줘", _policies())
 
@@ -60,6 +87,19 @@ def test_qa_filters_specific_coverage_amount_and_citations() -> None:
     assert "30,000,000원" in result.answer
     assert "31,000,000원" not in result.answer
     assert {citation.coverage_name for citation in result.citations} == {"암진단비"}
+
+
+def test_qa_resolves_curated_aliases_to_the_same_coverage_total() -> None:
+    for question in (
+        "허혈성심장질환진단비는 얼마야?",
+        "허혈성심질환진단비(감액없음) 가입금액은 얼마야?",
+    ):
+        result = answer_portfolio_question(question, _alias_policies())
+
+        assert result.status == "answered"
+        assert "허혈성심질환진단비" in result.answer
+        assert "30,000,000원" in result.answer
+        assert {citation.coverage_name for citation in result.citations} == {"허혈성심질환진단비"}
 
 
 def test_qa_does_not_fall_back_to_total_for_unknown_specific_coverage() -> None:

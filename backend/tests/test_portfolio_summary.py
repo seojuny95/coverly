@@ -162,6 +162,115 @@ def test_major_category_does_not_merge_distinct_coverage_names() -> None:
     ]
 
 
+def test_curated_name_variants_merge_with_stable_canonical_display() -> None:
+    base_coverages = [
+        {"담보명": "뇌혈관질환진단비", "가입금액숫자": 10_000_000, "지급유형": "정액"},
+        {
+            "담보명": "암진단비(유사암제외)",
+            "가입금액숫자": 20_000_000,
+            "지급유형": "정액",
+        },
+        {
+            "담보명": "유사암진단비(감액없음)",
+            "가입금액숫자": 10_000_000,
+            "지급유형": "정액",
+        },
+        {
+            "담보명": "허혈성심장질환진단비",
+            "가입금액숫자": 10_000_000,
+            "지급유형": "정액",
+        },
+    ]
+    variant_coverages = [
+        {
+            "담보명": "뇌혈관질환진단비(감액없음)",
+            "가입금액숫자": 20_000_000,
+            "지급유형": "정액",
+        },
+        {
+            "담보명": "암진단비(유사암제외)(감액없음)",
+            "가입금액숫자": 40_000_000,
+            "지급유형": "정액",
+        },
+        {"담보명": "유사암진담비", "가입금액숫자": 20_000_000, "지급유형": "정액"},
+        {
+            "담보명": "허혈성심질환진단비(감액없음)",
+            "가입금액숫자": 20_000_000,
+            "지급유형": "정액",
+        },
+    ]
+    policies = [
+        _policy("p1", "건강보험", "보험사A", base_coverages),
+        _policy("p2", "건강보험", "보험사B", variant_coverages),
+    ]
+
+    forward = summarize_portfolio_coverages(policies)
+    reverse = summarize_portfolio_coverages(list(reversed(policies)))
+
+    expected = {
+        "뇌혈관질환진단비": 30_000_000,
+        "암진단비(유사암제외)": 60_000_000,
+        "유사암진단비": 30_000_000,
+        "허혈성심질환진단비": 30_000_000,
+    }
+    assert {item.display_name: item.total_amount for item in forward.totals} == expected
+    assert {item.display_name: item.total_amount for item in reverse.totals} == expected
+    assert forward == reverse
+    assert all(item.coverage_count == 2 for item in forward.totals)
+    original_names = {
+        source.coverage_name for item in forward.totals for source in item.composition
+    }
+    assert original_names == {coverage["담보명"] for coverage in base_coverages + variant_coverages}
+
+
+def test_high_similarity_never_overrides_coverage_identity() -> None:
+    names = [
+        "암진단비",
+        "유사암진단비",
+        "암수술비",
+        "재진단암진단비",
+        "상해후유장해",
+        "질병후유장해",
+        "암진단비(감액50%)",
+    ]
+    policies = [
+        _policy(
+            f"p{index}",
+            "건강보험",
+            f"보험사{index}",
+            [{"담보명": name, "가입금액숫자": 1_000_000, "지급유형": "정액"}],
+        )
+        for index, name in enumerate(names)
+    ]
+
+    result = summarize_portfolio_coverages(policies)
+
+    assert len(result.totals) == len(names)
+    assert {item.display_name for item in result.totals} == set(names)
+    assert all(item.total_amount == 1_000_000 for item in result.totals)
+
+
+def test_curated_aliases_from_one_insurer_stay_unsummed() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {"담보명": "뇌혈관질환진단비", "가입금액숫자": 10_000_000, "지급유형": "정액"},
+            {
+                "담보명": "뇌혈관질환진단비(감액없음)",
+                "가입금액숫자": 20_000_000,
+                "지급유형": "정액",
+            },
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert [item.total_amount for item in result.totals] == [10_000_000, 20_000_000]
+    assert all(item.coverage_count == 1 for item in result.totals)
+
+
 def test_repeated_name_from_one_insurer_is_not_summed() -> None:
     policies = [
         _policy(

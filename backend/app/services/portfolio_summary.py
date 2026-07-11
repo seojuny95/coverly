@@ -13,6 +13,10 @@ from app.schemas.portfolio import (
     PolicyInput,
     PortfolioCoverageSummary,
 )
+from app.services.coverage_name_matching import (
+    canonicalize_coverage_name,
+    choose_display_name,
+)
 
 _AUTO_CATEGORY_TERMS = ("자동차",)
 _INDEMNITY_TERMS = ("실손", "실비", "실손의료", "실손보상")
@@ -120,7 +124,7 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
     """Aggregate only amounts whose fixed-benefit meaning and value are safe."""
 
     grouped_sources: dict[str, list[CoverageSourceItem]] = defaultdict(list)
-    display_names: dict[str, str] = {}
+    source_names_by_group: dict[str, list[str]] = defaultdict(list)
     indemnity_rows: list[tuple[PolicyInput, CoverageInput, str]] = []
     excluded: list[ExcludedCoverageItem] = []
     auto_count = 0
@@ -130,9 +134,9 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
             auto_count += 1
             continue
         for coverage in policy.보장목록:
-            normalized_name = normalize_coverage_name(coverage.담보명)
+            group_key = canonicalize_coverage_name(coverage.담보명).normalized_key
             if _is_indemnity(coverage):
-                indemnity_rows.append((policy, coverage, normalized_name))
+                indemnity_rows.append((policy, coverage, group_key))
                 continue
             if not _is_safe_fixed(coverage):
                 excluded.append(_excluded(policy, coverage, "지급유형을 안전하게 확인할 수 없음"))
@@ -141,11 +145,11 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
             if amount is None:
                 excluded.append(_excluded(policy, coverage, "가입금액을 숫자로 확인할 수 없음"))
                 continue
-            if not normalized_name:
+            if not group_key:
                 excluded.append(_excluded(policy, coverage, "담보명을 정규화할 수 없음"))
                 continue
-            display_names.setdefault(normalized_name, coverage.담보명)
-            grouped_sources[normalized_name].append(
+            source_names_by_group[group_key].append(coverage.담보명)
+            grouped_sources[group_key].append(
                 CoverageSourceItem(
                     policy_id=policy.id,
                     insurer=policy.기본정보.보험사,
@@ -156,8 +160,20 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
                 )
             )
 
+    display_names = {
+        group_key: choose_display_name(source_names)
+        for group_key, source_names in source_names_by_group.items()
+    }
     totals = _build_fixed_totals(grouped_sources, display_names)
     indemnity = _build_indemnity_items(indemnity_rows)
+    excluded.sort(
+        key=lambda item: (
+            item.policy_id or "",
+            item.coverage_name,
+            item.original_amount,
+            item.reason,
+        )
+    )
     return PortfolioCoverageSummary(
         totals=totals,
         indemnity_coverages=indemnity,
@@ -196,12 +212,13 @@ def _build_fixed_totals(
 
     totals: list[CoverageTotalItem] = []
     for name, sources in sorted(grouped_sources.items()):
-        known_insurers = [source.insurer for source in sources if source.insurer]
-        all_insurers_known = len(known_insurers) == len(sources)
-        can_sum = len(sources) == 1 or (
+        ordered_sources = sorted(sources, key=_source_sort_key)
+        known_insurers = [source.insurer for source in ordered_sources if source.insurer]
+        all_insurers_known = len(known_insurers) == len(ordered_sources)
+        can_sum = len(ordered_sources) == 1 or (
             all_insurers_known and len(known_insurers) == len(set(known_insurers))
         )
-        groups = [sources] if can_sum else [[source] for source in sources]
+        groups = [ordered_sources] if can_sum else [[source] for source in ordered_sources]
         for group in groups:
             totals.append(
                 CoverageTotalItem(
@@ -225,8 +242,18 @@ def _build_indemnity_items(
         if insurer:
             insurers_by_name[normalized_name].add(insurer)
 
+    ordered_rows = sorted(
+        rows,
+        key=lambda row: (
+            row[2],
+            row[0].기본정보.보험사 or "",
+            row[0].기본정보.상품명 or "",
+            row[0].id or "",
+            row[1].담보명,
+        ),
+    )
     items: list[IndemnityItem] = []
-    for policy, coverage, normalized_name in rows:
+    for policy, coverage, normalized_name in ordered_rows:
         items.append(
             IndemnityItem(
                 policy_id=policy.id,
@@ -238,3 +265,17 @@ def _build_indemnity_items(
             )
         )
     return items
+
+
+def _source_sort_key(
+    source: CoverageSourceItem,
+) -> tuple[bool, str, str, str, str, int, str]:
+    return (
+        source.insurer is None,
+        source.insurer or "",
+        source.product_name or "",
+        source.policy_id or "",
+        source.coverage_name,
+        source.amount,
+        source.original_amount,
+    )
