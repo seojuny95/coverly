@@ -63,9 +63,13 @@ _SYSTEM = (
     "'기본계약(일반상해후유장해(80%이상))'처럼 담보명을 감싸는 접두 래퍼는 바깥 래퍼만 벗긴다. "
     "반대로 '유사암제외'·'80%이상'·'1~5종'처럼 보장 범위·지급조건을 가르는 수식어는 반드시 남긴다. "
     "보장내용은 증권 원문 그대로 옮긴다(요약·축약 금지, '※'로 시작하는 단서 포함). 없으면 null. "
-    "가입금액이 없으면 빈 문자열로 둔다. "
-    "유형은 항상 '담보'로 표시한다."
+    "가입금액이 없으면 빈 문자열로 둔다."
 )
+
+# Appended to _SYSTEM for non-자동차 policies only: they have no rider/rate rows,
+# so 유형 is pinned to the schema default. Kept out of _SYSTEM itself so it never
+# contradicts _AUTO_GUIDANCE, which tags rider rows 유형='부가'.
+_DEFAULT_TYPE_GUIDANCE = "유형은 항상 '담보'로 표시한다."
 
 # Appended to _SYSTEM only for 자동차 policies — their coverage tables mix real
 # coverages with rate/discount riders and section headers, which the default
@@ -190,7 +194,10 @@ def normalize_coverages(
     if not source.strip():
         return []
     completer = complete or _default_completer()
-    system = _SYSTEM + _AUTO_GUIDANCE if category == "자동차" else _SYSTEM
+    if category == "자동차":
+        system = _SYSTEM + " " + _AUTO_GUIDANCE
+    else:
+        system = _SYSTEM + " " + _DEFAULT_TYPE_GUIDANCE
     rows = completer(system, source).get("보장목록", [])
     if not isinstance(rows, list):
         return []
