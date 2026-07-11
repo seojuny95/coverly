@@ -269,56 +269,54 @@ export function InsuranceAnalysisPage({
 
                           return (
                             <li key={insuranceDocument.id}>
-                              <div className="overflow-hidden focus-within:shadow-[inset_0_0_0_2px_#2563EB]">
-                                <button
-                                  type="button"
-                                  aria-expanded={isExpanded}
-                                  onClick={() =>
-                                    toggleInsurance(insuranceDocument.id)
-                                  }
-                                  className="flex w-full flex-col gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50 focus:outline-none sm:flex-row sm:items-center sm:justify-between"
-                                >
-                                  <span className="flex min-w-0 items-start gap-3">
-                                    <InsurerLogo
-                                      insurerName={basicInfo?.보험사}
-                                    />
-                                    <span className="min-w-0 flex-1">
-                                      <span className="flex min-w-0 items-center gap-2">
-                                        <span className="truncate text-base font-semibold text-zinc-950">
-                                          {basicInfo?.상품명 ??
-                                            insuranceDocument.fileName}
+                              <button
+                                type="button"
+                                aria-expanded={isExpanded}
+                                onClick={() =>
+                                  toggleInsurance(insuranceDocument.id)
+                                }
+                                className="flex w-full flex-col gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <span className="flex min-w-0 items-start gap-3">
+                                  <InsurerLogo
+                                    insurerName={basicInfo?.보험사}
+                                  />
+                                  <span className="min-w-0 flex-1">
+                                    <span className="flex min-w-0 items-center gap-2">
+                                      <span className="truncate text-base font-semibold text-zinc-950">
+                                        {basicInfo?.상품명 ??
+                                          insuranceDocument.fileName}
+                                      </span>
+                                      {basicInfo?.상품태그?.length ? (
+                                        <span className="flex shrink-0 flex-wrap gap-1.5">
+                                          {basicInfo.상품태그.map((tag) => (
+                                            <TagBadge key={tag} tag={tag} />
+                                          ))}
                                         </span>
-                                        {basicInfo?.상품태그?.length ? (
-                                          <span className="flex shrink-0 flex-wrap gap-1.5">
-                                            {basicInfo.상품태그.map((tag) => (
-                                              <TagBadge key={tag} tag={tag} />
-                                            ))}
-                                          </span>
-                                        ) : null}
-                                      </span>
-                                      <span className="mt-1 block truncate text-sm text-zinc-500">
-                                        {insuranceDocument.fileName}
-                                      </span>
+                                      ) : null}
+                                    </span>
+                                    <span className="mt-1 block truncate text-sm text-zinc-500">
+                                      {insuranceDocument.fileName}
                                     </span>
                                   </span>
-                                  <span className="inline-flex shrink-0 items-center rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                                    {isExpanded ? "접기" : "자세히 보기"}
-                                  </span>
-                                </button>
+                                </span>
+                                <span className="inline-flex shrink-0 items-center rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                                  {isExpanded ? "접기" : "자세히 보기"}
+                                </span>
+                              </button>
 
-                                <div
-                                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                                    isExpanded
-                                      ? "grid-rows-[1fr]"
-                                      : "grid-rows-[0fr]"
-                                  }`}
-                                >
-                                  <div className="overflow-hidden">
-                                    <InsuranceDetail
-                                      insuranceDocument={insuranceDocument}
-                                      isExpanded={isExpanded}
-                                    />
-                                  </div>
+                              <div
+                                className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                                  isExpanded
+                                    ? "grid-rows-[1fr]"
+                                    : "grid-rows-[0fr]"
+                                }`}
+                              >
+                                <div className="overflow-hidden">
+                                  <InsuranceDetail
+                                    insuranceDocument={insuranceDocument}
+                                    isExpanded={isExpanded}
+                                  />
                                 </div>
                               </div>
                             </li>
