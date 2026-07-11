@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -80,6 +80,87 @@ describe("portfolio features", () => {
       expect.stringContaining("/portfolio/summary"),
       expect.objectContaining({ body: expect.stringContaining('"policies"') }),
     );
+  });
+
+  test("groups every amount basis under the same coverage category", async () => {
+    saveFixture();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        () =>
+          new Response(
+            JSON.stringify({
+              totals: [
+                {
+                  category: "암치료비",
+                  majorCategory: "치료비",
+                  totalAmount: 10_000_000,
+                  coverageCount: 1,
+                  normalizedName: "암치료비",
+                  composition: [],
+                },
+              ],
+              indemnity_coverages: [
+                {
+                  policy_id: "health-1",
+                  insurer: "보험사A",
+                  product_name: "건강보험",
+                  coverage_name: "질병실손의료비",
+                  original_amount: "5천만원",
+                  major_category: "치료비",
+                  cross_insurer_duplicate: true,
+                },
+              ],
+              excluded_coverages: [
+                {
+                  policy_id: "health-1",
+                  insurer: "보험사A",
+                  product_name: "건강보험",
+                  coverage_name: "특정치료비",
+                  major_category: "치료비",
+                  original_amount: "1천만원",
+                  reason: "지급 방식을 확인하지 못해 합계에는 더하지 않았어요.",
+                },
+                {
+                  policy_id: "health-1",
+                  coverage_name: "생활보장",
+                  reason: "지급 방식을 확인하지 못해 합계에는 더하지 않았어요.",
+                },
+              ],
+              excluded_auto_policy_count: 0,
+            }),
+          ),
+      ),
+    );
+
+    render(<InsuranceAnalysisPage />);
+
+    const treatmentGroup = await screen.findByRole("rowgroup", {
+      name: "치료비",
+    });
+    const otherGroup = screen.getByRole("rowgroup", { name: "기타" });
+    expect(within(treatmentGroup).getByText("암치료비")).toBeInTheDocument();
+    expect(
+      within(treatmentGroup).getByText(/질병실손의료비/),
+    ).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("특정치료비")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("합계 1개")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("실손·비례형")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("개별 표시")).toBeInTheDocument();
+    expect(within(otherGroup).getByText("생활보장")).toBeInTheDocument();
+    expect(
+      within(otherGroup).getByText(/보험사 확인 필요/),
+    ).toBeInTheDocument();
+    expect(within(otherGroup).getByText("금액 확인 필요")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        "지급 방식을 확인하지 못해 합계에는 더하지 않았어요.",
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole("table", { name: "보험금 합계" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/합산하지 않은 담보/)).not.toBeInTheDocument();
   });
 
   test("starts analysis on first tab entry and keeps chat messages across tabs", async () => {

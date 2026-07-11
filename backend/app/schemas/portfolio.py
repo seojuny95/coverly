@@ -87,6 +87,8 @@ class IndemnityItem(BaseModel):
     coverage_name: str
     normalized_name: str
     cross_insurer_duplicate: bool
+    original_amount: str = ""
+    major_category: str = "기타"
 
 
 class ExcludedCoverageItem(BaseModel):
@@ -94,6 +96,9 @@ class ExcludedCoverageItem(BaseModel):
     coverage_name: str
     original_amount: str
     reason: str
+    insurer: str | None = None
+    product_name: str | None = None
+    major_category: str = "기타"
 
 
 class PortfolioCoverageSummary(BaseModel):

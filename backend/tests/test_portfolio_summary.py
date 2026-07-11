@@ -1,3 +1,5 @@
+import pytest
+
 from app.schemas.portfolio import PolicyInput
 from app.services.portfolio_summary import (
     build_portfolio_facts,
@@ -58,22 +60,201 @@ def test_sums_safe_fixed_benefits_and_exposes_composition() -> None:
     assert cancer.composition[0].original_amount == "1,000만원"
 
 
-def test_current_parse_shape_is_supported_conservatively() -> None:
+def test_treatment_benefits_without_payment_type_are_kept_for_display() -> None:
     policy = _policy(
         "p1",
         "건강보험",
         "보험사A",
         [
-            {"담보명": "암진단비", "가입금액": "3천만원", "보장내용": None, "해설": None},
-            {"담보명": "골절치료비", "가입금액": "100만원", "보장내용": None, "해설": None},
+            {
+                "담보명": "중대한화상및부식치료비",
+                "가입금액": "1천만원",
+                "보장내용": None,
+                "해설": None,
+            },
+            {
+                "담보명": "항암방사선약물치료비(감액없음)",
+                "가입금액": "2천만원",
+                "보장내용": None,
+                "해설": None,
+            },
         ],
     )
 
     result = summarize_portfolio_coverages([policy])
 
-    assert result.totals[0].total_amount == 30_000_000
-    assert result.excluded_coverages[0].coverage_name == "골절치료비"
-    assert result.excluded_coverages[0].reason == "지급유형을 안전하게 확인할 수 없음"
+    assert result.totals == []
+    assert {
+        (item.coverage_name, item.major_category, item.original_amount)
+        for item in result.excluded_coverages
+    } == {
+        ("중대한화상및부식치료비", "치료비", "1천만원"),
+        ("항암방사선약물치료비(감액없음)", "치료비", "2천만원"),
+    }
+
+
+def test_explicit_fixed_treatment_benefit_is_summed() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {
+                "담보명": "항암방사선약물치료비(감액없음)",
+                "가입금액": "2천만원",
+                "지급유형": "정액",
+            }
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals[0].display_name == "항암방사선약물치료비"
+    assert result.totals[0].major_category == "치료비"
+    assert result.totals[0].total_amount == 20_000_000
+    assert result.excluded_coverages == []
+
+
+def test_explicit_indemnity_treatment_benefit_is_never_summed() -> None:
+    policy = _policy(
+        "p1",
+        "실손보험",
+        "보험사A",
+        [
+            {
+                "담보명": "질병치료비",
+                "가입금액": "5천만원",
+                "지급유형": "실손",
+            }
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.excluded_coverages == []
+    assert result.indemnity_coverages[0].coverage_name == "질병치료비"
+
+
+def test_medical_expense_without_payment_type_is_kept_for_display() -> None:
+    policy = _policy(
+        "p1",
+        "실손보험",
+        "보험사A",
+        [{"담보명": "상해입원의료비", "가입금액": "5천만원"}],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.indemnity_coverages == []
+    assert result.excluded_coverages[0].coverage_name == "상해입원의료비"
+    assert result.excluded_coverages[0].major_category == "치료비"
+
+
+def test_explicit_indemnity_category_classifies_medical_expense() -> None:
+    policy = _policy(
+        "p1",
+        "실손보험",
+        "보험사A",
+        [
+            {
+                "담보명": "상해입원의료비",
+                "가입금액": "5천만원",
+                "보장분류": "실손",
+            }
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.excluded_coverages == []
+    assert result.indemnity_coverages[0].coverage_name == "상해입원의료비"
+    assert result.indemnity_coverages[0].major_category == "치료비"
+
+
+def test_unknown_coverage_is_kept_for_display_under_other() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {
+                "담보명": "특정질환보장",
+                "가입금액": "1천만원",
+                "지급유형": "확인필요",
+            }
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.indemnity_coverages == []
+    assert result.excluded_coverages[0].coverage_name == "특정질환보장"
+    assert result.excluded_coverages[0].major_category == "기타"
+    assert result.excluded_coverages[0].original_amount == "1천만원"
+    assert result.excluded_coverages[0].insurer == "보험사A"
+
+
+@pytest.mark.parametrize(
+    "payment_type",
+    ["비정액", "실손 제외", "실비 미해당", "정액·실손"],
+)
+def test_negated_or_ambiguous_payment_type_is_never_inferred(
+    payment_type: str,
+) -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {
+                "담보명": "암진단비",
+                "가입금액": "3천만원",
+                "지급유형": payment_type,
+            }
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.indemnity_coverages == []
+    assert result.excluded_coverages[0].coverage_name == "암진단비"
+
+
+@pytest.mark.parametrize(
+    ("coverage_name", "coverage_category"),
+    [
+        ("비실손암진단비", None),
+        ("암진단비", "실손 제외"),
+        ("암진단비", "실비 미해당"),
+    ],
+)
+def test_negated_indemnity_name_or_category_is_never_inferred(
+    coverage_name: str,
+    coverage_category: str | None,
+) -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {
+                "담보명": coverage_name,
+                "가입금액": "3천만원",
+                "보장분류": coverage_category,
+            }
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.indemnity_coverages == []
+    assert result.excluded_coverages[0].coverage_name == coverage_name
 
 
 def test_unknown_amount_is_excluded_instead_of_becoming_zero() -> None:
@@ -87,7 +268,9 @@ def test_unknown_amount_is_excluded_instead_of_becoming_zero() -> None:
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
-    assert result.excluded_coverages[0].reason == "가입금액을 숫자로 확인할 수 없음"
+    assert result.excluded_coverages[0].reason == (
+        "가입금액을 숫자로 확인하지 못해 합계에는 더하지 않았어요."
+    )
 
 
 def test_auto_policies_are_completely_excluded() -> None:
@@ -133,6 +316,8 @@ def test_indemnity_is_listed_and_flagged_only_across_insurers() -> None:
         item.policy_id: item.cross_insurer_duplicate for item in result.indemnity_coverages
     }
     assert duplicates == {"p1": True, "p2": True, "p3": False}
+    amounts = {item.policy_id: item.original_amount for item in result.indemnity_coverages}
+    assert amounts == {"p1": "5천만원", "p2": "5천만원", "p3": "3천만원"}
 
 
 def test_name_normalization_does_not_apply_semantic_aliases() -> None:

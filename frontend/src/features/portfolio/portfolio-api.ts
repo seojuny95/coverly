@@ -26,12 +26,17 @@ export type PortfolioSummary = {
     insurer?: string;
     product_name?: string;
     coverage_name: string;
+    original_amount?: string;
+    major_category?: string;
     cross_insurer_duplicate: boolean;
   }>;
   excluded_coverages: Array<{
     policy_id?: string;
+    insurer?: string;
+    product_name?: string;
     coverage_name: string;
-    original_amount: string;
+    major_category?: string;
+    original_amount?: string;
     reason: string;
   }>;
   excluded_auto_policy_count: number;

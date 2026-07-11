@@ -3,6 +3,7 @@
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 
 from app.schemas.portfolio import (
     CoverageInput,
@@ -19,10 +20,48 @@ from app.services.coverage_name_matching import (
 )
 
 _AUTO_CATEGORY_TERMS = ("자동차",)
-_INDEMNITY_TERMS = ("실손", "실비", "실손의료", "실손보상")
-_FIXED_PAYMENT_TERMS = ("정액", "고정액")
-_INDEMNITY_PAYMENT_TERMS = ("실손", "실비", "비례", "실액")
-_SAFE_FIXED_NAME_TERMS = ("진단비", "수술비", "입원일당", "입원비", "사망", "후유장해")
+_INDEMNITY_NAME_TERMS = ("실손", "실비")
+_INDEMNITY_CATEGORIES = frozenset({"실손", "실손형", "실비", "실비형"})
+_NEGATED_INDEMNITY_PATTERNS = (
+    "비실손",
+    "비실비",
+    "실손제외",
+    "실비제외",
+    "실손미해당",
+    "실비미해당",
+    "실손아님",
+    "실비아님",
+    "실손비대상",
+    "실비비대상",
+    "실손미포함",
+    "실비미포함",
+)
+_FIXED_PAYMENT_TYPES = frozenset({"정액", "정액형", "고정액", "고정액형"})
+_INDEMNITY_PAYMENT_TYPES = frozenset(
+    {
+        "실손",
+        "실손형",
+        "실비",
+        "실비형",
+        "비례",
+        "비례형",
+        "비례보상",
+        "실액",
+        "실액형",
+        "실액보상",
+    }
+)
+_SAFE_FIXED_NAME_TERMS = (
+    "진단비",
+    "수술비",
+    "입원일당",
+    "입원비",
+    "사망",
+    "후유장해",
+)
+_UNCONFIRMED_PAYMENT_REASON = "지급 방식을 확인하지 못해 합계에는 더하지 않았어요."
+_UNCONFIRMED_AMOUNT_REASON = "가입금액을 숫자로 확인하지 못해 합계에는 더하지 않았어요."
+_UNCONFIRMED_NAME_REASON = "담보명을 분류하지 못해 합계에는 더하지 않았어요."
 _UNITS = {
     "원": 1,
     "천원": 1_000,
@@ -52,6 +91,12 @@ class PortfolioFacts:
     coverage_summary: PortfolioCoverageSummary
 
 
+class _PayoutKind(Enum):
+    FIXED = "fixed"
+    INDEMNITY = "indemnity"
+    UNKNOWN = "unknown"
+
+
 def normalize_coverage_name(name: str) -> str:
     """Normalize formatting only, avoiding semantic aliases that can over-group."""
 
@@ -64,10 +109,6 @@ def major_category(name: str) -> str:
     normalized = normalize_coverage_name(name)
     if "후유장해" in normalized:
         return "후유장해"
-    if "입원" in normalized:
-        return "입원"
-    if "통원" in normalized:
-        return "통원"
     if "수술" in normalized:
         return "수술비"
     if "간병" in normalized or "요양" in normalized:
@@ -78,6 +119,10 @@ def major_category(name: str) -> str:
         return "사망"
     if "치료비" in normalized or "의료비" in normalized:
         return "치료비"
+    if "입원" in normalized:
+        return "입원"
+    if "통원" in normalized:
+        return "통원"
     return "기타"
 
 
@@ -88,21 +133,34 @@ def is_auto_policy(policy: PolicyInput) -> bool:
     return any(term in category for term in _AUTO_CATEGORY_TERMS)
 
 
-def _is_indemnity(coverage: CoverageInput) -> bool:
-    payment_type = coverage.지급유형 or ""
-    if any(term in payment_type for term in _INDEMNITY_PAYMENT_TERMS):
-        return True
-    searchable = " ".join((coverage.담보명, coverage.보장분류 or ""))
-    return any(term in searchable for term in _INDEMNITY_TERMS)
+def _classify_payout_kind(coverage: CoverageInput) -> _PayoutKind:
+    """Classify explicit payment evidence before conservative name inference."""
 
-
-def _is_safe_fixed(coverage: CoverageInput) -> bool:
-    payment_type = coverage.지급유형 or ""
-    if any(term in payment_type for term in _FIXED_PAYMENT_TERMS):
-        return True
+    payment_type = (coverage.지급유형 or "").strip()
+    if payment_type in _INDEMNITY_PAYMENT_TYPES:
+        return _PayoutKind.INDEMNITY
+    if payment_type in _FIXED_PAYMENT_TYPES:
+        return _PayoutKind.FIXED
     if payment_type:
-        return False
-    return any(term in coverage.담보명 for term in _SAFE_FIXED_NAME_TERMS)
+        return _PayoutKind.UNKNOWN
+
+    coverage_category = (coverage.보장분류 or "").strip()
+    normalized_name = normalize_coverage_name(coverage.담보명)
+    normalized_category = normalize_coverage_name(coverage_category)
+    has_negated_indemnity = any(
+        pattern in normalized_name or pattern in normalized_category
+        for pattern in _NEGATED_INDEMNITY_PATTERNS
+    )
+    if has_negated_indemnity:
+        return _PayoutKind.UNKNOWN
+    if coverage_category in _INDEMNITY_CATEGORIES:
+        return _PayoutKind.INDEMNITY
+    if any(term in normalized_name for term in _INDEMNITY_NAME_TERMS):
+        return _PayoutKind.INDEMNITY
+    if any(term in coverage.담보명 for term in _SAFE_FIXED_NAME_TERMS):
+        return _PayoutKind.FIXED
+
+    return _PayoutKind.UNKNOWN
 
 
 def _parse_amount(coverage: CoverageInput) -> int | None:
@@ -135,18 +193,19 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
             continue
         for coverage in policy.보장목록:
             group_key = canonicalize_coverage_name(coverage.담보명).normalized_key
-            if _is_indemnity(coverage):
+            payout_kind = _classify_payout_kind(coverage)
+            if payout_kind is _PayoutKind.INDEMNITY:
                 indemnity_rows.append((policy, coverage, group_key))
                 continue
-            if not _is_safe_fixed(coverage):
-                excluded.append(_excluded(policy, coverage, "지급유형을 안전하게 확인할 수 없음"))
+            if payout_kind is _PayoutKind.UNKNOWN:
+                excluded.append(_excluded(policy, coverage, _UNCONFIRMED_PAYMENT_REASON))
                 continue
             amount = _parse_amount(coverage)
             if amount is None:
-                excluded.append(_excluded(policy, coverage, "가입금액을 숫자로 확인할 수 없음"))
+                excluded.append(_excluded(policy, coverage, _UNCONFIRMED_AMOUNT_REASON))
                 continue
             if not group_key:
-                excluded.append(_excluded(policy, coverage, "담보명을 정규화할 수 없음"))
+                excluded.append(_excluded(policy, coverage, _UNCONFIRMED_NAME_REASON))
                 continue
             source_names_by_group[group_key].append(coverage.담보명)
             grouped_sources[group_key].append(
@@ -194,7 +253,10 @@ def build_portfolio_facts(policies: list[PolicyInput]) -> PortfolioFacts:
 def _excluded(policy: PolicyInput, coverage: CoverageInput, reason: str) -> ExcludedCoverageItem:
     return ExcludedCoverageItem(
         policy_id=policy.id,
+        insurer=policy.기본정보.보험사,
+        product_name=policy.기본정보.상품명,
         coverage_name=coverage.담보명,
+        major_category=major_category(coverage.담보명),
         original_amount=coverage.가입금액,
         reason=reason,
     )
@@ -260,8 +322,10 @@ def _build_indemnity_items(
                 insurer=policy.기본정보.보험사,
                 product_name=policy.기본정보.상품명,
                 coverage_name=coverage.담보명,
+                original_amount=coverage.가입금액,
                 normalized_name=normalized_name,
                 cross_insurer_duplicate=len(insurers_by_name[normalized_name]) >= 2,
+                major_category=major_category(coverage.담보명),
             )
         )
     return items
