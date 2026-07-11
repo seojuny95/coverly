@@ -1,4 +1,4 @@
-from app.services.coverage.explain import explain_coverages
+from app.services.explain import explain_coverages
 
 
 def test_generates_an_explanation_for_a_coverage_name() -> None:

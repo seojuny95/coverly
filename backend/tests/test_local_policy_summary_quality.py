@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from app.services.pdf_text import extract_pdf_text
-from app.services.policy.summary import extract_policy_summary
+from app.services.parsing import parse_document
+from app.services.summary import extract_policy_summary
 from tests.summary_helpers import EXPECTED_PATH, SAMPLE_PDF_DIR, flatten_summary
 
 pytestmark = pytest.mark.skipif(
@@ -24,7 +24,7 @@ def test_local_sample_policy_summary_field_accuracy() -> None:
         pdf_path = SAMPLE_PDF_DIR / filename
         assert pdf_path.exists(), f"missing local sample PDF: {filename}"
 
-        actual_summary = extract_policy_summary(extract_pdf_text(pdf_path.read_bytes()))
+        actual_summary = extract_policy_summary(parse_document(pdf_path.read_bytes()).text)
         flattened_expected = flatten_summary(expected_summary)
         flattened_actual = flatten_summary(actual_summary)
 

@@ -1,7 +1,23 @@
-from app.services.coverage.amount import AMOUNT_UNVERIFIED, normalize_amount
+from app.services.grounding import AMOUNT_UNVERIFIED, normalize_amount, wording_grounded
 
 MAN_UNIT_SOURCE = "| 보장명 | 가입금액 (만원) |\n| --- | --- |\n| 암진단비 | 3,000 |"
 WON_SOURCE = "| 보장명 | 가입금액 |\n| --- | --- |\n| 상해사망 | 10,000,000원 |"
+
+
+def test_amount_absent_from_source_is_demoted() -> None:
+    assert normalize_amount("9,999만원", source="암진단비 3,000만원") == AMOUNT_UNVERIFIED
+
+
+def test_amount_present_is_kept_verbatim() -> None:
+    assert normalize_amount("3,000만원", source="암진단비 3,000만원") == "3,000만원"
+
+
+def test_wording_absent_from_source_is_not_grounded() -> None:
+    assert wording_grounded("지어낸 문구", source="실제 원문") is False
+
+
+def test_wording_present_ignoring_whitespace_is_grounded() -> None:
+    assert wording_grounded("암 진단시 지급", source="암진단시\n지급") is True
 
 
 def test_amount_kept_when_grounded_in_source() -> None:
