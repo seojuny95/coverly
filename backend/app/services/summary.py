@@ -613,7 +613,9 @@ _SYSTEM_PROMPT = (
     "보험사는 보험계약을 인수하거나 증권을 발행한 보험회사명이다. "
     "상품명, 브랜드명, 플랜명, 부서명, 모집/품질보증 담당자명은 보험사가 아니다. "
     "보험사는 반드시 사용자가 제공한 후보 목록 중 하나만 선택한다. "
-    "후보 중 어느 보험사인지 확인할 수 없으면 null로 둔다."
+    "회사명이 그대로 적혀 있지 않으면 문서의 단서(로고 표기, 상품 브랜드, "
+    "홈페이지 주소, 콜센터 안내 등)를 후보 목록과 연결해 판단하라. "
+    "그래도 어느 후보인지 확인할 수 없으면 null로 둔다."
 )
 
 
@@ -893,6 +895,47 @@ def _needs_llm_fill(summary: PolicySummary) -> bool:
 # rather than free-text spans copied from the document, so they are excluded here.
 _GROUNDED_LLM_FIELDS = {"보험사", "증권번호", "계약자", "피보험자", "상품명"}
 
+# Generic industry suffixes of Korean insurer legal names, longest first. The
+# catalog lists full legal names ("DB손해보험") while documents usually print
+# only the brand ("DB", "디비손보"), so insurer grounding checks the brand —
+# the legal name minus one of these suffixes — instead of the full name.
+_INSURER_NAME_SUFFIXES = (
+    "화재해상보험",
+    "해상화재보험",
+    "손해보험",
+    "생명보험",
+    "화재보험",
+    "해상보험",
+    "화재",
+    "생명",
+    "보험",
+)
+
+_BRAND_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9]+|[가-힣]+")
+
+
+def _insurer_grounded(candidate: str, text: str) -> bool:
+    """True when the insurer's brand appears in the text (cite-or-refuse).
+
+    The brand is the catalog legal name minus one generic industry suffix;
+    every brand token of 2+ chars (alphanumeric or Hangul run) must appear in
+    the whitespace-normalized text, in any position — documents may print the
+    tokens apart ("NH", "농협금융지주"). Falls back to the full-name check when
+    stripping leaves nothing usable.
+    """
+    brand = candidate
+    for suffix in _INSURER_NAME_SUFFIXES:
+        if brand.endswith(suffix) and len(brand) > len(suffix):
+            brand = brand[: -len(suffix)]
+            break
+
+    tokens = [token for token in _BRAND_TOKEN_PATTERN.findall(brand) if len(token) >= 2]
+    if not tokens:
+        return wording_grounded(candidate, text)
+
+    normalized_text = re.sub(r"\s", "", text).lower()
+    return all(token.lower() in normalized_text for token in tokens)
+
 
 def _merge_missing_llm_fields(
     summary: PolicySummary, llm_summary: LlmPolicySummary | None, text: str
@@ -908,10 +951,16 @@ def _merge_missing_llm_fields(
         # Cite-or-refuse: an LLM-filled identity field must actually appear in the
         # source text. Without this check, a hallucinated value (e.g. an insurer
         # the enum permits but the document never names) would be surfaced as if
-        # it were extracted from the policy itself.
-        if key in _GROUNDED_LLM_FIELDS and (
-            not isinstance(value, str) or not wording_grounded(value, text)
-        ):
-            continue
+        # it were extracted from the policy itself. 보험사 is grounded on its
+        # brand token (see _insurer_grounded) because documents print the brand,
+        # not the catalog's full legal name.
+        if key in _GROUNDED_LLM_FIELDS:
+            if not isinstance(value, str):
+                continue
+            grounded = (
+                _insurer_grounded(value, text) if key == "보험사" else wording_grounded(value, text)
+            )
+            if not grounded:
+                continue
 
         summary[key] = value  # type: ignore[literal-required]

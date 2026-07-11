@@ -431,6 +431,59 @@ def test_llm_filled_insurer_present_in_text_is_set() -> None:
     assert result["보험사"] == "AXA손해보험"
 
 
+def test_llm_filled_insurer_grounded_by_brand_token_alone() -> None:
+    # Documents rarely print the catalog's full legal name ("DB손해보험") — they
+    # carry the brand ("DB", "디비손보"). Grounding the insurer on its brand
+    # token (legal name minus the generic industry suffix) keeps cite-or-refuse
+    # while accepting the document's own naming.
+    result = extract_policy_summary(
+        """
+        보험증권
+        DB 다이렉트 고객센터 안내
+        상품명: 건강보험
+        증권번호: POLICY-TEST-001
+        피보험자: 가나
+        """,
+        llm_extractor=lambda _text: {"보험사": "DB손해보험"},
+    )
+
+    assert result["보험사"] == "DB손해보험"
+
+
+def test_llm_filled_insurer_with_multi_token_brand_requires_every_token() -> None:
+    # "NH농협손해보험" -> brand tokens "NH" + "농협"; both must appear, in any
+    # position — the document may print them apart ("NH", "농협금융지주").
+    result = extract_policy_summary(
+        """
+        보험증권
+        NH 콜센터 / 농협금융지주 계열
+        상품명: 건강보험
+        증권번호: POLICY-TEST-001
+        피보험자: 가나
+        """,
+        llm_extractor=lambda _text: {"보험사": "NH농협손해보험"},
+    )
+
+    assert result["보험사"] == "NH농협손해보험"
+
+
+def test_llm_filled_insurer_brand_absent_is_still_dropped() -> None:
+    # Brand-token grounding must not become a free pass: an insurer whose brand
+    # never appears anywhere in the text stays out (the AXA hallucination case).
+    result = extract_policy_summary(
+        """
+        보험증권
+        상품명: 건강보험
+        증권번호: POLICY-TEST-001
+        피보험자: 가나
+        보험기간: 2026.01.01 ~ 2027.01.01
+        """,
+        llm_extractor=lambda _text: {"보험사": "현대해상화재보험"},
+    )
+
+    assert "보험사" not in result
+
+
 def test_llm_insurer_field_is_constrained_to_catalog() -> None:
     candidates = get_insurer_candidates()
 
