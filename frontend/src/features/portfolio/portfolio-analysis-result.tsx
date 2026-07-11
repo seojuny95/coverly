@@ -1,4 +1,7 @@
-import type { PortfolioAnalysisResult } from "./portfolio-api";
+import type {
+  AmountReviewItem,
+  PortfolioAnalysisResult,
+} from "./portfolio-api";
 
 export function PortfolioAnalysisResultView({
   result,
@@ -14,22 +17,7 @@ export function PortfolioAnalysisResultView({
       title: item.category,
       detail: item.reason,
     }));
-  const amountReviewItems =
-    result.counselor?.amount_review_items.map((item) => ({
-      title: item.title,
-      detail: [
-        `담보 ${item.coverage_name}`,
-        item.current_amount === null
-          ? "현재 확인 금액 없음"
-          : `현재 확인 금액 ${formatWon(item.current_amount)}`,
-        `일반 가이드 · ${formatConfidence(item.confidence)}`,
-        item.guidance,
-        item.rationale,
-        item.suggested_range ? `상담 참고 범위 ${item.suggested_range}` : null,
-      ]
-        .filter(Boolean)
-        .join(" "),
-    })) ?? [];
+  const amountReviewItems = result.counselor?.amount_review_items ?? [];
   const limitations = [
     ...(result.limitations ?? []),
     ...result.notices,
@@ -49,10 +37,10 @@ export function PortfolioAnalysisResultView({
 
       <section className="rounded-2xl border border-blue-100 bg-blue-50/50 p-6 sm:p-8">
         <p className="text-xs font-semibold tracking-[0.12em] text-blue-700 uppercase">
-          상담 전 요약
+          내 보험 상담
         </p>
         <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
-          상담사가 먼저 살펴본 내용이에요
+          Coverly가 당신 편에서 살펴봤어요
         </h2>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
           {result.counselor?.overview ??
@@ -84,24 +72,19 @@ export function PortfolioAnalysisResultView({
         />
         <ReviewCard
           eyebrow="보장 공백"
-          title="상담에서 확인할 항목"
+          title="더 확인해볼 항목"
           items={gaps}
           empty="일반 확인 기준에서 빠진 항목을 찾지 못했어요."
           tone="warning"
         />
       </div>
 
-      <ReviewCard
-        eyebrow="금액 검토"
-        title="보험금 수준을 함께 살펴볼 항목"
-        items={amountReviewItems}
-        empty="현재 구조화된 정보만으로 별도 금액 검토 항목을 만들지 않았어요. 상담에서 소득과 생활비를 함께 확인해보세요."
-      />
+      <AmountReviewCard items={amountReviewItems} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <ReviewCard
           eyebrow="다음 질문"
-          title="상담 전에 생각해볼 질문"
+          title="함께 생각해볼 질문"
           items={(result.counselor?.next_questions ?? []).map((title) => ({
             title,
           }))}
@@ -113,7 +96,7 @@ export function PortfolioAnalysisResultView({
           items={(result.counselor?.next_steps ?? []).map((title) => ({
             title,
           }))}
-          empty="원본 약관과 최신 계약 상태를 상담사와 함께 확인해보세요."
+          empty="원본 약관과 최신 계약 상태도 함께 확인해보세요."
         />
       </div>
 
@@ -147,6 +130,10 @@ export function PortfolioAnalysisResultView({
       <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
         <h2 className="text-sm font-semibold">확인 범위와 한계</h2>
         <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-500">
+          <li className="font-medium text-zinc-700">
+            · Coverly는 보험을 팔지 않아요. 겹치거나 불필요한 보장을 먼저
+            알려드려요.
+          </li>
           {limitations.map((item, index) => (
             <li key={`${item}-${index}`}>· {item}</li>
           ))}
@@ -154,6 +141,66 @@ export function PortfolioAnalysisResultView({
         </ul>
       </section>
     </div>
+  );
+}
+
+function AmountReviewCard({ items }: { items: AmountReviewItem[] }) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 p-6">
+      <p className="text-xs font-semibold text-blue-700">금액 검토</p>
+      <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+        보험금 수준을 함께 살펴볼 항목
+      </h2>
+
+      {items.length ? (
+        <ul className="mt-4 space-y-3">
+          {items.map((item, index) => (
+            <li
+              key={`${item.coverage_name}-${index}`}
+              className="rounded-xl bg-zinc-50 px-4 py-3 text-sm"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium text-zinc-800">{item.title}</p>
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-500">
+                  {formatConfidence(item.confidence)}
+                </span>
+              </div>
+
+              <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-500">
+                <div className="flex gap-1.5">
+                  <dt className="text-zinc-400">담보</dt>
+                  <dd className="text-zinc-600">{item.coverage_name}</dd>
+                </div>
+                <div className="flex gap-1.5">
+                  <dt className="text-zinc-400">현재 확인 금액</dt>
+                  <dd className="text-zinc-600">
+                    {item.current_amount === null
+                      ? "없음"
+                      : formatWon(item.current_amount)}
+                  </dd>
+                </div>
+                {item.suggested_range ? (
+                  <div className="flex gap-1.5">
+                    <dt className="text-zinc-400">참고 범위</dt>
+                    <dd className="text-zinc-600">{item.suggested_range}</dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              <p className="mt-2 leading-6 text-zinc-600">{item.guidance}</p>
+              <p className="mt-1 text-xs leading-5 text-zinc-400">
+                {item.rationale}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-4 text-sm leading-6 text-zinc-500">
+          현재 구조화된 정보만으로 별도 금액 검토 항목을 만들지 않았어요. 소득과
+          생활비도 함께 살펴보면 좋아요.
+        </p>
+      )}
+    </section>
   );
 }
 
