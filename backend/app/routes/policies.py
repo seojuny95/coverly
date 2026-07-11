@@ -54,7 +54,11 @@ async def parse_policy(file: UploadFile) -> dict[str, object]:
         analysis_status = STATUS_OK
     else:
         # Interim double-parse (pypdf text above, pdfplumber here); the pipeline
-        # task collapses both onto a single parse_document call.
+        # task collapses both onto a single parse_document call. Known interim gap
+        # (accepted): a PDF that pypdf reads but pdfplumber rejects degrades to an
+        # empty ParsedDocument -> blank source -> 완료, whereas it used to surface
+        # 부분. Once parse_document's text becomes the 422 gate, such a PDF fails
+        # fast instead.
         coverages, analysis_status = await asyncio.to_thread(
             lambda: extract_coverages(parse_document(data))
         )
