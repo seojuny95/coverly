@@ -2,12 +2,13 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
+import { primaryButtonClassName } from "../../components/coverly-brand";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import { askPortfolioQuestion, type ChatHistoryItem } from "./portfolio-api";
 
 const INITIAL_SUGGESTIONS = [
   "내 보험에서 확인된 강점은 뭐예요?",
-  "상담할 때 어떤 질문을 준비할까요?",
+  "겹치는 보장이 있는지 봐줄래요?",
   "확인 가능한 보험금 합계는 얼마예요?",
 ];
 
@@ -22,7 +23,7 @@ export function InsuranceChatbot({
     {
       id: 0,
       role: "assistant",
-      text: "상담 전에 궁금한 내용을 물어보세요. 올린 보험증권에서 확인한 사실을 근거로 답할게요.",
+      text: "궁금한 내용을 물어보세요. 올린 보험증권에서 확인한 사실을 근거로 답할게요. Coverly는 보험을 팔지 않아요.",
       limitations: [
         "자동차보험과 약관이 필요한 보상 판단은 답변에서 제외해요.",
       ],
@@ -125,7 +126,7 @@ export function InsuranceChatbot({
     >
       <header className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
         <div>
-          <h2 className="font-semibold">상담 전 보험 Q&A</h2>
+          <h2 className="font-semibold">내 보험 Q&A</h2>
           <p className="mt-1 text-xs text-zinc-500">
             증권 근거와 확인 한계를 함께 보여드려요
           </p>
@@ -181,13 +182,13 @@ export function InsuranceChatbot({
               maxLength={500}
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              placeholder="예: 상담에서 무엇을 물어보면 좋을까요?"
+              placeholder="예: 겹치는 보장이 있나요?"
               className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600"
             />
             <button
               type="submit"
               disabled={!question.trim() || loading}
-              className="rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
+              className={primaryButtonClassName}
             >
               질문하기
             </button>

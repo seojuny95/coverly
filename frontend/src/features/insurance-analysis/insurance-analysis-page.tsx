@@ -336,10 +336,10 @@ export function InsuranceAnalysisPage({
             <div className="mb-7">
               <PixelEyebrow>내 보험 분석</PixelEyebrow>
               <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
-                상담 전에 내 보험을 먼저 살펴봐요
+                내 보험을 당신 편에서 살펴봐요
               </h1>
               <p className="mt-3 text-sm leading-6 text-zinc-500">
-                확인한 강점과 보장 공백, 상담에서 이어갈 질문을 근거와 함께
+                확인한 강점과 보장 공백, 이어서 생각해볼 질문을 근거와 함께
                 정리해요.
               </p>
             </div>

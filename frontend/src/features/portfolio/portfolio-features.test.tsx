@@ -288,9 +288,8 @@ describe("portfolio features", () => {
     expect(
       screen.getByText("증권에서 암 진단비를 확인했어요."),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/담보 암 진단비 현재 확인 금액 10,000,000원/),
-    ).toBeInTheDocument();
+    expect(screen.getByText("암 진단비 금액")).toBeInTheDocument();
+    expect(screen.getByText("생활비와 함께 확인해보세요.")).toBeInTheDocument();
     expect(screen.getByText(/보통 확신/)).toBeInTheDocument();
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
@@ -391,7 +390,7 @@ describe("portfolio features", () => {
     render(<InsuranceAnalysisPage />);
 
     await user.click(await screen.findByRole("tab", { name: "보험 분석" }));
-    await screen.findByText("상담사가 먼저 살펴본 내용이에요");
+    await screen.findByText("Coverly가 당신 편에서 살펴봤어요");
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
     >;

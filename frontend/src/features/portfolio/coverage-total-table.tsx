@@ -30,6 +30,23 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
           합산해도 되는 보장은 묶어서 보여드리고, 따로 확인해야 하는 보장은
           구분해서 보여드려요.
         </p>
+        <dl className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs leading-5">
+          <LegendItem term="N개 합산" termClassName="bg-blue-50 text-blue-700">
+            같은 보장을 합쳐 총액으로 봐요
+          </LegendItem>
+          <LegendItem
+            term="실손형 보장"
+            termClassName="bg-emerald-50 text-emerald-700"
+          >
+            실제 쓴 만큼 주는 보장이라 합치지 않아요
+          </LegendItem>
+          <LegendItem
+            term="그대로 보는 보장"
+            termClassName="bg-zinc-100 text-zinc-600"
+          >
+            합산 기준을 확인 못 해 따로 봐요
+          </LegendItem>
+        </dl>
       </div>
 
       {status === "loading" ? (
@@ -44,6 +61,27 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
         </p>
       )}
     </section>
+  );
+}
+
+function LegendItem({
+  term,
+  termClassName,
+  children,
+}: {
+  term: string;
+  termClassName: string;
+  children: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <dt
+        className={`inline-flex shrink-0 rounded-full px-2 py-0.5 font-semibold ${termClassName}`}
+      >
+        {term}
+      </dt>
+      <dd className="text-zinc-500">{children}</dd>
+    </div>
   );
 }
 

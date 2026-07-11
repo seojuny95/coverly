@@ -139,7 +139,10 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
   return (
     <tr>
       <th scope="row" className="px-6 py-4 font-medium text-zinc-800">
-        <CoverageDisclosure label={row.displayName}>
+        <CoverageDisclosure
+          label={row.displayName}
+          badge={row.crossInsurerDuplicate ? <DuplicateBadge /> : null}
+        >
           <p className="mt-3 text-xs font-normal text-zinc-500">
             {coverageSourceLabel({
               insurer: row.insurer,
@@ -190,15 +193,30 @@ function IndividualCoverage({ row }: { row: IndividualCoverageRow }) {
 function CoverageDisclosure({
   children,
   label,
+  badge = null,
 }: {
   children: ReactNode;
   label: string;
+  badge?: ReactNode;
 }) {
   return (
     <details>
-      <summary className="cursor-pointer marker:text-zinc-400">{label}</summary>
+      <summary className="cursor-pointer marker:text-zinc-400">
+        <span className="inline-flex flex-wrap items-center gap-2">
+          {label}
+          {badge}
+        </span>
+      </summary>
       {children}
     </details>
+  );
+}
+
+function DuplicateBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+      중복 확인
+    </span>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
+import { primaryButtonClassName } from "../../components/coverly-brand";
 import { PortfolioAnalysisResultView } from "./portfolio-analysis-result";
 import {
   type PortfolioAnalysisResult,
@@ -75,7 +76,7 @@ export function PortfolioAnalysisPanel({
     return (
       <InfoState
         title="분석할 일반 보험이 없어요"
-        description="자동차보험은 이번 분석에서 제외해요. 건강·생명·운전자보험 증권을 올리면 상담 전 검토를 시작할 수 있어요."
+        description="자동차보험은 이번 분석에서 제외해요. 건강·생명·운전자보험 증권을 올리면 검토를 시작할 수 있어요."
       />
     );
   }
@@ -95,7 +96,7 @@ export function PortfolioAnalysisPanel({
         </p>
         <button
           type="button"
-          className="mt-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+          className={`mt-5 ${primaryButtonClassName}`}
           onClick={() => {
             setState({ status: "idle" });
             setAttempt((value) => value + 1);
@@ -183,7 +184,7 @@ function DemographicsForm({
           if (Number.isInteger(parsedAge) && parsedAge >= 0 && parsedAge <= 120)
             onSubmit({ age: parsedAge, gender, source: "user" });
         }}
-        className="mt-6 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+        className={`mt-6 ${primaryButtonClassName}`}
       >
         내 보험 분석하기
       </button>
@@ -200,7 +201,7 @@ function AnalysisLoading() {
     >
       <div className="h-2 w-20 animate-pulse rounded bg-blue-600" />
       <h2 className="mt-5 text-xl font-semibold">
-        상담 전에 볼 내용을 정리하고 있어요
+        당신 편에서 보험을 살펴보고 있어요
       </h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
         강점과 확인할 공백, 다음 질문을 증권 근거와 함께 살펴보고 있어요.
