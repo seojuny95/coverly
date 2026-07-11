@@ -17,6 +17,10 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 from openai.types.responses import EasyInputMessageParam, ResponseTextConfigParam
 
 from app.services.classification import classify_policy
+from app.services.demographics import (
+    extract_insured_demographics,
+    mask_demographic_identifiers,
+)
 from app.services.grounding import wording_grounded
 from app.services.types import (
     CoveragePeriod,
@@ -174,6 +178,10 @@ def extract_local_policy_summary(text: str) -> PolicySummary:
     payment_period = _extract_payment_period(text)
     if payment_period:
         summary["납입기간"] = payment_period
+
+    insured_demographics = extract_insured_demographics(text)
+    if insured_demographics:
+        summary["피보험자정보"] = insured_demographics
 
     return summary
 
@@ -914,12 +922,13 @@ def extract_policy_summary(
     ),
 ) -> PolicySummary:
     summary = extract_local_policy_summary(text)
+    masked_text = mask_demographic_identifiers(text)
 
     if llm_extractor and _needs_llm_fill(summary):
-        _merge_missing_llm_fields(summary, llm_extractor(text), text)
+        _merge_missing_llm_fields(summary, llm_extractor(masked_text), text)
 
     classification = classify_policy(
-        text=text,
+        text=masked_text,
         product_name=summary.get("상품명"),
     )
     summary["보험분류"] = classification["보험분류"]

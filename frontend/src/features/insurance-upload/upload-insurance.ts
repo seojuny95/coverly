@@ -14,6 +14,12 @@ export type InsuranceVehicleInfo = {
   연식?: string;
 };
 
+export type InsuranceDemographics = {
+  나이?: number;
+  성별?: string;
+  생애단계?: string;
+};
+
 export type InsuranceBasicInfo = {
   보험사?: string;
   상품명?: string;
@@ -26,6 +32,7 @@ export type InsuranceBasicInfo = {
   만기일?: string;
   보험기간?: InsurancePeriod;
   보험료?: InsurancePremium;
+  피보험자정보?: InsuranceDemographics;
   차량정보?: InsuranceVehicleInfo;
 };
 

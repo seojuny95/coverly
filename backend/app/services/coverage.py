@@ -29,6 +29,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
+from app.services.demographics import mask_demographic_identifiers
 from app.services.explain import explain_coverages
 from app.services.grounding import normalize_amount, wording_grounded
 from app.services.llm import JsonCompleter, structured_completer
@@ -60,12 +61,11 @@ _SYSTEM = (
     "입력은 증권에서 추출한 담보표 마크다운(또는 레이아웃 텍스트)이다. "
     "열 제목(보장명·담보명·담보종목·보장상세·보장내용·가입금액 등)을 보고 각 값을 정확히 매핑하라. "
     "표에 실제로 있는 담보만 옮기고 새로 지어내지 마라. "
-    "담보명은 증권 표기를 살리되, 보장 대상·사고를 바꾸지 않는 순수 수식어는 "
-    "괄호 안이라도 제거한다 "
-    "— '감액없음'·'감액'·'기본계약'·'주계약'·'선택'·'무배당' 같은 지급방식·계약형태 표시. "
-    "예: '암진단비(유사암제외)(감액없음)'→'암진단비(유사암제외)'. "
-    "'기본계약(일반상해후유장해(80%이상))'처럼 담보명을 감싸는 접두 래퍼는 바깥 래퍼만 벗긴다. "
-    "반대로 '유사암제외'·'80%이상'·'1~5종'처럼 보장 범위·지급조건을 가르는 수식어는 반드시 남긴다. "
+    "담보명은 증권 표기 그대로 옮긴다. "
+    "괄호 안 수식어, 감액없음·유사암제외·80%이상·1~5종 같은 지급조건, "
+    "기본계약·주계약·선택·무배당 같은 계약형태 표시도 임의로 제거하거나 고쳐 쓰지 마라. "
+    "서로 다른 증권의 담보명 비교, 유사도 판단, "
+    "화면 표시용 이름 정리는 후속 집계 단계에서 처리한다. "
     "보장내용은 증권 원문 그대로 옮긴다(요약·축약 금지, '※'로 시작하는 단서 포함). 없으면 null. "
     "금액·한도 칸의 문구는 아무리 길어도 설명이 아니라 가입금액이다 — 요약하지 말고 "
     "그대로 가입금액에 옮긴다 ('1인당 무한', '자배법에서 정한 금액'처럼 한도를 서술하는 "
@@ -338,7 +338,8 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
         return []
 
     completer = complete or _default_completer()
-    rows = completer(_SYSTEM, source).get("보장목록", [])
+    model_source = mask_demographic_identifiers(source)
+    rows = completer(_SYSTEM, model_source).get("보장목록", [])
     if not isinstance(rows, list):
         return []
 

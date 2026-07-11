@@ -56,6 +56,18 @@ class PremiumSummary(TypedDict, total=False):
     납입주기: str
 
 
+InsuredGender = Literal["남성", "여성"]
+LifeStage = Literal["어린이", "성인", "시니어"]
+
+
+class InsuredDemographics(TypedDict):
+    """Non-identifying insured attributes derived locally from the policy."""
+
+    나이: int
+    성별: InsuredGender
+    생애단계: LifeStage
+
+
 class PolicyCoreSummary(TypedDict, total=False):
     보험사: str
     상품명: str
@@ -66,6 +78,7 @@ class PolicyCoreSummary(TypedDict, total=False):
     만기일: str
     납입기간: str
     보험료: PremiumSummary
+    피보험자정보: InsuredDemographics
     차량정보: VehicleInfo
 
 
