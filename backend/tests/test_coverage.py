@@ -197,6 +197,69 @@ def test_normalize_returns_no_coverages_for_blank_source() -> None:
     assert normalize_coverages("   ", complete=fake_complete) == []
 
 
+def test_auto_category_appends_prompt_guidance() -> None:
+    captured: dict[str, str] = {}
+
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        captured["system"] = system
+        return {"보장목록": []}
+
+    normalize_coverages(
+        "| 담보종목 | 한도 |\n| --- | --- |\n| 대인배상Ⅰ | 무한 |",
+        category="자동차",
+        complete=fake_complete,
+    )
+    assert "부가" in captured["system"]  # auto guidance block present
+
+    captured.clear()
+    normalize_coverages(
+        "| 담보명 | 가입금액 |\n| --- | --- |\n| 암진단비 | 1억원 |",
+        complete=fake_complete,
+    )
+    assert "부가" not in captured["system"]  # non-auto prompt unchanged
+
+
+def test_normalize_carries_유형_from_llm() -> None:
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": "대인배상Ⅰ", "보장내용": None, "가입금액": "무한", "유형": "담보"},
+                {"담보명": "안전운전할인특약", "보장내용": None, "가입금액": "", "유형": "부가"},
+            ]
+        }
+
+    result = normalize_coverages(
+        "대인배상Ⅰ 무한 안전운전할인특약", category="자동차", complete=fake_complete
+    )
+    assert result[0].get("유형", "담보") == "담보"
+    assert result[1]["유형"] == "부가"
+
+
+def test_extract_skips_explanation_for_부가_rows() -> None:
+    explained: list[str] = []
+
+    def fake_explain(names: list[str]) -> tuple[dict[str, str], bool]:
+        explained.extend(names)
+        return {name: "설명" for name in names}, True
+
+    rows: list[Coverage] = [
+        {"담보명": "대인배상Ⅰ", "가입금액": "무한", "보장내용": None, "해설": None, "유형": "담보"},
+        {
+            "담보명": "안전운전할인특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+    ]
+    coverages, status = extract_coverages(
+        _doc(tables=(COVERAGE_TABLE,)), normalize=lambda _s: rows, explain=fake_explain
+    )
+    assert explained == ["대인배상Ⅰ"]
+    assert coverages[1]["해설"] is None
+    assert status == STATUS_OK
+
+
 # ---------------------------------------------------------------------------
 # extract_coverages (orchestrator: never raises, degrades to 부분)
 

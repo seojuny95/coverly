@@ -24,7 +24,8 @@ explanation failure keeps the extracted coverages (해설 stays None).
 
 import re
 from collections.abc import Callable
-from functools import lru_cache
+from functools import lru_cache, partial
+from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -55,14 +56,28 @@ _SYSTEM = (
     "입력은 증권에서 추출한 담보표 마크다운(또는 레이아웃 텍스트)이다. "
     "열 제목(보장명·담보명·담보종목·보장상세·보장내용·가입금액 등)을 보고 각 값을 정확히 매핑하라. "
     "표에 실제로 있는 담보만 옮기고 새로 지어내지 마라. "
-    "담보명은 증권 표기를 살리되, 보장 대상·사고를 바꾸지 않는 순수 부가어는 "
+    "담보명은 증권 표기를 살리되, 보장 대상·사고를 바꾸지 않는 순수 수식어는 "
     "괄호 안이라도 제거한다 "
     "— '감액없음'·'감액'·'기본계약'·'주계약'·'선택'·'무배당' 같은 지급방식·계약형태 표시. "
     "예: '암진단비(유사암제외)(감액없음)'→'암진단비(유사암제외)'. "
     "'기본계약(일반상해후유장해(80%이상))'처럼 담보명을 감싸는 접두 래퍼는 바깥 래퍼만 벗긴다. "
     "반대로 '유사암제외'·'80%이상'·'1~5종'처럼 보장 범위·지급조건을 가르는 수식어는 반드시 남긴다. "
     "보장내용은 증권 원문 그대로 옮긴다(요약·축약 금지, '※'로 시작하는 단서 포함). 없으면 null. "
-    "가입금액이 없으면 빈 문자열로 둔다."
+    "가입금액이 없으면 빈 문자열로 둔다. "
+    "유형은 항상 '담보'로 표시한다."
+)
+
+# Appended to _SYSTEM only for 자동차 policies — their coverage tables mix real
+# coverages with rate/discount riders and section headers, which the default
+# prompt has no vocabulary for.
+_AUTO_GUIDANCE = (
+    "이 증권은 자동차보험이다. 다음 지침을 추가로 따른다: "
+    "금액·한도 칸의 문구는 요약하지 말고 그대로 가입금액에 옮긴다 "
+    "('1인당 무한', '자배법에서 정한 금액'처럼 한도를 서술하는 문구도 포함). "
+    "여러 담보를 묶는 섹션·그룹 표제(예: '대인배상', '기본계약')는 담보 자체가 아니므로 "
+    "별도 행으로 만들지 마라. "
+    "보험료 할인·서비스·요율·기타 부가 특약은 이름만 정확히 옮기고 유형을 '부가'로 표시한다. "
+    "대인배상·대물배상·자기신체사고·자기차량손해 등 실제 보장 담보는 유형을 '담보'로 표시한다."
 )
 
 
@@ -156,6 +171,7 @@ class _CoverageRow(BaseModel):
     담보명: str
     보장내용: str | None
     가입금액: str
+    유형: Literal["담보", "부가"] = "담보"
 
 
 class _CoverageList(BaseModel):
@@ -167,12 +183,15 @@ def _default_completer() -> JsonCompleter:
     return structured_completer(_CoverageList)
 
 
-def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> list[Coverage]:
+def normalize_coverages(
+    source: str, category: str | None = None, complete: JsonCompleter | None = None
+) -> list[Coverage]:
     """Map a coverage-table source into Coverages (one structured LLM call)."""
     if not source.strip():
         return []
     completer = complete or _default_completer()
-    rows = completer(_SYSTEM, source).get("보장목록", [])
+    system = _SYSTEM + _AUTO_GUIDANCE if category == "자동차" else _SYSTEM
+    rows = completer(system, source).get("보장목록", [])
     if not isinstance(rows, list):
         return []
 
@@ -185,14 +204,15 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
         detail = parsed.보장내용.strip() if parsed.보장내용 else None
         if detail and not wording_grounded(detail, source):
             detail = None  # not the policy's own wording — don't present it as 원문
-        coverages.append(
-            Coverage(
-                담보명=parsed.담보명.strip(),
-                가입금액=normalize_amount(parsed.가입금액, source),
-                보장내용=detail or None,
-                해설=None,
-            )
+        coverage = Coverage(
+            담보명=parsed.담보명.strip(),
+            가입금액=normalize_amount(parsed.가입금액, source),
+            보장내용=detail or None,
+            해설=None,
         )
+        if parsed.유형 != "담보":
+            coverage["유형"] = parsed.유형  # omit for 담보 rows — preserve response shape
+        coverages.append(coverage)
     return coverages
 
 
@@ -200,16 +220,24 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
 # Orchestrator
 
 
+def _needs_explanation(coverage: Coverage) -> bool:
+    """Only 담보 rows without policy wording get a generated 해설 — 부가 rows are
+    name-only riders/rates with nothing substantive to explain."""
+    return not coverage["보장내용"] and coverage.get("유형", "담보") == "담보"
+
+
 def extract_coverages(
     doc: ParsedDocument,
     *,
-    normalize: Normalizer = normalize_coverages,
+    category: str | None = None,
+    normalize: Normalizer | None = None,
     explain: Explainer = explain_coverages,
 ) -> tuple[list[Coverage], str]:
     """Extract the coverage list from a parsed policy document, best-effort."""
+    resolve_normalizer = normalize or partial(normalize_coverages, category=category)
     try:
         source = build_coverage_source(doc)
-        coverages = normalize(source)
+        coverages = resolve_normalizer(source)
     except Exception:
         return [], STATUS_PARTIAL
 
@@ -219,12 +247,12 @@ def extract_coverages(
         # result — surface 부분. A blank source means there was nothing to analyze.
         return [], STATUS_PARTIAL if source.strip() else STATUS_OK
 
-    missing = [c["담보명"] for c in coverages if not c["보장내용"]]
+    missing = [c["담보명"] for c in coverages if _needs_explanation(c)]
     if not missing:
         return coverages, STATUS_OK
 
     explanations, ok = explain(missing)
     for coverage in coverages:
-        if coverage["보장내용"] is None:
+        if _needs_explanation(coverage):
             coverage["해설"] = explanations.get(coverage["담보명"])
     return coverages, STATUS_OK if ok else STATUS_PARTIAL
