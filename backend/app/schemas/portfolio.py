@@ -1,6 +1,8 @@
 """Typed contracts for deterministic portfolio calculations."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CoverageInput(BaseModel):
@@ -17,12 +19,30 @@ class CoverageInput(BaseModel):
     보장분류: str | None = None
 
 
+class PolicyInsuredDemographicsInput(BaseModel):
+    """Server-extracted demographics carried inside a parsed policy."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    나이: int = Field(ge=0, le=120, strict=True)
+    성별: Literal["남성", "여성"]
+    생애단계: Literal["어린이", "성인", "시니어"]
+
+    @model_validator(mode="after")
+    def validate_life_stage(self) -> "PolicyInsuredDemographicsInput":
+        expected = "어린이" if self.나이 < 19 else "시니어" if self.나이 >= 65 else "성인"
+        if self.생애단계 != expected:
+            raise ValueError("피보험자 생애단계가 나이와 일치하지 않습니다")
+        return self
+
+
 class PolicyInfoInput(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     보험사: str | None = None
     상품명: str | None = None
     보험분류: str | None = None
+    피보험자정보: PolicyInsuredDemographicsInput | None = None
 
 
 class PolicyInput(BaseModel):

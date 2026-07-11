@@ -160,6 +160,31 @@ def test_normalize_maps_rows_into_coverages() -> None:
     ]
 
 
+def test_normalize_masks_identifier_before_llm_without_weakening_grounding() -> None:
+    raw_identifier = "TESTBIRTH-A-1******"
+    source = f"피보험자 {raw_identifier}\n{SOURCE}"
+    captured: dict[str, str] = {}
+
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        captured["user"] = user
+        return {
+            "보장목록": [
+                {
+                    "담보명": "암진단비",
+                    "보장내용": "암 진단 확정 시 최초 1회 지급",
+                    "가입금액": "30,000,000원",
+                }
+            ]
+        }
+
+    result = normalize_coverages(source, complete=fake_complete)
+
+    assert raw_identifier not in captured["user"]
+    assert "TESTBIRTH-A" not in captured["user"]
+    assert "******-*******" in captured["user"]
+    assert result[0]["보장내용"] == "암 진단 확정 시 최초 1회 지급"
+
+
 def test_normalize_demotes_hallucinated_amounts() -> None:
     def fake_complete(system: str, user: str) -> dict[str, object]:
         return {

@@ -10,4 +10,7 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 @router.post("/analysis", response_model=PortfolioAnalysisResponse)
 def create_portfolio_analysis(request: PortfolioAnalysisRequest) -> PortfolioAnalysisResponse:
-    return analyze_portfolio(request.policies, age=request.age, gender=request.gender)
+    return analyze_portfolio(
+        request.policies,
+        demographics=request.resolved_demographics(),
+    )

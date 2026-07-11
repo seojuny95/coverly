@@ -28,6 +28,7 @@ from functools import lru_cache
 
 from pydantic import BaseModel, ValidationError
 
+from app.services.demographics import mask_demographic_identifiers
 from app.services.explain import explain_coverages
 from app.services.grounding import normalize_amount, wording_grounded
 from app.services.llm import JsonCompleter, structured_completer
@@ -172,7 +173,8 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
     if not source.strip():
         return []
     completer = complete or _default_completer()
-    rows = completer(_SYSTEM, source).get("보장목록", [])
+    model_source = mask_demographic_identifiers(source)
+    rows = completer(_SYSTEM, model_source).get("보장목록", [])
     if not isinstance(rows, list):
         return []
 

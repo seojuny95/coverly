@@ -77,7 +77,9 @@ def major_category(name: str) -> str:
     return "기타"
 
 
-def _is_auto_policy(policy: PolicyInput) -> bool:
+def is_auto_policy(policy: PolicyInput) -> bool:
+    """Return whether a policy belongs to the separately handled auto branch."""
+
     category = policy.기본정보.보험분류 or ""
     return any(term in category for term in _AUTO_CATEGORY_TERMS)
 
@@ -124,7 +126,7 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
     auto_count = 0
 
     for policy in policies:
-        if _is_auto_policy(policy):
+        if is_auto_policy(policy):
             auto_count += 1
             continue
         for coverage in policy.보장목록:
@@ -168,7 +170,7 @@ def build_portfolio_facts(policies: list[PolicyInput]) -> PortfolioFacts:
     """Build the deterministic common input for summary, analysis, and Q&A."""
 
     return PortfolioFacts(
-        policies=tuple(policies),
+        policies=tuple(policy for policy in policies if not is_auto_policy(policy)),
         coverage_summary=summarize_portfolio_coverages(policies),
     )
 

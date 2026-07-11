@@ -1,10 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
-import { askPortfolioQuestion } from "./portfolio-api";
+import { ChatMessage, type ChatMessageData } from "./chat-message";
+import { askPortfolioQuestion, type ChatHistoryItem } from "./portfolio-api";
 
-type Message = { id: number; role: "user" | "assistant"; text: string };
+const INITIAL_SUGGESTIONS = [
+  "내 보험에서 확인된 강점은 뭐예요?",
+  "상담할 때 어떤 질문을 준비할까요?",
+  "확인 가능한 보험금 합계는 얼마예요?",
+];
 
 export function InsuranceChatbot({
   documents,
@@ -13,51 +18,86 @@ export function InsuranceChatbot({
 }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<ChatMessageData[]>([
     {
       id: 0,
       role: "assistant",
-      text: "업로드한 보험증권에서 확인한 내용을 바탕으로 답해드려요.",
+      text: "상담 전에 궁금한 내용을 물어보세요. 올린 보험증권에서 확인한 사실을 근거로 답할게요.",
+      limitations: [
+        "자동차보험과 약관이 필요한 보상 판단은 답변에서 제외해요.",
+      ],
     },
   ]);
+  const [suggestions, setSuggestions] = useState(INITIAL_SUGGESTIONS);
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const nextMessageId = useRef(1);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (typeof endRef.current?.scrollIntoView === "function") {
+      endRef.current.scrollIntoView({ block: "nearest" });
+    }
+  }, [loading, messages]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const text = question.trim();
+    await sendQuestion(question);
+  }
+
+  async function sendQuestion(rawQuestion: string) {
+    const text = rawQuestion.trim().slice(0, 500);
     if (!text || loading) return;
-    const id = Date.now();
+    const id = nextMessageId.current;
+    nextMessageId.current += 2;
+    const history: ChatHistoryItem[] = messages
+      .filter((message) => message.id !== 0)
+      .map((message) => ({ role: message.role, content: message.text }));
     setQuestion("");
+    setSuggestions([]);
     setMessages((current) => [...current, { id, role: "user", text }]);
     setLoading(true);
     try {
-      const answer = await askPortfolioQuestion(text, documents);
-      const sourceLabels = answer.citations
-        .map((citation) =>
-          [citation.insurer, citation.product_name, citation.coverage_name]
+      const answer = await askPortfolioQuestion(text, documents, history);
+      const sources = answer.citations
+        .map((citation) => ({
+          label: [
+            citation.insurer,
+            citation.product_name,
+            citation.coverage_name,
+          ]
             .filter(Boolean)
             .join(" · "),
-        )
-        .filter(Boolean);
-      const details = [
-        ...new Set(sourceLabels.map((label) => `근거: ${label}`)),
-        ...answer.limitations,
-      ];
+        }))
+        .filter((source) => source.label);
       setMessages((current) => [
         ...current,
         {
           id: id + 1,
           role: "assistant",
-          text: [answer.answer, ...details].join("\n"),
+          text: answer.sections?.length
+            ? answer.sections
+                .map((section) => `${section.title}\n${section.content}`)
+                .join("\n\n")
+            : answer.answer,
+          sources,
+          limitations: answer.limitations,
         },
       ]);
+      setSuggestions(
+        answer.suggestions ?? answer.suggested_questions ?? INITIAL_SUGGESTIONS,
+      );
     } catch {
       setMessages((current) => [
         ...current,
         {
           id: id + 1,
           role: "assistant",
-          text: "답을 가져오지 못했어요. 잠시 후 다시 질문해주세요.",
+          text: "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
         },
       ]);
     } finally {
@@ -70,70 +110,90 @@ export function InsuranceChatbot({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-5 bottom-5 z-40 rounded-2xl bg-blue-600 px-6 py-4 text-base font-semibold text-white shadow-xl sm:right-8 sm:bottom-8"
+        className="fixed right-5 bottom-5 z-40 min-h-14 rounded-2xl bg-blue-600 px-6 py-4 text-base font-semibold text-white shadow-xl sm:right-8 sm:bottom-8"
       >
         내 보험에 질문하기
       </button>
     );
+
   return (
     <aside
       role="dialog"
       aria-label="내 보험 질문"
-      className="fixed inset-x-3 bottom-3 z-40 flex h-[min(82vh,42rem)] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl sm:inset-x-auto sm:right-8 sm:bottom-8 sm:h-[38rem] sm:w-[28rem]"
+      aria-modal="false"
+      className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-white shadow-2xl sm:inset-x-auto sm:top-auto sm:right-8 sm:bottom-8 sm:h-[min(78vh,46rem)] sm:w-[min(32rem,calc(100vw-4rem))] sm:rounded-2xl sm:border sm:border-zinc-200"
     >
       <header className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
         <div>
-          <h2 className="font-semibold">내 보험에 질문하기</h2>
+          <h2 className="font-semibold">상담 전 보험 Q&A</h2>
           <p className="mt-1 text-xs text-zinc-500">
-            업로드한 증권을 기준으로 확인해요
+            증권 근거와 확인 한계를 함께 보여드려요
           </p>
         </div>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded-lg px-3 py-2 text-sm hover:bg-zinc-100"
+          className="rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-blue-600"
         >
           닫기
         </button>
       </header>
-      <div className="flex-1 space-y-3 overflow-y-auto bg-zinc-50/60 p-4">
+
+      <div
+        aria-live="polite"
+        className="flex-1 space-y-3 overflow-y-auto bg-zinc-50/60 p-4 sm:p-5"
+      >
         {messages.map((message) => (
-          <p
-            key={message.id}
-            className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 whitespace-pre-line ${message.role === "user" ? "ml-auto bg-blue-600 text-white" : "border border-zinc-200 bg-white text-zinc-700"}`}
-          >
-            {message.text}
-          </p>
+          <ChatMessage key={message.id} message={message} />
         ))}
         {loading ? (
           <p role="status" className="text-sm text-zinc-500">
-            증권에서 답을 찾고 있어요.
+            증권에서 근거를 확인하고 있어요.
           </p>
         ) : null}
+        <div ref={endRef} />
       </div>
-      <form onSubmit={submit} className="border-t border-zinc-100 p-4">
-        <label htmlFor="insurance-question" className="sr-only">
-          보험 질문
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="insurance-question"
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder="예: 암 진단비가 얼마예요?"
-            className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600"
-          />
-          <button
-            disabled={!question.trim() || loading}
-            className="rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
-          >
-            질문하기
-          </button>
-        </div>
-        <p className="mt-2 text-[11px] leading-4 text-zinc-400">
-          보상 여부와 약관 조건은 추가 확인이 필요할 수 있어요.
-        </p>
-      </form>
+
+      <div className="border-t border-zinc-100 bg-white p-4">
+        {suggestions.length ? (
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                disabled={loading}
+                onClick={() => void sendQuestion(suggestion)}
+                className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <form onSubmit={submit}>
+          <label htmlFor="insurance-question" className="sr-only">
+            보험 질문
+          </label>
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              id="insurance-question"
+              maxLength={500}
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="예: 상담에서 무엇을 물어보면 좋을까요?"
+              className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600"
+            />
+            <button
+              type="submit"
+              disabled={!question.trim() || loading}
+              className="rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              질문하기
+            </button>
+          </div>
+        </form>
+      </div>
     </aside>
   );
 }

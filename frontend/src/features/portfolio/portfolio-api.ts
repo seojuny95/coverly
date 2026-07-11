@@ -55,7 +55,7 @@ export type PortfolioAnalysisResult = {
   indemnity_coverage_count: number;
   excluded_coverage_count: number;
   excluded_auto_policy_count: number;
-  age: number;
+  age: number | null;
   gender: string;
   life_stage: string;
   prepared_coverages: string[];
@@ -63,6 +63,49 @@ export type PortfolioAnalysisResult = {
   baseline_notice: string;
   classifications: ClassificationAnalysis[];
   notices: string[];
+  evidence?: Array<{
+    id?: string;
+    label?: string;
+    detail?: string;
+    fact?: string;
+    policy_id?: string;
+    insurer?: string;
+    product_name?: string;
+    coverage_name?: string;
+    amount?: number;
+  }>;
+  limitations?: string[];
+  demographics?: {
+    age: number | null;
+    gender: string;
+    source: "policy" | "user" | "unknown";
+  };
+  counselor?: {
+    overview: string;
+    strengths: ReviewItem[];
+    gaps: ReviewItem[];
+    amount_review_items: AmountReviewItem[];
+    next_questions: string[];
+    next_steps: string[];
+  };
+  generation?: "llm" | "fallback";
+};
+
+export type ReviewItem = {
+  title: string;
+  detail: string;
+  evidence_ids: string[];
+};
+
+export type AmountReviewItem = {
+  coverage_name: string;
+  current_amount: number | null;
+  title: string;
+  guidance: string;
+  rationale: string;
+  suggested_range: string | null;
+  confidence: "high" | "medium" | "low";
+  evidence_ids: string[];
 };
 
 export type QaAnswer = {
@@ -73,8 +116,22 @@ export type QaAnswer = {
     insurer?: string;
     product_name?: string;
     coverage_name?: string;
+    evidence_id?: string;
   }>;
   limitations: string[];
+  suggested_questions?: string[];
+  suggestions?: string[];
+  generation?: "llm" | "fallback";
+  sections?: Array<{
+    title: string;
+    content: string;
+    basis: "confirmed_fact" | "general_guidance";
+  }>;
+};
+
+export type ChatHistoryItem = {
+  role: "user" | "assistant";
+  content: string;
 };
 
 async function post<T>(path: string, body: unknown, signal?: AbortSignal) {
@@ -110,12 +167,23 @@ export function requestPortfolioSummary(
 
 export function requestPortfolioAnalysis(
   insuranceDocuments: AnalyzedInsurance[],
-  demographics: { age: number; gender: string },
+  demographics: {
+    age: number;
+    gender: string;
+    source?: "policy" | "user" | "unknown";
+  },
   signal?: AbortSignal,
 ) {
   return post<PortfolioAnalysisResult>(
     "/portfolio/analysis",
-    { policies: toPolicies(insuranceDocuments), ...demographics },
+    {
+      policies: toPolicies(insuranceDocuments),
+      demographics: {
+        age: demographics.age,
+        gender: demographics.gender,
+        source: demographics.source ?? "user",
+      },
+    },
     signal,
   );
 }
@@ -123,9 +191,35 @@ export function requestPortfolioAnalysis(
 export function askPortfolioQuestion(
   question: string,
   insuranceDocuments: AnalyzedInsurance[],
+  history: ChatHistoryItem[],
 ) {
+  const demographics = getPolicyDemographics(insuranceDocuments);
   return post<QaAnswer>("/qa", {
-    question,
+    question: normalizeQuestion(question),
     policies: toPolicies(insuranceDocuments),
+    demographics,
+    history: prepareChatHistory(history),
   });
+}
+
+export function normalizeQuestion(question: string) {
+  return question.trim().slice(0, 500);
+}
+
+export function prepareChatHistory(history: ChatHistoryItem[]) {
+  return history.slice(-12).map((message) => ({
+    role: message.role,
+    content: message.content.slice(0, 1_000),
+  }));
+}
+
+function getPolicyDemographics(insuranceDocuments: AnalyzedInsurance[]) {
+  for (const document of insuranceDocuments) {
+    if (document.result.기본정보?.보험분류?.includes("자동차")) continue;
+    const info = document.result.기본정보?.피보험자정보;
+    if (typeof info?.나이 === "number" && info.성별) {
+      return { age: info.나이, gender: info.성별, source: "policy" as const };
+    }
+  }
+  return { age: null, gender: "미상", source: "unknown" as const };
 }

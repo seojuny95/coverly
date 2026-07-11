@@ -10,4 +10,9 @@ router = APIRouter(tags=["qa"])
 
 @router.post("/qa", response_model=PortfolioQuestionResponse)
 def ask_portfolio_question(request: PortfolioQuestionRequest) -> PortfolioQuestionResponse:
-    return answer_portfolio_question(request.question, request.policies)
+    return answer_portfolio_question(
+        request.question,
+        request.policies,
+        demographics=request.demographics,
+        history=request.history,
+    )

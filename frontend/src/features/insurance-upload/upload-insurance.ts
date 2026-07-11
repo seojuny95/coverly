@@ -20,6 +20,11 @@ export type InsuranceBasicInfo = {
   만기일?: string;
   보험기간?: InsurancePeriod;
   보험료?: InsurancePremium;
+  피보험자정보?: {
+    나이?: number;
+    성별?: string;
+    생애단계?: string;
+  };
 };
 
 export type InsuranceCoverage = {

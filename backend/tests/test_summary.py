@@ -182,6 +182,11 @@ def test_extract_policy_summary_reads_collapsed_pdf_text() -> None:
         llm_extractor=None,
     )
 
+    demographics = result.pop("피보험자정보")
+    assert demographics["성별"] == "남성"
+    assert demographics["생애단계"] == "성인"
+    assert 0 <= demographics["나이"] <= 120
+
     assert result == {
         "상품명": "무배당 프로미라이프 참좋은운전자상해보험(TM)2404",
         "증권번호": "POLICY-TEST-MASKED-001",
