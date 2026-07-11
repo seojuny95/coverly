@@ -144,12 +144,14 @@ describe("portfolio features", () => {
       within(treatmentGroup).getByText(/질병실손의료비/),
     ).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("특정치료비")).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("확인한 금액")).toBeInTheDocument();
     expect(
-      within(treatmentGroup).getByText("실제 손해 기준"),
+      within(treatmentGroup).getByText("합산 보장금액"),
     ).toBeInTheDocument();
     expect(
-      within(treatmentGroup).getByText("가입금액 그대로"),
+      within(treatmentGroup).getByText("실손형 보장"),
+    ).toBeInTheDocument();
+    expect(
+      within(treatmentGroup).getByText("그대로 보는 보장"),
     ).toBeInTheDocument();
     for (const coverageName of ["암치료비", "질병실손의료비", "특정치료비"]) {
       const disclosure = within(treatmentGroup)

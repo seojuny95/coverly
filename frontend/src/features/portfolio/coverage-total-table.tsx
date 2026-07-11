@@ -27,8 +27,8 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
           보험금 합계
         </h2>
         <p className="mt-1 text-sm leading-6 text-zinc-500">
-          같은 보장으로 확인된 금액은 합치고, 따로 봐야 하는 금액은 증권 그대로
-          보여드려요.
+          합산해도 되는 보장은 묶어서 보여드리고, 따로 확인해야 하는 보장은
+          구분해서 보여드려요.
         </p>
       </div>
 

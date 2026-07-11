@@ -73,7 +73,7 @@ export function CoverageSummaryTable({
               금액
             </th>
             <th scope="col" className="px-6 py-3 text-right font-medium">
-              금액 보는 법
+              금액 해석 기준
             </th>
           </tr>
         </thead>
@@ -157,7 +157,7 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right">
-        <CoverageBasis tone="indemnity">실제 손해 기준</CoverageBasis>
+        <CoverageBasis tone="indemnity">실손형 보장</CoverageBasis>
       </td>
     </tr>
   );
@@ -181,7 +181,7 @@ function IndividualCoverage({ row }: { row: IndividualCoverageRow }) {
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right">
-        <CoverageBasis tone="individual">가입금액 그대로</CoverageBasis>
+        <CoverageBasis tone="individual">그대로 보는 보장</CoverageBasis>
       </td>
     </tr>
   );
@@ -295,5 +295,5 @@ function formatWon(amount: number) {
 }
 
 function summedBasisLabel(coverageCount: number) {
-  return coverageCount === 1 ? "확인한 금액" : `${coverageCount}개 금액 합침`;
+  return coverageCount === 1 ? "합산 보장금액" : `${coverageCount}개 합산`;
 }
