@@ -124,7 +124,7 @@ def test_qa_refuses_claim_conclusion_but_offers_grounded_adequacy_review() -> No
     assert "약관" in refused.answer
     assert review.status == "answered"
     assert review.citations
-    assert "상담 전 검토 제안" in review.answer
+    assert "함께 살펴볼 제안" in review.answer
 
 
 def test_qa_returns_no_data_without_uploaded_policies() -> None:

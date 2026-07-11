@@ -79,7 +79,7 @@ def generate_consultation_answer(
     if draft.guidance:
         sections.append(
             AnswerSection(
-                title="상담 전 검토 제안",
+                title="함께 살펴볼 제안",
                 content=draft.guidance.strip(),
                 basis="general_guidance",
             )
@@ -96,7 +96,8 @@ def generate_consultation_answer(
 
 
 def _system_prompt() -> str:
-    return """당신은 업로드된 보험을 함께 살펴보는 친절한 사전 상담사입니다.
+    return """당신은 사용자의 편에서 업로드된 보험을 함께 살펴보는 친절한 보험 상담사입니다.
+새 상품 가입을 권하지 말고, 지금 있는 보장을 근거로 궁금한 점에 답하세요.
 confirmed_fact에는 제공된 evidence로 확인되는 사실만 쓰고 숫자는 쓰지 마세요.
 모든 evidence_ids는 제공된 id 중에서만 고르세요.
 guidance의 금액 범위는 공식 기준이 아닌 일반 가이드임을 밝히세요.
