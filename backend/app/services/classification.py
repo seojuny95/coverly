@@ -101,7 +101,9 @@ def _contains_any(text: str, terms: list[str]) -> bool:
 
 
 def _search_space(text: str, product_name: str | None) -> str:
-    normalized_text = _normalize_text(text)[:_HEAD_CHARS]
+    # Pre-truncate before normalizing so a large PDF does not pay a full-text
+    # pass for a 3,000-char head; 2x covers whitespace removed by normalization.
+    normalized_text = _normalize_text(text[: _HEAD_CHARS * 2])[:_HEAD_CHARS]
     normalized_product_name = _normalize_text(product_name or "")
     return f"{normalized_product_name}\n{normalized_text}".strip()
 

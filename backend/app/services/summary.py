@@ -157,7 +157,7 @@ def extract_local_policy_summary(text: str) -> PolicySummary:
     if coverage_period:
         summary["보험기간"] = coverage_period
 
-    maturity_date = _extract_maturity_date(text, coverage_period)
+    maturity_date = _extract_maturity_date(coverage_period)
     if maturity_date:
         summary["만기일"] = maturity_date
 
@@ -320,7 +320,7 @@ def _extract_policy_number(text: str) -> str | None:
     )
     if inline_value:
         inline_match = policy_number_pattern.search(inline_value)
-        if inline_match:
+        if inline_match and not _is_parenthesized_id_mask(inline_value, inline_match):
             return _clean_value(inline_match.group(0))
 
     for index, line in enumerate(lines):
@@ -567,12 +567,7 @@ def _extract_payment_period(text: str) -> str | None:
     return None
 
 
-def _extract_maturity_date(
-    text: str,
-    coverage_period: CoveragePeriod | None,
-) -> str | None:
-    del text
-
+def _extract_maturity_date(coverage_period: CoveragePeriod | None) -> str | None:
     if coverage_period and coverage_period.get("종료일"):
         return coverage_period["종료일"]
     return None
