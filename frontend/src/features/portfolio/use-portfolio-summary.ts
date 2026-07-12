@@ -1,23 +1,17 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useCallback } from "react";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
 import {
   type PortfolioSummary,
   requestPortfolioSummary,
 } from "./portfolio-api";
+import { portfolioKey } from "./portfolio-key";
 
 type SummaryState =
   | { status: "loading" }
   | { status: "success"; summary: PortfolioSummary }
   | { status: "error" };
-
-function portfolioKey(documents: AnalyzedInsurance[]): string {
-  return documents
-    .map((document) => `${document.id}:${document.result.문자수}`)
-    .join("|");
-}
 
 export function usePortfolioSummary(documents: AnalyzedInsurance[]) {
   const query = useQuery({
@@ -32,9 +26,8 @@ export function usePortfolioSummary(documents: AnalyzedInsurance[]) {
       ? { status: "error" }
       : { status: "loading" };
 
-  const retry = useCallback(() => {
-    void query.refetch();
-  }, [query]);
-
-  return { state, retry };
+  // No useCallback here: query.refetch is already stable, and wrapping the
+  // whole `query` object (which is a fresh reference every render) in
+  // useCallback never actually memoized anything.
+  return { state, retry: () => void query.refetch() };
 }

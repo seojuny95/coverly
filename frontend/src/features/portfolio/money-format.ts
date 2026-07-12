@@ -1,3 +1,9 @@
+// Plain comma-separated won, no 억/만 breakdown — for smaller figures
+// (monthly premiums) where a breakdown would read as overly verbose.
+export function formatWon(amount: number): string {
+  return `${amount.toLocaleString("ko-KR")}원`;
+}
+
 export function formatKoreanWon(amount: number) {
   if (!Number.isFinite(amount)) return "금액 확인 필요";
   if (amount === 0) return "0원";

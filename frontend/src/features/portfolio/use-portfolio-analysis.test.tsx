@@ -36,6 +36,40 @@ describe("usePortfolioAnalysis", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it("refetches when a non-eligible document's content changes", async () => {
+    // auto insurance is excluded from `eligible`, but requestPortfolioAnalysis
+    // still sends the full document set — so a change confined to this
+    // non-eligible document must still bust the cache key.
+    const auto = (문자수: number): AnalyzedInsurance => ({
+      id: "auto-1",
+      fileName: "auto.pdf",
+      result: {
+        status: "accepted",
+        문자수,
+        기본정보: { 보험분류: "자동차" },
+      },
+    });
+    const spy = vi.spyOn(api, "requestPortfolioAnalysis").mockResolvedValue({
+      status: "complete",
+    } as unknown as api.PortfolioAnalysisResult);
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ documents }) =>
+        usePortfolioAnalysis(documents, { age: 35, gender: "남성" }),
+      {
+        initialProps: { documents: [covered, auto(5)] },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    await waitFor(() => expect(result.current.status).toBe("success"));
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    rerender({ documents: [covered, auto(6)] });
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+  });
+
   it("stays idle without demographics", () => {
     const spy = vi.spyOn(api, "requestPortfolioAnalysis");
     const client = makeTestQueryClient();

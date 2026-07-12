@@ -2,11 +2,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
-import { isAnalyzableDocument, isAutoInsurance } from "./analysis-eligibility";
+import { isAnalyzableDocument } from "./analysis-eligibility";
 import {
+  collectPolicyDemographicsCandidates,
   type PortfolioAnalysisResult,
   requestPortfolioAnalysis,
 } from "./portfolio-api";
+import { portfolioKey } from "./portfolio-key";
 
 export type Demographics = {
   age: number;
@@ -20,21 +22,14 @@ export function deriveDemographics(
   documents: AnalyzedInsurance[],
 ): Demographics | null {
   const candidates = new Map<string, Demographics>();
-  for (const document of documents) {
-    if (isAutoInsurance(document.result)) continue;
-    const info = document.result.기본정보?.피보험자정보;
-    if (typeof info?.나이 === "number" && info.성별) {
-      const demographics: Demographics = {
-        age: info.나이,
-        gender: info.성별,
-        lifeStage: info.생애단계,
-        source: "policy",
-      };
-      candidates.set(
-        `${demographics.age}:${demographics.gender}`,
-        demographics,
-      );
-    }
+  for (const candidate of collectPolicyDemographicsCandidates(documents)) {
+    const demographics: Demographics = {
+      age: candidate.age,
+      gender: candidate.gender,
+      lifeStage: candidate.lifeStage,
+      source: "policy",
+    };
+    candidates.set(`${demographics.age}:${demographics.gender}`, demographics);
   }
   if (candidates.size !== 1) return null;
   return candidates.values().next().value ?? null;
@@ -45,14 +40,15 @@ export function usePortfolioAnalysis(
   demographics: Demographics | null,
 ) {
   const eligible = documents.filter(isAnalyzableDocument);
-  const portfolioKey = eligible
-    .map((document) => `${document.id}:${document.result.문자수}`)
-    .join("|");
 
   const query = useQuery({
+    // Keyed on the full document set — requestPortfolioAnalysis sends every
+    // document (not just `eligible`) to the backend, so the cache key must
+    // reflect what's actually in the request body or a change confined to a
+    // non-eligible document would silently serve a stale cached result.
     queryKey: [
       "portfolio-analysis",
-      portfolioKey,
+      portfolioKey(documents),
       demographics?.age,
       demographics?.gender,
     ],

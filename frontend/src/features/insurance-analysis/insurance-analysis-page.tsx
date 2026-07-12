@@ -18,9 +18,11 @@ import insurerLogos from "./insurer-logos.json";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
+  getInsuredPersonName,
   useInsuranceData,
 } from "./insurance-analysis-store";
 import { LeaveGuardLink } from "./leave-guard-link";
+import { normalizeInsurerName } from "./policy-identity";
 import { useBeforeUnloadGuard } from "./use-leave-guard";
 import type {
   InsuranceBasicInfo,
@@ -44,6 +46,7 @@ import {
   usePortfolioAnalysis,
 } from "../portfolio/use-portfolio-analysis";
 import { usePortfolioSummary } from "../portfolio/use-portfolio-summary";
+import { formatWon } from "../portfolio/money-format";
 
 // Lazy-load the chatbot (and its react-markdown dependency) so they stay out of
 // the initial /analysis bundle — it only mounts after the user opens it.
@@ -106,10 +109,6 @@ export function InsuranceAnalysisPage({
     () => groupInsuranceDocuments(insuranceDocuments),
     [insuranceDocuments],
   );
-  const counts = useMemo(
-    () => countInsuranceDocuments(insuranceDocuments),
-    [insuranceDocuments],
-  );
   const portfolioSummary = usePortfolioSummary(insuranceDocuments);
 
   const demographics =
@@ -121,7 +120,7 @@ export function InsuranceAnalysisPage({
   // masking. Use it only when it is unambiguous across the analyzed policies.
   const insuredNames = new Set(
     eligible
-      .map((doc) => doc.result.기본정보?.피보험자?.trim())
+      .map((doc) => getInsuredPersonName(doc))
       .filter((name): name is string => Boolean(name)),
   );
   const insuredName =
@@ -249,7 +248,7 @@ export function InsuranceAnalysisPage({
                     {classification}
                   </dt>
                   <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
-                    {counts[classification] ?? 0}
+                    {groupedInsuranceDocuments[classification]?.length ?? 0}
                   </dd>
                 </div>
               ))}
@@ -509,10 +508,6 @@ function findInsurerLogo(insurerName?: string) {
   );
 }
 
-function normalizeInsurerName(value: string) {
-  return value.replace(/\s+/g, "").replace(/주식회사|\(주\)|㈜/g, "");
-}
-
 function TagBadge({ tag }: { tag: string }) {
   return (
     <span
@@ -538,18 +533,6 @@ function groupInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
   );
 }
 
-function countInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
-  return insuranceDocuments.reduce<Record<string, number>>(
-    (counts, insuranceDocument) => {
-      const classification =
-        insuranceDocument.result.기본정보?.보험분류 ?? "미분류";
-      counts[classification] = (counts[classification] ?? 0) + 1;
-      return counts;
-    },
-    {},
-  );
-}
-
 function formatPeriod(
   period: InsurancePeriod | InsuranceBasicInfo["보험기간"],
 ) {
@@ -562,7 +545,7 @@ function formatPremium(
 ) {
   if (premium?.금액 === undefined) return undefined;
   const cycle = premium.납입주기 ? `${premium.납입주기} ` : "";
-  return `${cycle}${premium.금액.toLocaleString("ko-KR")}원`;
+  return `${cycle}${formatWon(premium.금액)}`;
 }
 
 function formatDateTime(value: string) {

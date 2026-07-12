@@ -337,13 +337,37 @@ export function prepareChatHistory(history: ChatHistoryItem[]) {
   }));
 }
 
-function getPolicyDemographics(insuranceDocuments: AnalyzedInsurance[]) {
+export type PolicyDemographicsCandidate = {
+  age: number;
+  gender: string;
+  lifeStage?: string;
+};
+
+// Shared scan over non-auto policies for usable (age, gender) info. Callers
+// apply their own policy on top: getPolicyDemographics here takes the first
+// match (best-effort, for Q&A context); deriveDemographics in
+// use-portfolio-analysis.ts requires a single unambiguous match across all
+// documents (for the counselor-view demographics that must not silently guess).
+export function collectPolicyDemographicsCandidates(
+  insuranceDocuments: AnalyzedInsurance[],
+): PolicyDemographicsCandidate[] {
+  const candidates: PolicyDemographicsCandidate[] = [];
   for (const document of insuranceDocuments) {
     if (isAutoInsurance(document.result)) continue;
     const info = document.result.기본정보?.피보험자정보;
     if (typeof info?.나이 === "number" && info.성별) {
-      return { age: info.나이, gender: info.성별, source: "policy" as const };
+      candidates.push({
+        age: info.나이,
+        gender: info.성별,
+        lifeStage: info.생애단계,
+      });
     }
   }
-  return { age: null, gender: "미상", source: "unknown" as const };
+  return candidates;
+}
+
+function getPolicyDemographics(insuranceDocuments: AnalyzedInsurance[]) {
+  const [first] = collectPolicyDemographicsCandidates(insuranceDocuments);
+  if (!first) return { age: null, gender: "미상", source: "unknown" as const };
+  return { age: first.age, gender: first.gender, source: "policy" as const };
 }

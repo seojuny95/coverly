@@ -1,3 +1,4 @@
+import { formatWon } from "./money-format";
 import type { PortfolioAnalysisResult } from "./portfolio-api";
 
 export function PortfolioAnalysisResultView({
@@ -192,8 +193,4 @@ function Metric({ label, value }: { label: string; value: string }) {
       <dd className="mt-2 font-semibold text-zinc-900">{value}</dd>
     </div>
   );
-}
-
-function formatWon(amount: number) {
-  return `${amount.toLocaleString("ko-KR")}원`;
 }
