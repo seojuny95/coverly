@@ -1,12 +1,11 @@
-import type {
-  AmountReviewItem,
-  PortfolioAnalysisResult,
-} from "./portfolio-api";
+import type { PortfolioAnalysisResult } from "./portfolio-api";
 
 export function PortfolioAnalysisResultView({
   result,
+  insuredName,
 }: {
   result: PortfolioAnalysisResult;
+  insuredName?: string;
 }) {
   const strengths =
     result.counselor?.strengths ??
@@ -17,7 +16,9 @@ export function PortfolioAnalysisResultView({
       title: item.category,
       detail: item.reason,
     }));
-  const amountReviewItems = result.counselor?.amount_review_items ?? [];
+  const analyzedTitles = (result.sources ?? []).map(
+    (source) => source.product_name || source.insurer || "이름 미확인",
+  );
   const limitations = [
     ...(result.limitations ?? []),
     ...result.notices,
@@ -26,60 +27,85 @@ export function PortfolioAnalysisResultView({
 
   return (
     <div className="space-y-5">
-      {result.status === "partial" ? (
-        <p
-          role="status"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-        >
-          일부 보험은 확인하지 못했어요. 확인된 내용부터 보여드려요.
-        </p>
-      ) : null}
-
       <section className="rounded-2xl border border-blue-100 bg-blue-50/50 p-6 sm:p-8">
         <p className="text-xs font-semibold tracking-[0.12em] text-blue-700 uppercase">
           내 보험 상담
         </p>
-        <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
-          Coverly가 당신 편에서 살펴봤어요
-        </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
-          {result.counselor?.overview ??
-            `${result.life_stage} 기준으로 보험 ${result.policy_count}건에서 확인 가능한 보장을 정리했어요.`}
-        </p>
-        <p className="mt-4 text-xs text-zinc-500">
-          {result.age === null ? "나이 미확인" : `${result.age}세`} ·{" "}
-          {result.gender} · {result.life_stage}
-        </p>
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="text-2xl font-semibold tracking-[-0.04em]">
+            Coverly가 {insuredName ? `${insuredName}님` : "당신"} 편에서
+            살펴봤어요
+          </h2>
+          <span className="text-xs text-zinc-500">
+            {result.age === null ? "나이 미확인" : `${result.age}세`} ·{" "}
+            {result.gender} · {result.life_stage}
+          </span>
+        </div>
         <dl className="mt-6 grid gap-3 sm:grid-cols-3">
-          <Metric label="살펴본 보험" value={`${result.policy_count}개`} />
           <Metric
-            label="확인한 정액 보장"
-            value={`${result.confirmed_total_count}개`}
+            label="중복된 보장"
+            value={`${result.indemnity_duplicate_count}개`}
           />
+          <Metric label="보장 공백" value={`${gaps.length}개`} />
           <Metric
-            label="확인한 보험금 합계"
-            value={formatWon(result.confirmed_total_amount)}
+            label="매달 내는 보험료"
+            value={formatWon(result.premium.monthly_total)}
           />
         </dl>
       </section>
 
+      {analyzedTitles.length ? (
+        <section className="rounded-2xl border border-zinc-200 p-6">
+          <h2 className="text-sm font-semibold">이번 분석에 사용한 보험</h2>
+          <ul className="mt-3 space-y-2 text-sm text-zinc-700">
+            {analyzedTitles.map((title, index) => (
+              <li
+                key={`${title}-${index}`}
+                className="rounded-lg bg-zinc-50 px-3 py-2"
+              >
+                {title}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {result.indemnity_duplicate_count > 0 ? (
+        <section className="rounded-2xl border border-blue-100 bg-blue-50/40 px-5 py-4">
+          <p className="text-sm font-medium text-blue-900">
+            중복 수령이 안 되는데 겹쳐 가입된 보장{" "}
+            {result.indemnity_duplicate_count}건
+          </p>
+          <p className="mt-1 text-xs leading-5 text-blue-700">
+            같은 실손·비례보상 보장은 여러 개 들어도 더 받지 못해요. 정리하면
+            보험료를 아낄 수 있어요.
+          </p>
+        </section>
+      ) : null}
+
       <div className="grid gap-5 lg:grid-cols-2">
         <ReviewCard
           eyebrow="현재 강점"
-          title="증권에서 확인한 준비 항목"
+          title="잘 가입돼 있는 부분"
           items={strengths}
-          empty="현재 데이터에서 뚜렷한 준비 항목을 확인하지 못했어요."
+          empty="현재 데이터에서 뚜렷한 강점을 확인하지 못했어요."
         />
         <ReviewCard
-          eyebrow="보장 공백"
-          title="더 확인해볼 항목"
+          eyebrow="현재 부족한 점"
+          title="과하거나 부족한 부분"
           items={gaps}
-          empty="일반 확인 기준에서 빠진 항목을 찾지 못했어요."
+          empty="지금 데이터에서 과하거나 부족한 점을 찾지 못했어요."
           tone="warning"
         />
       </div>
 
-      <AmountReviewCard items={amountReviewItems} />
+      <section className="rounded-2xl border border-zinc-200 p-6">
+        <p className="text-xs font-semibold text-blue-700">총평</p>
+        <p className="mt-3 text-sm leading-7 text-zinc-700">
+          {result.counselor?.overview ??
+            `${result.life_stage} 기준으로 보험 ${result.policy_count}건에서 확인 가능한 보장을 정리했어요.`}
+        </p>
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <ReviewCard
@@ -100,33 +126,6 @@ export function PortfolioAnalysisResultView({
         />
       </div>
 
-      {result.evidence?.length ? (
-        <section className="rounded-2xl border border-zinc-200 p-6">
-          <h2 className="font-semibold">판단에 사용한 근거</h2>
-          <ul className="mt-4 divide-y divide-zinc-100 text-sm">
-            {result.evidence.map((item, index) => (
-              <li
-                key={item.id ?? `${item.label ?? item.fact}-${index}`}
-                className="py-3 first:pt-0"
-              >
-                <p className="font-medium text-zinc-800">
-                  {item.label ??
-                    ([item.insurer, item.product_name, item.coverage_name]
-                      .filter(Boolean)
-                      .join(" · ") ||
-                      "증권에서 확인한 내용")}
-                </p>
-                {(item.detail ?? item.fact) ? (
-                  <p className="mt-1 leading-6 text-zinc-500">
-                    {item.detail ?? item.fact}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
       <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
         <h2 className="text-sm font-semibold">확인 범위와 한계</h2>
         <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-500">
@@ -141,66 +140,6 @@ export function PortfolioAnalysisResultView({
         </ul>
       </section>
     </div>
-  );
-}
-
-function AmountReviewCard({ items }: { items: AmountReviewItem[] }) {
-  return (
-    <section className="rounded-2xl border border-zinc-200 p-6">
-      <p className="text-xs font-semibold text-blue-700">금액 검토</p>
-      <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
-        보험금 수준을 함께 살펴볼 항목
-      </h2>
-
-      {items.length ? (
-        <ul className="mt-4 space-y-3">
-          {items.map((item, index) => (
-            <li
-              key={`${item.coverage_name}-${index}`}
-              className="rounded-xl bg-zinc-50 px-4 py-3 text-sm"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium text-zinc-800">{item.title}</p>
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-500">
-                  {formatConfidence(item.confidence)}
-                </span>
-              </div>
-
-              <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-500">
-                <div className="flex gap-1.5">
-                  <dt className="text-zinc-400">담보</dt>
-                  <dd className="text-zinc-600">{item.coverage_name}</dd>
-                </div>
-                <div className="flex gap-1.5">
-                  <dt className="text-zinc-400">현재 확인 금액</dt>
-                  <dd className="text-zinc-600">
-                    {item.current_amount === null
-                      ? "없음"
-                      : formatWon(item.current_amount)}
-                  </dd>
-                </div>
-                {item.suggested_range ? (
-                  <div className="flex gap-1.5">
-                    <dt className="text-zinc-400">참고 범위</dt>
-                    <dd className="text-zinc-600">{item.suggested_range}</dd>
-                  </div>
-                ) : null}
-              </dl>
-
-              <p className="mt-2 leading-6 text-zinc-600">{item.guidance}</p>
-              <p className="mt-1 text-xs leading-5 text-zinc-400">
-                {item.rationale}
-              </p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-4 text-sm leading-6 text-zinc-500">
-          현재 구조화된 정보만으로 별도 금액 검토 항목을 만들지 않았어요. 소득과
-          생활비도 함께 살펴보면 좋아요.
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -257,12 +196,4 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function formatWon(amount: number) {
   return `${amount.toLocaleString("ko-KR")}원`;
-}
-
-function formatConfidence(confidence: "high" | "medium" | "low") {
-  return {
-    high: "높은 확신",
-    medium: "보통 확신",
-    low: "낮은 확신",
-  }[confidence];
 }

@@ -66,6 +66,22 @@ _UNSUPPORTED_GUIDANCE_TERMS = _ADEQUACY_TERMS + (
     "꼭 ",
 )
 _MONEY_UNITS = ("억원", "천만원", "백만원", "만원")
+_PAYOUT_OR_OFFICIAL_CLAIMS = (
+    "보험금이 지급",
+    "보험금을 지급",
+    "보상받을 수",
+    "보상 받을 수",
+    "면책이 없",
+    "면책되지 않",
+    "공식 기준",
+)
+_FABRICATED_PERSONAL_FACTS = (
+    "가족력이 있어",
+    "부양가족이 있어",
+    "자녀가 있어",
+    "소득이 높",
+    "소득이 낮",
+)
 
 
 @dataclass(frozen=True)
@@ -205,6 +221,23 @@ def is_safe_general_guidance(text: str) -> bool:
     if any(unit in cleaned for unit in _MONEY_UNITS):
         return False
     return not any(term in cleaned for term in _UNSUPPORTED_GUIDANCE_TERMS)
+
+
+def is_safe_analysis_text(text: str) -> bool:
+    """Allow grounded opinion — amounts, high/low, over/under judgments — while
+    still blocking sales commands, payout/exclusion verdicts, official-standard
+    claims, and fabricated personal facts. Used for the richer strength/gap and
+    overview analysis where adequacy opinions are intended."""
+
+    cleaned = text.strip()
+    if not cleaned:
+        return False
+    compact = " ".join(cleaned.split())
+    if any(term in compact for term in _PAYOUT_OR_OFFICIAL_CLAIMS):
+        return False
+    if any(term in compact for term in _FABRICATED_PERSONAL_FACTS):
+        return False
+    return not any(term in cleaned for term in _DIRECT_ACTION_TERMS)
 
 
 def valid_evidence_ids(evidence_ids: list[str], catalog: EvidenceCatalog) -> tuple[str, ...] | None:

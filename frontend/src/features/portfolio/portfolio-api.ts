@@ -57,8 +57,8 @@ export type PortfolioAnalysisResult = {
   policy_count: number;
   classification_count: number;
   confirmed_total_count: number;
-  confirmed_total_amount: number;
   indemnity_coverage_count: number;
+  indemnity_duplicate_count: number;
   excluded_coverage_count: number;
   excluded_auto_policy_count: number;
   age: number | null;
@@ -66,8 +66,34 @@ export type PortfolioAnalysisResult = {
   life_stage: string;
   prepared_coverages: string[];
   coverage_gaps: Array<{ category: string; reason: string }>;
+  excluded_coverages: Array<{
+    policy_id?: string;
+    insurer?: string;
+    product_name?: string;
+    coverage_name: string;
+    major_category?: string;
+    original_amount?: string;
+    reason: string;
+  }>;
+  premium: {
+    monthly_total: number;
+    monthly_policy_count: number;
+    unconfirmed_policy_count: number;
+    items: Array<{
+      policy_id?: string;
+      insurer?: string;
+      product_name?: string;
+      monthly_amount: number | null;
+      cycle: string | null;
+    }>;
+  };
   baseline_notice: string;
   classifications: ClassificationAnalysis[];
+  sources: Array<{
+    policy_id?: string;
+    insurer?: string;
+    product_name?: string;
+  }>;
   notices: string[];
   evidence?: Array<{
     id?: string;

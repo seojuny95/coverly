@@ -109,6 +109,16 @@ export function InsuranceAnalysisPage({
   const eligible = insuranceDocuments.filter(isAnalyzableDocument);
   const analysisView = usePortfolioAnalysis(insuranceDocuments, demographics);
 
+  // Name stays client-side only (never sent back to the server) to honor PII
+  // masking. Use it only when it is unambiguous across the analyzed policies.
+  const insuredNames = new Set(
+    eligible
+      .map((doc) => doc.result.기본정보?.피보험자?.trim())
+      .filter((name): name is string => Boolean(name)),
+  );
+  const insuredName =
+    insuredNames.size === 1 ? [...insuredNames][0] : undefined;
+
   const toggleInsurance = (policyId: string) => {
     setExpandedInsuranceIds((current) => {
       const next = new Set(current);
@@ -357,6 +367,7 @@ export function InsuranceAnalysisPage({
               needsDemographics={eligible.length > 0 && !demographics}
               onManualDemographics={setManualDemographics}
               onRetry={analysisView.refetch}
+              insuredName={insuredName}
             />
           </div>
         )}

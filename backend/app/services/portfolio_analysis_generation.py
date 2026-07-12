@@ -10,15 +10,25 @@ from app.schemas.analysis import (
     CounselorInsight,
 )
 from app.schemas.consultation import GenerationMode, InsuredDemographics
+from app.services.coverage_purpose import coverage_purpose
 from app.services.coverage_taxonomy import LifeStageCheck, classify_coverage
 from app.services.llm import JsonCompleter, structured_completer
 from app.services.portfolio_consultation import (
     EvidenceCatalog,
-    is_safe_confirmed_fact,
+    is_safe_analysis_text,
     is_safe_general_guidance,
     valid_evidence_ids,
 )
-from app.services.portfolio_summary import PortfolioFacts
+from app.services.portfolio_premium import summarize_premiums
+from app.services.portfolio_summary import (
+    PortfolioFacts,
+    count_duplicate_indemnity_coverages,
+)
+
+# Strengths cite held coverages; gaps may also cite existing coverages/실손 to
+# flag over-insurance, not only missing (gap:) categories.
+_STRENGTH_PREFIXES = ("coverage:", "indemnity:")
+_GAP_PREFIXES = ("gap:", "coverage:", "indemnity:", "excluded:")
 
 
 class _LlmInsight(BaseModel):
@@ -32,6 +42,7 @@ class _LlmAmountReview(BaseModel):
 
 
 class _LlmCounselorDraft(BaseModel):
+    overview: str = Field(default="", max_length=600)
     strengths: list[_LlmInsight] = Field(default_factory=list, max_length=8)
     gaps: list[_LlmInsight] = Field(default_factory=list, max_length=8)
     amount_review_items: list[_LlmAmountReview] = Field(default_factory=list, max_length=8)
@@ -53,15 +64,14 @@ def generate_counselor(
     try:
         raw = (complete or structured_completer(_LlmCounselorDraft))(
             _system_prompt(),
-            _user_prompt(demographics, life_stage_check, catalog),
+            _user_prompt(demographics, life_stage_check, catalog, facts),
         )
         draft = _LlmCounselorDraft.model_validate(raw)
     except Exception:
         return fallback, "fallback"
 
-    strengths = _filter_insights(draft.strengths, catalog, evidence_prefix="coverage:")
-    strengths.extend(_filter_insights(draft.strengths, catalog, evidence_prefix="indemnity:"))
-    gaps = _filter_insights(draft.gaps, catalog, evidence_prefix="gap:")
+    strengths = _filter_insights(draft.strengths, catalog, allowed_prefixes=_STRENGTH_PREFIXES)
+    gaps = _filter_insights(draft.gaps, catalog, allowed_prefixes=_GAP_PREFIXES)
     amount_reviews = _filter_amount_reviews(draft.amount_review_items, catalog)
     next_questions = _filter_guidance_list(draft.next_questions)
     next_steps = _filter_guidance_list(draft.next_steps)
@@ -71,9 +81,13 @@ def generate_counselor(
     if accepted_count == 0:
         return fallback, "fallback"
 
+    overview = draft.overview.strip()
+    if not overview or not is_safe_analysis_text(overview):
+        overview = fallback.overview
+
     return (
         CounselorAnalysis(
-            overview=fallback.overview,
+            overview=overview,
             strengths=strengths or fallback.strengths,
             gaps=gaps or fallback.gaps,
             amount_review_items=amount_reviews or fallback.amount_review_items,
@@ -88,18 +102,18 @@ def _filter_insights(
     drafts: list[_LlmInsight],
     catalog: EvidenceCatalog,
     *,
-    evidence_prefix: str,
+    allowed_prefixes: tuple[str, ...],
 ) -> list[CounselorInsight]:
     insights: list[CounselorInsight] = []
     for draft in drafts:
         evidence_ids = valid_evidence_ids(draft.evidence_ids, catalog)
         if evidence_ids is None:
             continue
-        if any(not evidence_id.startswith(evidence_prefix) for evidence_id in evidence_ids):
+        if any(not evidence_id.startswith(allowed_prefixes) for evidence_id in evidence_ids):
             continue
-        if not is_safe_confirmed_fact(draft.title):
+        if not is_safe_analysis_text(draft.title):
             continue
-        if not is_safe_confirmed_fact(draft.detail):
+        if not is_safe_analysis_text(draft.detail):
             continue
         if not _insight_matches_evidence(draft, evidence_ids, catalog):
             continue
@@ -118,6 +132,9 @@ def _insight_matches_evidence(
     evidence_ids: tuple[str, ...],
     catalog: EvidenceCatalog,
 ) -> bool:
+    """Keep each insight on the topic of what it cites, so amounts and opinions
+    attach to the right coverage instead of a mislabeled one."""
+
     text = f"{draft.title} {draft.detail}"
     claimed_category = classify_coverage(text)
     for evidence_id in evidence_ids:
@@ -181,27 +198,61 @@ def _filter_guidance_list(items: list[str]) -> list[str]:
 
 
 def _system_prompt() -> str:
-    return """당신은 사용자의 편에서 이미 가입한 보험을 함께 살펴보는 보험 상담 분석가입니다.
-새 상품 가입을 권하지 말고, 지금 있는 보장에서 확인·정리할 점을 짚어 주세요.
-반드시 제공된 evidence id와 사실만 가입 사실로 사용하세요.
-strengths와 gaps는 숫자를 쓰지 말고, 모든 항목에 유효한 evidence id를 붙이세요.
-보상 가능 여부, 면책, 보험금 지급 조건은 판단하지 마세요.
-amount_review_items의 현재 담보명과 금액은 직접 쓰지 말고 coverage evidence id만 고르세요.
-amount_review_items에서는 검토할 coverage evidence id만 선택하세요.
-금액 문구와 개인 변수 안내는 서버가 안전한 고정 템플릿으로 조립합니다.
-제공되지 않은 개인 사실을 있다고 가정하지 말고 상품 가입을 지시하지 마세요."""
+    return (
+        "당신은 사용자의 편에서 이미 가입한 보험을 함께 살펴보는 보험 상담 분석가입니다.\n"
+        "목표는 지금 가입한 보험을 최대한 깊이 분석해, 왜 잘 가입돼 있는지(strengths)와 "
+        "무엇이 과하거나 부족한지(gaps)를 근거와 함께 짚는 것입니다.\n\n"
+        "사용할 근거:\n"
+        "- 제공된 evidence의 담보명·금액·건수, category_purposes(담보가 대비하는 상황), "
+        "monthly_premium_total, duplicate_indemnity_count만 사실로 쓰세요.\n"
+        "- 없는 담보·숫자를 지어내지 말고, 인용한 모든 항목에 "
+        "실제 존재하는 evidence id를 붙이세요.\n"
+        "- 각 strengths/gaps 항목은 자신이 인용한 evidence의 담보와 같은 주제여야 합니다.\n\n"
+        "strengths(현재 강점): 확인된 담보가 그 담보가 대비하는 상황과 금액을 기준으로 "
+        "왜 잘 준비돼 있는지 설명하세요.\n"
+        "gaps(현재 부족한 점): 아래를 찾으세요.\n"
+        "1) 중복 과잉 — 오직 실손처럼 금액이 합산되지 않는 보장(비례보상)을 두 곳 이상 들어 "
+        "실제로는 하나만 보상되는 경우만 지적하세요(duplicate_indemnity_count 참고). "
+        "정액 담보(진단비·후유장해·수술비·사망 등)는 여러 건이어도 각각 지급되므로 "
+        "중복이나 과잉으로 지적하지 마세요.\n"
+        "2) 부족 — 이 나이·생애단계에서 흔히 필요한데 확인되지 않은 담보, "
+        "또는 금액이 낮아 보이는 담보.\n"
+        "gaps에는 왜 그런지 이유를 함께 적으세요.\n\n"
+        "금액이 높거나 낮다는 의견, 과하거나 부족하다는 의견은 제시해도 됩니다. "
+        "다만 공식 통계·기준이 있는 것처럼 단정하지 말고 "
+        '"~해 보여요 / 확인해 보면 좋아요"처럼 여지를 두는 톤으로 쓰세요.\n\n'
+        "overview(총평): 전체를 짧게 종합하세요. strengths·gaps에 이미 적은 개별 항목을 "
+        "그대로 되풀이하지 말고, 전반적으로 무엇이 잘 갖춰졌고 무엇을 먼저 살펴보면 "
+        "좋은지 큰 그림만 담으세요.\n\n"
+        "절대 하지 말 것:\n"
+        '- 특정 상품의 가입·해지·증액·감액을 지시하는 말투("~하세요").\n'
+        "- 보험금 지급·보상·면책 여부 단정.\n"
+        "- 제공되지 않은 개인 사실(가족력·소득·자녀 등)을 있다고 가정.\n"
+        "amount_review_items에는 검토할 coverage evidence id만 고르세요. "
+        "금액 문구는 서버가 조립합니다."
+    )
 
 
 def _user_prompt(
     demographics: InsuredDemographics,
     life_stage_check: LifeStageCheck,
     catalog: EvidenceCatalog,
+    facts: PortfolioFacts,
 ) -> str:
+    categories = list(life_stage_check.held) + list(life_stage_check.missing)
+    premium = summarize_premiums(list(facts.policies))
     payload = {
         "demographics": demographics.model_dump(mode="json"),
         "life_stage": life_stage_check.life_stage,
         "confirmed_categories": list(life_stage_check.held),
         "review_categories": list(life_stage_check.missing),
+        "category_purposes": {
+            category: coverage_purpose(category)
+            for category in categories
+            if coverage_purpose(category) is not None
+        },
+        "monthly_premium_total": premium.monthly_total,
+        "duplicate_indemnity_count": count_duplicate_indemnity_coverages(facts.coverage_summary),
         "evidence": [item.model_dump(mode="json") for item in catalog.items],
     }
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

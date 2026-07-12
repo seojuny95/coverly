@@ -200,13 +200,14 @@ def test_analysis_rejects_unknown_evidence_and_risky_claims() -> None:
     assert "made-up" not in rendered
 
 
-def test_analysis_rejects_adequacy_claim_with_valid_matching_evidence() -> None:
+def test_analysis_accepts_grounded_amount_opinion_and_llm_overview() -> None:
     def complete(_system: str, _user: str) -> dict[str, object]:
         return {
+            "overview": "전반적으로 진단 보장이 잘 잡혀 있어요.",
             "strengths": [
                 {
-                    "title": "암 진단 보장이 충분해요",
-                    "detail": "암 진단 담보가 잘 준비되어 있어요",
+                    "title": "암 진단 보장이 잘 준비돼 있어요",
+                    "detail": "암 진단비 3천만원이 확인돼 진단 초기 목돈에 대응할 수 있어요",
                     "evidence_ids": ["coverage:1"],
                 }
             ],
@@ -218,8 +219,39 @@ def test_analysis_rejects_adequacy_claim_with_valid_matching_evidence() -> None:
 
     result = analyze_portfolio(_policies(), demographics=_demographics(), complete=complete)
 
-    assert result.generation == "fallback"
-    assert "충분해요" not in result.model_dump_json()
+    assert result.generation == "llm"
+    assert "잘 준비돼 있어요" in result.model_dump_json()
+    assert result.counselor.overview == "전반적으로 진단 보장이 잘 잡혀 있어요."
+
+
+def test_analysis_still_blocks_sales_commands_and_payout_claims() -> None:
+    def complete(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "overview": "",
+            "strengths": [
+                {
+                    "title": "암 진단 보장을 늘리세요",
+                    "detail": "암 진단비를 증액하세요",
+                    "evidence_ids": ["coverage:1"],
+                },
+                {
+                    "title": "암 진단 담보가 확인돼요",
+                    "detail": "암 진단을 받으면 보험금이 지급됩니다",
+                    "evidence_ids": ["coverage:1"],
+                },
+            ],
+            "gaps": [],
+            "amount_review_items": [],
+            "next_questions": [],
+            "next_steps": [],
+        }
+
+    result = analyze_portfolio(_policies(), demographics=_demographics(), complete=complete)
+
+    rendered = result.model_dump_json()
+    assert "늘리세요" not in rendered
+    assert "증액하세요" not in rendered
+    assert "보험금이 지급됩니다" not in rendered
 
 
 def test_qa_passes_recent_history_and_returns_only_catalog_citations() -> None:

@@ -14,6 +14,7 @@ from app.schemas.analysis import (
 )
 from app.schemas.consultation import Gender, GenerationMode, InsuredDemographics
 from app.schemas.portfolio import PolicyInput
+from app.services.coverage_purpose import coverage_purpose
 from app.services.coverage_taxonomy import LifeStageCheck, check_life_stage
 from app.services.llm import JsonCompleter
 from app.services.portfolio_analysis_generation import generate_counselor
@@ -22,7 +23,12 @@ from app.services.portfolio_consultation import (
     build_evidence_catalog,
 )
 from app.services.portfolio_demographics import resolve_portfolio_demographics
-from app.services.portfolio_summary import PortfolioFacts, build_portfolio_facts
+from app.services.portfolio_premium import summarize_premiums
+from app.services.portfolio_summary import (
+    PortfolioFacts,
+    build_portfolio_facts,
+    count_duplicate_indemnity_coverages,
+)
 
 _UNCLASSIFIED = "미분류"
 
@@ -65,9 +71,10 @@ def analyze_portfolio(
         policy_count=len(facts.policies),
         classification_count=len(classifications),
         confirmed_total_count=len(summary.totals),
-        confirmed_total_amount=sum(item.total_amount for item in summary.totals),
         indemnity_coverage_count=len(summary.indemnity_coverages),
+        indemnity_duplicate_count=count_duplicate_indemnity_coverages(summary),
         excluded_coverage_count=excluded_count,
+        excluded_coverages=list(summary.excluded_coverages),
         excluded_auto_policy_count=summary.excluded_auto_policy_count,
         age=insured.age,
         gender=insured.gender,
@@ -91,6 +98,7 @@ def analyze_portfolio(
         evidence=list(catalog.items),
         notices=notices,
         limitations=limitations,
+        premium=summarize_premiums(list(facts.policies)),
         generation=generation,
     )
 
@@ -124,10 +132,13 @@ def _fallback_counselor(
         evidence_ids = catalog.coverage_ids_by_category.get(category, ())
         if not evidence_ids:
             continue
+        purpose = coverage_purpose(category)
+        confirmed = "지금 증권에서 이 담보의 가입 사실을 확인했어요."
+        detail = f"{purpose} {confirmed}" if purpose else confirmed
         strengths.append(
             CounselorInsight(
                 title=f"{category} 담보가 확인돼요",
-                detail="현재 업로드된 증권에서 해당 담보의 가입 사실을 확인했습니다.",
+                detail=detail,
                 evidence_ids=list(evidence_ids),
             )
         )
@@ -135,13 +146,13 @@ def _fallback_counselor(
     gaps: list[CounselorInsight] = []
     gap_evidence = [item for item in catalog.items if item.id.startswith("gap:")]
     for category, evidence in zip(life_stage_check.missing, gap_evidence, strict=True):
+        purpose = coverage_purpose(category)
+        unconfirmed = "지금 증권에서는 이 성격의 보장이 확인되지 않았어요."
+        detail = f"{purpose} {unconfirmed}" if purpose else unconfirmed
         gaps.append(
             CounselorInsight(
                 title=f"{category} 항목을 확인해 보세요",
-                detail=(
-                    "현재 증권에서는 확인되지 않았어요. 필요 여부는 건강 상태, 예산, "
-                    "기존 자산을 함께 놓고 살펴보는 것이 좋아요."
-                ),
+                detail=detail,
                 evidence_ids=[evidence.id],
             )
         )

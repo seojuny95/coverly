@@ -54,3 +54,4 @@ pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
 - **PR 제목**: 영어로 작성한다. 예: `chore: scaffold Coverly apps and CI`
 - **PR 본문**: 한국어로 작성해도 된다. 요약 · 변경사항 · 결정 및 고민 · 검증 · 후속/범위 밖을 포함한다.
 - 혼자 개발하는 동안에는 `main` 직접 커밋을 기본으로 하고, 큰 변경이나 리뷰가 필요한 경우에만 브랜치/PR을 사용한다.
+- **PR 머지는 스쿼시 머지(squash merge)로 한다.** 브랜치의 커밋들을 하나로 합쳐 `main` 히스토리를 깔끔하게 유지한다.

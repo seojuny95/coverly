@@ -493,3 +493,30 @@ def test_build_portfolio_facts_reuses_the_same_summary_contract() -> None:
 
     assert facts.policies == (policy,)
     assert facts.coverage_summary.totals[0].total_amount == 10_000_000
+
+
+def test_counts_distinct_indemnity_coverages_duplicated_across_insurers() -> None:
+    from app.services.portfolio_summary import count_duplicate_indemnity_coverages
+
+    policies = [
+        _policy("p1", "실손", "보험사A", [{"담보명": "실손의료비", "지급유형": "실손"}]),
+        _policy("p2", "실손", "보험사B", [{"담보명": "실손의료비", "지급유형": "실손"}]),
+        _policy("p3", "실손", "보험사A", [{"담보명": "실손의료비", "지급유형": "실손"}]),
+    ]
+
+    summary = summarize_portfolio_coverages(policies)
+
+    # 3 rows, but one distinct coverage name duplicated across insurers -> count 1
+    assert count_duplicate_indemnity_coverages(summary) == 1
+
+
+def test_indemnity_held_at_single_insurer_is_not_counted_as_duplicate() -> None:
+    from app.services.portfolio_summary import count_duplicate_indemnity_coverages
+
+    policies = [
+        _policy("p1", "실손", "보험사A", [{"담보명": "실손의료비", "지급유형": "실손"}]),
+    ]
+
+    summary = summarize_portfolio_coverages(policies)
+
+    assert count_duplicate_indemnity_coverages(summary) == 0

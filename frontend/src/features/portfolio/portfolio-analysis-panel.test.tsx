@@ -69,8 +69,8 @@ test("renders the result view on success", () => {
     policy_count: 1,
     classification_count: 1,
     confirmed_total_count: 0,
-    confirmed_total_amount: 0,
     indemnity_coverage_count: 0,
+    indemnity_duplicate_count: 0,
     excluded_coverage_count: 0,
     excluded_auto_policy_count: 0,
     age: 35,
@@ -78,8 +78,16 @@ test("renders the result view on success", () => {
     life_stage: "성인",
     prepared_coverages: [],
     coverage_gaps: [],
+    excluded_coverages: [],
+    premium: {
+      monthly_total: 0,
+      monthly_policy_count: 0,
+      unconfirmed_policy_count: 0,
+      items: [],
+    },
     baseline_notice: "참고 정보예요.",
     classifications: [],
+    sources: [{ product_name: "테스트건강보험" }],
     notices: [],
     counselor: {
       overview: "상담 전에 확인한 요약이에요.",
@@ -96,13 +104,15 @@ test("renders the result view on success", () => {
       {...baseProps()}
       status="success"
       result={result}
+      insuredName="다라"
     />,
   );
 
   expect(
-    screen.getByText("Coverly가 당신 편에서 살펴봤어요"),
+    screen.getByText("Coverly가 다라님 편에서 살펴봤어요"),
   ).toBeInTheDocument();
   expect(screen.getByText("상담 전에 확인한 요약이에요.")).toBeInTheDocument();
+  expect(screen.getByText("테스트건강보험")).toBeInTheDocument();
 });
 
 test("calls onRetry from the error state", async () => {

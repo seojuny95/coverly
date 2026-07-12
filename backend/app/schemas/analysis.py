@@ -11,7 +11,7 @@ from app.schemas.consultation import (
     GenerationMode,
     InsuredDemographics,
 )
-from app.schemas.portfolio import PolicyInput
+from app.schemas.portfolio import ExcludedCoverageItem, PolicyInput
 
 
 class PortfolioAnalysisRequest(BaseModel):
@@ -85,14 +85,30 @@ class CounselorAnalysis(BaseModel):
     next_steps: list[str]
 
 
+class PremiumPolicyItem(BaseModel):
+    policy_id: str | None
+    insurer: str | None
+    product_name: str | None
+    monthly_amount: int | None
+    cycle: str | None
+
+
+class PremiumOverview(BaseModel):
+    monthly_total: int
+    monthly_policy_count: int
+    unconfirmed_policy_count: int
+    items: list[PremiumPolicyItem]
+
+
 class PortfolioAnalysisResponse(BaseModel):
     status: Literal["complete", "partial", "empty"]
     policy_count: int
     classification_count: int
     confirmed_total_count: int
-    confirmed_total_amount: int
     indemnity_coverage_count: int
+    indemnity_duplicate_count: int
     excluded_coverage_count: int
+    excluded_coverages: list[ExcludedCoverageItem]
     excluded_auto_policy_count: int
     age: int | None
     gender: str
@@ -107,4 +123,5 @@ class PortfolioAnalysisResponse(BaseModel):
     evidence: list[ConsultationEvidence]
     notices: list[str]
     limitations: list[str]
+    premium: PremiumOverview
     generation: GenerationMode

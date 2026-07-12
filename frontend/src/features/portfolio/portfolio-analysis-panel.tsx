@@ -35,6 +35,7 @@ export function PortfolioAnalysisPanel({
   needsDemographics,
   onManualDemographics,
   onRetry,
+  insuredName,
 }: {
   status: "idle" | "loading" | "success" | "error";
   result?: PortfolioAnalysisResult;
@@ -43,6 +44,7 @@ export function PortfolioAnalysisPanel({
   needsDemographics: boolean;
   onManualDemographics: (value: Demographics) => void;
   onRetry: () => void;
+  insuredName?: string;
 }) {
   if (eligibleCount === 0) {
     return <InfoState {...EMPTY_COPY[emptyReason]} />;
@@ -71,7 +73,9 @@ export function PortfolioAnalysisPanel({
       </section>
     );
 
-  return <PortfolioAnalysisResultView result={result!} />;
+  return (
+    <PortfolioAnalysisResultView result={result!} insuredName={insuredName} />
+  );
 }
 
 function DemographicsForm({

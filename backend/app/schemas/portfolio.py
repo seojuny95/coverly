@@ -36,6 +36,15 @@ class PolicyInsuredDemographicsInput(BaseModel):
         return self
 
 
+class PremiumInput(BaseModel):
+    """Policy-level premium as carried by the parse result."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    금액: int | None = Field(default=None, ge=0)
+    납입주기: str | None = None
+
+
 class PolicyInfoInput(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -43,6 +52,7 @@ class PolicyInfoInput(BaseModel):
     상품명: str | None = None
     보험분류: str | None = None
     피보험자정보: PolicyInsuredDemographicsInput | None = None
+    보험료: PremiumInput | None = None
 
 
 class PolicyInput(BaseModel):

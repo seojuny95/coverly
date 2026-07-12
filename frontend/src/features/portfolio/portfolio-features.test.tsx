@@ -228,8 +228,20 @@ describe("portfolio features", () => {
             policy_count: 1,
             classification_count: 1,
             confirmed_total_count: 1,
-            confirmed_total_amount: 10_000_000,
             indemnity_coverage_count: 0,
+            indemnity_duplicate_count: 1,
+            excluded_coverages: [
+              {
+                coverage_name: "알 수 없는 담보",
+                reason: "담보명을 분류하지 못해 합계에는 더하지 않았어요.",
+              },
+            ],
+            premium: {
+              monthly_total: 80000,
+              monthly_policy_count: 2,
+              unconfirmed_policy_count: 0,
+              items: [],
+            },
             excluded_coverage_count: 0,
             excluded_auto_policy_count: 0,
             age: 35,
@@ -309,9 +321,7 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
-    expect((await screen.findAllByText("10,000,000원")).length).toBeGreaterThan(
-      0,
-    );
+    await screen.findByText("Coverly가 당신 편에서 살펴봤어요");
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/portfolio/analysis"),
       expect.objectContaining({
@@ -332,9 +342,11 @@ describe("portfolio features", () => {
     expect(
       screen.getByText("증권에서 암 진단비를 확인했어요."),
     ).toBeInTheDocument();
-    expect(screen.getByText("암 진단비 금액")).toBeInTheDocument();
-    expect(screen.getByText("생활비와 함께 확인해보세요.")).toBeInTheDocument();
-    expect(screen.getByText(/보통 확신/)).toBeInTheDocument();
+    expect(screen.getByText("매달 내는 보험료")).toBeInTheDocument();
+    expect(screen.getByText("80,000원")).toBeInTheDocument();
+    expect(
+      screen.getByText(/중복 수령이 안 되는데 겹쳐 가입된 보장 1건/),
+    ).toBeInTheDocument();
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
     >;
@@ -360,8 +372,8 @@ describe("portfolio features", () => {
           policy_count: 1,
           classification_count: 1,
           confirmed_total_count: 1,
-          confirmed_total_amount: 10_000_000,
           indemnity_coverage_count: 0,
+          indemnity_duplicate_count: 0,
           excluded_coverage_count: 0,
           excluded_auto_policy_count: 0,
           age: 35,
@@ -369,6 +381,13 @@ describe("portfolio features", () => {
           life_stage: "성인",
           prepared_coverages: [],
           coverage_gaps: [],
+          excluded_coverages: [],
+          premium: {
+            monthly_total: 0,
+            monthly_policy_count: 0,
+            unconfirmed_policy_count: 0,
+            items: [],
+          },
           baseline_notice: "참고 정보예요.",
           classifications: [],
           counselor: {
@@ -475,8 +494,15 @@ describe("portfolio features", () => {
             policy_count: 1,
             classification_count: 1,
             confirmed_total_count: 0,
-            confirmed_total_amount: 0,
             indemnity_coverage_count: 0,
+            indemnity_duplicate_count: 0,
+            excluded_coverages: [],
+            premium: {
+              monthly_total: 0,
+              monthly_policy_count: 0,
+              unconfirmed_policy_count: 0,
+              items: [],
+            },
             excluded_coverage_count: 0,
             excluded_auto_policy_count: 0,
             age: 35,

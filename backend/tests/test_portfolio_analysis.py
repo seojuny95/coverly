@@ -34,7 +34,6 @@ def test_analysis_returns_overall_and_classification_facts() -> None:
     assert result.status == "complete"
     assert result.policy_count == 2
     assert result.classification_count == 2
-    assert result.confirmed_total_amount == 31_000_000
     assert [(item.classification, item.policy_count) for item in result.classifications] == [
         ("상해", 1),
         ("질병", 1),
@@ -199,3 +198,70 @@ def test_analysis_compares_held_coverages_with_life_stage_checklist() -> None:
         "사망",
         "상해 후유장해",
     }
+
+
+def test_analysis_reports_indemnity_duplicate_count() -> None:
+    def _indemnity(policy_id: str, insurer: str) -> PolicyInput:
+        return PolicyInput.model_validate(
+            {
+                "id": policy_id,
+                "기본정보": {"보험사": insurer, "상품명": f"상품-{policy_id}", "보험분류": "실손"},
+                "보장목록": [{"담보명": "실손의료비", "지급유형": "실손"}],
+            }
+        )
+
+    result = analyze_portfolio(
+        [_indemnity("p1", "보험사A"), _indemnity("p2", "보험사B")], age=35, gender="여성"
+    )
+
+    assert result.indemnity_duplicate_count == 1
+
+
+def test_analysis_exposes_excluded_coverage_ledger_with_reasons() -> None:
+    partial = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "테스트보험", "상품명": "상품-p1", "보험분류": "질병"},
+            "보장목록": [{"담보명": "알 수 없는 담보", "가입금액": "별도 약정"}],
+        }
+    )
+
+    result = analyze_portfolio([partial], age=35, gender="여성")
+
+    assert result.excluded_coverage_count == len(result.excluded_coverages)
+    assert result.excluded_coverages[0].coverage_name == "알 수 없는 담보"
+    assert result.excluded_coverages[0].reason
+
+
+def test_analysis_reports_monthly_premium_total() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {
+                "보험사": "테스트보험",
+                "상품명": "상품-p1",
+                "보험분류": "질병",
+                "보험료": {"금액": 30000, "납입주기": "월납"},
+            },
+            "보장목록": [{"담보명": "암진단비", "가입금액": "3,000만원", "지급유형": "정액"}],
+        }
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert result.premium.monthly_total == 30000
+    assert result.premium.monthly_policy_count == 1
+
+
+def test_fallback_gaps_explain_why() -> None:
+    def _boom(*_: object) -> dict[str, object]:
+        raise RuntimeError("force fallback")
+
+    held = _policy("p1", "질병", "암진단비", "3,000만원")
+    result = analyze_portfolio([held], age=35, gender="여성", complete=_boom)
+
+    # A single-coverage policy leaves most life-stage essentials missing, so gaps
+    # are non-empty and every missing category has a purpose sentence.
+    assert result.generation == "fallback"
+    gap_details = " ".join(item.detail for item in result.counselor.gaps)
+    assert "성격이에요" in gap_details

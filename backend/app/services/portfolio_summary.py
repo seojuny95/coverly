@@ -241,6 +241,19 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
     )
 
 
+def count_duplicate_indemnity_coverages(summary: PortfolioCoverageSummary) -> int:
+    """Count distinct indemnity coverage names duplicated across ≥2 insurers.
+
+    Duplicated indemnity coverage cannot pay out more (비례보상), so this is the
+    'can be tidied up' signal — counted by distinct coverage, not by row.
+    """
+
+    duplicated = {
+        item.normalized_name for item in summary.indemnity_coverages if item.cross_insurer_duplicate
+    }
+    return len(duplicated)
+
+
 def build_portfolio_facts(policies: list[PolicyInput]) -> PortfolioFacts:
     """Build the deterministic common input for summary, analysis, and Q&A."""
 
