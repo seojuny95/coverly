@@ -219,7 +219,7 @@ export default function Home() {
         <CoverlyLogo className="absolute top-6 left-6 lg:left-8" />
 
         <div className="mb-6">
-          <PixelEyebrow>보험을 팔지 않는 보험 분석</PixelEyebrow>
+          <PixelEyebrow>보험을 팔지 않는 AI 보험 분석</PixelEyebrow>
         </div>
 
         <h1 className="max-w-5xl text-[2.25rem] leading-[1.04] font-semibold tracking-[-0.075em] [word-break:keep-all] text-zinc-950 sm:text-[clamp(3.5rem,7.2vw,6.7rem)] sm:leading-[1.01]">
@@ -230,7 +230,7 @@ export default function Home() {
         </h1>
 
         <p className="mt-7 max-w-2xl text-base leading-7 [word-break:keep-all] text-zinc-600 sm:text-lg sm:leading-8">
-          여러 보험사에 나뉜 가입 내역을 연결해 보장별로 정리하고,
+          여러 보험사에 나뉜 가입 내역을 AI가 연결해 보장별로 정리하고,
           <br className="hidden sm:block" /> 모든 내용에 확인한 근거를 함께
           보여드려요.
         </p>
@@ -257,7 +257,8 @@ const dontDoItems = [
   },
   {
     title: "추측하지 않아요",
-    description: "약관에서 확인한 내용만 말해요. 확인이 안 되면 모른다고 해요.",
+    description:
+      "AI가 약관에서 확인한 내용만 말해요. 확인이 안 되면 모른다고 해요.",
   },
   {
     title: "개인정보를 남기지 않아요",

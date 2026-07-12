@@ -6,7 +6,7 @@ FastAPI + uv 백엔드. 전체 프로젝트 가이드: [../AGENTS.md](../AGENTS.
 
 ## 프로젝트 소개
 
-보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 엔드포인트는 두 갈래다: 증권 1건을 처리하는 파싱 파이프라인(`POST /policies/parse`)과, 파싱 결과 여러 건을 묶어 다루는 포트폴리오 기능(`POST /portfolio/summary`·`/portfolio/analysis`·`POST /qa`).
+Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 분류·상담·Q&A 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 엔드포인트는 두 갈래다: 증권 1건을 처리하는 파싱 파이프라인(`POST /policies/parse`)과, 파싱 결과 여러 건을 묶어 다루는 포트폴리오 기능(`POST /portfolio/summary`·`/portfolio/analysis`·`POST /qa`).
 
 ## Development Commands
 

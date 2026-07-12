@@ -325,7 +325,7 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
-    await screen.findByText("Coverly가 당신 편에서 살펴봤어요");
+    await screen.findByText("Coverly AI가 당신 편에서 살펴봤어요");
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/portfolio/analysis"),
       expect.objectContaining({
@@ -538,7 +538,7 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
-    await screen.findByText("Coverly가 당신 편에서 살펴봤어요");
+    await screen.findByText("Coverly AI가 당신 편에서 살펴봤어요");
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
     >;

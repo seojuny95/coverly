@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Coverly — 보험은 흩어져 있어도, 이해는 한 번에",
+  title: "Coverly AI — 보험은 흩어져 있어도, 이해는 한 번에",
   description:
-    "여러 보험사에 나뉜 가입 내역을 찾아 연결하고, 보장 범위와 중복을 근거와 함께 분석해요.",
+    "여러 보험사에 나뉜 가입 내역을 AI가 찾아 연결하고, 보장 범위와 중복을 근거와 함께 분석해요.",
 };
 
 export default function RootLayout({

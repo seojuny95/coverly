@@ -19,7 +19,7 @@ export function CoverlyMark() {
   return (
     <>
       <span className="text-[19px] font-semibold tracking-[-0.065em] text-zinc-950">
-        coverly
+        coverly<span className="text-blue-600"> AI</span>
       </span>
       <span
         className="size-1.5 translate-y-0.5 bg-blue-600 shadow-[3px_3px_0_#dbeafe]"
@@ -34,7 +34,7 @@ export function CoverlyLogo({ className = "" }: { className?: string }) {
     <Link
       href="/"
       className={`${coverlyLogoLinkClassName} ${className}`}
-      aria-label="Coverly 홈"
+      aria-label="Coverly AI 홈"
     >
       <CoverlyMark />
     </Link>

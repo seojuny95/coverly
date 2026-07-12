@@ -8,7 +8,7 @@ Next.js App Router + TypeScript 프론트엔드. 전체 프로젝트 가이드: 
 
 ## 프로젝트 소개
 
-Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 종류별 정리·보험금 합계·상담 전 검토·근거 기반 Q&A를 보여준다. "보험을 팔지 않는 내 편 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
+Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 AI가 정리한 종류별 정리·보험금 합계·상담 전 검토·근거 기반 Q&A를 보여준다. "보험을 팔지 않는 내 편 AI 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
 
 ## Development Commands
 

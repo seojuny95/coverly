@@ -109,7 +109,7 @@ test("renders the result view on success", () => {
   );
 
   expect(
-    screen.getByText("Coverly가 다라님 편에서 살펴봤어요"),
+    screen.getByText("Coverly AI가 다라님 편에서 살펴봤어요"),
   ).toBeInTheDocument();
   expect(screen.getByText("상담 전에 확인한 요약이에요.")).toBeInTheDocument();
   expect(screen.getByText("테스트건강보험")).toBeInTheDocument();

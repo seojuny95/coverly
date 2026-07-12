@@ -1,4 +1,4 @@
-# Coverly frontend
+# Coverly AI frontend
 
 Next.js App Router 기반 프론트엔드 앱이다.
 

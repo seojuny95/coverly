@@ -29,11 +29,11 @@ export function PortfolioAnalysisResultView({
     <div className="space-y-5">
       <section className="rounded-2xl border border-blue-100 bg-blue-50/50 p-6 sm:p-8">
         <p className="text-xs font-semibold tracking-[0.12em] text-blue-700 uppercase">
-          내 보험 상담
+          AI 보험 상담
         </p>
         <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 className="text-2xl font-semibold tracking-[-0.04em]">
-            Coverly가 {insuredName ? `${insuredName}님` : "당신"} 편에서
+            Coverly AI가 {insuredName ? `${insuredName}님` : "당신"} 편에서
             살펴봤어요
           </h2>
           <span className="text-xs text-zinc-500">
@@ -130,7 +130,7 @@ export function PortfolioAnalysisResultView({
         <h2 className="text-sm font-semibold">확인 범위와 한계</h2>
         <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-500">
           <li className="font-medium text-zinc-700">
-            · Coverly는 보험을 팔지 않아요. 겹치거나 불필요한 보장을 먼저
+            · Coverly AI는 보험을 팔지 않아요. 겹치거나 불필요한 보장을 먼저
             알려드려요.
           </li>
           {limitations.map((item, index) => (

@@ -27,7 +27,7 @@ export function InsuranceChatbot({
     {
       id: 0,
       role: "assistant",
-      text: "궁금한 내용을 물어보세요. 올린 보험증권에서 확인한 사실을 근거로 답할게요. Coverly는 보험을 팔지 않아요.",
+      text: "궁금한 내용을 물어보세요. AI가 올린 보험증권에서 확인한 사실을 근거로 답할게요. Coverly AI는 보험을 팔지 않아요.",
       limitations: [
         "자동차보험과 약관이 필요한 보상 판단은 답변에서 제외해요.",
       ],

@@ -152,7 +152,7 @@ export function InsuranceAnalysisPage({
             분석할 보험증권이 없어요
           </h1>
           <p className="mt-3 text-sm leading-6 text-zinc-500">
-            보험증권 PDF를 올리면 정리한 결과를 여기에서 볼 수 있어요.
+            보험증권 PDF를 올리면 AI가 정리한 결과를 여기에서 볼 수 있어요.
           </p>
           <Link href="/upload" className={`mt-6 ${primaryButtonClassName}`}>
             보험증권 올리기
@@ -170,7 +170,7 @@ export function InsuranceAnalysisPage({
           enabled={hasData}
           onLeave={clear}
           className={coverlyLogoLinkClassName}
-          ariaLabel="Coverly 홈"
+          ariaLabel="Coverly AI 홈"
         >
           <CoverlyMark />
         </LeaveGuardLink>
