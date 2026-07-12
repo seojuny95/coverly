@@ -162,16 +162,22 @@ export function InsuranceUploadForm({
   ) => {
     const failedIds = new Set(files.map((file) => file.id));
     setSelectedUploadFiles((current) =>
-      current.map((selectedFile) =>
-        failedIds.has(selectedFile.id)
-          ? {
-              ...selectedFile,
-              status: "failed",
-              errorCode: code,
-              errorMessage: message,
-            }
-          : selectedFile,
-      ),
+      current.map((selectedFile) => {
+        if (failedIds.has(selectedFile.id)) {
+          return {
+            ...selectedFile,
+            status: "failed",
+            errorCode: code,
+            errorMessage: message,
+          };
+        }
+        // This aborts the batch, so clear the transient "reading" state set at
+        // submit — untouched files must not stay stuck mid-read.
+        if (selectedFile.status === "reading") {
+          return { ...selectedFile, status: "idle" as const };
+        }
+        return selectedFile;
+      }),
     );
     setError(
       `${message} ${files
@@ -211,10 +217,15 @@ export function InsuranceUploadForm({
     setSelectedName("");
     let shouldKeepProgress = false;
     try {
+      const fileFingerprints = await Promise.all(
+        selectedUploadFiles.map((selectedFile) =>
+          createFileFingerprint(selectedFile.file),
+        ),
+      );
+
       // Reject files whose bytes are not actually a PDF (e.g. an image renamed
-      // to .pdf) before hashing or uploading — the cheap 1KB magic-byte check
-      // runs first so a doomed large file is never fully read + hashed. The
-      // backend re-validates content and remains the authoritative gate.
+      // to .pdf). The backend re-validates content and remains the authoritative
+      // gate; this is fast client-side feedback.
       const contentIsPdf = await Promise.all(
         selectedUploadFiles.map((selectedFile) =>
           fileHasPdfMagic(selectedFile.file),
@@ -234,13 +245,6 @@ export function InsuranceUploadForm({
         );
         return;
       }
-
-      // Only the surviving valid PDFs get the full read + SHA-256 hash.
-      const fileFingerprints = await Promise.all(
-        selectedUploadFiles.map((selectedFile) =>
-          createFileFingerprint(selectedFile.file),
-        ),
-      );
 
       // Catch byte-identical re-uploads before spending a full parse + LLM pass.
       const byteIdenticalIndexes = findByteIdenticalDuplicateIndexes({

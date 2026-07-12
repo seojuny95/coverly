@@ -14,7 +14,7 @@ describe("hasPdfMagicBytes", () => {
   });
 
   it("rejects non-PDF content", () => {
-    expect(hasPdfMagicBytes(encode("PKzip-content"))).toBe(false);
+    expect(hasPdfMagicBytes(encode("PKzip-content"))).toBe(false);
     expect(hasPdfMagicBytes(encode("<html></html>"))).toBe(false);
     expect(hasPdfMagicBytes(new Uint8Array())).toBe(false);
   });
@@ -29,7 +29,7 @@ describe("fileHasPdfMagic", () => {
   });
 
   it("is false for a non-PDF renamed to .pdf", async () => {
-    const file = new File([encode("PNG\r\n")], "not-really.pdf", {
+    const file = new File([encode("PNG\r\n")], "not-really.pdf", {
       type: "application/pdf",
     });
     expect(await fileHasPdfMagic(file)).toBe(false);

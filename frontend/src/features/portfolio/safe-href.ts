@@ -4,13 +4,23 @@
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "tel:", "mailto:"]);
 const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
+function stripControlChars(value: string): string {
+  // Browsers strip ASCII control chars (including leading ones) from URL
+  // attributes before parsing, so "\x01javascript:" or "java\tscript:" would
+  // execute as javascript:. Drop all C0 controls + DEL so the scheme check
+  // below can't be bypassed by hiding a scheme behind a control byte.
+  return Array.from(value)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      return code > 0x1f && code !== 0x7f;
+    })
+    .join("");
+}
+
 export function safeHref(href: string | undefined): string | undefined {
   if (!href) return undefined;
 
-  // Browsers strip ASCII tab/newline/CR from URL attributes before parsing, so
-  // "java\tscript:alert(1)" would execute as javascript:. Strip them the same
-  // way first, then evaluate — otherwise the scheme check is trivially bypassed.
-  const cleaned = href.replace(/[\t\n\r]/g, "").trim();
+  const cleaned = stripControlChars(href).trim();
   if (cleaned === "") return undefined;
 
   // Protocol-relative ("//host") and backslash-authority ("/\\host", "\\\\host")

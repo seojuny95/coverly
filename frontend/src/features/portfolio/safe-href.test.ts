@@ -30,8 +30,10 @@ describe("safeHref", () => {
       safeHref("data:text/html,<script>alert(1)</script>"),
     ).toBeUndefined();
     expect(safeHref("vbscript:msgbox(1)")).toBeUndefined();
-    // Tab/newline/CR are stripped before the scheme check, so this can't
-    // smuggle a javascript: scheme past the allowlist.
+    // Control chars are stripped before the scheme check, so a scheme hidden
+    // behind a leading C0 byte (or a tab inside it) can't slip past.
+    expect(safeHref("\x01javascript:alert(1)")).toBeUndefined();
+    expect(safeHref("\x00//evil.com")).toBeUndefined();
     expect(safeHref("java\tscript:alert(1)")).toBeUndefined();
   });
 
