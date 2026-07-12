@@ -23,6 +23,7 @@ from app.services.llm import JsonCompleter, TextStreamer
 from app.services.portfolio_consultation import (
     EvidenceCatalog,
     build_evidence_catalog,
+    with_session_evidence,
 )
 from app.services.portfolio_demographics import resolve_portfolio_demographics
 from app.services.portfolio_qa_generation import (
@@ -36,6 +37,7 @@ from app.services.portfolio_summary import (
     is_auto_policy,
 )
 from app.services.rag.answer import RagAnswer, RagCitation, answer_official_question
+from app.services.session_rag import retrieve_policy_context
 
 # "How do I claim?" is procedural — answer with the deterministic channel directory.
 _CLAIM_HOWTO_TERMS = ("청구", "신청", "접수", "서류")
@@ -108,6 +110,7 @@ def answer_portfolio_question(
         return _with_demographics(channels, insured)
 
     fallback = _consultation_fallback(facts, insured, life_stage_check, catalog)
+    catalog = _with_session_context(catalog, policies, normalized_question)
     response = generate_consultation_answer(
         fallback=fallback,
         question=normalized_question,
@@ -197,6 +200,7 @@ def stream_portfolio_answer(
     fallback = _with_demographics(
         _consultation_fallback(facts, insured, life_stage_check, catalog), insured
     )
+    catalog = _with_session_context(catalog, policies, normalized_question)
     limitations = list(_standard_limitations(facts))
     notice = _demographic_notice(insured)
     if notice:
@@ -241,6 +245,17 @@ def _claim_targets(
             # the shared classifier's result, not a brittle 지급유형 == "실손" match.
             targets.append((normalized, insurer, normalized in medical_indemnity_names))
     return targets
+
+
+def _with_session_context(
+    catalog: EvidenceCatalog,
+    policies: list[PolicyInput],
+    question: str,
+) -> EvidenceCatalog:
+    session_ids = [policy.문서세션ID for policy in policies if policy.문서세션ID is not None]
+    if not session_ids:
+        return catalog
+    return with_session_evidence(catalog, retrieve_policy_context(session_ids, question))
 
 
 def _answer_with_official_rag(

@@ -1,7 +1,7 @@
 from app.services.rag.chunking import RagChunk, build_chunks
 from app.services.rag.eval import evaluate_retrieval, load_retrieval_eval_cases
 from app.services.rag.official_sources import rag_sources, verify_downloaded_sources
-from app.services.rag.retrieve import infer_profile, retrieve
+from app.services.rag.retrieve import ModelReranker, infer_profile, load_official_chunks, retrieve
 
 
 def test_rag_sources_are_verified_and_small() -> None:
@@ -10,6 +10,8 @@ def test_rag_sources_are_verified_and_small() -> None:
     assert {source.id for source in sources} == {
         "standard_terms_annex_15_2026_06_30",
         "fsc_policy_terms_roadmap_2019_10_22",
+        "insurance_business_act",
+        "financial_consumer_protection_act",
     }
     assert verify_downloaded_sources() == []
 
@@ -69,6 +71,45 @@ def test_retrieve_uses_profile_aware_reranking() -> None:
     assert hits[0].rerank_score > hits[0].keyword_score
 
 
+def test_model_reranker_can_reorder_candidates() -> None:
+    chunks = (
+        RagChunk(
+            id="first",
+            source_id="standard_terms_annex_15_2026_06_30",
+            source_title="표준약관",
+            source_category="standard_clause",
+            publisher="금융감독원",
+            text="보험금의 지급사유를 확인합니다.",
+            page_start=1,
+            page_end=1,
+            label="지급사유",
+        ),
+        RagChunk(
+            id="second",
+            source_id="insurance_business_act",
+            source_title="보험업법",
+            source_category="law",
+            publisher="국가법령정보센터",
+            text="보험금 감액 또는 지급하지 아니하는 경우 사유를 설명하여야 합니다.",
+            page_start=1,
+            page_end=1,
+            label="설명의무",
+        ),
+    )
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {"ranked": [{"chunk_id": "second"}, {"chunk_id": "first"}]}
+
+    hits = retrieve(
+        "보험금을 감액할 때 설명해야 해?",
+        chunks=chunks,
+        profile="claim_check",
+        reranker=ModelReranker(complete),
+    )
+
+    assert [hit.chunk.id for hit in hits[:2]] == ["second", "first"]
+
+
 def test_infer_profile_routes_claim_checks_to_claim_profile() -> None:
     assert infer_profile("암이면 보험금 받을 수 있어?") == "claim_check"
     assert infer_profile("면책이 뭐야?") == "claim_check"
@@ -79,5 +120,13 @@ def test_retrieval_eval_fixture_passes_current_small_corpus() -> None:
     cases = load_retrieval_eval_cases()
     report = evaluate_retrieval(cases)
 
-    assert report.total == 3
+    assert report.total == 6
     assert report.recall == 1.0, report.results
+
+
+def test_law_snapshots_are_loaded_as_rag_chunks() -> None:
+    chunks = load_official_chunks()
+    law_chunks = [chunk for chunk in chunks if chunk.source_id == "insurance_business_act"]
+
+    assert law_chunks
+    assert any("보험상품" in chunk.text for chunk in law_chunks)

@@ -4,6 +4,7 @@ from fastapi import APIRouter, UploadFile
 
 from app.errors import ApiError
 from app.services.pipeline import EmptyTextError, run_pipeline
+from app.services.session_rag import delete_policy_session
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
@@ -42,3 +43,9 @@ async def parse_policy(file: UploadFile) -> dict[str, object]:
             message="PDF에서 텍스트를 추출할 수 없습니다.",
         ) from None
     return {"status": "accepted", **result}
+
+
+@router.delete("/sessions/{session_id}")
+def delete_policy_text_session(session_id: str) -> dict[str, str]:
+    delete_policy_session(session_id)
+    return {"status": "deleted"}

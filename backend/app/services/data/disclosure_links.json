@@ -1,0 +1,22 @@
+{
+  "association_links": [
+    {
+      "kind": "life",
+      "name": "생명보험협회 공시실",
+      "url": "https://www.klia.or.kr/",
+      "description": "생명보험 상품공시와 약관 확인 경로"
+    },
+    {
+      "kind": "non_life",
+      "name": "손해보험협회 소비자포털 공시정보",
+      "url": "https://consumer.knia.or.kr/disclosure.do",
+      "description": "손해보험·자동차보험 상품공시와 약관 확인 경로"
+    },
+    {
+      "kind": "integrated",
+      "name": "보험다모아",
+      "url": "https://e-insmarket.or.kr/",
+      "description": "보험상품 비교공시 경로"
+    }
+  ]
+}

@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import re
+import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Protocol
 
 import pdfplumber
+from pydantic import BaseModel, Field
 
+from app.services.llm import JsonCompleter, structured_completer
 from app.services.rag.chunking import RagChunk, build_chunks
 from app.services.rag.official_sources import OfficialSource, rag_sources
 
@@ -35,6 +39,7 @@ _PROFILE_TERMS: dict[str, tuple[str, ...]] = {
         "지급하지",
         "면책",
         "감액",
+        "지급하지 아니",
         "대기기간",
         "진단확정",
     ),
@@ -77,6 +82,46 @@ class LexicalReranker:
         )
 
 
+class _RerankChoice(BaseModel):
+    chunk_id: str
+
+
+class _RerankDraft(BaseModel):
+    ranked: list[_RerankChoice] = Field(default_factory=list, max_length=24)
+
+
+class ModelReranker:
+    """LLM reranker with deterministic lexical fallback."""
+
+    def __init__(self, complete: JsonCompleter | None = None) -> None:
+        self._complete = complete or structured_completer(_RerankDraft)
+        self._fallback = LexicalReranker()
+
+    def rerank(
+        self, query: str, candidates: list[RetrievalHit], *, profile: str
+    ) -> list[RetrievalHit]:
+        lexical = self._fallback.rerank(query, candidates, profile=profile)
+        if not lexical:
+            return []
+        try:
+            raw = self._complete(
+                _reranker_system_prompt(profile),
+                _reranker_user_prompt(query, lexical),
+            )
+            draft = _RerankDraft.model_validate(raw)
+        except Exception:
+            return lexical
+
+        by_id = {hit.chunk.id: hit for hit in lexical}
+        ranked: list[RetrievalHit] = []
+        for choice in draft.ranked:
+            hit = by_id.get(choice.chunk_id)
+            if hit is not None and hit not in ranked:
+                ranked.append(hit)
+        ranked.extend(hit for hit in lexical if hit not in ranked)
+        return ranked
+
+
 @lru_cache(maxsize=1)
 def load_official_chunks() -> tuple[RagChunk, ...]:
     chunks: list[RagChunk] = []
@@ -85,7 +130,10 @@ def load_official_chunks() -> tuple[RagChunk, ...]:
             continue
         if not source.absolute_path.exists():
             continue
-        chunks.extend(_load_pdf_chunks(source))
+        if source.absolute_path.suffix.casefold() == ".xml":
+            chunks.extend(_load_law_xml_chunks(source))
+        else:
+            chunks.extend(_load_pdf_chunks(source))
     return tuple(chunks)
 
 
@@ -141,14 +189,62 @@ def _load_pdf_chunks(source: OfficialSource) -> list[RagChunk]:
     return build_chunks(source, pages)
 
 
+def _load_law_xml_chunks(source: OfficialSource) -> list[RagChunk]:
+    assert source.absolute_path is not None
+    root = ET.fromstring(source.absolute_path.read_text(encoding="utf-8"))
+    chunks: list[RagChunk] = []
+    for index, article in enumerate(root.findall(".//조문단위"), start=1):
+        if article.findtext("조문여부") != "조문":
+            continue
+        number = (article.findtext("조문번호") or "").strip()
+        title = (article.findtext("조문제목") or "").strip()
+        body = _law_article_text(article)
+        if len(body) < 30:
+            continue
+        label = f"제{number}조({title})" if title else f"제{number}조"
+        chunks.append(
+            RagChunk(
+                id=f"{source.id}:{number or index}",
+                source_id=source.id,
+                source_title=source.title,
+                source_category=source.category,
+                publisher=source.publisher,
+                text=body,
+                page_start=index,
+                page_end=index,
+                label=label,
+                citation_label=f"{source.title} {label}",
+                version_label=source.version_label,
+                source_url=source.source_url,
+                local_path=source.local_path,
+            )
+        )
+    return chunks
+
+
+def _law_article_text(article: ET.Element) -> str:
+    values: list[str] = []
+    for tag in ("조문내용", "조문참고자료"):
+        text = article.findtext(tag)
+        if text and text.strip():
+            values.append(" ".join(text.split()))
+    for element in (
+        article.findall(".//항내용") + article.findall(".//호내용") + article.findall(".//목내용")
+    ):
+        if element.text and element.text.strip():
+            values.append(" ".join(element.text.split()))
+    return "\n".join(dict.fromkeys(values))
+
+
 def _expanded_terms(query: str, profile: str) -> list[str]:
     terms: list[str] = []
     seen: set[str] = set()
     for token in _TOKEN_RE.findall(query):
-        if len(token) < 2 or token in _STOPWORDS or token in seen:
-            continue
-        seen.add(token)
-        terms.append(token)
+        for term in _term_variants(token):
+            if len(term) < 2 or term in _STOPWORDS or term in seen:
+                continue
+            seen.add(term)
+            terms.append(term)
     for term in _PROFILE_TERMS.get(profile, ()):
         if term not in seen:
             seen.add(term)
@@ -159,6 +255,15 @@ def _expanded_terms(query: str, profile: str) -> list[str]:
                 seen.add(term)
                 terms.append(term)
     return terms[:16]
+
+
+def _term_variants(token: str) -> tuple[str, ...]:
+    variants = [token]
+    for suffix in ("에서는", "에서", "으로", "라는", "은", "는", "이", "가", "을", "를"):
+        if token.endswith(suffix) and len(token) > len(suffix) + 1:
+            variants.append(token[: -len(suffix)])
+            break
+    return tuple(dict.fromkeys(variants))
 
 
 def _keyword_score(chunk: RagChunk, terms: list[str]) -> int:
@@ -185,6 +290,12 @@ def _rerank_score(query: str, chunk: RagChunk, profile: str) -> float:
             score += 6
         if any(term in label or term in chunk.text for term in _EXCLUSION_TERMS):
             score += 5
+        if (
+            chunk.source_category == "law"
+            and any(term in query for term in ("설명", "사유"))
+            and any(term in chunk.text for term in ("감액하여", "지급하지 아니", "설명하여야"))
+        ):
+            score += 25
     if profile == "term_explain" and label and any(term in label for term in terms):
         score += 4
     if chunk.source_category == "standard_clause":
@@ -199,3 +310,27 @@ def _with_rerank_score(hit: RetrievalHit, rerank_score: float) -> RetrievalHit:
         keyword_score=hit.keyword_score,
         rerank_score=rerank_score,
     )
+
+
+def _reranker_system_prompt(profile: str) -> str:
+    return (
+        "제공된 공식자료 후보를 질문 관련성이 높은 순서로 정렬하세요. "
+        "근거가 직접적인 조문·약관 발췌문을 우선하세요. "
+        f"검색 프로필: {profile}. chunk_id만 반환하세요."
+    )
+
+
+def _reranker_user_prompt(query: str, candidates: list[RetrievalHit]) -> str:
+    payload = {
+        "query": query,
+        "candidates": [
+            {
+                "chunk_id": hit.chunk.id,
+                "source_title": hit.chunk.source_title,
+                "label": hit.chunk.label,
+                "text": hit.chunk.text[:700],
+            }
+            for hit in candidates
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

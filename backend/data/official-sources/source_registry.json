@@ -31,20 +31,26 @@
       "title": "보험업법",
       "category": "law",
       "publisher": "국가법령정보센터",
-      "status": "public_url_verified",
-      "source_url": "https://www.law.go.kr/법령/보험업법",
-      "rag_enabled": false,
-      "notes": "다음 단계에서 조문 스냅샷을 저장한 뒤 RAG에 편입한다."
+      "status": "downloaded",
+      "local_path": "laws/insurance-business-act-2025-01-31.xml",
+      "effective_date": "2025-01-31",
+      "sha256": "110ca4b69ebc90a956a7fef94f1935257c11cdeca7bd42eaca9a63e2980d2534",
+      "source_url": "https://www.law.go.kr/DRF/lawService.do?OC=test&target=law&MST=265389&type=XML&efYd=20250131",
+      "rag_enabled": true,
+      "notes": "국가법령정보센터 DRF XML 원문 스냅샷. 보험상품 정의, 보험계약자 보호 등 법령 근거 설명에 사용한다."
     },
     {
       "id": "financial_consumer_protection_act",
       "title": "금융소비자 보호에 관한 법률",
       "category": "law",
       "publisher": "국가법령정보센터",
-      "status": "public_url_verified",
-      "source_url": "https://www.law.go.kr/법령/금융소비자보호에관한법률",
-      "rag_enabled": false,
-      "notes": "설명의무, 적합성·적정성 원칙 관련 근거 후보. 원문 스냅샷 저장 후 편입한다."
+      "status": "downloaded",
+      "local_path": "laws/financial-consumer-protection-act-2026-01-02.xml",
+      "effective_date": "2026-01-02",
+      "sha256": "ba464e9c184b8ec7ab25c311525e9b743712a03ab2b1f60f0969c6199f36dc8c",
+      "source_url": "https://www.law.go.kr/DRF/lawService.do?OC=test&target=law&MST=277247&type=XML&efYd=20260102",
+      "rag_enabled": true,
+      "notes": "국가법령정보센터 DRF XML 원문 스냅샷. 금융상품판매업자 설명의무 등 소비자 보호 근거 설명에 사용한다."
     }
   ]
 }

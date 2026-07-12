@@ -1,10 +1,13 @@
 import json
 
+from pytest import MonkeyPatch
+
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import ConversationMessage
 from app.services.portfolio_qa import answer_portfolio_question
 from app.services.rag.answer import RagAnswer, RagCitation
+from app.services.session_rag import SessionRagChunk, SessionRagHit
 
 
 def _policies() -> list[PolicyInput]:
@@ -540,3 +543,41 @@ def test_qa_does_not_call_llm_for_deterministic_amount_questions() -> None:
 
     assert amount.status == "answered"
     assert "30,000,000원" in amount.answer
+
+
+def test_qa_adds_session_policy_text_to_llm_context(monkeypatch: MonkeyPatch) -> None:
+    from app.services import portfolio_qa
+
+    policy = _policies()[0]
+    policy.문서세션ID = "session-1"
+    hit = SessionRagHit(
+        chunk=SessionRagChunk(
+            id="session:session-1:1",
+            session_id="session-1",
+            text="암진단비 특별약관 원문에 진단확정 문구가 있습니다.",
+            embedding=(1.0,),
+            created_at=1.0,
+        ),
+        score=1.0,
+    )
+    monkeypatch.setattr(portfolio_qa, "retrieve_policy_context", lambda _ids, _query: [hit])
+
+    def complete(_: str, user: str) -> dict[str, object]:
+        assert "session:1" in user
+        assert "진단확정" in user
+        return {
+            "confirmed_fact": "암 진단 담보 원문 발췌를 확인했어요.",
+            "guidance": None,
+            "evidence_ids": ["session:1"],
+            "suggestions": [],
+            "limitations": [],
+        }
+
+    result = answer_portfolio_question(
+        "암진단비 원문에는 뭐라고 적혀 있어?",
+        [policy],
+        complete=complete,
+    )
+
+    assert result.generation == "llm"
+    assert result.citations[0].evidence_id == "session:1"

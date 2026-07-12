@@ -64,6 +64,7 @@ class PolicyInput(BaseModel):
     기본정보: PolicyInfoInput
     보장목록: list[CoverageInput] = Field(default_factory=list)
     분석상태: str | None = None
+    문서세션ID: str | None = None
 
 
 class PortfolioSummaryRequest(BaseModel):

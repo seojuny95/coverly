@@ -10,10 +10,11 @@ coverage failures degrade to 부분 inside extract_coverages.
 """
 
 from collections.abc import Callable
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from app.services.coverage import extract_coverages
 from app.services.parsing import parse_document
+from app.services.session_rag import store_policy_text
 from app.services.summary import extract_policy_summary
 from app.services.types import Coverage, ParsedDocument, PolicySummary
 
@@ -23,6 +24,7 @@ class PipelineResult(TypedDict):
     보장목록: list[Coverage]
     분석상태: str
     문자수: int
+    문서세션ID: NotRequired[str]
 
 
 class EmptyTextError(Exception):
@@ -41,9 +43,13 @@ def run_pipeline(
         raise EmptyTextError
     summary = summarize(doc.text)
     coverages, status = extract(doc)
-    return {
+    result: PipelineResult = {
         "기본정보": summary,
         "보장목록": coverages,
         "분석상태": status,
         "문자수": len(doc.text),
     }
+    session_id = store_policy_text(doc.text)
+    if session_id:
+        result["문서세션ID"] = session_id
+    return result

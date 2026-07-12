@@ -129,3 +129,17 @@ def test_parse_maps_empty_text_error_to_422(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "PDF_TEXT_EXTRACTION_FAILED"
+
+
+def test_delete_policy_text_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routes import policies
+
+    deleted: list[str] = []
+    monkeypatch.setattr(policies, "delete_policy_session", deleted.append)
+
+    client = TestClient(app)
+    response = client.delete("/policies/sessions/session-1")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "deleted"}
+    assert deleted == ["session-1"]

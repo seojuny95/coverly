@@ -6,6 +6,7 @@ from app.schemas.consultation import ConsultationEvidence, InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.services.coverage_taxonomy import classify_coverage
 from app.services.portfolio_summary import PortfolioFacts
+from app.services.session_rag import SessionRagHit
 
 _UNSUPPORTED_CONCLUSIONS = (
     "보험금이 지급",
@@ -100,6 +101,25 @@ class EvidenceCatalog:
     items: tuple[ConsultationEvidence, ...]
     by_id: dict[str, ConsultationEvidence]
     coverage_ids_by_category: dict[str, tuple[str, ...]]
+
+
+def with_session_evidence(catalog: EvidenceCatalog, hits: list[SessionRagHit]) -> EvidenceCatalog:
+    """Append ephemeral uploaded-document chunks to the consultation catalog."""
+    if not hits:
+        return catalog
+    items = list(catalog.items)
+    for index, hit in enumerate(hits, start=1):
+        items.append(
+            ConsultationEvidence(
+                id=f"session:{index}",
+                fact=f"업로드 증권 원문 발췌: {hit.chunk.text}",
+            )
+        )
+    return EvidenceCatalog(
+        items=tuple(items),
+        by_id={item.id: item for item in items},
+        coverage_ids_by_category=catalog.coverage_ids_by_category,
+    )
 
 
 def build_evidence_catalog(
