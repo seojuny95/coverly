@@ -93,6 +93,25 @@ describe("InsuranceUploadForm", () => {
     ).toBeEnabled();
   });
 
+  test("rejects a non-PDF renamed to .pdf with a wrong-type badge", async () => {
+    const user = userEvent.setup();
+    const fakePdf = new File(["this is not a pdf at all"], "fake.pdf", {
+      type: "application/pdf",
+    });
+    const { uploadInsurance } = renderForm();
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), fakePdf);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    // The per-file badge names the real reason (not "읽을 수 없는 PDF").
+    expect(await screen.findByText("PDF 형식 아님")).toBeInTheDocument();
+    expect(screen.queryByText("읽을 수 없는 PDF")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/PDF 형식이 아니에요\./).length).toBeGreaterThan(
+      0,
+    );
+    expect(uploadInsurance).not.toHaveBeenCalled();
+  });
+
   test("selects a PDF through drag and drop", async () => {
     renderForm();
 
@@ -526,7 +545,7 @@ describe("InsuranceUploadForm", () => {
         "이미 올린 보험증권이에요. second-insurance.pdf 파일을 제거하고 다시 시도해주세요.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("읽을 수 없는 PDF")).toBeInTheDocument();
+    expect(screen.getByText("중복 증권")).toBeInTheDocument();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 
@@ -597,7 +616,7 @@ describe("InsuranceUploadForm", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getAllByText("policy.pdf")).toHaveLength(2);
-    expect(screen.getAllByText("읽을 수 없는 PDF")).toHaveLength(1);
+    expect(screen.getAllByText("중복 증권")).toHaveLength(1);
     expect(screen.getAllByText("이미 올린 보험증권이에요.")).toHaveLength(1);
     expect(onAnalysisComplete).not.toHaveBeenCalled();
   });

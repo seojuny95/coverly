@@ -211,15 +211,10 @@ export function InsuranceUploadForm({
     setSelectedName("");
     let shouldKeepProgress = false;
     try {
-      const fileFingerprints = await Promise.all(
-        selectedUploadFiles.map((selectedFile) =>
-          createFileFingerprint(selectedFile.file),
-        ),
-      );
-
       // Reject files whose bytes are not actually a PDF (e.g. an image renamed
-      // to .pdf) before uploading. The backend re-validates content; this is
-      // fast client-side feedback, not the authoritative check.
+      // to .pdf) before hashing or uploading — the cheap 1KB magic-byte check
+      // runs first so a doomed large file is never fully read + hashed. The
+      // backend re-validates content and remains the authoritative gate.
       const contentIsPdf = await Promise.all(
         selectedUploadFiles.map((selectedFile) =>
           fileHasPdfMagic(selectedFile.file),
@@ -239,6 +234,13 @@ export function InsuranceUploadForm({
         );
         return;
       }
+
+      // Only the surviving valid PDFs get the full read + SHA-256 hash.
+      const fileFingerprints = await Promise.all(
+        selectedUploadFiles.map((selectedFile) =>
+          createFileFingerprint(selectedFile.file),
+        ),
+      );
 
       // Catch byte-identical re-uploads before spending a full parse + LLM pass.
       const byteIdenticalIndexes = findByteIdenticalDuplicateIndexes({
@@ -665,7 +667,10 @@ function SelectedFileList({
                 <span className="inline-block max-w-[260px] truncate align-bottom font-medium">
                   {selectedFile.file.name}
                 </span>
-                <SelectedFileStatusBadge status={selectedFile.status} />
+                <SelectedFileStatusBadge
+                  status={selectedFile.status}
+                  errorCode={selectedFile.errorCode}
+                />
               </span>
               {selectedFile.errorMessage ? (
                 <span className="mt-1 block leading-5 text-red-700">
@@ -693,11 +698,23 @@ function SelectedFileList({
   );
 }
 
-function SelectedFileStatusBadge({ status }: { status: FileReadStatus }) {
+function failedBadgeLabel(errorCode?: string): string {
+  if (errorCode === "INVALID_PDF") return "PDF 형식 아님";
+  if (errorCode === "DUPLICATE_POLICY") return "중복 증권";
+  return "읽을 수 없는 PDF";
+}
+
+function SelectedFileStatusBadge({
+  status,
+  errorCode,
+}: {
+  status: FileReadStatus;
+  errorCode?: string;
+}) {
   if (status === "failed") {
     return (
       <span className="rounded-md border border-red-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-red-700">
-        읽을 수 없는 PDF
+        {failedBadgeLabel(errorCode)}
       </span>
     );
   }
