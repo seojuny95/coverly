@@ -6,7 +6,11 @@ import {
   InsuranceUploadForm,
   type UploadInsurance,
 } from "./insurance-upload-form";
-import type { InsuranceAnalysis } from "../insurance-analysis/insurance-analysis-store";
+import { UploadInsuranceError } from "./upload-insurance";
+import type {
+  AnalyzedInsurance,
+  InsuranceAnalysis,
+} from "../insurance-analysis/insurance-analysis-store";
 import { useInsuranceData } from "../insurance-analysis/insurance-analysis-store";
 import { renderWithProviders } from "../../test-utils/render-with-providers";
 
@@ -34,24 +38,31 @@ const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
 const textFile = new File(["hello"], "note.txt", {
   type: "text/plain",
 });
-const secondInsuranceFile = new File(["%PDF-1.7"], "second-insurance.pdf", {
-  type: "application/pdf",
-});
+const secondInsuranceFile = new File(
+  ["%PDF-1.7\nsecond"],
+  "second-insurance.pdf",
+  {
+    type: "application/pdf",
+  },
+);
 
 function renderForm({
   uploadInsurance = vi.fn(),
   onAnalysisComplete = vi.fn(),
   navigateToAnalysis = vi.fn(),
+  existingDocuments = [],
 }: {
   uploadInsurance?: UploadInsurance;
   onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
   navigateToAnalysis?: () => void;
+  existingDocuments?: AnalyzedInsurance[];
 } = {}) {
   renderWithProviders(
     <InsuranceUploadForm
       uploadInsurance={uploadInsurance}
       onAnalysisComplete={onAnalysisComplete}
       navigateToAnalysis={navigateToAnalysis}
+      existingDocuments={existingDocuments}
     />,
   );
   return { uploadInsurance, onAnalysisComplete, navigateToAnalysis };
@@ -392,6 +403,236 @@ describe("InsuranceUploadForm", () => {
     ).toBeInTheDocument();
   });
 
+  test("shows unreadable PDFs in the selected list and lets the user remove only those files", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
+      .mockRejectedValueOnce(
+        new UploadInsuranceError({
+          code: "PDF_TEXT_EXTRACTION_FAILED",
+          status: 422,
+          userMessage: "PDF에서 텍스트를 추출할 수 없습니다.",
+        }),
+      )
+      .mockResolvedValueOnce({
+        status: "accepted",
+        문자수: 20,
+        기본정보: {
+          보험사: "현대해상화재보험",
+          상품명: "개인용자동차보험",
+          피보험자: "테스트고객",
+          보험분류: "자동차",
+          상품태그: ["자동차"],
+        },
+      })
+      .mockResolvedValueOnce({
+        status: "accepted",
+        문자수: 20,
+        기본정보: {
+          보험사: "현대해상화재보험",
+          상품명: "개인용자동차보험",
+          피보험자: "테스트고객",
+          보험분류: "자동차",
+          상품태그: ["자동차"],
+        },
+      });
+    const onAnalysisComplete = vi.fn();
+    const navigateToAnalysis = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      secondInsuranceFile,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(await screen.findByText("읽을 수 없는 PDF")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "텍스트를 추출할 수 없는 PDF가 있어요. 표시된 파일을 제거한 뒤 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
+    expect(screen.getByText("second-insurance.pdf")).toBeInTheDocument();
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", { name: "insurance.pdf 제거" }),
+    );
+    expect(screen.queryByText("insurance.pdf")).not.toBeInTheDocument();
+    expect(screen.getByText("second-insurance.pdf")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    await waitFor(() => {
+      expect(onAnalysisComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          insuranceDocuments: [
+            expect.objectContaining({ fileName: "second-insurance.pdf" }),
+          ],
+          selectedName: "테스트고객",
+        }),
+      );
+    });
+    expect(navigateToAnalysis).toHaveBeenCalledOnce();
+  });
+
+  test("keeps network errors as a global upload error", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi.fn<UploadInsurance>().mockRejectedValue(
+      new UploadInsuranceError({
+        code: "UPLOAD_NETWORK_ERROR",
+        userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+      }),
+    );
+    renderForm({ uploadInsurance });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("읽을 수 없는 PDF")).not.toBeInTheDocument();
+  });
+
+  test("rejects duplicate policies in the same upload batch", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      status: "accepted",
+      문자수: 20,
+      기본정보: {
+        보험사: "삼성화재",
+        상품명: "건강보험",
+        증권번호: "POLICY-TEST-001",
+        피보험자: "테스트고객",
+        보험분류: "상해·질병·실손",
+        상품태그: ["질병"],
+      },
+    });
+    const onAnalysisComplete = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      secondInsuranceFile,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "이미 올린 보험증권이에요. second-insurance.pdf 파일을 제거하고 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("읽을 수 없는 PDF")).toBeInTheDocument();
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
+  });
+
+  test("marks only the duplicate selected file when selected PDFs share the same file name", async () => {
+    const user = userEvent.setup();
+    const duplicateNamedFile = new File(["%PDF-1.7\nexisting"], "policy.pdf", {
+      type: "application/pdf",
+    });
+    const uniqueNamedFile = new File(["%PDF-1.7\nunique"], "policy.pdf", {
+      type: "application/pdf",
+    });
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
+      .mockResolvedValueOnce({
+        status: "accepted",
+        문자수: 20,
+        기본정보: {
+          보험사: "삼성화재",
+          상품명: "건강보험",
+          증권번호: "POLICY-TEST-999",
+          피보험자: "테스트고객",
+          보험분류: "상해·질병·실손",
+          상품태그: ["질병"],
+        },
+      })
+      .mockResolvedValueOnce({
+        status: "accepted",
+        문자수: 20,
+        기본정보: {
+          보험사: "현대해상화재보험",
+          상품명: "개인용자동차보험",
+          증권번호: "POLICY-TEST-NEW",
+          피보험자: "테스트고객",
+          보험분류: "자동차",
+          상품태그: ["자동차"],
+        },
+      });
+    const existingDocuments: AnalyzedInsurance[] = [
+      {
+        id: "existing-policy",
+        fileName: "existing-policy.pdf",
+        result: {
+          status: "accepted",
+          문자수: 20,
+          기본정보: {
+            보험사: "삼성화재",
+            상품명: "건강보험",
+            증권번호: "POLICY-TEST-999",
+            피보험자: "테스트고객",
+            보험분류: "상해·질병·실손",
+            상품태그: ["질병"],
+          },
+        },
+      },
+    ];
+    const onAnalysisComplete = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete, existingDocuments });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      duplicateNamedFile,
+      uniqueNamedFile,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "이미 올린 보험증권이에요. policy.pdf 파일을 제거하고 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("policy.pdf")).toHaveLength(2);
+    expect(screen.getAllByText("읽을 수 없는 PDF")).toHaveLength(1);
+    expect(screen.getAllByText("이미 올린 보험증권이에요.")).toHaveLength(1);
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
+  });
+
+  test("rejects the same PDF file even when policy fields are not enough for identity matching", async () => {
+    const user = userEvent.setup();
+    const samePdfAgain = new File(["%PDF-1.7"], "same-policy-copy.pdf", {
+      type: "application/pdf",
+    });
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      status: "accepted",
+      문자수: 20,
+      기본정보: {
+        피보험자: "테스트고객",
+        보험분류: "미분류",
+        상품태그: [],
+      },
+    });
+    const onAnalysisComplete = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      samePdfAgain,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "이미 올린 보험증권이에요. same-policy-copy.pdf 파일을 제거하고 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
+  });
+
   test("disables upload while a request is pending", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockImplementation(
@@ -476,6 +717,10 @@ describe("InsuranceUploadForm", () => {
     await waitFor(() => {
       expect(routerPush).toHaveBeenCalledWith("/analysis");
     });
+    expect(screen.getByText("증권을 한 장씩 읽고 있어요")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "내 보험 분석하기" }),
+    ).not.toBeInTheDocument();
     expect(assignSpy).not.toHaveBeenCalled();
 
     Object.defineProperty(window, "location", {

@@ -432,4 +432,64 @@ describe("InsuranceAnalysisPage", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getAllByText("자동차").length).toBeGreaterThan(1);
   });
+
+  test("keeps duplicate policy uploads out of the current analysis", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      status: "accepted",
+      문자수: 80,
+      기본정보: {
+        보험사: "삼성화재",
+        상품명: "건강보험",
+        증권번호: "POLICY-TEST-001",
+        피보험자: "테스트고객",
+        보험분류: "상해·질병·실손",
+        상품태그: ["질병"],
+      },
+    });
+
+    const initialAnalysis: InsuranceAnalysis = {
+      generatedAt: "2026-07-09T07:30:00.000Z",
+      selectedName: "테스트고객",
+      insuranceDocuments: [
+        {
+          id: "insurance-1",
+          fileName: "health.pdf",
+          result: {
+            status: "accepted",
+            문자수: 100,
+            기본정보: {
+              보험사: "삼성화재",
+              상품명: "건강보험",
+              증권번호: "POLICY-TEST-001",
+              피보험자: "테스트고객",
+              보험분류: "상해·질병·실손",
+              상품태그: ["질병"],
+            },
+          },
+        },
+      ],
+    };
+
+    renderWithProviders(
+      <InsuranceAnalysisPage uploadInsurance={uploadInsurance} />,
+      { initialAnalysis },
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "보험증권 더 올리기" }),
+    );
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "분석에 추가하기" }));
+
+    expect(
+      await screen.findByText(
+        "이미 올린 보험증권이에요. insurance.pdf 파일을 제거하고 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(
+      screen.getByText("테스트고객님의 보험 1개를 종류별로 보기 쉽게 정리했어요."),
+    ).toBeInTheDocument();
+  });
 });

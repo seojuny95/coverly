@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { PortfolioSummary } from "./portfolio-api";
+import { formatKoreanWon } from "./money-format";
 
 type SummedCoverageRow = {
   kind: "summed";
@@ -124,7 +125,7 @@ function SummedCoverage({ row }: { row: SummedCoverageRow }) {
         </CoverageDisclosure>
       </th>
       <td className="px-6 py-4 text-right font-semibold text-blue-600">
-        {formatWon(row.totalAmount)}
+        {formatKoreanWon(row.totalAmount)}
       </td>
       <td className="px-6 py-4 text-right">
         <CoverageBasis tone="summed">
@@ -306,10 +307,6 @@ function coverageSourceLabel(source: {
   return [source.insurer ?? "보험사 확인 필요", source.product_name]
     .filter(Boolean)
     .join(" · ");
-}
-
-function formatWon(amount: number) {
-  return `${amount.toLocaleString("ko-KR")}원`;
 }
 
 function summedBasisLabel(coverageCount: number) {

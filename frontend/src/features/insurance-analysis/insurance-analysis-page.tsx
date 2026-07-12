@@ -367,6 +367,7 @@ export function InsuranceAnalysisPage({
       {isUploadModalOpen ? (
         <UploadInsuranceModal
           selectedName={analysis.selectedName}
+          existingDocuments={insuranceDocuments}
           uploadInsurance={uploadInsurance}
           onClose={closeUploadModal}
           onAnalysisComplete={handleAdditionalAnalysisComplete}
@@ -554,11 +555,13 @@ function formatDateTime(value: string) {
 
 function UploadInsuranceModal({
   selectedName,
+  existingDocuments,
   uploadInsurance,
   onClose,
   onAnalysisComplete,
 }: {
   selectedName?: string;
+  existingDocuments: AnalyzedInsurance[];
   uploadInsurance?: UploadInsurance;
   onClose: () => void;
   onAnalysisComplete: (analysis: InsuranceAnalysis) => void;
@@ -592,6 +595,7 @@ function UploadInsuranceModal({
         <div className="mt-6">
           <InsuranceUploadForm
             uploadInsurance={uploadInsurance}
+            existingDocuments={existingDocuments}
             fixedSelectedName={selectedName}
             onAnalysisComplete={onAnalysisComplete}
             navigateToAnalysis={onClose}

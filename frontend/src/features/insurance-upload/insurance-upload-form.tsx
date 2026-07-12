@@ -8,6 +8,7 @@ import {
   getInsuredPersonName,
   useInsuranceData,
 } from "../insurance-analysis/insurance-analysis-store";
+import { findDuplicatePolicyDocuments } from "../insurance-analysis/policy-identity";
 import {
   type DragEvent,
   type FormEvent,
@@ -33,12 +34,21 @@ type InsuranceUploadFormProps = {
   onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
   navigateToAnalysis?: () => void;
   fixedSelectedName?: string;
+  existingDocuments?: AnalyzedInsurance[];
   surface?: "page" | "modal";
 };
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
-type FileReadStatus = "reading" | "done";
+type FileReadStatus = "idle" | "reading" | "done" | "failed";
+
+type SelectedUploadFile = {
+  id: string;
+  file: File;
+  status: FileReadStatus;
+  errorCode?: string;
+  errorMessage?: string;
+};
 
 function validateFile(file: File): string | null {
   const isPdf =
@@ -62,6 +72,7 @@ export function InsuranceUploadForm({
   // that pass it use it for side effects like closing the upload modal.
   navigateToAnalysis = () => {},
   fixedSelectedName,
+  existingDocuments = [],
   surface = "page",
 }: InsuranceUploadFormProps) {
   const { setAnalysis } = useInsuranceData();
@@ -73,14 +84,15 @@ export function InsuranceUploadForm({
       setAnalysis(analysis);
       router.push("/analysis");
     });
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedUploadFiles, setSelectedUploadFiles] = useState<
+    SelectedUploadFile[]
+  >([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState({
     completed: 0,
     total: 0,
   });
-  const [fileStatuses, setFileStatuses] = useState<FileReadStatus[]>([]);
   const [pendingAnalysis, setPendingAnalysis] =
     useState<InsuranceAnalysis | null>(null);
   const [selectedName, setSelectedName] = useState("");
@@ -90,7 +102,7 @@ export function InsuranceUploadForm({
   const selectFiles = (files: FileList | File[]) => {
     const incomingFiles = toFiles(files);
     if (incomingFiles.length === 0) {
-      setSelectedFiles([]);
+      setSelectedUploadFiles([]);
       setPendingAnalysis(null);
       setSelectedName("");
       setError("올릴 파일을 찾지 못했어요. PDF를 다시 선택해주세요.");
@@ -100,7 +112,7 @@ export function InsuranceUploadForm({
     const invalidFile = incomingFiles.find((file) => validateFile(file));
     if (invalidFile) {
       const validationError = validateFile(invalidFile);
-      setSelectedFiles([]);
+      setSelectedUploadFiles([]);
       setPendingAnalysis(null);
       setSelectedName("");
       setError(validationError);
@@ -108,7 +120,24 @@ export function InsuranceUploadForm({
       return;
     }
 
-    setSelectedFiles(incomingFiles);
+    setSelectedUploadFiles(
+      incomingFiles.map((file, index) => ({
+        id: `${Date.now()}-${index}-${file.name}-${file.size}`,
+        file,
+        status: "idle",
+      })),
+    );
+    setPendingAnalysis(null);
+    setSelectedName("");
+    setError(null);
+  };
+
+  const removeSelectedFile = (fileId: string) => {
+    setSelectedUploadFiles((current) => {
+      const next = current.filter((selectedFile) => selectedFile.id !== fileId);
+      if (next.length === 0 && inputRef.current) inputRef.current.value = "";
+      return next;
+    });
     setPendingAnalysis(null);
     setSelectedName("");
     setError(null);
@@ -122,50 +151,118 @@ export function InsuranceUploadForm({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (selectedFiles.length === 0 || isAnalyzing) return;
+    if (selectedUploadFiles.length === 0 || isAnalyzing) return;
 
     setIsAnalyzing(true);
-    setAnalysisProgress({ completed: 0, total: selectedFiles.length });
-    setFileStatuses(selectedFiles.map(() => "reading"));
+    setAnalysisProgress({ completed: 0, total: selectedUploadFiles.length });
+    setSelectedUploadFiles((current) =>
+      current.map((selectedFile) => ({
+        ...selectedFile,
+        status: "reading",
+        errorCode: undefined,
+        errorMessage: undefined,
+      })),
+    );
     setError(null);
     setPendingAnalysis(null);
     setSelectedName("");
+    let shouldKeepProgress = false;
     try {
-      const insuranceDocuments = await Promise.all(
-        selectedFiles.map(async (file, index) => {
+      const fileFingerprints = await Promise.all(
+        selectedUploadFiles.map((selectedFile) =>
+          createFileFingerprint(selectedFile.file),
+        ),
+      );
+      const uploadResults = await Promise.all(
+        selectedUploadFiles.map(async (selectedFile, index) => {
           try {
-            const result = await uploadMutation.mutateAsync(file);
+            const result = await uploadMutation.mutateAsync(selectedFile.file);
             setAnalysisProgress((current) => ({
               ...current,
               completed: current.completed + 1,
             }));
-            setFileStatuses((current) =>
-              current.map((status, statusIndex) =>
-                statusIndex === index ? "done" : status,
+            setSelectedUploadFiles((current) =>
+              current.map((currentFile) =>
+                currentFile.id === selectedFile.id
+                  ? { ...currentFile, status: "done" }
+                  : currentFile,
               ),
             );
             return {
-              id: `${Date.now()}-${index}-${file.name}`,
-              fileName: file.name,
-              result,
+              status: "fulfilled" as const,
+              selectedFileId: selectedFile.id,
+              document: {
+                id: `${Date.now()}-${index}-${selectedFile.file.name}`,
+                fileName: selectedFile.file.name,
+                fileFingerprint: fileFingerprints[index],
+                result,
+              },
             };
           } catch (err) {
-            const message =
-              err instanceof UploadInsuranceError
-                ? err.userMessage
-                : err instanceof Error
-                  ? err.message
-                  : "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
-            throw new Error(message);
+            if (!isFileSpecificUploadError(err)) throw err;
+
+            const uploadError = err as UploadInsuranceError;
+            setAnalysisProgress((current) => ({
+              ...current,
+              completed: current.completed + 1,
+            }));
+            setSelectedUploadFiles((current) =>
+              current.map((currentFile) =>
+                currentFile.id === selectedFile.id
+                  ? {
+                      ...currentFile,
+                      status: "failed",
+                      errorCode: uploadError.code,
+                      errorMessage: uploadError.userMessage,
+                    }
+                  : currentFile,
+              ),
+            );
+            return {
+              status: "rejected" as const,
+              fileName: selectedFile.file.name,
+              message: uploadError.userMessage,
+            };
           }
         }),
+      );
+
+      const failedUploads = uploadResults.filter(
+        (result) => result.status === "rejected",
+      );
+      if (failedUploads.length > 0) {
+        setError(
+          "텍스트를 추출할 수 없는 PDF가 있어요. 표시된 파일을 제거한 뒤 다시 시도해주세요.",
+        );
+        return;
+      }
+
+      const insuranceDocuments = uploadResults.flatMap((result) =>
+        result.status === "fulfilled" ? [result.document] : [],
+      );
+      const selectedFileIdsByDocumentId = new Map(
+        uploadResults.flatMap((result) =>
+          result.status === "fulfilled"
+            ? [[result.document.id, result.selectedFileId]]
+            : [],
+        ),
       );
       const analysis = {
         generatedAt: new Date().toISOString(),
         insuranceDocuments,
       };
-      continueWithNameValidation(analysis);
+      shouldKeepProgress = continueWithNameValidation(
+        analysis,
+        selectedFileIdsByDocumentId,
+      );
     } catch (err) {
+      setSelectedUploadFiles((current) =>
+        current.map((selectedFile) =>
+          selectedFile.status === "reading"
+            ? { ...selectedFile, status: "idle" }
+            : selectedFile,
+        ),
+      );
       if (err instanceof UploadInsuranceError) {
         setError(err.userMessage);
       } else {
@@ -176,11 +273,16 @@ export function InsuranceUploadForm({
         );
       }
     } finally {
-      setIsAnalyzing(false);
+      if (!shouldKeepProgress) {
+        setIsAnalyzing(false);
+      }
     }
   };
 
-  const continueWithNameValidation = (analysis: InsuranceAnalysis) => {
+  const continueWithNameValidation = (
+    analysis: InsuranceAnalysis,
+    selectedFileIdsByDocumentId: Map<string, string>,
+  ) => {
     const insuranceDocumentsWithoutName = analysis.insuranceDocuments.filter(
       (insuranceDocument) => !getInsuredPersonName(insuranceDocument),
     );
@@ -188,7 +290,36 @@ export function InsuranceUploadForm({
       setError(
         "피보험자를 확인할 수 없는 증권이 있어요. 피보험자가 확인된 증권만 분석할 수 있어요.",
       );
-      return;
+      return false;
+    }
+
+    const duplicateDocuments = findDuplicatePolicyDocuments({
+      candidates: analysis.insuranceDocuments,
+      existingDocuments,
+    });
+    if (duplicateDocuments.length > 0) {
+      const duplicateFileIds = new Set(
+        duplicateDocuments.flatMap((document) => {
+          const selectedFileId = selectedFileIdsByDocumentId.get(document.id);
+          return selectedFileId ? [selectedFileId] : [];
+        }),
+      );
+      setSelectedUploadFiles((current) =>
+        current.map((selectedFile) =>
+          duplicateFileIds.has(selectedFile.id)
+            ? {
+                ...selectedFile,
+                status: "failed",
+                errorCode: "DUPLICATE_POLICY",
+                errorMessage: "이미 올린 보험증권이에요.",
+              }
+            : selectedFile,
+        ),
+      );
+      setError(
+        `이미 올린 보험증권이에요. ${duplicateDocuments.map((document) => document.fileName).join(", ")} 파일을 제거하고 다시 시도해주세요.`,
+      );
+      return false;
     }
 
     if (fixedSelectedName) {
@@ -199,11 +330,11 @@ export function InsuranceUploadForm({
         setError(
           `${fixedSelectedName}님의 보험증권만 추가할 수 있어요. 같은 피보험자의 증권만 선택해주세요.`,
         );
-        return;
+        return false;
       }
 
       saveSelectedNameAnalysis(analysis, fixedSelectedName);
-      return;
+      return true;
     }
 
     const names = getInsuranceNameOptions(analysis.insuranceDocuments).map(
@@ -211,11 +342,12 @@ export function InsuranceUploadForm({
     );
     if (names.length === 1) {
       saveSelectedNameAnalysis(analysis, names[0]);
-      return;
+      return true;
     }
 
     setSelectedName(names[0] ?? "");
     setPendingAnalysis(analysis);
+    return false;
   };
 
   const saveSelectedNameAnalysis = (
@@ -239,6 +371,9 @@ export function InsuranceUploadForm({
     saveSelectedNameAnalysis(pendingAnalysis, selectedName);
   };
 
+  const selectedFiles = selectedUploadFiles.map(
+    (selectedFile) => selectedFile.file,
+  );
   const selectedBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
   const fileSizeLabel =
     selectedFiles.length > 0
@@ -255,9 +390,10 @@ export function InsuranceUploadForm({
     return (
       <AnalysisProgress
         progress={analysisProgress}
-        files={selectedFiles.map((file, index) => ({
-          name: file.name,
-          status: fileStatuses[index] ?? "reading",
+        files={selectedUploadFiles.map((selectedFile) => ({
+          name: selectedFile.file.name,
+          status:
+            selectedFile.status === "done" ? "done" : ("reading" as const),
         }))}
         surface={surface}
       />
@@ -357,10 +493,15 @@ export function InsuranceUploadForm({
           )}
 
           <div className="mt-4 flex flex-col gap-4">
-            <SelectedFileList files={selectedFiles} surface={surface} />
+            <SelectedFileList
+              files={selectedUploadFiles}
+              surface={surface}
+              onRemove={removeSelectedFile}
+              disableRemove={isAnalyzing}
+            />
             <button
               type="submit"
-              disabled={selectedFiles.length === 0 || isAnalyzing}
+              disabled={selectedUploadFiles.length === 0 || isAnalyzing}
               className={`${primaryButtonClassName} self-stretch ${isModal ? "" : "sm:self-end"}`}
             >
               {isAnalyzing ? "보험 정리 중이에요" : submitLabel}
@@ -395,9 +536,13 @@ export function InsuranceUploadForm({
 function SelectedFileList({
   files,
   surface,
+  onRemove,
+  disableRemove,
 }: {
-  files: File[];
+  files: SelectedUploadFile[];
   surface: "page" | "modal";
+  onRemove: (fileId: string) => void;
+  disableRemove: boolean;
 }) {
   if (files.length === 0) {
     return (
@@ -413,9 +558,6 @@ function SelectedFileList({
     );
   }
 
-  const visibleFiles = files.slice(0, 6);
-  const hiddenFileCount = Math.max(files.length - visibleFiles.length, 0);
-
   return (
     <section
       aria-label="선택한 PDF"
@@ -429,28 +571,75 @@ function SelectedFileList({
         <p className="text-sm font-semibold text-zinc-950">선택한 PDF</p>
         <p className="text-xs text-zinc-500">
           {files.length}개 ·{" "}
-          {formatFileSize(files.reduce((sum, file) => sum + file.size, 0))}
+          {formatFileSize(
+            files.reduce(
+              (sum, selectedFile) => sum + selectedFile.file.size,
+              0,
+            ),
+          )}
         </p>
       </div>
-      <ul className="mt-3 flex flex-wrap gap-2">
-        {visibleFiles.map((file, index) => (
+      <ul className="mt-3 space-y-2">
+        {files.map((selectedFile) => (
           <li
-            key={`${file.name}-${file.size}-${index}`}
-            className="max-w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-700"
+            key={selectedFile.id}
+            className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${
+              selectedFile.status === "failed"
+                ? "border-red-200 bg-red-50 text-red-900"
+                : "border-zinc-200 bg-zinc-50 text-zinc-700"
+            }`}
           >
-            <span className="inline-block max-w-[220px] truncate align-bottom">
-              {file.name}
+            <span className="min-w-0">
+              <span className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="inline-block max-w-[260px] truncate align-bottom font-medium">
+                  {selectedFile.file.name}
+                </span>
+                <SelectedFileStatusBadge status={selectedFile.status} />
+              </span>
+              {selectedFile.errorMessage ? (
+                <span className="mt-1 block leading-5 text-red-700">
+                  {selectedFile.errorMessage}
+                </span>
+              ) : (
+                <span className="mt-1 block text-zinc-500">
+                  {formatFileSize(selectedFile.file.size)}
+                </span>
+              )}
             </span>
+            <button
+              type="button"
+              disabled={disableRemove}
+              onClick={() => onRemove(selectedFile.id)}
+              aria-label={`${selectedFile.file.name} 제거`}
+              className="shrink-0 rounded-md border border-zinc-200 bg-white px-2 py-1 font-medium text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              제거
+            </button>
           </li>
         ))}
-        {hiddenFileCount > 0 ? (
-          <li className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">
-            외 {hiddenFileCount}개
-          </li>
-        ) : null}
       </ul>
     </section>
   );
+}
+
+function SelectedFileStatusBadge({ status }: { status: FileReadStatus }) {
+  if (status === "failed") {
+    return (
+      <span className="rounded-md border border-red-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-red-700">
+        읽을 수 없는 PDF
+      </span>
+    );
+  }
+
+  if (status === "done") {
+    return (
+      <span className="rounded-md border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">
+        완료
+      </span>
+    );
+  }
+
+  return null;
 }
 
 const ANALYSIS_STEP_MESSAGES = [
@@ -613,6 +802,21 @@ function formatFileSize(size: number) {
   }
 
   return `${(size / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function isFileSpecificUploadError(err: unknown) {
+  if (!(err instanceof UploadInsuranceError)) return false;
+  if (err.code === "UPLOAD_NETWORK_ERROR") return false;
+  if (err.status && err.status >= 500) return false;
+  return true;
+}
+
+async function createFileFingerprint(file: File) {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function getInsuranceNameOptions(insuranceDocuments: AnalyzedInsurance[]) {

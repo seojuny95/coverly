@@ -8,10 +8,12 @@ import {
   useState,
 } from "react";
 import type { InsuranceUploadResult } from "../insurance-upload/upload-insurance";
+import { getPolicyIdentityKeys } from "./policy-identity";
 
 export type AnalyzedInsurance = {
   id: string;
   fileName: string;
+  fileFingerprint?: string;
   result: InsuranceUploadResult;
 };
 
@@ -21,16 +23,36 @@ export type InsuranceAnalysis = {
   insuranceDocuments: AnalyzedInsurance[];
 };
 
-// Merge two analyses by document id (later wins). Pure — reused by the provider.
+// Merge by document id first, then by policy identity as a defensive boundary.
 export function mergeInsuranceAnalysis(
   current: InsuranceAnalysis,
   next: InsuranceAnalysis,
 ): InsuranceAnalysis {
   const byId = new Map<string, AnalyzedInsurance>();
+  const existingIdentityKeys = new Set<string>();
   for (const document of current.insuranceDocuments)
     byId.set(document.id, document);
-  for (const document of next.insuranceDocuments)
+
+  for (const document of current.insuranceDocuments) {
+    for (const key of getPolicyIdentityKeys(document)) {
+      existingIdentityKeys.add(key);
+    }
+  }
+
+  for (const document of next.insuranceDocuments) {
+    const keys = getPolicyIdentityKeys(document);
+    if (
+      keys.some((key) => existingIdentityKeys.has(key)) &&
+      !byId.has(document.id)
+    ) {
+      continue;
+    }
     byId.set(document.id, document);
+    for (const key of keys) {
+      existingIdentityKeys.add(key);
+    }
+  }
+
   return {
     generatedAt: next.generatedAt,
     selectedName: next.selectedName ?? current.selectedName,

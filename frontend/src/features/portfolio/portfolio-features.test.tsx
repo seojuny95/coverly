@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 import { renderWithProviders } from "../../test-utils/render-with-providers";
 import { InsuranceAnalysisPage } from "../insurance-analysis/insurance-analysis-page";
 import type { InsuranceAnalysis } from "../insurance-analysis/insurance-analysis-store";
+import { CoverageSummaryTable } from "./coverage-summary-table";
 
 function fixture(): InsuranceAnalysis {
   return {
@@ -76,17 +77,51 @@ describe("portfolio features", () => {
       initialAnalysis: fixture(),
     });
 
-    await screen.findByText("10,000,000원");
+    await screen.findByText("1,000만원");
     const text = container.textContent ?? "";
     expect(text.indexOf("상해·질병·실손")).toBeLessThan(
       text.indexOf("보험금 합계"),
     );
     expect(text.indexOf("보험금 합계")).toBeLessThan(text.indexOf("건강보험"));
-    expect(screen.getByText("10,000,000원")).toBeInTheDocument();
+    expect(screen.getByText("1,000만원")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/portfolio/summary"),
       expect.objectContaining({ body: expect.stringContaining('"policies"') }),
     );
+  });
+
+  test("formats summed coverage amounts with Korean units", async () => {
+    render(
+      <CoverageSummaryTable
+        summary={{
+          totals: [
+            {
+              category: "암 진단비",
+              majorCategory: "진단비",
+              totalAmount: 150_001_000,
+              coverageCount: 2,
+              normalizedName: "암진단비",
+              composition: [],
+            },
+            {
+              category: "통원비",
+              majorCategory: "통원",
+              totalAmount: 3_000,
+              coverageCount: 1,
+              normalizedName: "통원비",
+              composition: [],
+            },
+          ],
+          indemnity_coverages: [],
+          excluded_coverages: [],
+          excluded_auto_policy_count: 0,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("1억 5,000만원 1천원")).toBeInTheDocument();
+    expect(screen.getByText("3천원")).toBeInTheDocument();
+    expect(screen.getByText("2개 합산")).toBeInTheDocument();
   });
 
   test("groups every amount basis under the same coverage category", async () => {
