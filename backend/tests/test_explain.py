@@ -1,6 +1,5 @@
 from app.services.explain import explain_coverages
-from app.services.rag.chunking import RagChunk
-from app.services.rag.retrieve import RetrievalHit
+from app.services.rag.models import RagChunk, RetrievalHit
 
 
 def _hit(text: str) -> RetrievalHit:
@@ -17,8 +16,8 @@ def _hit(text: str) -> RetrievalHit:
             citation_label="표준약관 제3조",
         ),
         score=1.0,
-        keyword_score=1,
-        rerank_score=1.0,
+        keyword_score=1.0,
+        vector_score=1.0,
     )
 
 

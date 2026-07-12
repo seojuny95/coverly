@@ -4,8 +4,7 @@ from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.services import portfolio_analysis
 from app.services.portfolio_analysis import analyze_portfolio
-from app.services.rag.chunking import RagChunk
-from app.services.rag.retrieve import RetrievalHit
+from app.services.rag.models import RagChunk, RetrievalHit
 
 
 def _policy(policy_id: str, classification: str, coverage_name: str, amount: str) -> PolicyInput:
@@ -42,8 +41,8 @@ def _official_hit(text: str) -> RetrievalHit:
             citation_label="표준약관 제3조",
         ),
         score=1.0,
-        keyword_score=1,
-        rerank_score=1.0,
+        keyword_score=1.0,
+        vector_score=1.0,
     )
 
 

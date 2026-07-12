@@ -17,7 +17,8 @@ from functools import lru_cache
 from pydantic import BaseModel, ValidationError
 
 from app.services.llm import JsonCompleter, structured_completer
-from app.services.rag.retrieve import RetrievalHit, retrieve
+from app.services.rag.models import RetrievalHit
+from app.services.rag.retrieval import retrieve
 
 _SYSTEM = (
     "너는 사용자가 이미 가진 보험의 담보를 이해하도록 돕는 상담사다. "
@@ -119,7 +120,7 @@ def _user_prompt(
 
 def _retrieve_official_context(name: str) -> list[RetrievalHit]:
     query = f"{name} 뜻 지급사유 면책 감액 보상하지 않는 사항"
-    return retrieve(query, profile="term_explain", final_k=2)
+    return retrieve(query, final_k=2)
 
 
 def _trim(text: str) -> str:

@@ -1,17 +1,22 @@
-from pytest import MonkeyPatch
+from pathlib import Path
 
-from app.services.rag.chunking import RagChunk, build_chunks
-from app.services.rag.eval import evaluate_source_chunk_retrieval, load_retrieval_eval_cases
-from app.services.rag.official_sources import rag_sources, verify_downloaded_sources
-from app.services.rag.pgvector_store import VectorChunkHit
-from app.services.rag.retrieve import ModelReranker, infer_profile, load_official_chunks, retrieve
+import pytest
+
+from app.services.rag.chunking import build_chunks
+from app.services.rag.embeddings import HashingEmbedder, openai_embedder_from_settings
+from app.services.rag.evaluation import (
+    RetrievalEvalCase,
+    evaluate_retrieval,
+    load_retrieval_eval_cases,
+)
+from app.services.rag.indexing import build_vector_records
+from app.services.rag.loaders import _load_law_xml_chunks, load_official_chunks
+from app.services.rag.models import RagChunk, RetrievalHit
+from app.services.rag.retrieval import retrieve, transform_query
+from app.services.rag.sources import OfficialSource, rag_sources, verify_downloaded_sources
 
 
-def _forbid_local_official_rag() -> tuple[RagChunk, ...]:
-    raise AssertionError("local official RAG must not run")
-
-
-def test_official_sources_are_registered_and_verified() -> None:
+def test_rag_sources_are_verified_and_small() -> None:
     sources = rag_sources()
 
     assert {source.id for source in sources} == {
@@ -23,7 +28,7 @@ def test_official_sources_are_registered_and_verified() -> None:
     assert verify_downloaded_sources() == []
 
 
-def test_indexing_source_chunker_preserves_standard_clause_article_citations() -> None:
+def test_standard_clause_chunking_preserves_article_citations() -> None:
     source = next(source for source in rag_sources() if source.category == "standard_clause")
     chunks = build_chunks(
         source,
@@ -42,7 +47,128 @@ def test_indexing_source_chunker_preserves_standard_clause_article_citations() -
     assert "계약 전 알릴 의무" in chunks[1].citation_label
 
 
-def test_lexical_reranker_scores_injected_candidates_by_profile() -> None:
+def test_standard_clause_chunking_caps_articles_without_paragraph_breaks() -> None:
+    """Regression test: an annex article with no blank lines and no further
+    article header used to become a single unbounded chunk (28k+ chars),
+    which OpenAI's embedding endpoint rejects past 8192 tokens."""
+
+    source = next(source for source in rag_sources() if source.category == "standard_clause")
+    huge_body = "장기 무중단 특약 " * 300
+    chunks = build_chunks(
+        source,
+        [
+            "부록 ··· 2",
+            f"제99조(장기 무중단 조항) {huge_body}",
+        ],
+    )
+
+    assert len(chunks) > 1
+    assert all(len(chunk.text) <= 1500 for chunk in chunks)
+    assert all(chunk.label == "제99조(장기 무중단 조항)" for chunk in chunks)
+
+
+def test_build_vector_records_embeds_chunks() -> None:
+    chunks = (
+        RagChunk(
+            id="payment",
+            source_id="standard_terms_annex_15_2026_06_30",
+            source_title="표준약관",
+            source_category="standard_clause",
+            publisher="금융감독원",
+            text="제3조(보험금의 지급사유) 암 진단 확정 등 약관에서 정한 사유를 확인합니다.",
+            page_start=10,
+            page_end=10,
+            label="제3조(보험금의 지급사유)",
+        ),
+    )
+
+    records = build_vector_records(chunks=chunks, embedder=HashingEmbedder())
+
+    assert len(records) == 1
+    assert records[0].chunk.id == "payment"
+    assert any(value > 0 for value in records[0].embedding)
+
+
+def test_vector_records_keep_chunk_metadata() -> None:
+    chunks = (
+        RagChunk(
+            id="payment",
+            source_id="standard_terms_annex_15_2026_06_30",
+            source_title="표준약관",
+            source_category="standard_clause",
+            publisher="금융감독원",
+            text="보험금의 지급사유를 확인합니다.",
+            page_start=1,
+            page_end=1,
+        ),
+    )
+    records = build_vector_records(chunks=chunks, embedder=HashingEmbedder())
+
+    assert records[0].chunk.id == "payment"
+    assert records[0].chunk.source_title == "표준약관"
+
+
+def test_build_vector_records_defaults_to_the_openai_embedder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test: production indexing must not silently fall back to the
+    offline hashing embedder, which embeds in a different vector space than
+    the OpenAI embedder retrieval queries with."""
+
+    calls: list[list[str]] = []
+
+    class _StubEmbedder:
+        def embed_texts(self, texts: list[str]) -> list[tuple[float, ...]]:
+            calls.append(texts)
+            return [(1.0, 0.0) for _ in texts]
+
+    monkeypatch.setattr(
+        "app.services.rag.indexing.openai_embedder_from_settings",
+        lambda: _StubEmbedder(),
+    )
+    chunks = (
+        RagChunk(
+            id="payment",
+            source_id="standard_terms_annex_15_2026_06_30",
+            source_title="표준약관",
+            source_category="standard_clause",
+            publisher="금융감독원",
+            text="보험금의 지급사유를 확인합니다.",
+            page_start=1,
+            page_end=1,
+        ),
+    )
+
+    records = build_vector_records(chunks=chunks)
+
+    assert calls
+    assert records[0].embedding == (1.0, 0.0)
+
+
+def test_openai_embedder_rejects_mismatched_dimension_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test: OPENAI_EMBEDDING_DIMENSIONS used to be read into
+    Settings but never actually passed to the OpenAI embedder, so shrinking it
+    without also updating RAG_EMBEDDING_DIM silently produced vectors that
+    didn't match the pgvector column width."""
+
+    class _StubSettings:
+        openai_api_key = "test-key"
+        openai_embedding_model = "text-embedding-3-small"
+        openai_embedding_dimensions = 512
+        rag_embedding_dim = 1536
+
+    monkeypatch.setattr(
+        "app.services.rag.embeddings.get_settings",
+        lambda: _StubSettings(),
+    )
+
+    with pytest.raises(RuntimeError, match="must match"):
+        openai_embedder_from_settings()
+
+
+def test_retrieve_uses_hybrid_vector_and_bm25_search() -> None:
     chunks = (
         RagChunk(
             id="payment",
@@ -69,19 +195,23 @@ def test_lexical_reranker_scores_injected_candidates_by_profile() -> None:
     )
 
     hits = retrieve(
-        "암 진단비를 받을 수 있는지 볼 때 뭘 확인해야 해?",
+        "암 진단 확정 지급사유",
         chunks=chunks,
-        profile="claim_check",
+        embedder=HashingEmbedder(),
     )
 
     assert hits[0].chunk.id == "payment"
-    assert hits[0].rerank_score > hits[0].keyword_score
+    assert hits[0].keyword_score > 0
+    assert hits[0].vector_score > 0
 
 
-def test_optional_model_reranker_can_reorder_injected_candidates() -> None:
+def test_retrieve_requires_an_explicit_embedder_for_in_memory_chunks() -> None:
+    """retrieve() is production code — it must not fall back to a test-only
+    embedder on its own. Callers on the in-memory path own that choice."""
+
     chunks = (
         RagChunk(
-            id="first",
+            id="payment",
             source_id="standard_terms_annex_15_2026_06_30",
             source_title="표준약관",
             source_category="standard_clause",
@@ -89,122 +219,100 @@ def test_optional_model_reranker_can_reorder_injected_candidates() -> None:
             text="보험금의 지급사유를 확인합니다.",
             page_start=1,
             page_end=1,
-            label="지급사유",
-        ),
-        RagChunk(
-            id="second",
-            source_id="insurance_business_act",
-            source_title="보험업법",
-            source_category="law",
-            publisher="국가법령정보센터",
-            text="보험금 감액 또는 지급하지 아니하는 경우 사유를 설명하여야 합니다.",
-            page_start=1,
-            page_end=1,
-            label="설명의무",
         ),
     )
 
-    def complete(_: str, __: str) -> dict[str, object]:
-        return {"ranked": [{"chunk_id": "second"}, {"chunk_id": "first"}]}
-
-    hits = retrieve(
-        "보험금을 감액할 때 설명해야 해?",
-        chunks=chunks,
-        profile="claim_check",
-        reranker=ModelReranker(complete),
-    )
-
-    assert [hit.chunk.id for hit in hits[:2]] == ["second", "first"]
+    with pytest.raises(ValueError, match="embedder is required"):
+        retrieve("지급사유", chunks=chunks)
 
 
-def test_runtime_retrieve_uses_pgvector_candidates(monkeypatch: MonkeyPatch) -> None:
-    from app.services.rag import retrieve as retrieve_module
+def test_transform_query_only_normalizes_whitespace() -> None:
+    plan = transform_query("암 진단비 받을 수 있어?")
 
-    chunk = RagChunk(
-        id="vector-hit",
-        source_id="insurance_business_act",
-        source_title="보험업법",
-        source_category="law",
-        publisher="국가법령정보센터",
-        text="보험금 감액 사유를 설명하여야 합니다.",
-        page_start=1,
-        page_end=1,
-        label="설명의무",
-    )
-
-    class Settings:
-        database_url = "postgresql://example"
-        openai_api_key = "test-key"
-        openai_embedding_dimensions = 1536
-
-    monkeypatch.setattr(retrieve_module, "get_settings", lambda: Settings())
-    monkeypatch.setattr(
-        retrieve_module,
-        "search_chunks",
-        lambda *_args, **_kwargs: [VectorChunkHit(chunk=chunk, score=0.9)],
-    )
-    monkeypatch.setattr(retrieve_module, "load_official_chunks", _forbid_local_official_rag)
-
-    hits = retrieve("보험금을 감액할 때 설명해야 해?")
-
-    assert [hit.chunk.id for hit in hits] == ["vector-hit"]
+    assert plan.search_query == "암 진단비 받을 수 있어?"
+    assert plan.terms == ("암", "진단비", "받을", "수", "있어")
 
 
-def test_runtime_retrieve_returns_no_hits_when_pgvector_fails(monkeypatch: MonkeyPatch) -> None:
-    from app.services.rag import retrieve as retrieve_module
-
-    class Settings:
-        database_url = "postgresql://example"
-        openai_api_key = "test-key"
-        openai_embedding_dimensions = 1536
-
-    def fail(*_args: object, **_kwargs: object) -> list[VectorChunkHit]:
-        raise RuntimeError("db down")
-
-    monkeypatch.setattr(retrieve_module, "get_settings", lambda: Settings())
-    monkeypatch.setattr(retrieve_module, "search_chunks", fail)
-    monkeypatch.setattr(retrieve_module, "load_official_chunks", _forbid_local_official_rag)
-
-    hits = retrieve("계약 전 알릴 의무가 뭐야?")
-
-    assert hits == []
-
-
-def test_runtime_retrieve_without_database_does_not_use_local_official_rag(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    from app.services.rag import retrieve as retrieve_module
-
-    class Settings:
-        database_url = ""
-        openai_api_key = ""
-        openai_embedding_dimensions = 1536
-
-    monkeypatch.setattr(retrieve_module, "get_settings", lambda: Settings())
-    monkeypatch.setattr(retrieve_module, "load_official_chunks", _forbid_local_official_rag)
-
-    hits = retrieve("계약 전 알릴 의무가 뭐야?")
-
-    assert hits == []
-
-
-def test_infer_profile_routes_claim_checks_to_claim_profile() -> None:
-    assert infer_profile("암이면 보험금 받을 수 있어?") == "claim_check"
-    assert infer_profile("면책이 뭐야?") == "claim_check"
-    assert infer_profile("고지의무 뜻이 뭐야?") == "term_explain"
-
-
-def test_indexing_source_chunks_cover_eval_fixture() -> None:
+def test_retrieval_eval_fixture_passes_current_small_corpus() -> None:
     cases = load_retrieval_eval_cases()
-    report = evaluate_source_chunk_retrieval(cases)
+    report = evaluate_retrieval(cases)
 
-    assert report.total == 6
-    assert report.recall == 1.0, report.results
+    assert report.total == 60
+    assert report.recall >= 0.4, report.results
 
 
-def test_law_snapshots_are_available_for_pgvector_indexing() -> None:
+def test_law_snapshots_are_loaded_as_rag_chunks() -> None:
     chunks = load_official_chunks()
     law_chunks = [chunk for chunk in chunks if chunk.source_id == "insurance_business_act"]
 
     assert law_chunks
     assert any("보험상품" in chunk.text for chunk in law_chunks)
+
+
+_LAW_XML_WITH_BRANCH_ARTICLE = """<?xml version="1.0" encoding="UTF-8"?>
+<법령>
+  <조문단위>
+    <조문번호>11</조문번호>
+    <조문여부>조문</조문여부>
+    <조문제목>보험회사의 겸영업무</조문제목>
+    <조문내용>제11조(보험회사의 겸영업무) 경영건전성을 해치지 않는 금융업무를 할 수 있다.</조문내용>
+  </조문단위>
+  <조문단위>
+    <조문번호>11</조문번호>
+    <조문가지번호>2</조문가지번호>
+    <조문여부>조문</조문여부>
+    <조문제목>보험회사의 부수업무</조문제목>
+    <조문내용>제11조의2(보험회사의 부수업무) 보험업에 부수하는 업무를 할 수 있다.</조문내용>
+  </조문단위>
+</법령>
+"""
+
+
+def test_law_xml_branch_articles_get_distinct_ids_and_labels(tmp_path: Path) -> None:
+    """Regression test: 조문가지번호 (e.g. 제11조의2) used to be ignored, so
+    "제11조"/"제11조의2"/"제11조의3" collapsed onto the same id and every
+    branch article but the first was silently dropped from the index."""
+
+    xml_path = tmp_path / "law.xml"
+    xml_path.write_text(_LAW_XML_WITH_BRANCH_ARTICLE, encoding="utf-8")
+    source = OfficialSource(
+        id="test_law",
+        title="테스트 법률",
+        category="law",
+        publisher="법제처",
+        status="downloaded",
+        rag_enabled=True,
+        local_path=str(xml_path),
+    )
+
+    chunks = _load_law_xml_chunks(source)
+
+    assert [chunk.label for chunk in chunks] == [
+        "제11조(보험회사의 겸영업무)",
+        "제11조의2(보험회사의 부수업무)",
+    ]
+    assert len({chunk.id for chunk in chunks}) == 2
+
+
+def test_evaluate_retrieval_production_flag_skips_in_memory_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[RagChunk, ...] | None] = []
+
+    def _fake_retrieve(
+        *,
+        query: str,
+        chunks: tuple[RagChunk, ...] | None = None,
+        embedder: object | None = None,
+    ) -> list[RetrievalHit]:
+        calls.append(chunks)
+        return []
+
+    monkeypatch.setattr("app.services.rag.evaluation.retrieve", _fake_retrieve)
+    cases = (RetrievalEvalCase(id="case", query="질문", expected_source_ids=(), expected_terms=()),)
+
+    evaluate_retrieval(cases, production=True)
+    evaluate_retrieval(cases, production=False)
+
+    assert calls[0] is None
+    assert calls[1] is not None

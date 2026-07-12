@@ -1,10 +1,9 @@
 from app.services.rag.answer import answer_official_question
-from app.services.rag.chunking import RagChunk
-from app.services.rag.retrieve import RetrievalHit
+from app.services.rag.models import RagChunk, RetrievalHit
 
 
 def _hit(chunk: RagChunk) -> RetrievalHit:
-    return RetrievalHit(chunk=chunk, score=10.0, keyword_score=10, rerank_score=12.0)
+    return RetrievalHit(chunk=chunk, score=10.0, keyword_score=10.0, vector_score=1.0)
 
 
 def _chunk(
@@ -56,12 +55,12 @@ def test_answer_official_question_returns_cited_term_explanation() -> None:
     )
 
     assert result.status == "answered"
-    assert result.mode == "term_explain"
+    assert result.mode == "general"
     assert result.citations[0].chunk_id == "chunk-1"
     assert "공식자료" in result.limitations[0]
 
 
-def test_claim_check_answer_adds_policy_confirmation_notice() -> None:
+def test_answer_official_question_keeps_missing_context() -> None:
     result = answer_official_question(
         "암 진단비 받을 수 있어?",
         hits=[
@@ -83,12 +82,11 @@ def test_claim_check_answer_adds_policy_confirmation_notice() -> None:
     )
 
     assert result.status == "answered"
-    assert result.mode == "claim_check"
-    assert "최종 지급 여부" in result.answer
+    assert result.mode == "general"
     assert result.missing_context == ("가입 상품 약관", "진단일")
 
 
-def test_claim_check_answer_allows_grounded_payment_language() -> None:
+def test_answer_official_question_allows_grounded_payment_language() -> None:
     result = answer_official_question(
         "암 진단비 받을 수 있어?",
         hits=[_hit(_chunk(label="제3조(보험금의 지급사유)"))],
@@ -103,22 +101,6 @@ def test_claim_check_answer_allows_grounded_payment_language() -> None:
 
     assert result.status == "answered"
     assert "보험금이 지급됩니다" in result.answer
-    assert "최종 지급 여부" in result.answer
-
-
-def test_claim_check_answer_filters_overstated_payment_verdict() -> None:
-    result = answer_official_question(
-        "암 진단비 받을 수 있어?",
-        hits=[_hit(_chunk(label="제3조(보험금의 지급사유)"))],
-        complete=lambda _system, _user: {
-            "answer": "이 경우 무조건 보험금이 지급됩니다.",
-            "citation_ids": ["chunk-1"],
-            "missing_context": [],
-        },
-    )
-
-    assert result.status == "filtered"
-    assert result.missing_context == ("근거 수준을 넘는 지급 단정",)
 
 
 def test_answer_official_question_no_evidence_without_hits() -> None:

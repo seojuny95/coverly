@@ -176,6 +176,24 @@ def test_qa_ignores_filtered_official_rag_and_uses_existing_flow() -> None:
     assert result.citations[0].policy_id == "p1"
 
 
+def test_qa_degrades_to_existing_flow_when_official_rag_raises() -> None:
+    """Regression test: an official-RAG outage (pgvector/OpenAI down) used to
+    propagate as an uncaught exception and fail the whole question, even
+    though the portfolio-fact fallback below could have answered it."""
+
+    def broken(_: str) -> RagAnswer:
+        raise RuntimeError("DATABASE_URL is required for RAG retrieval")
+
+    result = answer_portfolio_question(
+        "가입한 보험 목록 알려줘",
+        _policies(),
+        official_answer=broken,
+    )
+
+    assert result.status == "answered"
+    assert result.citations[0].policy_id == "p1"
+
+
 def test_qa_answers_how_to_claim_with_insurer_channels() -> None:
     def forbidden(_: str, __: str) -> dict[str, object]:
         raise AssertionError("LLM should not be called for claim-channel questions")

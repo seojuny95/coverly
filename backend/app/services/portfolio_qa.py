@@ -273,7 +273,13 @@ def _answer_with_official_rag(
 ) -> PortfolioQuestionResponse | None:
     if not _should_try_official_rag(question):
         return None
-    result = (answerer or answer_official_question)(question)
+    try:
+        result = (answerer or answer_official_question)(question)
+    except Exception:
+        # official RAG is a shortcut, not a requirement — a pgvector/OpenAI
+        # outage should fall through to the portfolio-fact answer below,
+        # not fail the whole question.
+        return None
     if result.status != "answered":
         return None
 
@@ -294,6 +300,8 @@ def _answer_with_official_rag(
 
 
 def _should_try_official_rag(question: str) -> bool:
+    if any(term in question for term in _AMOUNT_TERMS):
+        return False
     if any(term in question for term in _CLAIM_HOWTO_TERMS):
         return False
     if any(term in question for term in _OFFICIAL_RAG_TERMS):

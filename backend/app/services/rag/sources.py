@@ -1,4 +1,8 @@
-"""Official source registry loading for the small RAG corpus."""
+"""Official source registry for the official-source RAG corpus.
+
+This file knows which official files exist, where they live, and whether their
+local copies match the registry hash. It does not read document contents.
+"""
 
 from __future__ import annotations
 

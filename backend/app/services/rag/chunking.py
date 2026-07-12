@@ -1,12 +1,16 @@
-"""Chunk official insurance sources into citation-ready text units."""
+"""Chunk official insurance sources into citation-ready text units.
+
+This file only decides chunk boundaries and citation labels. It does not load
+files, create embeddings, or search.
+"""
 
 from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
 
-from app.services.rag.official_sources import OfficialSource
+from app.services.rag.models import RagChunk
+from app.services.rag.sources import OfficialSource
 
 _ARTICLE_RE = re.compile(r"제\s*\d+\s*조\s*\([^)]*\)")
 _TOC_LINE_RE = re.compile(
@@ -17,23 +21,6 @@ _SECTION_HEADING_RE = re.compile(r"^(?:[Ⅰ-Ⅹ]+|[0-9]+)\s+[^\n]{2,80}$")
 _WHITESPACE_RE = re.compile(r"[ \t]+")
 _MIN_ARTICLE_BODY_CHARS = 30
 _MAX_PAGE_CHUNK_CHARS = 1400
-
-
-@dataclass(frozen=True)
-class RagChunk:
-    id: str
-    source_id: str
-    source_title: str
-    source_category: str
-    publisher: str
-    text: str
-    page_start: int
-    page_end: int
-    label: str | None = None
-    citation_label: str | None = None
-    version_label: str | None = None
-    source_url: str | None = None
-    local_path: str | None = None
 
 
 def build_chunks(source: OfficialSource, pages: list[str]) -> list[RagChunk]:
@@ -64,19 +51,22 @@ def _standard_clause_chunks(source: OfficialSource, pages: list[str]) -> list[Ra
     for index, (label, start_page) in enumerate(toc):
         end_page = toc[index + 1][1] - 1 if index + 1 < len(toc) else total_pages
         section_text = normalize_text("\n".join(pages[start_page - 1 : end_page]))
-        for order, (article_title, article_text) in enumerate(_split_articles(section_text), 1):
-            text = f"[{label} > {article_title}]\n{article_text}"
-            chunks.append(
-                _chunk(
-                    source,
-                    page_start=start_page,
-                    page_end=end_page,
-                    order=order,
-                    text=text,
-                    label=article_title,
-                    citation_label=f"{source.title} {article_title}",
+        order = 0
+        for article_title, article_text in _split_articles(section_text):
+            for block in split_within_char_limit(article_text):
+                order += 1
+                text = f"[{label} > {article_title}]\n{block}"
+                chunks.append(
+                    _chunk(
+                        source,
+                        page_start=start_page,
+                        page_end=end_page,
+                        order=order,
+                        text=text,
+                        label=article_title,
+                        citation_label=f"{source.title} {article_title}",
+                    )
                 )
-            )
     return chunks
 
 
@@ -86,7 +76,7 @@ def _page_or_section_chunks(source: OfficialSource, pages: list[str]) -> list[Ra
         text = normalize_text(raw_text)
         if not text:
             continue
-        blocks = _split_heading_blocks(text) or _split_long_page(text)
+        blocks = _split_heading_blocks(text) or split_within_char_limit(text)
         for order, block in enumerate(blocks, start=1):
             normalized = normalize_text(block)
             if len(normalized) < 40:
@@ -143,21 +133,48 @@ def _split_heading_blocks(text: str) -> list[str]:
     return blocks
 
 
-def _split_long_page(text: str) -> list[str]:
+def split_within_char_limit(text: str) -> list[str]:
     if len(text) <= _MAX_PAGE_CHUNK_CHARS:
         return [text]
-    paragraphs = [paragraph.strip() for paragraph in text.split("\n\n") if paragraph.strip()]
+    units = [unit.strip() for unit in text.split("\n\n") if unit.strip()]
+    return _pack_units(units) or [text[:_MAX_PAGE_CHUNK_CHARS]]
+
+
+def _pack_units(units: list[str]) -> list[str]:
+    """Greedily pack units under the size cap, splitting oversized units first."""
     blocks: list[str] = []
     current = ""
-    for paragraph in paragraphs:
-        if current and len(current) + len(paragraph) > _MAX_PAGE_CHUNK_CHARS:
-            blocks.append(current)
-            current = paragraph
-            continue
-        current = f"{current}\n\n{paragraph}".strip() if current else paragraph
+    for unit in units:
+        for piece in _fit_unit(unit):
+            candidate = f"{current}\n{piece}" if current else piece
+            if current and len(candidate) > _MAX_PAGE_CHUNK_CHARS:
+                blocks.append(current)
+                current = piece
+                continue
+            current = candidate
     if current:
         blocks.append(current)
-    return blocks or [text[:_MAX_PAGE_CHUNK_CHARS]]
+    return blocks
+
+
+def _fit_unit(unit: str) -> list[str]:
+    """Split one over-cap unit by line, then hard-slice as a last resort.
+
+    A unit here is a paragraph (or, on retry, a line). Real annex tables can
+    run for pages without a blank line between rows, so falling back to plain
+    character slicing keeps every chunk under the OpenAI embedding input limit.
+    """
+    if len(unit) <= _MAX_PAGE_CHUNK_CHARS:
+        return [unit]
+
+    lines = [line.strip() for line in unit.split("\n") if line.strip()]
+    if len(lines) > 1:
+        return _pack_units(lines)
+
+    return [
+        unit[start : start + _MAX_PAGE_CHUNK_CHARS]
+        for start in range(0, len(unit), _MAX_PAGE_CHUNK_CHARS)
+    ]
 
 
 def _first_line(text: str) -> str | None:

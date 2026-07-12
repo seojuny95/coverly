@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
     database_url: str = ""
+    rag_pg_table: str = "official_rag_chunks"
+    rag_embedding_dim: int = 1536
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[1] / ".env",

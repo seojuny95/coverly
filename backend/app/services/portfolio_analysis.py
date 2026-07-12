@@ -30,7 +30,8 @@ from app.services.portfolio_summary import (
     build_portfolio_facts,
     count_duplicate_indemnity_coverages,
 )
-from app.services.rag.retrieve import RetrievalHit, retrieve
+from app.services.rag.models import RetrievalHit
+from app.services.rag.retrieval import retrieve
 
 _UNCLASSIFIED = "미분류"
 
@@ -253,13 +254,22 @@ def _analysis_limitations(generation: GenerationMode) -> list[str]:
 
 @lru_cache(maxsize=1)
 def _official_analysis_guidance() -> tuple[RetrievalHit, ...]:
-    return tuple(
-        retrieve(
-            "약관에서 지급사유 면책 감액 보상하지 않는 사항을 왜 확인해야 하는지",
-            profile="claim_check",
-            final_k=4,
+    """Retrieve grounding hits for the counselor prompt.
+
+    This is supplementary context, not a required fact — if pgvector isn't
+    reachable (e.g. DATABASE_URL unset in this environment), degrade to no
+    guidance instead of failing the whole analysis, same as explain.py's
+    LLM-boundary degrade pattern.
+    """
+    try:
+        return tuple(
+            retrieve(
+                "약관에서 지급사유 면책 감액 보상하지 않는 사항을 왜 확인해야 하는지",
+                final_k=4,
+            )
         )
-    )
+    except Exception:
+        return ()
 
 
 def _analyze_classifications(facts: PortfolioFacts) -> list[ClassificationAnalysis]:

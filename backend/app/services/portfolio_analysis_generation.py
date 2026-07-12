@@ -24,7 +24,7 @@ from app.services.portfolio_summary import (
     PortfolioFacts,
     count_duplicate_indemnity_coverages,
 )
-from app.services.rag.retrieve import RetrievalHit
+from app.services.rag.models import RetrievalHit
 
 # Strengths cite held coverages; gaps may also cite existing coverages/실손 to
 # flag over-insurance, not only missing (gap:) categories.
