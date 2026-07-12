@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import type { ClaimChannelBlock } from "./portfolio-api";
@@ -75,5 +76,24 @@ describe("ChatMessage", () => {
       screen.queryByRole("link", { name: "위험링크" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("위험링크")).toBeInTheDocument();
+  });
+
+  it("renders answer sources in a collapsed disclosure", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatMessage
+        message={assistant({
+          text: "확인한 답변이에요.",
+          sources: [{ label: "테스트보험 · 암진단비" }],
+        })}
+      />,
+    );
+
+    const disclosure = screen.getByText("확인한 근거").closest("details");
+    expect(disclosure).not.toHaveAttribute("open");
+
+    await user.click(screen.getByText("확인한 근거"));
+
+    expect(disclosure).toHaveAttribute("open");
   });
 });

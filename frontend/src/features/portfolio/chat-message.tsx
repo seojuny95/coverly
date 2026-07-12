@@ -104,14 +104,16 @@ function ChatMessageComponent({ message }: { message: ChatMessageData }) {
         <ClaimChannels block={message.claimChannels} />
       ) : null}
       {message.sources?.length ? (
-        <div className="mt-3 border-t border-zinc-100 pt-3">
-          <p className="text-[11px] font-semibold text-zinc-500">확인한 근거</p>
+        <details className="group mt-3 border-t border-zinc-100 pt-3">
+          <summary className="cursor-pointer text-[11px] font-semibold text-zinc-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+            확인한 근거
+          </summary>
           <ul className="mt-1 space-y-1 text-xs text-zinc-500">
             {message.sources.map((source, index) => (
               <li key={`${source.label}-${index}`}>{source.label}</li>
             ))}
           </ul>
-        </div>
+        </details>
       ) : null}
       {message.limitations?.length ? (
         <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">

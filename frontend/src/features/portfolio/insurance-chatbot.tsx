@@ -17,6 +17,13 @@ const INITIAL_SUGGESTIONS = [
   "확인 가능한 보험금 합계는 얼마예요?",
 ];
 
+const INITIAL_ONLY_LIMITATIONS = [
+  "보상 조건·면책·지급 가능성은 약관 근거 없이 판단하지 않습니다.",
+  "실손형 담보는 가입금액 합계에 포함하지 않았습니다.",
+  "지급유형 또는 금액이 확인되지 않은 담보는 합계에 포함하지 않았습니다.",
+  "가입금액 합계·집계에는 자동차 보험을 포함하지 않았어요.",
+];
+
 export function InsuranceChatbot({
   documents,
 }: {
@@ -31,6 +38,7 @@ export function InsuranceChatbot({
       text: "궁금한 내용을 물어보세요. AI가 올린 보험증권에서 확인한 사실을 근거로 답할게요. Coverly AI는 보험을 팔지 않아요.",
       limitations: [
         "자동차보험과 약관이 필요한 보상 판단은 답변에서 제외해요.",
+        ...INITIAL_ONLY_LIMITATIONS,
       ],
     },
   ]);
@@ -80,11 +88,14 @@ export function InsuranceChatbot({
           .filter(Boolean)
           .join(" · "),
       }))
-      .filter((source) => source.label);
+      .filter((source) => source.label)
+      .slice(0, 3);
     updateMessage(assistantId, (message) => ({
       ...message,
       sources,
-      limitations: end.limitations,
+      limitations: end.limitations.filter(
+        (item) => !INITIAL_ONLY_LIMITATIONS.includes(item),
+      ),
       claimChannels: end.claim_channels,
     }));
     setSuggestions(
