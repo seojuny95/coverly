@@ -1,7 +1,7 @@
 import type { InsuranceCoverage } from "../insurance-upload/upload-insurance";
 
 const GENERATED_NOTICE =
-  "일반적인 설명이에요. 정확한 보장 내용은 가입한 상품의 약관에서 확인할 수 있어요.";
+  "증권에 설명이 없어 표준약관을 참고해 만든 안내예요. 정확한 내용은 가입한 상품의 약관에서 확인해 주세요.";
 
 type InsuranceCoverageListProps = {
   coverages?: InsuranceCoverage[];

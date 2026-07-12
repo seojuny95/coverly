@@ -24,6 +24,7 @@ def _hit(text: str) -> RetrievalHit:
 def test_generates_an_explanation_for_a_coverage_name() -> None:
     def fake_complete(system: str, user: str) -> dict[str, object]:
         assert "official_excerpts" in user
+        assert "약관 확인이 필요하다는 안내" in system
         return {"설명목록": [{"담보명": "가입설명담보", "해설": "이런 상황에 보험금을 드려요."}]}
 
     explanations, ok = explain_coverages(
