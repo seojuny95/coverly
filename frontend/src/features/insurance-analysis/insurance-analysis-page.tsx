@@ -3,7 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { type ReactNode, useMemo, useState } from "react";
+import {
+  forwardRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   CoverlyLogo,
@@ -23,6 +30,7 @@ import {
 } from "./insurance-analysis-store";
 import { LeaveGuardLink } from "./leave-guard-link";
 import { normalizeInsurerName } from "./policy-identity";
+import { useDialogA11y } from "./use-dialog-a11y";
 import { useBeforeUnloadGuard } from "./use-leave-guard";
 import type {
   InsuranceBasicInfo,
@@ -95,6 +103,18 @@ export function InsuranceAnalysisPage({
   const [activeTab, setActiveTab] = useState<"insurance" | "analysis">(
     "insurance",
   );
+  const insuranceTabRef = useRef<HTMLButtonElement>(null);
+  const analysisTabRef = useRef<HTMLButtonElement>(null);
+
+  // Arrow-key navigation between the two tabs (WAI-ARIA tabs pattern,
+  // automatic activation): moves focus and switches the panel in one step.
+  const handleTabListKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const next = activeTab === "insurance" ? "analysis" : "insurance";
+    setActiveTab(next);
+    (next === "insurance" ? insuranceTabRef : analysisTabRef).current?.focus();
+  };
   const [expandedInsuranceIds, setExpandedInsuranceIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -185,16 +205,24 @@ export function InsuranceAnalysisPage({
 
       <section className="mx-auto mt-10 w-full max-w-6xl">
         <nav
+          role="tablist"
           aria-label="보험 정보 보기"
+          onKeyDown={handleTabListKeyDown}
           className="mb-8 flex gap-1 border-b border-zinc-200"
         >
           <TabButton
+            ref={insuranceTabRef}
+            id="insurance-tab"
+            controls="insurance-tabpanel"
             active={activeTab === "insurance"}
             onClick={() => setActiveTab("insurance")}
           >
             내 보험
           </TabButton>
           <TabButton
+            ref={analysisTabRef}
+            id="analysis-tab"
+            controls="analysis-tabpanel"
             active={activeTab === "analysis"}
             onClick={() => setActiveTab("analysis")}
             badge={
@@ -209,7 +237,12 @@ export function InsuranceAnalysisPage({
           </TabButton>
         </nav>
         {activeTab === "insurance" ? (
-          <>
+          <div
+            id="insurance-tabpanel"
+            role="tabpanel"
+            aria-labelledby="insurance-tab"
+            tabIndex={0}
+          >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <div className="mb-4">
@@ -353,9 +386,14 @@ export function InsuranceAnalysisPage({
                 );
               })}
             </div>
-          </>
+          </div>
         ) : (
-          <div>
+          <div
+            id="analysis-tabpanel"
+            role="tabpanel"
+            aria-labelledby="analysis-tab"
+            tabIndex={0}
+          >
             <div className="mb-7">
               <PixelEyebrow>내 보험 분석</PixelEyebrow>
               <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
@@ -395,22 +433,28 @@ export function InsuranceAnalysisPage({
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-  badge,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  badge?: ReactNode;
-}) {
+const TabButton = forwardRef<
+  HTMLButtonElement,
+  {
+    id: string;
+    controls: string;
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+    badge?: ReactNode;
+  }
+>(function TabButton({ id, controls, active, onClick, children, badge }, ref) {
   return (
     <button
+      ref={ref}
+      id={id}
       type="button"
       role="tab"
       aria-selected={active}
+      aria-controls={controls}
+      // Roving tabindex: only the active tab is a Tab stop; arrow keys move
+      // focus between tabs (handled by the tablist's onKeyDown).
+      tabIndex={active ? 0 : -1}
       onClick={onClick}
       className={`inline-flex items-center border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${active ? "border-blue-600 text-blue-600" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
     >
@@ -418,7 +462,7 @@ function TabButton({
       {badge}
     </button>
   );
-}
+});
 
 function InsuranceDetail({
   insuranceDocument,
@@ -568,12 +612,16 @@ function UploadInsuranceModal({
   onClose: () => void;
   onAnalysisComplete: (analysis: InsuranceAnalysis) => void;
 }) {
+  const dialogRef = useDialogA11y<HTMLDivElement>({ open: true, onClose });
+
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/45 px-5 py-8 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="analysis-upload-modal-title"
+      tabIndex={-1}
     >
       <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-[12px_12px_0_rgba(232,237,255,0.45)] sm:p-6">
         <div className="flex items-start justify-between gap-4">

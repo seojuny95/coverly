@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
+import { useDialogA11y } from "./use-dialog-a11y";
 
 // In-app navigation guard: when `enabled`, intercepts the click and shows a
 // custom confirm modal before leaving (in-memory analysis data would be lost).
@@ -24,6 +25,11 @@ export function LeaveGuardLink({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const closeDialog = useCallback(() => setOpen(false), []);
+  const dialogRef = useDialogA11y<HTMLDivElement>({
+    open,
+    onClose: closeDialog,
+  });
 
   const go = () => router.push(href);
 
@@ -48,9 +54,11 @@ export function LeaveGuardLink({
       </a>
       {open ? (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal
           aria-labelledby="leave-guard-title"
+          tabIndex={-1}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5"
         >
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center">
@@ -65,7 +73,7 @@ export function LeaveGuardLink({
               <button
                 type="button"
                 className="rounded-xl border px-4 py-2 text-sm"
-                onClick={() => setOpen(false)}
+                onClick={closeDialog}
               >
                 닫기
               </button>

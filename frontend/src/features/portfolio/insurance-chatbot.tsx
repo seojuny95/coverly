@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
+import { useDialogA11y } from "../insurance-analysis/use-dialog-a11y";
 import { primaryButtonClassName } from "../../components/coverly-brand";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import {
@@ -39,6 +40,14 @@ export function InsuranceChatbot({
   const nextMessageId = useRef(1);
 
   const [streaming, setStreaming] = useState(false);
+  const closeChatbot = useCallback(() => setOpen(false), []);
+  // autoFocus: false — this dialog already focuses the question input itself
+  // (below), which is a better initial target than the "닫기" button.
+  const dialogRef = useDialogA11y<HTMLElement>({
+    open,
+    onClose: closeChatbot,
+    autoFocus: false,
+  });
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -133,9 +142,11 @@ export function InsuranceChatbot({
 
   return (
     <aside
+      ref={dialogRef}
       role="dialog"
       aria-label="내 보험 질문"
       aria-modal="false"
+      tabIndex={-1}
       className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-white shadow-2xl sm:inset-x-auto sm:top-auto sm:right-8 sm:bottom-8 sm:h-[min(78vh,46rem)] sm:w-[min(32rem,calc(100vw-4rem))] sm:rounded-2xl sm:border sm:border-zinc-200"
     >
       <header className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
@@ -147,7 +158,7 @@ export function InsuranceChatbot({
         </div>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={closeChatbot}
           className="rounded-lg px-3 py-2 text-sm hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-blue-600"
         >
           닫기
