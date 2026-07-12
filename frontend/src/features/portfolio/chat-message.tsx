@@ -1,6 +1,11 @@
 "use client";
 
-import { type ComponentPropsWithoutRef, useEffect, useState } from "react";
+import {
+  type ComponentPropsWithoutRef,
+  memo,
+  useEffect,
+  useState,
+} from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 
 import type { ClaimChannelBlock } from "./portfolio-api";
@@ -74,7 +79,7 @@ export type ChatMessageData = {
   claimChannels?: ClaimChannelBlock | null;
 };
 
-export function ChatMessage({ message }: { message: ChatMessageData }) {
+function ChatMessageComponent({ message }: { message: ChatMessageData }) {
   const isUser = message.role === "user";
   return (
     <article
@@ -118,6 +123,11 @@ export function ChatMessage({ message }: { message: ChatMessageData }) {
     </article>
   );
 }
+
+// Memoized so a streaming answer (which rebuilds the messages array on each
+// token) only re-renders the message whose text actually changed, not every
+// prior ChatMessage (each of which runs ReactMarkdown).
+export const ChatMessage = memo(ChatMessageComponent);
 
 function ChannelLinks({
   links,

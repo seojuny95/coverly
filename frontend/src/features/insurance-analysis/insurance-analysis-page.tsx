@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { type ReactNode, useMemo, useState } from "react";
 
 import {
@@ -32,7 +33,6 @@ import {
 } from "../insurance-upload/insurance-upload-form";
 import { InsuranceCoverageList } from "./insurance-coverage-list";
 import { CoverageTotalTable } from "../portfolio/coverage-total-table";
-import { InsuranceChatbot } from "../portfolio/insurance-chatbot";
 import { PortfolioAnalysisPanel } from "../portfolio/portfolio-analysis-panel";
 import {
   emptyReasonFor,
@@ -44,6 +44,14 @@ import {
   usePortfolioAnalysis,
 } from "../portfolio/use-portfolio-analysis";
 import { usePortfolioSummary } from "../portfolio/use-portfolio-summary";
+
+// Lazy-load the chatbot (and its react-markdown dependency) so they stay out of
+// the initial /analysis bundle — it only mounts after the user opens it.
+const InsuranceChatbot = dynamic(
+  () =>
+    import("../portfolio/insurance-chatbot").then((m) => m.InsuranceChatbot),
+  { ssr: false },
+);
 
 const CLASSIFICATION_ORDER = [
   "자동차",
