@@ -12,13 +12,7 @@ import {
   findByteIdenticalDuplicateIndexes,
   findDuplicatePolicyDocuments,
 } from "../insurance-analysis/policy-identity";
-import {
-  type DragEvent,
-  type FormEvent,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type DragEvent, type FormEvent, useRef, useState } from "react";
 
 import {
   type InsuranceUploadResult,
@@ -30,6 +24,7 @@ import {
   secondaryButtonClassName,
 } from "../../components/coverly-brand";
 import { fileHasPdfMagic } from "./pdf-magic";
+import { AnalysisProgress } from "./analysis-progress";
 
 export type UploadInsurance = (file: File) => Promise<InsuranceUploadResult>;
 
@@ -732,142 +727,6 @@ function SelectedFileStatusBadge({
   }
 
   return null;
-}
-
-const ANALYSIS_STEP_MESSAGES = [
-  "증권에서 보장 내용을 찾고 있어요",
-  "보장마다 확인한 근거를 붙이고 있어요",
-];
-
-const LONG_WAIT_MESSAGE = "파일이 길수록 조금 더 걸려요. 지금도 읽고 있어요.";
-const ALMOST_DONE_MESSAGE = "거의 다 왔어요. 조금만 더 기다려주세요.";
-
-function AnalysisProgress({
-  progress,
-  files,
-  surface,
-}: {
-  progress: { completed: number; total: number };
-  files: Array<{ name: string; status: FileReadStatus }>;
-  surface: "page" | "modal";
-}) {
-  const milestonePercent =
-    progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
-  // Trickle only fills up to 90% of the in-flight file's share; real
-  // completions move the milestone, so the bar never fakes a finish.
-  const trickleCapPercent =
-    progress.total > 0
-      ? Math.min(((progress.completed + 0.9) / progress.total) * 100, 100)
-      : 90;
-  const [displayPercent, setDisplayPercent] = useState(0);
-  const [messageIndex, setMessageIndex] = useState(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setDisplayPercent(
-        (current) => current + (trickleCapPercent - current) * 0.04,
-      );
-    }, 250);
-    return () => clearInterval(timer);
-  }, [trickleCapPercent]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setMessageIndex((current) => current + 1);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsedSeconds((current) => current + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const statusMessages = [
-    ...ANALYSIS_STEP_MESSAGES,
-    ...(elapsedSeconds >= 90
-      ? [ALMOST_DONE_MESSAGE]
-      : elapsedSeconds >= 30
-        ? [LONG_WAIT_MESSAGE]
-        : []),
-  ];
-  const statusMessage = statusMessages[messageIndex % statusMessages.length];
-  // Real milestones floor the trickle so completed files always show through.
-  const percent = Math.round(Math.max(displayPercent, milestonePercent));
-
-  return (
-    <section
-      role="status"
-      className={`${
-        surface === "modal"
-          ? "flex w-full max-w-none flex-col items-center py-8 text-center"
-          : "fixed inset-0 z-50 flex items-center justify-center bg-white/90 px-6 py-10 text-center backdrop-blur-sm"
-      }`}
-    >
-      <div className="flex w-full max-w-[560px] flex-col items-center">
-        <div className="analysis-pixel-loader grid size-16 grid-cols-3 gap-1.5 rounded-2xl border border-zinc-200 bg-white p-3 shadow-[7px_7px_0_#e8edff]">
-          {Array.from({ length: 9 }).map((_, index) => (
-            <span key={index} />
-          ))}
-        </div>
-        <h1 className="mt-8 text-2xl font-semibold tracking-[-0.04em] text-zinc-950">
-          증권을 한 장씩 읽고 있어요
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-zinc-500">
-          보통 1~2분 정도 걸려요
-        </p>
-        <div
-          role="progressbar"
-          aria-label="보험 분석 진행률"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          className="mt-7 h-1.5 w-full overflow-hidden rounded-sm bg-zinc-100"
-        >
-          <div
-            className="h-full bg-blue-600 transition-all duration-300"
-            style={{ width: `${Math.max(percent, 4)}%` }}
-          />
-        </div>
-        {files.length > 0 ? (
-          <ul
-            aria-label="파일별 진행 상태"
-            className="mt-5 max-h-40 w-full space-y-1.5 overflow-y-auto text-left"
-          >
-            {files.map((file, index) => (
-              <li
-                key={`${file.name}-${index}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-100 bg-white px-3 py-2 text-xs text-zinc-600"
-              >
-                <span className="truncate">{file.name}</span>
-                {file.status === "done" ? (
-                  <span className="shrink-0 font-medium text-blue-600">
-                    완료
-                  </span>
-                ) : (
-                  <span className="shrink-0 animate-pulse text-zinc-400">
-                    읽는 중
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <p
-          key={statusMessage}
-          className="analysis-status-message mt-6 text-sm leading-6 text-zinc-500"
-        >
-          {statusMessage}
-        </p>
-        <p className="mt-1 text-xs text-zinc-400">
-          확인이 안 되는 내용은 추측하지 않아요.
-        </p>
-      </div>
-    </section>
-  );
 }
 
 function ReassuranceCheckIcon() {
