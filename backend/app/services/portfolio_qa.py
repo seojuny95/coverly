@@ -33,21 +33,14 @@ from app.services.portfolio_qa_generation import (
 from app.services.portfolio_summary import (
     PortfolioFacts,
     build_portfolio_facts,
+    is_auto_policy,
 )
 
-# Coverage/payout verdicts require policy terms (약관 RAG) — refuse these.
-_CLAIM_VERDICT_TERMS = (
-    "보상되",
-    "보상 받을",
-    "보상받을",
-    "지급 조건",
-    "면책",
-    "약관",
-    "보험금 받을",
-    "보험금을 받을",
-)
 # "How do I claim?" is procedural — answer with the deterministic channel directory.
 _CLAIM_HOWTO_TERMS = ("청구", "신청", "접수", "서류")
+# A claim-how-to question is auto-related only when it names a car-accident context;
+# otherwise auto insurers stay out of a health/life claim answer.
+_AUTO_CLAIM_TERMS = ("자동차", "사고", "대물", "대인", "접촉", "추돌", "차량", "주차")
 _AMOUNT_TERMS = ("합계", "총액", "얼마", "가입금액")
 _STATUS_TERMS = ("추출 상태", "분석 상태", "제외된", "확인 못한")
 _HOLDING_TERMS = ("몇 개", "몇개", "몇 건", "몇건", "보유 중", "목록", "가입한 보험")
@@ -65,22 +58,22 @@ def answer_portfolio_question(
 
     insured = resolve_portfolio_demographics(policies, demographics)
     facts = build_portfolio_facts(policies)
+    auto_policies = tuple(policy for policy in policies if is_auto_policy(policy))
     normalized_question = question.strip()
     life_stage_check = _life_stage_check(insured, facts)
-    catalog = build_evidence_catalog(facts, insured, life_stage_check.missing)
+    catalog = build_evidence_catalog(facts, insured, life_stage_check.missing, auto_policies)
 
-    if not facts.policies:
-        return _with_demographics(_no_uploaded_policies_response(facts), insured)
-    if any(term in normalized_question for term in _CLAIM_VERDICT_TERMS):
-        return _with_demographics(_refuse_claim_question(), insured)
+    if not facts.policies and not auto_policies:
+        return _with_demographics(_no_uploaded_policies_response(), insured)
     if any(term in normalized_question for term in _AMOUNT_TERMS):
         return _with_demographics(_answer_amount(normalized_question, facts, catalog), insured)
     if any(term in normalized_question for term in _STATUS_TERMS):
-        return _with_demographics(_answer_status(facts, catalog), insured)
+        return _with_demographics(_answer_status(facts, catalog, auto_policies), insured)
     if any(term in normalized_question for term in _HOLDING_TERMS):
-        return _with_demographics(_answer_holdings(facts, catalog), insured)
+        return _with_demographics(_answer_holdings(facts, catalog, auto_policies), insured)
     if any(term in normalized_question for term in _CLAIM_HOWTO_TERMS):
-        return _with_demographics(_answer_claim_channels(facts), insured)
+        channels = _answer_claim_channels(policies, facts, normalized_question)
+        return _with_demographics(channels, insured)
 
     fallback = _consultation_fallback(facts, insured, life_stage_check, catalog)
     response = generate_consultation_answer(
@@ -96,15 +89,12 @@ def answer_portfolio_question(
     return _with_demographics(response, insured)
 
 
-def _no_uploaded_policies_response(facts: PortfolioFacts) -> PortfolioQuestionResponse:
-    limitations = ["보험증권을 먼저 업로드해 주세요."]
-    if facts.coverage_summary.excluded_auto_policy_count:
-        limitations.append("자동차 보험은 별도 분석 대상이라 현재 Q&A에서 제외합니다.")
+def _no_uploaded_policies_response() -> PortfolioQuestionResponse:
     return PortfolioQuestionResponse(
         status="no_data",
-        answer="살펴볼 비자동차 보험 정보가 아직 없어요.",
+        answer="살펴볼 보험 정보가 아직 없어요.",
         citations=[],
-        limitations=limitations,
+        limitations=["보험증권을 먼저 업로드해 주세요."],
         suggestions=["보험증권을 업로드한 뒤 다시 질문해 주세요."],
     )
 
@@ -139,30 +129,29 @@ def stream_portfolio_answer(
 
     insured = resolve_portfolio_demographics(policies, demographics)
     facts = build_portfolio_facts(policies)
+    auto_policies = tuple(policy for policy in policies if is_auto_policy(policy))
     normalized_question = question.strip()
     life_stage_check = _life_stage_check(insured, facts)
-    catalog = build_evidence_catalog(facts, insured, life_stage_check.missing)
+    catalog = build_evidence_catalog(facts, insured, life_stage_check.missing, auto_policies)
 
-    if not facts.policies:
-        yield from _stream_response(
-            _with_demographics(_no_uploaded_policies_response(facts), insured)
-        )
-        return
-    if any(term in normalized_question for term in _CLAIM_VERDICT_TERMS):
-        yield from _stream_response(_with_demographics(_refuse_claim_question(), insured))
+    if not facts.policies and not auto_policies:
+        yield from _stream_response(_with_demographics(_no_uploaded_policies_response(), insured))
         return
     if any(term in normalized_question for term in _AMOUNT_TERMS):
         response = _answer_amount(normalized_question, facts, catalog)
         yield from _stream_response(_with_demographics(response, insured))
         return
     if any(term in normalized_question for term in _STATUS_TERMS):
-        yield from _stream_response(_with_demographics(_answer_status(facts, catalog), insured))
+        status = _answer_status(facts, catalog, auto_policies)
+        yield from _stream_response(_with_demographics(status, insured))
         return
     if any(term in normalized_question for term in _HOLDING_TERMS):
-        yield from _stream_response(_with_demographics(_answer_holdings(facts, catalog), insured))
+        holdings = _answer_holdings(facts, catalog, auto_policies)
+        yield from _stream_response(_with_demographics(holdings, insured))
         return
     if any(term in normalized_question for term in _CLAIM_HOWTO_TERMS):
-        yield from _stream_response(_with_demographics(_answer_claim_channels(facts), insured))
+        channels = _answer_claim_channels(policies, facts, normalized_question)
+        yield from _stream_response(_with_demographics(channels, insured))
         return
 
     fallback = _with_demographics(
@@ -181,21 +170,25 @@ def stream_portfolio_answer(
         limitations=limitations,
         suggestions=["다른 담보나 보장 공백도 이어서 물어보세요."],
         fallback=fallback,
-        claim_targets=_claim_targets(facts),
+        claim_targets=_claim_targets(policies, _medical_indemnity_names(facts)),
         stream=stream,
     )
 
 
-def _claim_targets(facts: PortfolioFacts) -> list[tuple[str, str, bool]]:
+def _claim_targets(
+    policies: list[PolicyInput], medical_indemnity_names: set[str]
+) -> list[tuple[str, str, bool]]:
     """Map each held coverage to its policy's insurer for claim-channel routing.
 
-    Uses the coverage's base name (dropping a "(유사암제외)"-style suffix) so a
-    conversational mention like "암 진단비" still resolves to 암진단비(유사암제외),
-    and takes the insurer from the policy — never None like a multi-policy total.
+    Covers every policy including auto, so an accident answer that names an auto
+    coverage (대물배상 등) resolves to the auto insurer. Uses the coverage's base
+    name (dropping a "(유사암제외)"-style suffix) so a conversational mention like
+    "암 진단비" still resolves to 암진단비(유사암제외); the insurer comes from the
+    policy — never None like a multi-policy total.
     """
 
     targets: list[tuple[str, str, bool]] = []
-    for policy in facts.policies:
+    for policy in policies:
         insurer = policy.기본정보.보험사
         if not insurer:
             continue
@@ -204,11 +197,24 @@ def _claim_targets(facts: PortfolioFacts) -> list[tuple[str, str, bool]]:
             normalized = canonicalize_coverage_name(base_name).normalized_key
             if not normalized:
                 continue
-            targets.append((normalized, insurer, coverage.지급유형 == "실손"))
+            # 실손24 belongs to non-auto medical indemnity (실손/실비/비례) only — use
+            # the shared classifier's result, not a brittle 지급유형 == "실손" match.
+            targets.append((normalized, insurer, normalized in medical_indemnity_names))
     return targets
 
 
-def _answer_holdings(facts: PortfolioFacts, catalog: EvidenceCatalog) -> PortfolioQuestionResponse:
+def _medical_indemnity_names(facts: PortfolioFacts) -> set[str]:
+    return {
+        canonicalize_coverage_name(item.coverage_name).normalized_key
+        for item in facts.coverage_summary.indemnity_coverages
+    }
+
+
+def _answer_holdings(
+    facts: PortfolioFacts,
+    catalog: EvidenceCatalog,
+    auto_policies: tuple[PolicyInput, ...] = (),
+) -> PortfolioQuestionResponse:
     labels: list[str] = []
     evidence_ids: list[str] = []
     policy_evidence = [item for item in catalog.items if item.id.startswith("policy:")]
@@ -218,7 +224,15 @@ def _answer_holdings(facts: PortfolioFacts, catalog: EvidenceCatalog) -> Portfol
         classification = policy.기본정보.보험분류 or "미분류"
         labels.append(f"{insurer} {product}({classification})")
         evidence_ids.append(evidence.id)
-    content = f"업로드된 비자동차 보험은 {len(labels)}건이에요: {', '.join(labels)}."
+
+    auto_evidence = [item for item in catalog.items if item.id.startswith("auto:")]
+    for policy, evidence in zip(auto_policies, auto_evidence, strict=True):
+        insurer = policy.기본정보.보험사 or "보험사 미확인"
+        product = policy.기본정보.상품명 or "상품명 미확인"
+        labels.append(f"{insurer} {product}(자동차)")
+        evidence_ids.append(evidence.id)
+
+    content = f"업로드된 보험은 {len(labels)}건이에요: {', '.join(labels)}."
     return _fact_response(content, evidence_ids, catalog, facts)
 
 
@@ -277,10 +291,16 @@ def _answer_amount(
     return _fact_response(content, evidence_ids, catalog, facts)
 
 
-def _answer_status(facts: PortfolioFacts, catalog: EvidenceCatalog) -> PortfolioQuestionResponse:
+def _answer_status(
+    facts: PortfolioFacts,
+    catalog: EvidenceCatalog,
+    auto_policies: tuple[PolicyInput, ...] = (),
+) -> PortfolioQuestionResponse:
     summary = facts.coverage_summary
+    auto_note = f", 자동차보험 {len(auto_policies)}건" if auto_policies else ""
     content = (
-        f"보험 {len(facts.policies)}건에서 정액형 합계 {len(summary.totals)}종을 확인했고, "
+        f"비자동차 보험 {len(facts.policies)}건{auto_note}에서 "
+        f"정액형 합계 {len(summary.totals)}종을 확인했고, "
         f"실손형 {len(summary.indemnity_coverages)}건과 "
         f"합계 제외 {len(summary.excluded_coverages)}건이 있어요."
     )
@@ -371,23 +391,13 @@ def _consultation_fallback(
     )
 
 
-def _refuse_claim_question() -> PortfolioQuestionResponse:
-    return PortfolioQuestionResponse(
-        status="refused",
-        answer=(
-            "그 판단은 담보명과 가입금액만으로는 정확히 답할 수 없어요. "
-            "해당 약관의 보장 조건·면책·지급 사유를 확인해야 합니다."
-        ),
-        citations=[],
-        limitations=[
-            "현재는 업로드된 증권의 구조화 정보만 사용하며 약관 RAG는 아직 연결되지 않았습니다."
-        ],
-        suggestions=["가입한 담보와 금액처럼 증권에서 확인 가능한 내용을 물어보세요."],
-    )
-
-
-def _answer_claim_channels(facts: PortfolioFacts) -> PortfolioQuestionResponse:
-    insurers = [policy.기본정보.보험사 for policy in facts.policies if policy.기본정보.보험사]
+def _answer_claim_channels(
+    policies: list[PolicyInput], facts: PortfolioFacts, question: str
+) -> PortfolioQuestionResponse:
+    auto_related = any(term in question for term in _AUTO_CLAIM_TERMS)
+    relevant = policies if auto_related else [p for p in policies if not is_auto_policy(p)]
+    insurers = [policy.기본정보.보험사 for policy in relevant if policy.기본정보.보험사]
+    # 실손24 is medical-indemnity only — keyed off the non-auto classifier, not auto 비례.
     has_indemnity = bool(facts.coverage_summary.indemnity_coverages)
     block = claim_channel_block(insurers, has_indemnity=has_indemnity)
     lead_in = "청구는 아래 채널에서 확인하실 수 있어요."
@@ -413,7 +423,7 @@ def _standard_limitations(facts: PortfolioFacts) -> list[str]:
     if summary.excluded_coverages:
         limitations.append("지급유형 또는 금액이 확인되지 않은 담보는 합계에 포함하지 않았습니다.")
     if summary.excluded_auto_policy_count:
-        limitations.append("자동차 보험은 별도 분석 대상이라 현재 답변에서 제외했습니다.")
+        limitations.append("가입금액 합계·집계에는 자동차 보험을 포함하지 않았어요.")
     return limitations
 
 

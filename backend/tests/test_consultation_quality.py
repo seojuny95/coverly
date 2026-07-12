@@ -307,9 +307,15 @@ def test_qa_falls_back_when_llm_cites_unknown_fact() -> None:
     assert all(citation.evidence_id != "unknown" for citation in result.citations)
 
 
-def test_qa_refuses_claim_decision_before_calling_llm() -> None:
+def test_qa_answers_claim_question_with_a_hedge_instead_of_refusing() -> None:
     def complete(_system: str, _user: str) -> dict[str, object]:
-        raise AssertionError("claim questions must not reach the LLM")
+        return {
+            "confirmed_fact": "암 진단 관련 담보가 확인돼요.",
+            "guidance": "정확한 지급 여부는 약관과 보험사에서 확인하는 게 좋아요.",
+            "evidence_ids": ["coverage:1"],
+            "suggestions": [],
+            "limitations": [],
+        }
 
     result = answer_portfolio_question(
         "암 진단을 받으면 보험금을 받을 수 있나요?",
@@ -318,6 +324,5 @@ def test_qa_refuses_claim_decision_before_calling_llm() -> None:
         complete=complete,
     )
 
-    assert result.status == "refused"
-    assert result.generation == "fallback"
-    assert result.citations == []
+    assert result.status == "answered"
+    assert result.generation == "llm"

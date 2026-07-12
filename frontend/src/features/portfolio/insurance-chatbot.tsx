@@ -127,7 +127,7 @@ export function InsuranceChatbot({
         onClick={() => setOpen(true)}
         className="fixed right-5 bottom-5 z-40 min-h-14 rounded-2xl bg-blue-600 px-6 py-4 text-base font-semibold text-white shadow-xl sm:right-8 sm:bottom-8"
       >
-        내 보험에 질문하기
+        AI 상담사에게 질문하기
       </button>
     );
 
@@ -191,6 +191,9 @@ export function InsuranceChatbot({
               maxLength={500}
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder="예: 겹치는 보장이 있나요?"
               className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600"
             />

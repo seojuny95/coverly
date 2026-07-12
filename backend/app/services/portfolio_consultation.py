@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from app.schemas.consultation import ConsultationEvidence, InsuredDemographics
+from app.schemas.portfolio import PolicyInput
 from app.services.coverage_taxonomy import classify_coverage
 from app.services.portfolio_summary import PortfolioFacts
 
@@ -105,8 +106,13 @@ def build_evidence_catalog(
     facts: PortfolioFacts,
     demographics: InsuredDemographics,
     missing_categories: tuple[str, ...] = (),
+    auto_policies: tuple[PolicyInput, ...] = (),
 ) -> EvidenceCatalog:
-    """Build the only policy facts that an LLM is allowed to cite."""
+    """Build the only policy facts that an LLM is allowed to cite.
+
+    `auto_policies` are excluded from the analysis aggregates but surfaced here
+    so Q&A knows the user's auto coverage exists (accident help, claim channel).
+    """
 
     items: list[ConsultationEvidence] = []
     category_ids: dict[str, list[str]] = {}
@@ -190,6 +196,22 @@ def build_evidence_catalog(
                 id=f"gap:{index}",
                 fact=f"업로드된 비자동차 보험 전체에서 {category} 담보를 확인하지 못함",
                 coverage_name=category,
+            )
+        )
+
+    for index, policy in enumerate(auto_policies, start=1):
+        insurer = policy.기본정보.보험사
+        product = policy.기본정보.상품명
+        label = " · ".join(item for item in (insurer, product) if item) or "상품 정보 미확인"
+        coverage_names = [coverage.담보명 for coverage in policy.보장목록 if coverage.담보명]
+        detail = f" (보장: {', '.join(coverage_names)})" if coverage_names else ""
+        items.append(
+            ConsultationEvidence(
+                id=f"auto:{index}",
+                fact=f"{label} 자동차보험 가입 사실 확인{detail}",
+                policy_id=policy.id,
+                insurer=insurer,
+                product_name=product,
             )
         )
 

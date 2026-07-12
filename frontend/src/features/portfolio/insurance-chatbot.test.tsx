@@ -16,7 +16,9 @@ const docs: AnalyzedInsurance[] = [
 async function openChat() {
   const user = userEvent.setup();
   renderWithProviders(<InsuranceChatbot documents={docs} />);
-  await user.click(screen.getByRole("button", { name: "내 보험에 질문하기" }));
+  await user.click(
+    screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
+  );
   return user;
 }
 

@@ -99,13 +99,23 @@ def test_qa_claim_channels_include_clickable_links() -> None:
     assert any(link.url.startswith("http") for link in result.claim_channels.indemnity.links)
 
 
-def test_qa_still_refuses_coverage_verdict_questions() -> None:
+def test_qa_answers_coverage_question_with_hedge_instead_of_refusing() -> None:
+    def complete(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "confirmed_fact": "암 진단 관련 담보가 확인돼요.",
+            "guidance": "정확한 지급 여부는 약관과 보험사에서 확인하는 게 좋아요.",
+            "evidence_ids": ["coverage:1"],
+            "suggestions": [],
+            "limitations": [],
+        }
+
     result = answer_portfolio_question(
-        "암이면 실제로 보상 받을 수 있어?", _named_insurer_policies("삼성화재")
+        "암이면 실제로 보상 받을 수 있어?",
+        _named_insurer_policies("삼성화재"),
+        complete=complete,
     )
 
-    assert result.status == "refused"
-    assert "약관" in result.answer
+    assert result.status == "answered"
 
 
 def test_qa_answers_holdings_with_policy_citation() -> None:
@@ -115,6 +125,87 @@ def test_qa_answers_holdings_with_policy_citation() -> None:
     assert "1건" in result.answer
     assert "건강보험" in result.answer
     assert result.citations[0].policy_id == "p1"
+
+
+def _health_plus_auto() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "h1",
+                "기본정보": {"보험사": "삼성화재", "상품명": "건강보험", "보험분류": "질병"},
+                "보장목록": [{"담보명": "실손의료비", "지급유형": "실손"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "a1",
+                "기본정보": {"보험사": "현대해상", "상품명": "하이카", "보험분류": "자동차"},
+                "보장목록": [{"담보명": "대물배상", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+
+def test_qa_claim_howto_excludes_auto_insurer_for_non_auto_question() -> None:
+    result = answer_portfolio_question("실손 청구 어떻게 해?", _health_plus_auto())
+
+    assert result.claim_channels is not None
+    names = [insurer.name for insurer in result.claim_channels.insurers]
+    assert "삼성화재" in names
+    assert "현대해상" not in names
+
+
+def test_qa_claim_howto_includes_auto_insurer_for_car_question() -> None:
+    result = answer_portfolio_question("자동차 사고 청구 어떻게 해?", _health_plus_auto())
+
+    assert result.claim_channels is not None
+    names = [insurer.name for insurer in result.claim_channels.insurers]
+    assert "현대해상" in names
+
+
+def test_qa_claim_howto_detects_indemnity_beyond_exact_실손_type() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "h1",
+                "기본정보": {"보험사": "삼성화재", "상품명": "건강보험", "보험분류": "질병"},
+                "보장목록": [{"담보명": "실손의료비", "지급유형": "실손형"}],
+            }
+        )
+    ]
+
+    result = answer_portfolio_question("실손 청구 어떻게 해?", policies)
+
+    assert result.claim_channels is not None
+    assert result.claim_channels.indemnity is not None
+    assert result.claim_channels.indemnity.name == "실손24"
+
+
+def test_qa_status_counts_auto_policies() -> None:
+    result = answer_portfolio_question("분석 상태 알려줘", [_health_plus_auto()[1]])
+
+    assert result.status == "answered"
+    assert "자동차보험 1건" in result.answer
+
+
+def test_qa_holdings_include_auto_policies() -> None:
+    policies = _policies()
+    policies.append(
+        PolicyInput.model_validate(
+            {
+                "id": "auto1",
+                "기본정보": {"보험사": "현대해상", "상품명": "하이카", "보험분류": "자동차"},
+                "보장목록": [{"담보명": "대물배상", "지급유형": "실손"}],
+            }
+        )
+    )
+
+    result = answer_portfolio_question("가입한 보험 목록 알려줘", policies)
+
+    assert result.status == "answered"
+    assert "2건" in result.answer
+    assert "현대해상" in result.answer
+    assert "자동차" in result.answer
 
 
 def test_qa_uses_confirmed_summary_for_amount_answer() -> None:
@@ -161,8 +252,7 @@ def test_qa_does_not_fall_back_to_total_for_unknown_specific_coverage() -> None:
     assert "찾지 못" in result.answer
 
 
-def test_qa_refuses_claim_conclusion_but_offers_grounded_adequacy_review() -> None:
-    refused = answer_portfolio_question("암이면 실제로 보상 받을 수 있어?", _policies())
+def test_qa_offers_grounded_adequacy_review() -> None:
     review = answer_portfolio_question(
         "이 보험이면 충분해?",
         _policies(),
@@ -170,9 +260,6 @@ def test_qa_refuses_claim_conclusion_but_offers_grounded_adequacy_review() -> No
         complete=lambda _system, _user: (_ for _ in ()).throw(RuntimeError("offline")),
     )
 
-    assert refused.status == "refused"
-    assert refused.citations == []
-    assert "약관" in refused.answer
     assert review.status == "answered"
     assert review.citations
     assert "함께 살펴볼 제안" in review.answer
@@ -342,17 +429,13 @@ def test_qa_drops_unsafe_guidance_but_keeps_confirmed_answer() -> None:
     assert all(section.basis != "general_guidance" for section in result.sections)
 
 
-def test_qa_does_not_call_llm_for_claim_or_amount_questions() -> None:
+def test_qa_does_not_call_llm_for_deterministic_amount_questions() -> None:
     def forbidden(_: str, __: str) -> dict[str, object]:
         raise AssertionError("LLM should not be called")
 
-    claim = answer_portfolio_question(
-        "암 진단을 받으면 보험금을 받을 수 있어?", _policies(), complete=forbidden
-    )
     amount = answer_portfolio_question(
         "암진단비 가입금액은 얼마야?", _policies(), complete=forbidden
     )
 
-    assert claim.status == "refused"
     assert amount.status == "answered"
     assert "30,000,000원" in amount.answer

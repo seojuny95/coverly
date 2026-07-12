@@ -126,6 +126,49 @@ def test_stream_channels_resolve_coverage_with_paren_suffix() -> None:
     assert any(c.get("coverage_name") == "암진단비(유사암제외)" for c in citations)
 
 
+def _auto_policy(insurer: str) -> PolicyInput:
+    return PolicyInput.model_validate(
+        {
+            "id": "auto1",
+            "기본정보": {"보험사": insurer, "상품명": "다이렉트자동차보험", "보험분류": "자동차"},
+            "보장목록": [
+                {"담보명": "대물배상", "지급유형": "실손"},
+                {"담보명": "자기차량손해", "지급유형": "실손"},
+            ],
+        }
+    )
+
+
+def test_stream_gives_auto_insurer_channel_for_accident_answer() -> None:
+    def fake_stream(_system: str, _user: str) -> Iterator[str]:
+        yield "자동차 사고가 나셨군요. 대물배상으로 청구하시면 돼요."
+
+    events = list(
+        stream_portfolio_answer(
+            "사고 났어 어떻게 청구해?", [_auto_policy("삼성화재")], stream=fake_stream
+        )
+    )
+
+    channels = events[-1]["claim_channels"]
+    assert isinstance(channels, dict)
+    assert any(insurer["name"] == "삼성화재" for insurer in channels["insurers"])
+
+
+def test_stream_answers_auto_only_portfolio_instead_of_no_data() -> None:
+    def fake_stream(_system: str, _user: str) -> Iterator[str]:
+        yield "가입하신 자동차보험으로 사고를 접수하실 수 있어요."
+
+    events = list(
+        stream_portfolio_answer(
+            "나 자동차 사고 났어 어떻게 해?", [_auto_policy("삼성화재")], stream=fake_stream
+        )
+    )
+
+    assert events[0]["status"] != "no_data"
+    text = "".join(str(e["text"]) for e in events if e["type"] == "delta")
+    assert "자동차보험" in text
+
+
 def test_stream_llm_answer_has_no_channels_when_not_claim_related() -> None:
     def fake_stream(_system: str, _user: str) -> Iterator[str]:
         yield "암진단비 담보가 확인돼요."

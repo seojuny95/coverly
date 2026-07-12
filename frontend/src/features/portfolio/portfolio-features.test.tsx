@@ -335,7 +335,7 @@ describe("portfolio features", () => {
     );
 
     await user.click(
-      screen.getByRole("button", { name: "내 보험에 질문하기" }),
+      screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
     );
     await user.type(screen.getByLabelText("보험 질문"), "암 진단비는?");
     await user.click(screen.getByRole("button", { name: "질문하기" }));
