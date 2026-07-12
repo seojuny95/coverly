@@ -29,6 +29,7 @@ import {
   primaryButtonClassName,
   secondaryButtonClassName,
 } from "../../components/coverly-brand";
+import { fileHasPdfMagic } from "./pdf-magic";
 
 export type UploadInsurance = (file: File) => Promise<InsuranceUploadResult>;
 
@@ -152,31 +153,42 @@ export function InsuranceUploadForm({
     selectFiles(event.dataTransfer.files);
   };
 
-  // Shared by both duplicate paths (byte-identical pre-upload check and the
-  // post-parse semantic check): mark the given selected files as duplicates and
-  // surface one "remove and retry" message. Non-duplicate files are left as-is.
-  const rejectDuplicateFiles = (
-    duplicates: Array<{ id: string; fileName: string }>,
+  // Mark the given selected files as failed with a shared code + message and
+  // surface one "remove and retry" summary. Non-listed files are left as-is.
+  const failSelectedFiles = (
+    files: Array<{ id: string; fileName: string }>,
+    code: string,
+    message: string,
   ) => {
-    const duplicateFileIds = new Set(
-      duplicates.map((duplicate) => duplicate.id),
-    );
+    const failedIds = new Set(files.map((file) => file.id));
     setSelectedUploadFiles((current) =>
       current.map((selectedFile) =>
-        duplicateFileIds.has(selectedFile.id)
+        failedIds.has(selectedFile.id)
           ? {
               ...selectedFile,
               status: "failed",
-              errorCode: "DUPLICATE_POLICY",
-              errorMessage: "이미 올린 보험증권이에요.",
+              errorCode: code,
+              errorMessage: message,
             }
           : selectedFile,
       ),
     );
     setError(
-      `이미 올린 보험증권이에요. ${duplicates
-        .map((duplicate) => duplicate.fileName)
+      `${message} ${files
+        .map((file) => file.fileName)
         .join(", ")} 파일을 제거하고 다시 시도해주세요.`,
+    );
+  };
+
+  // Used by both duplicate paths: the byte-identical pre-upload check and the
+  // post-parse semantic check.
+  const rejectDuplicateFiles = (
+    duplicates: Array<{ id: string; fileName: string }>,
+  ) => {
+    failSelectedFiles(
+      duplicates,
+      "DUPLICATE_POLICY",
+      "이미 올린 보험증권이에요.",
     );
   };
 
@@ -204,6 +216,29 @@ export function InsuranceUploadForm({
           createFileFingerprint(selectedFile.file),
         ),
       );
+
+      // Reject files whose bytes are not actually a PDF (e.g. an image renamed
+      // to .pdf) before uploading. The backend re-validates content; this is
+      // fast client-side feedback, not the authoritative check.
+      const contentIsPdf = await Promise.all(
+        selectedUploadFiles.map((selectedFile) =>
+          fileHasPdfMagic(selectedFile.file),
+        ),
+      );
+      const invalidTypeFiles = selectedUploadFiles.filter(
+        (_, index) => !contentIsPdf[index],
+      );
+      if (invalidTypeFiles.length > 0) {
+        failSelectedFiles(
+          invalidTypeFiles.map((selectedFile) => ({
+            id: selectedFile.id,
+            fileName: selectedFile.file.name,
+          })),
+          "INVALID_PDF",
+          "PDF 형식이 아니에요.",
+        );
+        return;
+      }
 
       // Catch byte-identical re-uploads before spending a full parse + LLM pass.
       const byteIdenticalIndexes = findByteIdenticalDuplicateIndexes({

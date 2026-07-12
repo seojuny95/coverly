@@ -4,6 +4,7 @@ import { type ComponentPropsWithoutRef, useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 
 import type { ClaimChannelBlock } from "./portfolio-api";
+import { safeHref } from "./safe-href";
 
 type ChatSource = { label: string };
 
@@ -55,7 +56,7 @@ const markdownComponents: Components = {
   li: (props) => <li className="pl-0.5" {...props} />,
   a: ({ href, ...props }: ComponentPropsWithoutRef<"a">) => (
     <a
-      href={href}
+      href={safeHref(href)}
       target="_blank"
       rel="noopener noreferrer"
       className="text-blue-600 underline underline-offset-2 hover:text-blue-700"
@@ -126,17 +127,28 @@ function ChannelLinks({
   if (!links.length) return null;
   return (
     <span className="ml-1 inline-flex flex-wrap gap-x-2">
-      {links.map((link) => (
-        <a
-          key={`${link.label}-${link.url}`}
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 underline underline-offset-2 hover:text-blue-700"
-        >
-          {link.label}
-        </a>
-      ))}
+      {links.map((link) => {
+        const href = safeHref(link.url);
+        if (!href) {
+          return (
+            <span key={`${link.label}-${link.url}`} className="text-zinc-500">
+              {link.label}
+            </span>
+          );
+        }
+
+        return (
+          <a
+            key={`${link.label}-${link.url}`}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline underline-offset-2 hover:text-blue-700"
+          >
+            {link.label}
+          </a>
+        );
+      })}
     </span>
   );
 }
