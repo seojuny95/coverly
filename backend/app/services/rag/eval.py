@@ -1,4 +1,4 @@
-"""Tiny retrieval evaluation loop for the first RAG iteration."""
+"""Tiny source-chunk coverage eval for official RAG indexing."""
 
 from __future__ import annotations
 
@@ -6,7 +6,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.services.rag.retrieve import RetrievalHit, infer_profile, retrieve
+from app.services.rag.chunking import RagChunk
+from app.services.rag.retrieve import RetrievalHit, infer_profile, load_official_chunks, retrieve
 
 EVAL_FIXTURE = Path(__file__).resolve().parents[3] / "tests/fixtures/rag/retrieval_eval.json"
 
@@ -59,10 +60,22 @@ def load_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[RetrievalEvalC
     return tuple(cases)
 
 
-def evaluate_retrieval(cases: tuple[RetrievalEvalCase, ...] | None = None) -> RetrievalEvalReport:
+def evaluate_source_chunk_retrieval(
+    cases: tuple[RetrievalEvalCase, ...] | None = None,
+) -> RetrievalEvalReport:
+    """Evaluate local source chunks before they are indexed into pgvector."""
+    chunks = load_official_chunks()
+    return evaluate_source_chunk_retrieval_with_chunks(cases, chunks=chunks)
+
+
+def evaluate_source_chunk_retrieval_with_chunks(
+    cases: tuple[RetrievalEvalCase, ...] | None = None,
+    *,
+    chunks: tuple[RagChunk, ...],
+) -> RetrievalEvalReport:
     active_cases = cases or load_retrieval_eval_cases()
     results = tuple(
-        _evaluate_case(case, retrieve(query=case.query, profile=case.profile))
+        _evaluate_case(case, retrieve(query=case.query, profile=case.profile, chunks=chunks))
         for case in active_cases
     )
     return RetrievalEvalReport(

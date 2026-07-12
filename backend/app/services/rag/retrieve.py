@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 from app.services.llm import JsonCompleter, structured_completer
 from app.services.rag.chunking import RagChunk, build_chunks
 from app.services.rag.official_sources import OfficialSource, rag_sources
+from app.services.rag.pgvector_store import search_chunks
+from app.settings import get_settings
 
 _TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]+")
 _STOPWORDS = {
@@ -142,17 +144,49 @@ def retrieve(
     *,
     chunks: tuple[RagChunk, ...] | None = None,
     profile: str = "general",
-    candidate_k: int = 24,
+    candidate_k: int = 80,
     final_k: int = 6,
     reranker: Reranker | None = None,
 ) -> list[RetrievalHit]:
-    """Retrieve official-source chunks, then rerank and trim."""
+    """Retrieve official-source chunks, then rerank and trim.
+
+    Production official-source retrieval uses pgvector only. The optional
+    `chunks` argument exists for deterministic unit/eval tests and indexing
+    validation; it is not the runtime fallback path.
+    """
+    if chunks is None:
+        vector_hits = _retrieve_from_pgvector(query, final_k=candidate_k)
+        if not vector_hits:
+            return []
+        ranked = (reranker or LexicalReranker()).rerank(
+            query,
+            vector_hits,
+            profile=profile,
+        )
+        return ranked[:final_k]
+
     terms = _expanded_terms(query, profile)
     if not terms:
         return []
 
+    candidates = _lexical_candidates(terms, chunks, candidate_k=candidate_k)
+    ranked = (reranker or LexicalReranker()).rerank(
+        query,
+        candidates,
+        profile=profile,
+    )
+    return ranked[:final_k]
+
+
+def _lexical_candidates(
+    terms: list[str],
+    corpus: tuple[RagChunk, ...],
+    *,
+    candidate_k: int,
+) -> list[RetrievalHit]:
+    if not terms:
+        return []
     candidates: list[RetrievalHit] = []
-    corpus = chunks if chunks is not None else load_official_chunks()
     for chunk in corpus:
         keyword_score = _keyword_score(chunk, terms)
         if keyword_score <= 0:
@@ -166,12 +200,30 @@ def retrieve(
             )
         )
     candidates.sort(key=lambda hit: (-hit.keyword_score, hit.chunk.source_id, hit.chunk.page_start))
-    ranked = (reranker or LexicalReranker()).rerank(
-        query,
-        candidates[:candidate_k],
-        profile=profile,
-    )
-    return ranked[:final_k]
+    return candidates[:candidate_k]
+
+
+def _retrieve_from_pgvector(query: str, *, final_k: int) -> list[RetrievalHit]:
+    settings = get_settings()
+    if not settings.database_url or not settings.openai_api_key:
+        return []
+    try:
+        hits = search_chunks(
+            settings.database_url,
+            query,
+            final_k=final_k,
+        )
+    except Exception:
+        return []
+    return [
+        RetrievalHit(
+            chunk=hit.chunk,
+            score=hit.score,
+            keyword_score=0,
+            rerank_score=hit.score,
+        )
+        for hit in hits
+    ]
 
 
 def infer_profile(query: str) -> str:

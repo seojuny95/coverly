@@ -17,6 +17,7 @@ from app.settings import get_settings
 
 JsonCompleter = Callable[[str, str], dict[str, object]]
 TextStreamer = Callable[[str, str], Iterator[str]]
+Embedder = Callable[[list[str]], list[list[float]]]
 
 _TIMEOUT_S = 30.0
 _MAX_RETRIES = 2
@@ -71,3 +72,18 @@ def stream_completion(system: str, user: str) -> Iterator[str]:
         delta = chunk.choices[0].delta.content if chunk.choices else None
         if delta:
             yield delta
+
+
+def embed_texts(texts: list[str]) -> list[list[float]]:
+    """Embed texts through the configured OpenAI embedding model."""
+    if not texts:
+        return []
+    settings = get_settings()
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    response = _get_client(settings.openai_api_key).embeddings.create(
+        model=settings.openai_embedding_model,
+        input=texts,
+        dimensions=settings.openai_embedding_dimensions,
+    )
+    return [list(item.embedding) for item in response.data]
