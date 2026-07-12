@@ -1,0 +1,50 @@
+{
+  "sources": [
+    {
+      "id": "standard_terms_annex_15_2026_06_30",
+      "title": "보험업감독업무시행세칙 별표15 표준약관",
+      "category": "standard_clause",
+      "publisher": "금융감독원",
+      "status": "downloaded",
+      "local_path": "standard-clauses/별표15-표준약관-2026-06-15.pdf",
+      "effective_date": "2026-06-30",
+      "sha256": "4c166b40f0aa6753a6e5848425abf632a4f3c4ee5521cc7d5caac5abf670f547",
+      "source_url": "https://www.law.go.kr/LSW/flDownload.do?flSeq=166365465",
+      "rag_enabled": true,
+      "notes": "파일명은 POC 원본 기준 2026-06-15이나, law.go.kr 2026-06-30 별표15 다운로드와 동일 해시다."
+    },
+    {
+      "id": "fsc_policy_terms_roadmap_2019_10_22",
+      "title": "보험약관 개선 로드맵",
+      "category": "consumer_guide",
+      "publisher": "금융위원회",
+      "status": "downloaded",
+      "local_path": "official-sources/consumer-guides/보험약관-개선-로드맵-2019-10-22.pdf",
+      "published_date": "2019-10-22",
+      "sha256": "ad803a1857f28238c7dcbd945895d401e28ce4dbb43ed664a5092aa5d689c554",
+      "source_url": "https://www.fsc.go.kr",
+      "rag_enabled": true,
+      "notes": "약관 구성, 용어, 소비자 이해도 개선 방향에 대한 소비자 안내 근거로 사용한다."
+    },
+    {
+      "id": "insurance_business_act",
+      "title": "보험업법",
+      "category": "law",
+      "publisher": "국가법령정보센터",
+      "status": "public_url_verified",
+      "source_url": "https://www.law.go.kr/법령/보험업법",
+      "rag_enabled": false,
+      "notes": "다음 단계에서 조문 스냅샷을 저장한 뒤 RAG에 편입한다."
+    },
+    {
+      "id": "financial_consumer_protection_act",
+      "title": "금융소비자 보호에 관한 법률",
+      "category": "law",
+      "publisher": "국가법령정보센터",
+      "status": "public_url_verified",
+      "source_url": "https://www.law.go.kr/법령/금융소비자보호에관한법률",
+      "rag_enabled": false,
+      "notes": "설명의무, 적합성·적정성 원칙 관련 근거 후보. 원문 스냅샷 저장 후 편입한다."
+    }
+  ]
+}

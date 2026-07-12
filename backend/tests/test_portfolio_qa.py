@@ -4,6 +4,7 @@ from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import ConversationMessage
 from app.services.portfolio_qa import answer_portfolio_question
+from app.services.rag.answer import RagAnswer, RagCitation
 
 
 def _policies() -> list[PolicyInput]:
@@ -70,6 +71,106 @@ def _named_insurer_policies(insurer: str) -> list[PolicyInput]:
             }
         )
     ]
+
+
+def _official_answer(question: str) -> RagAnswer:
+    assert question
+    return RagAnswer(
+        status="answered",
+        mode="term_explain",
+        answer="계약 전 알릴 의무는 가입 전에 중요한 사항을 알려야 한다는 뜻이에요.",
+        citations=(
+            RagCitation(
+                chunk_id="official-1",
+                source_id="standard_terms_annex_15_2026_06_30",
+                source_title="보험업감독업무시행세칙 별표15 표준약관",
+                source_category="standard_clause",
+                publisher="금융감독원",
+                citation_label="표준약관 제2조(계약 전 알릴 의무)",
+                page_start=10,
+                page_end=10,
+                version_label="시행일 2026-06-30",
+                source_url="https://www.law.go.kr/LSW/flDownload.do?flSeq=166365465",
+            ),
+        ),
+        limitations=("공식자료 발췌문에 근거한 일반 설명입니다.",),
+    )
+
+
+def _official_claim_answer(_: str) -> RagAnswer:
+    return RagAnswer(
+        status="answered",
+        mode="claim_check",
+        answer=(
+            "표준약관 기준으로 암 진단 확정이라는 지급사유에 해당하면 "
+            "보험금이 지급됩니다. 업로드된 증권에서 확인된 암진단비 가입금액은 "
+            "구조화된 담보 정보로 별도 확인할 수 있어요.\n\n"
+            "최종 지급 여부는 가입한 상품 약관과 보험사 심사로 확정돼요."
+        ),
+        citations=(
+            RagCitation(
+                chunk_id="official-claim-1",
+                source_id="standard_terms_annex_15_2026_06_30",
+                source_title="보험업감독업무시행세칙 별표15 표준약관",
+                source_category="standard_clause",
+                publisher="금융감독원",
+                citation_label="표준약관 제3조(보험금의 지급사유)",
+                page_start=12,
+                page_end=12,
+                version_label="시행일 2026-06-30",
+                source_url="https://www.law.go.kr/LSW/flDownload.do?flSeq=166365465",
+            ),
+        ),
+        limitations=("표준약관 기준의 일반 확인 안내입니다.",),
+        missing_context=("가입 상품 약관", "진단확정 서류"),
+    )
+
+
+def test_qa_routes_official_terms_to_rag_even_without_uploaded_policies() -> None:
+    result = answer_portfolio_question(
+        "계약 전 알릴 의무가 뭐야?",
+        [],
+        official_answer=_official_answer,
+    )
+
+    assert result.status == "answered"
+    assert result.generation == "llm"
+    assert result.citations[0].source_id == "standard_terms_annex_15_2026_06_30"
+    assert result.citations[0].source_page == 10
+    assert "보험증권을 먼저 업로드" not in result.answer
+
+
+def test_qa_allows_grounded_official_payment_explanation() -> None:
+    result = answer_portfolio_question(
+        "암 진단비 받을 수 있는지 확인 기준 알려줘",
+        _policies(),
+        official_answer=_official_claim_answer,
+    )
+
+    assert result.status == "answered"
+    assert "보험금이 지급됩니다" in result.answer
+    assert "최종 지급 여부" in result.answer
+    assert result.citations[0].source_id == "standard_terms_annex_15_2026_06_30"
+
+
+def test_qa_ignores_filtered_official_rag_and_uses_existing_flow() -> None:
+    def filtered(_: str) -> RagAnswer:
+        return RagAnswer(
+            status="filtered",
+            mode="term_explain",
+            answer="공식 자료 근거 안에서 안전하게 답변하지 못했습니다.",
+            citations=(),
+            limitations=("답변이 근거를 벗어나면 폐기합니다.",),
+        )
+
+    result = answer_portfolio_question(
+        "가입한 보험 목록 알려줘",
+        _policies(),
+        official_answer=filtered,
+    )
+
+    assert result.status == "answered"
+    assert result.citations[0].policy_id == "p1"
 
 
 def test_qa_answers_how_to_claim_with_insurer_channels() -> None:

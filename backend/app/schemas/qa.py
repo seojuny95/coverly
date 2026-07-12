@@ -30,6 +30,12 @@ class AnswerCitation(BaseModel):
     insurer: str | None
     product_name: str | None
     coverage_name: str | None = None
+    source_id: str | None = None
+    source_title: str | None = None
+    source_category: str | None = None
+    source_url: str | None = None
+    source_page: int | None = Field(default=None, ge=1)
+    source_version: str | None = None
 
 
 class ClaimChannelLink(BaseModel):

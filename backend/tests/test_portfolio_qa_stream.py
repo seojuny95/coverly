@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import ConversationMessage
 from app.services.portfolio_qa import stream_portfolio_answer
+from app.services.rag.answer import RagAnswer, RagCitation
 
 
 def _policies() -> list[PolicyInput]:
@@ -20,6 +21,51 @@ def _policies() -> list[PolicyInput]:
             }
         )
     ]
+
+
+def _official_answer(_: str) -> RagAnswer:
+    return RagAnswer(
+        status="answered",
+        mode="claim_check",
+        answer=(
+            "표준약관 기준으로는 지급사유와 면책 사유를 확인해야 해요.\n\n"
+            "최종 지급 여부는 가입한 상품 약관과 보험사 심사로 확정돼요."
+        ),
+        citations=(
+            RagCitation(
+                chunk_id="official-claim-1",
+                source_id="standard_terms_annex_15_2026_06_30",
+                source_title="보험업감독업무시행세칙 별표15 표준약관",
+                source_category="standard_clause",
+                publisher="금융감독원",
+                citation_label="표준약관 제3조(보험금의 지급사유)",
+                page_start=12,
+                page_end=12,
+                version_label="시행일 2026-06-30",
+                source_url="https://www.law.go.kr/LSW/flDownload.do?flSeq=166365465",
+            ),
+        ),
+        limitations=("표준약관 기준의 일반 확인 안내입니다.",),
+    )
+
+
+def test_stream_routes_official_rag_as_single_delta() -> None:
+    events = list(
+        stream_portfolio_answer(
+            "암 진단비 받을 수 있는지 확인 기준 알려줘",
+            _policies(),
+            official_answer=_official_answer,
+        )
+    )
+
+    assert events[0]["type"] == "meta"
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert "지급사유" in text
+    end = events[-1]
+    assert end["type"] == "end"
+    citations = end["citations"]
+    assert isinstance(citations, list)
+    assert citations[0]["source_id"] == "standard_terms_annex_15_2026_06_30"
 
 
 def test_stream_llm_answer_yields_deltas_then_end_with_citations() -> None:
