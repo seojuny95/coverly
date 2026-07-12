@@ -57,6 +57,57 @@ def _alias_policies() -> list[PolicyInput]:
     ]
 
 
+def _named_insurer_policies(insurer: str) -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": insurer, "상품명": "건강보험", "보험분류": "질병"},
+                "보장목록": [
+                    {"담보명": "암진단비", "가입금액": "3,000만원", "지급유형": "정액"},
+                    {"담보명": "실손의료비", "가입금액": "5,000만원", "지급유형": "실손"},
+                ],
+            }
+        )
+    ]
+
+
+def test_qa_answers_how_to_claim_with_insurer_channels() -> None:
+    def forbidden(_: str, __: str) -> dict[str, object]:
+        raise AssertionError("LLM should not be called for claim-channel questions")
+
+    result = answer_portfolio_question(
+        "실손 어떻게 청구해?", _named_insurer_policies("삼성화재"), complete=forbidden
+    )
+
+    assert result.status == "answered"
+    assert result.claim_channels is not None
+    assert any(insurer.name == "삼성화재" for insurer in result.claim_channels.insurers)
+    assert result.claim_channels.indemnity is not None
+    assert result.claim_channels.indemnity.name == "실손24"
+    assert any("약관" in limitation for limitation in result.limitations)
+
+
+def test_qa_claim_channels_include_clickable_links() -> None:
+    result = answer_portfolio_question("실손 어떻게 청구해?", _named_insurer_policies("삼성화재"))
+
+    assert result.claim_channels is not None
+    insurer = result.claim_channels.insurers[0]
+    assert insurer.name == "삼성화재"
+    assert any(link.url.startswith("http") for link in insurer.links)
+    assert result.claim_channels.indemnity is not None
+    assert any(link.url.startswith("http") for link in result.claim_channels.indemnity.links)
+
+
+def test_qa_still_refuses_coverage_verdict_questions() -> None:
+    result = answer_portfolio_question(
+        "암이면 실제로 보상 받을 수 있어?", _named_insurer_policies("삼성화재")
+    )
+
+    assert result.status == "refused"
+    assert "약관" in result.answer
+
+
 def test_qa_answers_holdings_with_policy_citation() -> None:
     result = answer_portfolio_question("가입한 보험 목록 알려줘", _policies())
 
@@ -225,29 +276,70 @@ def test_qa_filters_hallucinated_numbers_and_invalid_evidence() -> None:
     assert "1억원" not in result.answer
 
 
-def test_qa_filters_direct_action_and_numeric_guidance_with_valid_evidence() -> None:
-    unsafe_guidance = ("암보험 가입하세요", "1억원이 필요해요")
+def test_qa_keeps_guidance_with_everyday_advisory_words() -> None:
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "confirmed_fact": "암 진단 담보의 가입 사실이 확인돼요.",
+            "guidance": "지금 보장을 잘 유지하시면 좋아요. 필요할 때 함께 준비해요.",
+            "evidence_ids": ["coverage:1"],
+            "suggestions": [],
+            "limitations": [],
+        }
 
-    for guidance in unsafe_guidance:
+    result = answer_portfolio_question(
+        "내 보장을 어떻게 준비할까?",
+        _policies(),
+        demographics=InsuredDemographics(age=35, gender="여성", source="policy"),
+        complete=complete,
+    )
 
-        def complete(_: str, __: str, guidance: str = guidance) -> dict[str, object]:
-            return {
-                "confirmed_fact": "암 진단 담보의 가입 사실이 확인돼요.",
-                "guidance": guidance,
-                "evidence_ids": ["coverage:1"],
-                "suggestions": [],
-                "limitations": [],
-            }
+    assert result.generation == "llm"
+    assert "유지하시면 좋아요" in result.answer
 
-        result = answer_portfolio_question(
-            "내 보장을 어떻게 준비할까?",
-            _policies(),
-            demographics=InsuredDemographics(age=35, gender="여성", source="policy"),
-            complete=complete,
-        )
 
-        assert result.generation == "fallback"
-        assert guidance not in result.answer
+def test_qa_allows_hedged_money_range_in_guidance() -> None:
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "confirmed_fact": "암 진단 담보의 가입 사실이 확인돼요.",
+            "guidance": "정답은 아니지만 월 3만원 정도로 준비하는 분들도 있어요.",
+            "evidence_ids": ["coverage:1"],
+            "suggestions": [],
+            "limitations": [],
+        }
+
+    result = answer_portfolio_question(
+        "내 보장을 어떻게 준비할까?",
+        _policies(),
+        demographics=InsuredDemographics(age=35, gender="여성", source="policy"),
+        complete=complete,
+    )
+
+    assert result.generation == "llm"
+    assert "월 3만원" in result.answer
+
+
+def test_qa_drops_unsafe_guidance_but_keeps_confirmed_answer() -> None:
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "confirmed_fact": "암 진단 담보의 가입 사실이 확인돼요.",
+            "guidance": "지금 바로 암보험 가입하세요.",
+            "evidence_ids": ["coverage:1"],
+            "suggestions": [],
+            "limitations": [],
+        }
+
+    result = answer_portfolio_question(
+        "내 보장을 어떻게 준비할까?",
+        _policies(),
+        demographics=InsuredDemographics(age=35, gender="여성", source="policy"),
+        complete=complete,
+    )
+
+    assert result.generation == "llm"
+    assert result.citations[0].evidence_id == "coverage:1"
+    assert "가입하세요" not in result.answer
+    assert any(section.basis == "confirmed_fact" for section in result.sections)
+    assert all(section.basis != "general_guidance" for section in result.sections)
 
 
 def test_qa_does_not_call_llm_for_claim_or_amount_questions() -> None:

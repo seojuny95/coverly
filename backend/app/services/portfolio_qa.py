@@ -1,5 +1,7 @@
 """Conversational Q&A grounded in uploaded portfolio facts."""
 
+from collections.abc import Iterator
+
 from app.schemas.consultation import (
     AnswerSection,
     ConsultationEvidence,
@@ -11,34 +13,41 @@ from app.schemas.qa import (
     ConversationMessage,
     PortfolioQuestionResponse,
 )
+from app.services.claim_channels import claim_channel_block
 from app.services.coverage_name_matching import (
     canonicalize_coverage_name,
     query_contains_canonical_name,
 )
 from app.services.coverage_taxonomy import LifeStageCheck, check_life_stage
-from app.services.llm import JsonCompleter
+from app.services.llm import JsonCompleter, TextStreamer
 from app.services.portfolio_consultation import (
     EvidenceCatalog,
     build_evidence_catalog,
 )
 from app.services.portfolio_demographics import resolve_portfolio_demographics
-from app.services.portfolio_qa_generation import generate_consultation_answer
+from app.services.portfolio_qa_generation import (
+    QaStreamEvent,
+    generate_consultation_answer,
+    stream_consultation_answer,
+)
 from app.services.portfolio_summary import (
     PortfolioFacts,
     build_portfolio_facts,
 )
 
-_CLAIM_TERMS = (
+# Coverage/payout verdicts require policy terms (약관 RAG) — refuse these.
+_CLAIM_VERDICT_TERMS = (
     "보상되",
     "보상 받을",
     "보상받을",
     "지급 조건",
     "면책",
     "약관",
-    "청구",
     "보험금 받을",
     "보험금을 받을",
 )
+# "How do I claim?" is procedural — answer with the deterministic channel directory.
+_CLAIM_HOWTO_TERMS = ("청구", "신청", "접수", "서류")
 _AMOUNT_TERMS = ("합계", "총액", "얼마", "가입금액")
 _STATUS_TERMS = ("추출 상태", "분석 상태", "제외된", "확인 못한")
 _HOLDING_TERMS = ("몇 개", "몇개", "몇 건", "몇건", "보유 중", "목록", "가입한 보험")
@@ -61,20 +70,8 @@ def answer_portfolio_question(
     catalog = build_evidence_catalog(facts, insured, life_stage_check.missing)
 
     if not facts.policies:
-        limitations = ["보험증권을 먼저 업로드해 주세요."]
-        if facts.coverage_summary.excluded_auto_policy_count:
-            limitations.append("자동차 보험은 별도 분석 대상이라 현재 Q&A에서 제외합니다.")
-        return _with_demographics(
-            PortfolioQuestionResponse(
-                status="no_data",
-                answer="살펴볼 비자동차 보험 정보가 아직 없어요.",
-                citations=[],
-                limitations=limitations,
-                suggestions=["보험증권을 업로드한 뒤 다시 질문해 주세요."],
-            ),
-            insured,
-        )
-    if any(term in normalized_question for term in _CLAIM_TERMS):
+        return _with_demographics(_no_uploaded_policies_response(facts), insured)
+    if any(term in normalized_question for term in _CLAIM_VERDICT_TERMS):
         return _with_demographics(_refuse_claim_question(), insured)
     if any(term in normalized_question for term in _AMOUNT_TERMS):
         return _with_demographics(_answer_amount(normalized_question, facts, catalog), insured)
@@ -82,6 +79,8 @@ def answer_portfolio_question(
         return _with_demographics(_answer_status(facts, catalog), insured)
     if any(term in normalized_question for term in _HOLDING_TERMS):
         return _with_demographics(_answer_holdings(facts, catalog), insured)
+    if any(term in normalized_question for term in _CLAIM_HOWTO_TERMS):
+        return _with_demographics(_answer_claim_channels(facts), insured)
 
     fallback = _consultation_fallback(facts, insured, life_stage_check, catalog)
     response = generate_consultation_answer(
@@ -95,6 +94,118 @@ def answer_portfolio_question(
         complete=complete,
     )
     return _with_demographics(response, insured)
+
+
+def _no_uploaded_policies_response(facts: PortfolioFacts) -> PortfolioQuestionResponse:
+    limitations = ["보험증권을 먼저 업로드해 주세요."]
+    if facts.coverage_summary.excluded_auto_policy_count:
+        limitations.append("자동차 보험은 별도 분석 대상이라 현재 Q&A에서 제외합니다.")
+    return PortfolioQuestionResponse(
+        status="no_data",
+        answer="살펴볼 비자동차 보험 정보가 아직 없어요.",
+        citations=[],
+        limitations=limitations,
+        suggestions=["보험증권을 업로드한 뒤 다시 질문해 주세요."],
+    )
+
+
+def _stream_response(response: PortfolioQuestionResponse) -> Iterator[QaStreamEvent]:
+    """Emit a fully-computed deterministic answer as a single-delta stream."""
+
+    yield {"type": "meta", "status": response.status, "generation": response.generation}
+    yield {"type": "delta", "text": response.answer}
+    yield {
+        "type": "end",
+        "status": response.status,
+        "generation": response.generation,
+        "citations": [citation.model_dump(mode="json") for citation in response.citations],
+        "limitations": response.limitations,
+        "suggestions": response.suggestions,
+        "claim_channels": (
+            response.claim_channels.model_dump(mode="json") if response.claim_channels else None
+        ),
+    }
+
+
+def stream_portfolio_answer(
+    question: str,
+    policies: list[PolicyInput],
+    *,
+    demographics: InsuredDemographics | None = None,
+    history: list[ConversationMessage] | None = None,
+    stream: TextStreamer | None = None,
+) -> Iterator[QaStreamEvent]:
+    """Stream the answer: deterministic routes emit at once, the LLM route streams."""
+
+    insured = resolve_portfolio_demographics(policies, demographics)
+    facts = build_portfolio_facts(policies)
+    normalized_question = question.strip()
+    life_stage_check = _life_stage_check(insured, facts)
+    catalog = build_evidence_catalog(facts, insured, life_stage_check.missing)
+
+    if not facts.policies:
+        yield from _stream_response(
+            _with_demographics(_no_uploaded_policies_response(facts), insured)
+        )
+        return
+    if any(term in normalized_question for term in _CLAIM_VERDICT_TERMS):
+        yield from _stream_response(_with_demographics(_refuse_claim_question(), insured))
+        return
+    if any(term in normalized_question for term in _AMOUNT_TERMS):
+        response = _answer_amount(normalized_question, facts, catalog)
+        yield from _stream_response(_with_demographics(response, insured))
+        return
+    if any(term in normalized_question for term in _STATUS_TERMS):
+        yield from _stream_response(_with_demographics(_answer_status(facts, catalog), insured))
+        return
+    if any(term in normalized_question for term in _HOLDING_TERMS):
+        yield from _stream_response(_with_demographics(_answer_holdings(facts, catalog), insured))
+        return
+    if any(term in normalized_question for term in _CLAIM_HOWTO_TERMS):
+        yield from _stream_response(_with_demographics(_answer_claim_channels(facts), insured))
+        return
+
+    fallback = _with_demographics(
+        _consultation_fallback(facts, insured, life_stage_check, catalog), insured
+    )
+    limitations = list(_standard_limitations(facts))
+    notice = _demographic_notice(insured)
+    if notice:
+        limitations.append(notice)
+    yield from stream_consultation_answer(
+        question=normalized_question,
+        demographics=insured,
+        history=history or [],
+        life_stage_check=life_stage_check,
+        catalog=catalog,
+        limitations=limitations,
+        suggestions=["다른 담보나 보장 공백도 이어서 물어보세요."],
+        fallback=fallback,
+        claim_targets=_claim_targets(facts),
+        stream=stream,
+    )
+
+
+def _claim_targets(facts: PortfolioFacts) -> list[tuple[str, str, bool]]:
+    """Map each held coverage to its policy's insurer for claim-channel routing.
+
+    Uses the coverage's base name (dropping a "(유사암제외)"-style suffix) so a
+    conversational mention like "암 진단비" still resolves to 암진단비(유사암제외),
+    and takes the insurer from the policy — never None like a multi-policy total.
+    """
+
+    targets: list[tuple[str, str, bool]] = []
+    for policy in facts.policies:
+        insurer = policy.기본정보.보험사
+        if not insurer:
+            continue
+        for coverage in policy.보장목록:
+            base_name = coverage.담보명.split("(")[0].strip() or coverage.담보명
+            normalized = canonicalize_coverage_name(base_name).normalized_key
+            if not normalized:
+                continue
+            targets.append((normalized, insurer, coverage.지급유형 == "실손"))
+    return targets
 
 
 def _answer_holdings(facts: PortfolioFacts, catalog: EvidenceCatalog) -> PortfolioQuestionResponse:
@@ -275,6 +386,25 @@ def _refuse_claim_question() -> PortfolioQuestionResponse:
     )
 
 
+def _answer_claim_channels(facts: PortfolioFacts) -> PortfolioQuestionResponse:
+    insurers = [policy.기본정보.보험사 for policy in facts.policies if policy.기본정보.보험사]
+    has_indemnity = bool(facts.coverage_summary.indemnity_coverages)
+    block = claim_channel_block(insurers, has_indemnity=has_indemnity)
+    lead_in = "청구는 아래 채널에서 확인하실 수 있어요."
+    return PortfolioQuestionResponse(
+        status="answered",
+        answer=lead_in,
+        sections=[AnswerSection(title="청구 방법 안내", content=lead_in, basis="general_guidance")],
+        citations=[],
+        limitations=[
+            "청구 방법만 안내했어요. "
+            "보상 가능 여부와 지급액은 약관·보험사 안내를 확인해야 정확합니다."
+        ],
+        suggestions=["가입한 담보와 금액처럼 증권에서 확인 가능한 내용도 물어보세요."],
+        claim_channels=block,
+    )
+
+
 def _standard_limitations(facts: PortfolioFacts) -> list[str]:
     summary = facts.coverage_summary
     limitations = ["보상 조건·면책·지급 가능성은 약관 근거 없이 판단하지 않습니다."]
@@ -308,18 +438,22 @@ def _citation(item: ConsultationEvidence) -> AnswerCitation:
     )
 
 
-def _with_demographics(
-    response: PortfolioQuestionResponse,
-    demographics: InsuredDemographics,
-) -> PortfolioQuestionResponse:
-    limitations = list(response.limitations)
-    demographic_notice = {
+def _demographic_notice(demographics: InsuredDemographics) -> str | None:
+    return {
         "conflict": "증권별 피보험자 정보가 서로 달라 나이·성별 개인화를 적용하지 않았습니다.",
         "conflict_user_override": (
             "증권별 피보험자 정보가 서로 달라 사용자가 확인한 정보로 개인화했습니다."
         ),
         "missing": "증권에서 피보험자 나이·성별을 확인하지 못해 개인화를 적용하지 않았습니다.",
     }.get(demographics.status)
+
+
+def _with_demographics(
+    response: PortfolioQuestionResponse,
+    demographics: InsuredDemographics,
+) -> PortfolioQuestionResponse:
+    limitations = list(response.limitations)
+    demographic_notice = _demographic_notice(demographics)
     if demographic_notice and demographic_notice not in limitations:
         limitations.append(demographic_notice)
     return response.model_copy(update={"demographics": demographics, "limitations": limitations})

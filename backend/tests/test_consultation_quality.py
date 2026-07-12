@@ -239,6 +239,11 @@ def test_analysis_still_blocks_sales_commands_and_payout_claims() -> None:
                     "detail": "암 진단을 받으면 보험금이 지급됩니다",
                     "evidence_ids": ["coverage:1"],
                 },
+                {
+                    "title": "이 특약을 추천해요",
+                    "detail": "이 특약은 반드시 가입하는 것이 좋습니다",
+                    "evidence_ids": ["coverage:1"],
+                },
             ],
             "gaps": [],
             "amount_review_items": [],
@@ -252,6 +257,7 @@ def test_analysis_still_blocks_sales_commands_and_payout_claims() -> None:
     assert "늘리세요" not in rendered
     assert "증액하세요" not in rendered
     assert "보험금이 지급됩니다" not in rendered
+    assert "반드시 가입" not in rendered
 
 
 def test_qa_passes_recent_history_and_returns_only_catalog_citations() -> None:

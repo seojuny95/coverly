@@ -140,6 +140,23 @@ export type AmountReviewItem = {
   evidence_ids: string[];
 };
 
+export type ClaimChannelLink = { label: string; url: string };
+
+export type ClaimChannelBlock = {
+  insurers: Array<{
+    name: string;
+    customer_center?: string | null;
+    note?: string | null;
+    links: ClaimChannelLink[];
+  }>;
+  indemnity?: {
+    name: string;
+    description?: string | null;
+    call_center?: string | null;
+    links: ClaimChannelLink[];
+  } | null;
+};
+
 export type QaAnswer = {
   status: "answered" | "refused" | "no_data";
   answer: string;
@@ -159,6 +176,7 @@ export type QaAnswer = {
     content: string;
     basis: "confirmed_fact" | "general_guidance";
   }>;
+  claim_channels?: ClaimChannelBlock | null;
 };
 
 export type ChatHistoryItem = {
@@ -232,6 +250,80 @@ export function askPortfolioQuestion(
     demographics,
     history: prepareChatHistory(history),
   });
+}
+
+export type QaStreamEnd = {
+  status: QaAnswer["status"];
+  generation?: "llm" | "fallback";
+  citations: QaAnswer["citations"];
+  limitations: string[];
+  suggestions?: string[];
+  claim_channels?: ClaimChannelBlock | null;
+};
+
+type QaStreamHandlers = {
+  onMeta?: (meta: { status: QaAnswer["status"] }) => void;
+  onDelta: (text: string) => void;
+  onEnd: (end: QaStreamEnd) => void;
+};
+
+export async function streamPortfolioQuestion(
+  question: string,
+  insuranceDocuments: AnalyzedInsurance[],
+  history: ChatHistoryItem[],
+  handlers: QaStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const demographics = getPolicyDemographics(insuranceDocuments);
+  const response = await fetch(`${API_BASE_URL}/qa/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: normalizeQuestion(question),
+      policies: toPolicies(insuranceDocuments),
+      demographics,
+      history: prepareChatHistory(history),
+    }),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const dispatch = (raw: string) => {
+    const line = raw.trim();
+    if (!line.startsWith("data:")) return;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(line.slice(5).trim()) as Record<string, unknown>;
+    } catch {
+      return; // skip a malformed/keepalive frame rather than aborting the stream
+    }
+    if (event.type === "meta") {
+      handlers.onMeta?.({ status: event.status as QaAnswer["status"] });
+    } else if (event.type === "delta") {
+      handlers.onDelta(String(event.text ?? ""));
+    } else if (event.type === "end") {
+      handlers.onEnd(event as unknown as QaStreamEnd);
+    }
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      dispatch(buffer.slice(0, boundary));
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+  if (buffer.trim()) dispatch(buffer);
 }
 
 export function normalizeQuestion(question: string) {

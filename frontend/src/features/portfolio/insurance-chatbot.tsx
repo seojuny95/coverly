@@ -1,14 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
 import { primaryButtonClassName } from "../../components/coverly-brand";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import {
-  askPortfolioQuestion,
+  streamPortfolioQuestion,
   type ChatHistoryItem,
-  type QaAnswer,
+  type QaStreamEnd,
 } from "./portfolio-api";
 
 const INITIAL_SUGGESTIONS = [
@@ -39,16 +38,7 @@ export function InsuranceChatbot({
   const endRef = useRef<HTMLDivElement>(null);
   const nextMessageId = useRef(1);
 
-  const askMutation = useMutation({
-    mutationFn: ({
-      question: askedQuestion,
-      history,
-    }: {
-      question: string;
-      history: ChatHistoryItem[];
-    }) => askPortfolioQuestion(askedQuestion, documents, history),
-  });
-  const loading = askMutation.isPending;
+  const [streaming, setStreaming] = useState(false);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -58,69 +48,76 @@ export function InsuranceChatbot({
     if (typeof endRef.current?.scrollIntoView === "function") {
       endRef.current.scrollIntoView({ block: "nearest" });
     }
-  }, [loading, messages]);
+  }, [streaming, messages]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     await sendQuestion(question);
   }
 
-  function appendAnswer(id: number, answer: QaAnswer) {
-    const sources = answer.citations
+  function updateMessage(
+    id: number,
+    change: (message: ChatMessageData) => ChatMessageData,
+  ) {
+    setMessages((current) =>
+      current.map((message) => (message.id === id ? change(message) : message)),
+    );
+  }
+
+  function finalizeAnswer(assistantId: number, end: QaStreamEnd) {
+    const sources = end.citations
       .map((citation) => ({
         label: [citation.insurer, citation.product_name, citation.coverage_name]
           .filter(Boolean)
           .join(" · "),
       }))
       .filter((source) => source.label);
-    setMessages((current) => [
-      ...current,
-      {
-        id: id + 1,
-        role: "assistant",
-        text: answer.sections?.length
-          ? answer.sections
-              .map((section) => `${section.title}\n${section.content}`)
-              .join("\n\n")
-          : answer.answer,
-        sources,
-        limitations: answer.limitations,
-      },
-    ]);
+    updateMessage(assistantId, (message) => ({
+      ...message,
+      sources,
+      limitations: end.limitations,
+      claimChannels: end.claim_channels,
+    }));
     setSuggestions(
-      answer.suggestions ?? answer.suggested_questions ?? INITIAL_SUGGESTIONS,
+      end.suggestions?.length ? end.suggestions : INITIAL_SUGGESTIONS,
     );
-  }
-
-  function appendError(id: number) {
-    setMessages((current) => [
-      ...current,
-      {
-        id: id + 1,
-        role: "assistant",
-        text: "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
-      },
-    ]);
   }
 
   async function sendQuestion(rawQuestion: string) {
     const text = rawQuestion.trim().slice(0, 500);
-    if (!text || loading) return;
-    const id = nextMessageId.current;
+    if (!text || streaming) return;
+    const userId = nextMessageId.current;
+    const assistantId = userId + 1;
     nextMessageId.current += 2;
     const history: ChatHistoryItem[] = messages
       .filter((message) => message.id !== 0)
       .map((message) => ({ role: message.role, content: message.text }));
     setQuestion("");
     setSuggestions([]);
-    setMessages((current) => [...current, { id, role: "user", text }]);
-    askMutation.mutate(
-      { question: text, history },
-      {
-        onSuccess: (answer) => appendAnswer(id, answer),
-        onError: () => appendError(id),
-      },
-    );
+    setMessages((current) => [
+      ...current,
+      { id: userId, role: "user", text },
+      { id: assistantId, role: "assistant", text: "" },
+    ]);
+    setStreaming(true);
+    try {
+      await streamPortfolioQuestion(text, documents, history, {
+        onDelta: (delta) =>
+          updateMessage(assistantId, (message) => ({
+            ...message,
+            text: message.text + delta,
+          })),
+        onEnd: (end) => finalizeAnswer(assistantId, end),
+      });
+    } catch {
+      updateMessage(assistantId, (message) => ({
+        ...message,
+        text: "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
+      }));
+      setSuggestions(INITIAL_SUGGESTIONS);
+    } finally {
+      setStreaming(false);
+    }
   }
 
   if (!open)
@@ -164,11 +161,6 @@ export function InsuranceChatbot({
         {messages.map((message) => (
           <ChatMessage key={message.id} message={message} />
         ))}
-        {loading ? (
-          <p role="status" className="text-sm text-zinc-500">
-            증권에서 근거를 확인하고 있어요.
-          </p>
-        ) : null}
         <div ref={endRef} />
       </div>
 
@@ -179,7 +171,7 @@ export function InsuranceChatbot({
               <button
                 key={suggestion}
                 type="button"
-                disabled={loading}
+                disabled={streaming}
                 onClick={() => void sendQuestion(suggestion)}
                 className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
               >
@@ -204,7 +196,7 @@ export function InsuranceChatbot({
             />
             <button
               type="submit"
-              disabled={!question.trim() || loading}
+              disabled={!question.trim() || streaming}
               className={primaryButtonClassName}
             >
               질문하기

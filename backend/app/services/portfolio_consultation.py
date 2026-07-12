@@ -34,6 +34,14 @@ _ADEQUACY_TERMS = (
     "필수",
     "무조건",
 )
+# Sales pushes that _DIRECT_ACTION_TERMS misses but are never acceptable — kept
+# separate from adequacy words (충분/부족) that grounded analysis is allowed to use.
+_SALES_PUSH_TERMS = (
+    "반드시 가입",
+    "꼭 가입",
+    "가입하면 됩니다",
+    "가입하는 것이 좋습니다",
+)
 _DIRECT_ACTION_TERMS = (
     "가입하세요",
     "가입해요",
@@ -236,6 +244,8 @@ def is_safe_analysis_text(text: str) -> bool:
     if any(term in compact for term in _PAYOUT_OR_OFFICIAL_CLAIMS):
         return False
     if any(term in compact for term in _FABRICATED_PERSONAL_FACTS):
+        return False
+    if any(term in compact for term in _SALES_PUSH_TERMS):
         return False
     return not any(term in cleaned for term in _DIRECT_ACTION_TERMS)
 

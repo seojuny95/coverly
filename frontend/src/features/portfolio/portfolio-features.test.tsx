@@ -289,22 +289,26 @@ describe("portfolio features", () => {
           }),
         );
       }
-      if (path.endsWith("/qa")) {
-        return new Response(
-          JSON.stringify({
+      if (path.endsWith("/qa/stream")) {
+        const events = [
+          { type: "meta", status: "answered", generation: "llm" },
+          { type: "delta", text: "암 진단비는 1,000만원이에요." },
+          {
+            type: "end",
             status: "answered",
-            answer: "중복되면 안 되는 요약",
-            sections: [
-              {
-                title: "확인된 보장",
-                content: "암 진단비는 1,000만원이에요.",
-                basis: "confirmed_fact",
-              },
-            ],
+            generation: "llm",
             citations: [],
             limitations: [],
-          }),
-        );
+            suggestions: [],
+            claim_channels: null,
+          },
+        ];
+        const body = events
+          .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+          .join("");
+        return new Response(body, {
+          headers: { "Content-Type": "text/event-stream" },
+        });
       }
       return new Response(
         JSON.stringify({
@@ -336,7 +340,7 @@ describe("portfolio features", () => {
     await user.type(screen.getByLabelText("보험 질문"), "암 진단비는?");
     await user.click(screen.getByRole("button", { name: "질문하기" }));
     expect(
-      await screen.findByText(/확인된 보장\s+암 진단비는 1,000만원이에요\./),
+      await screen.findByText("암 진단비는 1,000만원이에요."),
     ).toBeInTheDocument();
     expect(screen.queryByText("중복되면 안 되는 요약")).not.toBeInTheDocument();
     expect(
@@ -350,12 +354,14 @@ describe("portfolio features", () => {
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
     >;
-    const qaCall = fetchCalls.find(([input]) => String(input).endsWith("/qa"));
+    const qaCall = fetchCalls.find(([input]) =>
+      String(input).endsWith("/qa/stream"),
+    );
     expect(qaCall?.[1]?.body).toContain('"history":[]');
 
     await user.click(screen.getByRole("tab", { name: "내 보험" }));
     expect(
-      screen.getByText(/확인된 보장\s+암 진단비는 1,000만원이에요\./),
+      screen.getByText("암 진단비는 1,000만원이에요."),
     ).toBeInTheDocument();
   });
 

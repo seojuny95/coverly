@@ -6,7 +6,7 @@ a missing key or API failure; callers isolate failures (the coverage pipeline
 degrades to 확인필요/부분 instead of breaking the upload).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from functools import lru_cache
 from typing import Any, cast
 
@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from app.settings import get_settings
 
 JsonCompleter = Callable[[str, str], dict[str, object]]
+TextStreamer = Callable[[str, str], Iterator[str]]
 
 _TIMEOUT_S = 30.0
 _MAX_RETRIES = 2
@@ -49,3 +50,24 @@ def structured_completer(schema: type[BaseModel]) -> JsonCompleter:
         return parsed.model_dump(mode="json") if parsed else {}
 
     return complete
+
+
+def stream_completion(system: str, user: str) -> Iterator[str]:
+    """Stream plain-text deltas from the model for conversational answers."""
+
+    settings = get_settings()
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    stream = _get_client(settings.openai_api_key).chat.completions.create(
+        model=settings.openai_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        temperature=0,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content if chunk.choices else None
+        if delta:
+            yield delta

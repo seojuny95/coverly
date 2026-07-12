@@ -32,6 +32,30 @@ class AnswerCitation(BaseModel):
     coverage_name: str | None = None
 
 
+class ClaimChannelLink(BaseModel):
+    label: str
+    url: str
+
+
+class ClaimChannelInsurer(BaseModel):
+    name: str
+    customer_center: str | None = None
+    note: str | None = None
+    links: list[ClaimChannelLink] = Field(default_factory=list)
+
+
+class ClaimChannelIndemnity(BaseModel):
+    name: str
+    description: str | None = None
+    call_center: str | None = None
+    links: list[ClaimChannelLink] = Field(default_factory=list)
+
+
+class ClaimChannelBlock(BaseModel):
+    insurers: list[ClaimChannelInsurer] = Field(default_factory=list)
+    indemnity: ClaimChannelIndemnity | None = None
+
+
 class PortfolioQuestionResponse(BaseModel):
     status: Literal["answered", "refused", "no_data"]
     answer: str
@@ -41,3 +65,4 @@ class PortfolioQuestionResponse(BaseModel):
     suggestions: list[str] = Field(default_factory=list)
     generation: GenerationMode = "fallback"
     demographics: InsuredDemographics = Field(default_factory=InsuredDemographics)
+    claim_channels: ClaimChannelBlock | None = None
