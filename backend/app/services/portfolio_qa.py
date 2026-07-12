@@ -237,14 +237,23 @@ def _claim_targets(
         if not insurer:
             continue
         for coverage in policy.보장목록:
-            base_name = coverage.담보명.split("(")[0].strip() or coverage.담보명
-            normalized = canonicalize_coverage_name(base_name).normalized_key
+            normalized = _base_normalized_key(coverage.담보명)
             if not normalized:
                 continue
             # 실손24 belongs to non-auto medical indemnity (실손/실비/비례) only — use
             # the shared classifier's result, not a brittle 지급유형 == "실손" match.
+            # Both sides key off the same base name so a "(질병)"-style suffix on the
+            # indemnity coverage still matches the medical-indemnity set.
             targets.append((normalized, insurer, normalized in medical_indemnity_names))
     return targets
+
+
+def _base_normalized_key(coverage_name: str) -> str:
+    """Normalize to a coverage's base name, dropping a "(유사암제외)/(질병)"-style
+    suffix, so the same coverage keys identically everywhere it is referenced."""
+
+    base_name = coverage_name.split("(")[0].strip() or coverage_name
+    return canonicalize_coverage_name(base_name).normalized_key
 
 
 def _with_session_context(
@@ -321,7 +330,7 @@ def _official_suggestions(result: RagAnswer) -> list[str]:
 
 def _medical_indemnity_names(facts: PortfolioFacts) -> set[str]:
     return {
-        canonicalize_coverage_name(item.coverage_name).normalized_key
+        _base_normalized_key(item.coverage_name)
         for item in facts.coverage_summary.indemnity_coverages
     }
 

@@ -172,6 +172,34 @@ def test_stream_channels_resolve_coverage_with_paren_suffix() -> None:
     assert any(c.get("coverage_name") == "암진단비(유사암제외)" for c in citations)
 
 
+def test_stream_indemnity_channel_survives_paren_suffix() -> None:
+    """A 실손 coverage whose name carries a "(질병)"-style suffix must still route to
+    the medical-indemnity (실손24) claim channel, not lose it to name normalization."""
+
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "삼성화재", "상품명": "건강보험", "보험분류": "질병"},
+                "보장목록": [
+                    {"담보명": "실손의료비(질병)", "가입금액": "5,000만원", "지급유형": "실손"}
+                ],
+            }
+        )
+    ]
+
+    def fake_stream(_system: str, _user: str) -> Iterator[str]:
+        yield "실손의료비는 진료비 영수증을 내고 보험금을 청구하시면 돼요."
+
+    events = list(stream_portfolio_answer("보험금 어떻게 받아?", policies, stream=fake_stream))
+
+    channels = events[-1]["claim_channels"]
+    assert isinstance(channels, dict)
+    assert any(insurer["name"] == "삼성화재" for insurer in channels["insurers"])
+    assert channels["indemnity"] is not None
+    assert channels["indemnity"]["name"] == "실손24"
+
+
 def _auto_policy(insurer: str) -> PolicyInput:
     return PolicyInput.model_validate(
         {
