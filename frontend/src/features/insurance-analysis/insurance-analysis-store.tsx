@@ -1,0 +1,110 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
+import type { InsuranceUploadResult } from "../insurance-upload/upload-insurance";
+
+export type AnalyzedInsurance = {
+  id: string;
+  fileName: string;
+  result: InsuranceUploadResult;
+};
+
+export type InsuranceAnalysis = {
+  generatedAt: string;
+  selectedName?: string;
+  insuranceDocuments: AnalyzedInsurance[];
+};
+
+// Merge two analyses by document id (later wins). Pure — reused by the provider.
+export function mergeInsuranceAnalysis(
+  current: InsuranceAnalysis,
+  next: InsuranceAnalysis,
+): InsuranceAnalysis {
+  const byId = new Map<string, AnalyzedInsurance>();
+  for (const document of current.insuranceDocuments)
+    byId.set(document.id, document);
+  for (const document of next.insuranceDocuments)
+    byId.set(document.id, document);
+  return {
+    generatedAt: next.generatedAt,
+    selectedName: next.selectedName ?? current.selectedName,
+    insuranceDocuments: [...byId.values()],
+  };
+}
+
+export function getInsuredPersonName(
+  insuranceDocument: AnalyzedInsurance,
+): string | null {
+  return insuranceDocument.result.기본정보?.피보험자?.trim() || null;
+}
+
+type InsuranceDataValue = {
+  analysis: InsuranceAnalysis | null;
+  hasData: boolean;
+  setAnalysis: (next: InsuranceAnalysis) => void;
+  mergeDocuments: (next: InsuranceAnalysis) => void;
+  clear: () => void;
+};
+
+const InsuranceDataContext = createContext<InsuranceDataValue | null>(null);
+
+export function InsuranceDataProvider({
+  children,
+  initialAnalysis = null,
+}: {
+  children: React.ReactNode;
+  // Test-only seed for the in-memory analysis; harmless in production (defaults null).
+  initialAnalysis?: InsuranceAnalysis | null;
+}) {
+  const [analysis, setAnalysisState] = useState<InsuranceAnalysis | null>(
+    initialAnalysis,
+  );
+
+  const setAnalysis = useCallback((next: InsuranceAnalysis) => {
+    setAnalysisState(next);
+  }, []);
+
+  const mergeDocuments = useCallback((next: InsuranceAnalysis) => {
+    setAnalysisState((current) =>
+      current ? mergeInsuranceAnalysis(current, next) : next,
+    );
+  }, []);
+
+  // Discard the in-memory analysis. Called when the user leaves the analysis
+  // screen so the "data disappears when you leave" warning stays true.
+  const clear = useCallback(() => {
+    setAnalysisState(null);
+  }, []);
+
+  const value = useMemo<InsuranceDataValue>(
+    () => ({
+      analysis,
+      hasData: (analysis?.insuranceDocuments.length ?? 0) > 0,
+      setAnalysis,
+      mergeDocuments,
+      clear,
+    }),
+    [analysis, setAnalysis, mergeDocuments, clear],
+  );
+
+  return (
+    <InsuranceDataContext.Provider value={value}>
+      {children}
+    </InsuranceDataContext.Provider>
+  );
+}
+
+export function useInsuranceData(): InsuranceDataValue {
+  const value = useContext(InsuranceDataContext);
+  if (!value)
+    throw new Error(
+      "useInsuranceData must be used within InsuranceDataProvider",
+    );
+  return value;
+}

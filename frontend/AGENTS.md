@@ -34,12 +34,13 @@ src/
 ├── components/                 # 공용 UI (coverly-brand, app-error-fallback)
 └── features/
     ├── insurance-upload/       # 업로드 폼 + upload-insurance API
-    ├── insurance-analysis/     # 분석 페이지, 보장 목록, sessionStorage store, 보험사 로고
+    ├── insurance-analysis/     # 분석 페이지, 보장 목록, 인메모리 데이터 Context, 이탈 경고, 보험사 로고
     └── portfolio/              # 보험금 합계표, 상담 전 검토 패널, Q&A 챗봇, portfolio API
 ```
 
-- 화면 상태는 `insurance-analysis-store.ts`가 sessionStorage로 관리한다(업로드 → 분석 전달).
-- 백엔드 호출은 `features/*/*-api.ts`에 모으고, base URL은 `NEXT_PUBLIC_API_BASE_URL`을 쓴다.
+- 증권·분석 데이터는 `insurance-analysis-store.tsx`의 인메모리 React Context(`InsuranceDataProvider`)가 관리한다(업로드 → 분석 전달). 로그인이 없고 민감정보라 **영속 저장은 하지 않는다** — 새로고침·화면 이탈 시 사라지며, 그 전에 경고한다.
+- 서버 데이터 패칭은 **react-query**로 통일한다(조회는 `useQuery`, 생성/전송은 `useMutation`). 앱 전역 `QueryClientProvider`는 `app/providers.tsx`에 둔다. 캐시는 인메모리 전용(persister 없음)이라 서비스 탭 전환에는 유지되고 새로고침에는 사라진다.
+- 백엔드 호출 함수는 `features/*/*-api.ts`에 모으고, base URL은 `NEXT_PUBLIC_API_BASE_URL`을 쓴다.
 
 ## Coding Style & Naming Conventions
 

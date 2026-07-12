@@ -1,4 +1,5 @@
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
+import { isAutoInsurance } from "./analysis-eligibility";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -220,7 +221,7 @@ export function prepareChatHistory(history: ChatHistoryItem[]) {
 
 function getPolicyDemographics(insuranceDocuments: AnalyzedInsurance[]) {
   for (const document of insuranceDocuments) {
-    if (document.result.기본정보?.보험분류?.includes("자동차")) continue;
+    if (isAutoInsurance(document.result)) continue;
     const info = document.result.기본정보?.피보험자정보;
     if (typeof info?.나이 === "number" && info.성별) {
       return { age: info.나이, gender: info.성별, source: "policy" as const };

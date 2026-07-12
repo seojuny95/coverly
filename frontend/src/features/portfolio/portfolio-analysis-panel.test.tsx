@@ -1,99 +1,122 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
+import { expect, test, vi } from "vitest";
 
-import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
 import { PortfolioAnalysisPanel } from "./portfolio-analysis-panel";
+import type { PortfolioAnalysisResult } from "./portfolio-api";
 
-function document(id: string): AnalyzedInsurance {
+const noop = () => {};
+
+function baseProps() {
   return {
-    id,
-    fileName: `${id}.pdf`,
-    result: {
-      status: "accepted",
-      문자수: 100,
-      기본정보: {
-        보험분류: "상해·질병·실손",
-        피보험자정보: { 나이: 35, 성별: "여성", 생애단계: "성인" },
-      },
-      보장목록: [],
-    },
+    status: "idle" as const,
+    result: undefined,
+    eligibleCount: 1,
+    emptyReason: "no-coverage" as const,
+    needsDemographics: false,
+    onManualDemographics: noop,
+    onRetry: noop,
   };
 }
 
-function response(overview: string) {
-  return new Response(
-    JSON.stringify({
-      status: "complete",
-      policy_count: 1,
-      classification_count: 1,
-      confirmed_total_count: 0,
-      confirmed_total_amount: 0,
-      indemnity_coverage_count: 0,
-      excluded_coverage_count: 0,
-      excluded_auto_policy_count: 0,
-      age: 35,
-      gender: "여성",
-      life_stage: "성인",
-      prepared_coverages: [],
-      coverage_gaps: [],
-      baseline_notice: "참고 정보예요.",
-      classifications: [],
-      notices: [],
-      counselor: {
-        overview,
-        strengths: [],
-        gaps: [],
-        amount_review_items: [],
-        next_questions: [],
-        next_steps: [],
-      },
-    }),
-  );
-}
-
-afterEach(() => vi.unstubAllGlobals());
-
-test("ignores an older analysis response after the portfolio changes", async () => {
-  let resolveFirst: ((value: Response) => void) | undefined;
-  let resolveSecond: ((value: Response) => void) | undefined;
-  const first = new Promise<Response>((resolve) => {
-    resolveFirst = resolve;
-  });
-  const second = new Promise<Response>((resolve) => {
-    resolveSecond = resolve;
-  });
-  const fetchMock = vi
-    .fn()
-    .mockReturnValueOnce(first)
-    .mockReturnValueOnce(second);
-  vi.stubGlobal("fetch", fetchMock);
-  const { rerender } = render(
-    <PortfolioAnalysisPanel active documents={[document("first")]} />,
+test("shows the auto-only empty copy when no eligible documents", () => {
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      eligibleCount={0}
+      emptyReason="auto-only"
+    />,
   );
 
-  rerender(<PortfolioAnalysisPanel active documents={[document("second")]} />);
-  resolveSecond?.(response("새 보험 기준 분석"));
-  expect(await screen.findByText("새 보험 기준 분석")).toBeInTheDocument();
-
-  resolveFirst?.(response("이전 보험 기준 분석"));
-  await Promise.resolve();
-  expect(screen.queryByText("이전 보험 기준 분석")).not.toBeInTheDocument();
+  expect(screen.getByText("분석할 보험이 없어요")).toBeInTheDocument();
+  expect(
+    screen.getByText(/자동차보험은 이번 분석에서 제외해요/),
+  ).toBeInTheDocument();
 });
 
-test("asks for confirmation when policies contain conflicting demographics", () => {
-  const first = document("first");
-  const second = document("second");
-  second.result.기본정보!.피보험자정보 = {
-    나이: 42,
-    성별: "남성",
-    생애단계: "성인",
-  };
-  const fetchMock = vi.fn();
-  vi.stubGlobal("fetch", fetchMock);
+test("shows the no-coverage empty copy when no eligible documents", () => {
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      eligibleCount={0}
+      emptyReason="no-coverage"
+    />,
+  );
 
-  render(<PortfolioAnalysisPanel active documents={[first, second]} />);
+  expect(screen.getByText("분석할 보험이 없어요")).toBeInTheDocument();
+  expect(
+    screen.getByText(/담보 내용이 확인된 증권만 분석할 수 있어요\./),
+  ).toBeInTheDocument();
+});
+
+test("asks for demographics when they are needed", () => {
+  render(<PortfolioAnalysisPanel {...baseProps()} needsDemographics />);
 
   expect(screen.getByLabelText("나이")).toBeInTheDocument();
   expect(screen.getByLabelText("성별")).toBeInTheDocument();
-  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test("shows the loading state while analysis runs", () => {
+  render(<PortfolioAnalysisPanel {...baseProps()} status="loading" />);
+
+  expect(
+    screen.getByText("당신 편에서 보험을 살펴보고 있어요"),
+  ).toBeInTheDocument();
+});
+
+test("renders the result view on success", () => {
+  const result = {
+    status: "complete",
+    policy_count: 1,
+    classification_count: 1,
+    confirmed_total_count: 0,
+    confirmed_total_amount: 0,
+    indemnity_coverage_count: 0,
+    excluded_coverage_count: 0,
+    excluded_auto_policy_count: 0,
+    age: 35,
+    gender: "여성",
+    life_stage: "성인",
+    prepared_coverages: [],
+    coverage_gaps: [],
+    baseline_notice: "참고 정보예요.",
+    classifications: [],
+    notices: [],
+    counselor: {
+      overview: "상담 전에 확인한 요약이에요.",
+      strengths: [],
+      gaps: [],
+      amount_review_items: [],
+      next_questions: [],
+      next_steps: [],
+    },
+  } as unknown as PortfolioAnalysisResult;
+
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      status="success"
+      result={result}
+    />,
+  );
+
+  expect(
+    screen.getByText("Coverly가 당신 편에서 살펴봤어요"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("상담 전에 확인한 요약이에요.")).toBeInTheDocument();
+});
+
+test("calls onRetry from the error state", async () => {
+  const onRetry = vi.fn();
+  const { default: userEvent } = await import("@testing-library/user-event");
+  const user = userEvent.setup();
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      status="error"
+      onRetry={onRetry}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "다시 분석하기" }));
+  expect(onRetry).toHaveBeenCalledTimes(1);
 });

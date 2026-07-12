@@ -2,11 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import {
   CoverlyLogo,
+  CoverlyMark,
   PixelEyebrow,
+  coverlyLogoLinkClassName,
   ghostButtonClassName,
   primaryButtonClassName,
 } from "../../components/coverly-brand";
@@ -15,10 +17,10 @@ import insurerLogos from "./insurer-logos.json";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
-  getInsuredPersonName,
-  loadInsuranceAnalysis,
-  saveInsuranceAnalysis,
+  useInsuranceData,
 } from "./insurance-analysis-store";
+import { LeaveGuardLink } from "./leave-guard-link";
+import { useBeforeUnloadGuard } from "./use-leave-guard";
 import type {
   InsuranceBasicInfo,
   InsurancePremium,
@@ -32,6 +34,15 @@ import { InsuranceCoverageList } from "./insurance-coverage-list";
 import { CoverageTotalTable } from "../portfolio/coverage-total-table";
 import { InsuranceChatbot } from "../portfolio/insurance-chatbot";
 import { PortfolioAnalysisPanel } from "../portfolio/portfolio-analysis-panel";
+import {
+  emptyReasonFor,
+  isAnalyzableDocument,
+} from "../portfolio/analysis-eligibility";
+import {
+  type Demographics,
+  deriveDemographics,
+  usePortfolioAnalysis,
+} from "../portfolio/use-portfolio-analysis";
 import { usePortfolioSummary } from "../portfolio/use-portfolio-summary";
 
 const CLASSIFICATION_ORDER = [
@@ -67,7 +78,8 @@ type InsuranceAnalysisPageProps = {
 export function InsuranceAnalysisPage({
   uploadInsurance,
 }: InsuranceAnalysisPageProps = {}) {
-  const [analysis, setAnalysis] = useState<InsuranceAnalysis | null>();
+  const { analysis, hasData, mergeDocuments, clear } = useInsuranceData();
+  useBeforeUnloadGuard(hasData);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"insurance" | "analysis">(
     "insurance",
@@ -75,14 +87,8 @@ export function InsuranceAnalysisPage({
   const [expandedInsuranceIds, setExpandedInsuranceIds] = useState<Set<string>>(
     () => new Set(),
   );
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setAnalysis(loadInsuranceAnalysis());
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, []);
+  const [manualDemographics, setManualDemographics] =
+    useState<Demographics | null>(null);
 
   const insuranceDocuments = useMemo(
     () => analysis?.insuranceDocuments ?? [],
@@ -97,6 +103,11 @@ export function InsuranceAnalysisPage({
     [insuranceDocuments],
   );
   const portfolioSummary = usePortfolioSummary(insuranceDocuments);
+
+  const demographics =
+    deriveDemographics(insuranceDocuments) ?? manualDemographics;
+  const eligible = insuranceDocuments.filter(isAnalyzableDocument);
+  const analysisView = usePortfolioAnalysis(insuranceDocuments, demographics);
 
   const toggleInsurance = (policyId: string) => {
     setExpandedInsuranceIds((current) => {
@@ -116,26 +127,8 @@ export function InsuranceAnalysisPage({
   const handleAdditionalAnalysisComplete = (
     nextAnalysis: InsuranceAnalysis,
   ) => {
-    if (!analysis) return;
-
-    const mergedAnalysis = mergeInsuranceAnalysis(analysis, nextAnalysis);
-    saveInsuranceAnalysis(mergedAnalysis);
-    setAnalysis(mergedAnalysis);
+    mergeDocuments(nextAnalysis);
   };
-
-  if (analysis === undefined) {
-    return (
-      <main className="relative flex min-h-screen items-center justify-center bg-white px-5 text-zinc-950">
-        <CoverlyLogo className="absolute top-6 left-6" />
-        <div className="flex flex-col items-center gap-4">
-          <span className="size-2 animate-pulse bg-blue-600" />
-          <p className="text-sm font-medium text-zinc-500">
-            분석 결과를 불러오고 있어요.
-          </p>
-        </div>
-      </main>
-    );
-  }
 
   if (!analysis || insuranceDocuments.length === 0) {
     return (
@@ -162,7 +155,15 @@ export function InsuranceAnalysisPage({
   return (
     <main className="min-h-screen bg-white px-5 py-6 text-zinc-950 sm:px-6">
       <header className="mx-auto flex w-full max-w-6xl items-center gap-4">
-        <CoverlyLogo />
+        <LeaveGuardLink
+          href="/"
+          enabled={hasData}
+          onLeave={clear}
+          className={coverlyLogoLinkClassName}
+          ariaLabel="Coverly 홈"
+        >
+          <CoverlyMark />
+        </LeaveGuardLink>
       </header>
 
       <section className="mx-auto mt-10 w-full max-w-6xl">
@@ -179,6 +180,13 @@ export function InsuranceAnalysisPage({
           <TabButton
             active={activeTab === "analysis"}
             onClick={() => setActiveTab("analysis")}
+            badge={
+              analysisView.status === "loading" ? (
+                <span className="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">
+                  분석 중…
+                </span>
+              ) : null
+            }
           >
             보험 분석
           </TabButton>
@@ -342,8 +350,13 @@ export function InsuranceAnalysisPage({
               </p>
             </div>
             <PortfolioAnalysisPanel
-              active={activeTab === "analysis"}
-              documents={insuranceDocuments}
+              status={analysisView.status}
+              result={analysisView.result}
+              eligibleCount={eligible.length}
+              emptyReason={emptyReasonFor(insuranceDocuments)}
+              needsDemographics={eligible.length > 0 && !demographics}
+              onManualDemographics={setManualDemographics}
+              onRetry={analysisView.refetch}
             />
           </div>
         )}
@@ -367,10 +380,12 @@ function TabButton({
   active,
   onClick,
   children,
+  badge,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  badge?: ReactNode;
 }) {
   return (
     <button
@@ -378,9 +393,10 @@ function TabButton({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${active ? "border-blue-600 text-blue-600" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
+      className={`inline-flex items-center border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${active ? "border-blue-600 text-blue-600" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
     >
       {children}
+      {badge}
     </button>
   );
 }
@@ -534,29 +550,6 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function mergeInsuranceAnalysis(
-  currentAnalysis: InsuranceAnalysis,
-  nextAnalysis: InsuranceAnalysis,
-): InsuranceAnalysis {
-  const selectedName =
-    currentAnalysis.selectedName ?? nextAnalysis.selectedName;
-  const insuranceDocuments = [
-    ...currentAnalysis.insuranceDocuments,
-    ...nextAnalysis.insuranceDocuments,
-  ];
-
-  return {
-    generatedAt: nextAnalysis.generatedAt,
-    selectedName,
-    insuranceDocuments: selectedName
-      ? insuranceDocuments.filter(
-          (insuranceDocument) =>
-            getInsuredPersonName(insuranceDocument) === selectedName,
-        )
-      : insuranceDocuments,
-  };
 }
 
 function UploadInsuranceModal({

@@ -1,93 +1,60 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
+import { useState } from "react";
 import { primaryButtonClassName } from "../../components/coverly-brand";
+import type { EmptyReason } from "./analysis-eligibility";
 import { PortfolioAnalysisResultView } from "./portfolio-analysis-result";
-import {
-  type PortfolioAnalysisResult,
-  requestPortfolioAnalysis,
-} from "./portfolio-api";
+import type { Demographics } from "./use-portfolio-analysis";
+import type { PortfolioAnalysisResult } from "./portfolio-api";
 
-type Demographics = {
-  age: number;
-  gender: string;
-  lifeStage?: string;
-  source?: "policy" | "user" | "unknown";
-};
+// Empty-state copy by reason: name what is empty, then the next action.
+const EMPTY_COPY: Record<EmptyReason, { title: string; description: string }> =
+  {
+    "auto-only": {
+      title: "분석할 보험이 없어요",
+      description:
+        "자동차보험은 이번 분석에서 제외해요. 건강·생명·운전자보험 증권을 올리면 검토를 시작할 수 있어요.",
+    },
+    "no-coverage": {
+      title: "분석할 보험이 없어요",
+      description:
+        "담보 내용이 확인된 증권만 분석할 수 있어요. 담보가 담긴 증권을 올리면 검토를 시작할 수 있어요.",
+    },
+    mixed: {
+      title: "분석할 보험이 없어요",
+      description:
+        "담보 내용이 확인된 증권만 분석할 수 있어요. 자동차보험은 제외하고, 담보가 담긴 증권을 올리면 검토를 시작할 수 있어요.",
+    },
+  };
 
 export function PortfolioAnalysisPanel({
-  active,
-  documents,
+  status,
+  result,
+  eligibleCount,
+  emptyReason,
+  needsDemographics,
+  onManualDemographics,
+  onRetry,
 }: {
-  active: boolean;
-  documents: AnalyzedInsurance[];
+  status: "idle" | "loading" | "success" | "error";
+  result?: PortfolioAnalysisResult;
+  eligibleCount: number;
+  emptyReason: EmptyReason;
+  needsDemographics: boolean;
+  onManualDemographics: (value: Demographics) => void;
+  onRetry: () => void;
 }) {
-  const automaticDemographics = useMemo(
-    () => findDemographics(documents),
-    [documents],
-  );
-  const [manualDemographics, setManualDemographics] =
-    useState<Demographics | null>(null);
-  const demographics = automaticDemographics ?? manualDemographics;
-  const [state, setState] = useState<{
-    status: "idle" | "loading" | "success" | "error";
-    result?: PortfolioAnalysisResult;
-  }>({ status: "idle" });
-  const [attempt, setAttempt] = useState(0);
-  const requestedKey = useRef<string | null>(null);
-  const requestSequence = useRef(0);
-  const eligibleDocuments = useMemo(
-    () =>
-      documents.filter(
-        ({ result }) => !result.기본정보?.보험분류?.includes("자동차"),
-      ),
-    [documents],
-  );
-  const portfolioKey = eligibleDocuments
-    .map((document) => `${document.id}:${document.result.문자수}`)
-    .join("|");
-
-  useEffect(() => {
-    if (!demographics) return;
-    const requestKey = `${portfolioKey}:${demographics.age}:${demographics.gender}:${attempt}`;
-    if (!active || requestedKey.current === requestKey) return;
-    requestedKey.current = requestKey;
-    requestSequence.current += 1;
-    const requestId = requestSequence.current;
-    setState({ status: "loading" });
-    const controller = new AbortController();
-    void requestPortfolioAnalysis(documents, demographics, controller.signal)
-      .then((result) => {
-        if (requestSequence.current === requestId)
-          setState({ status: "success", result });
-      })
-      .catch((error: unknown) => {
-        if (
-          requestSequence.current === requestId &&
-          (error as { name?: string }).name !== "AbortError"
-        )
-          setState({ status: "error" });
-      });
-    // Keep the request alive when the user switches tabs.
-  }, [active, attempt, demographics, documents, portfolioKey]);
-
-  if (eligibleDocuments.length === 0) {
-    return (
-      <InfoState
-        title="분석할 일반 보험이 없어요"
-        description="자동차보험은 이번 분석에서 제외해요. 건강·생명·운전자보험 증권을 올리면 검토를 시작할 수 있어요."
-      />
-    );
+  if (eligibleCount === 0) {
+    return <InfoState {...EMPTY_COPY[emptyReason]} />;
   }
 
-  if (!demographics) {
-    return <DemographicsForm onSubmit={setManualDemographics} />;
+  if (needsDemographics) {
+    return <DemographicsForm onSubmit={onManualDemographics} />;
   }
 
-  if (state.status === "idle" || state.status === "loading")
-    return <AnalysisLoading />;
-  if (state.status === "error")
+  if (status === "idle" || status === "loading") return <AnalysisLoading />;
+
+  if (status === "error")
     return (
       <section className="rounded-2xl border border-zinc-200 p-8 text-center">
         <h2 className="text-xl font-semibold">분석 결과를 불러오지 못했어요</h2>
@@ -97,39 +64,14 @@ export function PortfolioAnalysisPanel({
         <button
           type="button"
           className={`mt-5 ${primaryButtonClassName}`}
-          onClick={() => {
-            setState({ status: "idle" });
-            setAttempt((value) => value + 1);
-          }}
+          onClick={onRetry}
         >
           다시 분석하기
         </button>
       </section>
     );
 
-  return <PortfolioAnalysisResultView result={state.result!} />;
-}
-
-function findDemographics(documents: AnalyzedInsurance[]): Demographics | null {
-  const candidates = new Map<string, Demographics>();
-  for (const document of documents) {
-    if (document.result.기본정보?.보험분류?.includes("자동차")) continue;
-    const info = document.result.기본정보?.피보험자정보;
-    if (typeof info?.나이 === "number" && info.성별) {
-      const demographics = {
-        age: info.나이,
-        gender: info.성별,
-        lifeStage: info.생애단계,
-        source: "policy",
-      } satisfies Demographics;
-      candidates.set(
-        `${demographics.age}:${demographics.gender}`,
-        demographics,
-      );
-    }
-  }
-  if (candidates.size !== 1) return null;
-  return candidates.values().next().value ?? null;
+  return <PortfolioAnalysisResultView result={result!} />;
 }
 
 function DemographicsForm({

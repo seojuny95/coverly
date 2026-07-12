@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
 import {
   type PortfolioSummary,
@@ -12,24 +13,28 @@ type SummaryState =
   | { status: "success"; summary: PortfolioSummary }
   | { status: "error" };
 
-export function usePortfolioSummary(documents: AnalyzedInsurance[]) {
-  const [state, setState] = useState<SummaryState>({ status: "loading" });
-  const [attempt, setAttempt] = useState(0);
+function portfolioKey(documents: AnalyzedInsurance[]): string {
+  return documents
+    .map((document) => `${document.id}:${document.result.문자수}`)
+    .join("|");
+}
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void requestPortfolioSummary(documents, controller.signal)
-      .then((summary) => setState({ status: "success", summary }))
-      .catch((error: unknown) => {
-        if ((error as { name?: string }).name !== "AbortError")
-          setState({ status: "error" });
-      });
-    return () => controller.abort();
-  }, [attempt, documents]);
+export function usePortfolioSummary(documents: AnalyzedInsurance[]) {
+  const query = useQuery({
+    queryKey: ["portfolio-summary", portfolioKey(documents)],
+    queryFn: ({ signal }) => requestPortfolioSummary(documents, signal),
+    enabled: documents.length > 0,
+  });
+
+  const state: SummaryState = query.isSuccess
+    ? { status: "success", summary: query.data }
+    : query.isError
+      ? { status: "error" }
+      : { status: "loading" };
 
   const retry = useCallback(() => {
-    setState({ status: "loading" });
-    setAttempt((value) => value + 1);
-  }, []);
+    void query.refetch();
+  }, [query]);
+
   return { state, retry };
 }

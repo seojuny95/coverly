@@ -1,10 +1,12 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
   getInsuredPersonName,
-  saveInsuranceAnalysis,
+  useInsuranceData,
 } from "../insurance-analysis/insurance-analysis-store";
 import {
   type DragEvent,
@@ -54,13 +56,23 @@ function toFiles(files: FileList | File[]): File[] {
 
 export function InsuranceUploadForm({
   uploadInsurance = uploadInsuranceRequest,
-  onAnalysisComplete = saveInsuranceAnalysis,
-  navigateToAnalysis = () => {
-    window.location.assign("/analysis");
-  },
+  onAnalysisComplete,
+  // Intentionally a no-op default: navigation now happens inside the default
+  // onAnalysisComplete (via router.push), not through this callback. Callers
+  // that pass it use it for side effects like closing the upload modal.
+  navigateToAnalysis = () => {},
   fixedSelectedName,
   surface = "page",
 }: InsuranceUploadFormProps) {
+  const { setAnalysis } = useInsuranceData();
+  const router = useRouter();
+  const uploadMutation = useMutation({ mutationFn: uploadInsurance });
+  const completeAnalysis =
+    onAnalysisComplete ??
+    ((analysis: InsuranceAnalysis) => {
+      setAnalysis(analysis);
+      router.push("/analysis");
+    });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -122,7 +134,7 @@ export function InsuranceUploadForm({
       const insuranceDocuments = await Promise.all(
         selectedFiles.map(async (file, index) => {
           try {
-            const result = await uploadInsurance(file);
+            const result = await uploadMutation.mutateAsync(file);
             setAnalysisProgress((current) => ({
               ...current,
               completed: current.completed + 1,
@@ -218,7 +230,7 @@ export function InsuranceUploadForm({
           getInsuredPersonName(insuranceDocument) === personName,
       ),
     };
-    onAnalysisComplete(filteredAnalysis);
+    completeAnalysis(filteredAnalysis);
     navigateToAnalysis();
   };
 

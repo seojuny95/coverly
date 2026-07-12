@@ -1,22 +1,53 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { renderWithProviders } from "../../test-utils/render-with-providers";
 import { InsuranceAnalysisPage } from "./insurance-analysis-page";
-import { saveInsuranceAnalysis } from "./insurance-analysis-store";
+import type { InsuranceAnalysis } from "./insurance-analysis-store";
 import type { UploadInsurance } from "../insurance-upload/insurance-upload-form";
+
+// The upload modal renders InsuranceUploadForm, which calls useRouter even
+// when onAnalysisComplete is provided (the router is only used by its
+// default handler). Mock next/navigation so it doesn't need a real App
+// Router context in tests.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
   type: "application/pdf",
 });
 
+// Page-level queries (summary/analysis) fire when documents exist; keep them
+// deterministic with an empty summary response.
+function stubEmptySummary() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          totals: [],
+          indemnity_coverages: [],
+          excluded_coverages: [],
+          excluded_auto_policy_count: 0,
+        }),
+      ),
+    ),
+  );
+}
+
 describe("InsuranceAnalysisPage", () => {
+  beforeEach(() => {
+    stubEmptySummary();
+  });
+
   afterEach(() => {
-    window.sessionStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   test("shows insurance counts by classification", async () => {
-    saveInsuranceAnalysis({
+    const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객",
       insuranceDocuments: [
@@ -51,9 +82,9 @@ describe("InsuranceAnalysisPage", () => {
           },
         },
       ],
-    });
+    };
 
-    render(<InsuranceAnalysisPage />);
+    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
 
     expect(
       await screen.findByText("내 보험을 종류별로 정리했어요"),
@@ -78,7 +109,7 @@ describe("InsuranceAnalysisPage", () => {
   });
 
   test("expands a insurance row to show detail fields", async () => {
-    saveInsuranceAnalysis({
+    const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
       insuranceDocuments: [
         {
@@ -109,9 +140,9 @@ describe("InsuranceAnalysisPage", () => {
           },
         },
       ],
-    });
+    };
 
-    render(<InsuranceAnalysisPage />);
+    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
 
     const row = await screen.findByRole("button", {
       name: /건강보험/,
@@ -131,7 +162,7 @@ describe("InsuranceAnalysisPage", () => {
   });
 
   test("renders every display field and insurer logo when an insurance document has full data", async () => {
-    saveInsuranceAnalysis({
+    const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객A",
       insuranceDocuments: [
@@ -163,9 +194,11 @@ describe("InsuranceAnalysisPage", () => {
           },
         },
       ],
-    });
+    };
 
-    const { container } = render(<InsuranceAnalysisPage />);
+    const { container } = renderWithProviders(<InsuranceAnalysisPage />, {
+      initialAnalysis,
+    });
 
     const row = await screen.findByRole("button", {
       name: /마이헬스파트너/,
@@ -200,7 +233,7 @@ describe("InsuranceAnalysisPage", () => {
   });
 
   test("shows vehicle info and separates rider rows for an auto policy", async () => {
-    saveInsuranceAnalysis({
+    const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객",
       insuranceDocuments: [
@@ -240,9 +273,9 @@ describe("InsuranceAnalysisPage", () => {
           },
         },
       ],
-    });
+    };
 
-    render(<InsuranceAnalysisPage />);
+    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
 
     const row = await screen.findByRole("button", {
       name: /개인용자동차보험/,
@@ -262,7 +295,7 @@ describe("InsuranceAnalysisPage", () => {
   });
 
   test("renders DB insurer name and logo for a parsed driver insurance document", async () => {
-    saveInsuranceAnalysis({
+    const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객A",
       insuranceDocuments: [
@@ -294,9 +327,11 @@ describe("InsuranceAnalysisPage", () => {
           },
         },
       ],
-    });
+    };
 
-    const { container } = render(<InsuranceAnalysisPage />);
+    const { container } = renderWithProviders(<InsuranceAnalysisPage />, {
+      initialAnalysis,
+    });
     const row = await screen.findByRole("button", {
       name: /무배당 프로미라이프 참좋은운전자상해보험/,
     });
@@ -318,7 +353,7 @@ describe("InsuranceAnalysisPage", () => {
   });
 
   test("shows an empty state when no analysis exists", async () => {
-    render(<InsuranceAnalysisPage />);
+    renderWithProviders(<InsuranceAnalysisPage />);
 
     expect(
       await screen.findByText("분석할 보험증권이 없어요"),
@@ -342,7 +377,7 @@ describe("InsuranceAnalysisPage", () => {
       },
     });
 
-    saveInsuranceAnalysis({
+    const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
       selectedName: "테스트고객",
       insuranceDocuments: [
@@ -362,9 +397,12 @@ describe("InsuranceAnalysisPage", () => {
           },
         },
       ],
-    });
+    };
 
-    render(<InsuranceAnalysisPage uploadInsurance={uploadInsurance} />);
+    renderWithProviders(
+      <InsuranceAnalysisPage uploadInsurance={uploadInsurance} />,
+      { initialAnalysis },
+    );
 
     await user.click(
       await screen.findByRole("button", { name: "보험증권 더 올리기" }),
@@ -382,7 +420,10 @@ describe("InsuranceAnalysisPage", () => {
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "분석에 추가하기" }));
 
-    expect(uploadInsurance).toHaveBeenCalledWith(insuranceFile);
+    expect(uploadInsurance).toHaveBeenCalledWith(
+      insuranceFile,
+      expect.anything(),
+    );
     expect(
       await screen.findByText(
         "테스트고객님의 보험 2개를 종류별로 보기 쉽게 정리했어요.",

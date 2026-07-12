@@ -1,12 +1,32 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi, beforeEach } from "vitest";
 
 import {
   InsuranceUploadForm,
   type UploadInsurance,
 } from "./insurance-upload-form";
 import type { InsuranceAnalysis } from "../insurance-analysis/insurance-analysis-store";
+import { useInsuranceData } from "../insurance-analysis/insurance-analysis-store";
+import { renderWithProviders } from "../../test-utils/render-with-providers";
+
+// Probe consumer: reads the in-memory context so tests can assert what the
+// form wrote via the default onAnalysisComplete (setAnalysis).
+function InsuranceDataProbe() {
+  const { analysis } = useInsuranceData();
+  return (
+    <div data-testid="probe">
+      {(analysis?.insuranceDocuments ?? [])
+        .map((document) => document.fileName)
+        .join(",")}
+    </div>
+  );
+}
+
+const routerPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
 
 const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
   type: "application/pdf",
@@ -27,7 +47,7 @@ function renderForm({
   onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
   navigateToAnalysis?: () => void;
 } = {}) {
-  render(
+  renderWithProviders(
     <InsuranceUploadForm
       uploadInsurance={uploadInsurance}
       onAnalysisComplete={onAnalysisComplete}
@@ -36,6 +56,10 @@ function renderForm({
   );
   return { uploadInsurance, onAnalysisComplete, navigateToAnalysis };
 }
+
+beforeEach(() => {
+  routerPush.mockClear();
+});
 
 describe("InsuranceUploadForm", () => {
   test("disables upload until a file is selected", () => {
@@ -193,8 +217,14 @@ describe("InsuranceUploadForm", () => {
     ]);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
-    expect(uploadInsurance).toHaveBeenCalledWith(insuranceFile);
-    expect(uploadInsurance).toHaveBeenCalledWith(secondInsuranceFile);
+    expect(uploadInsurance).toHaveBeenCalledWith(
+      insuranceFile,
+      expect.anything(),
+    );
+    expect(uploadInsurance).toHaveBeenCalledWith(
+      secondInsuranceFile,
+      expect.anything(),
+    );
     expect(onAnalysisComplete).toHaveBeenCalledWith(
       expect.objectContaining({
         generatedAt: expect.any(String),
@@ -403,6 +433,55 @@ describe("InsuranceUploadForm", () => {
     expect(
       screen.getByText("가입 권유 전화가 가지 않아요"),
     ).toBeInTheDocument();
+  });
+
+  test("default behavior writes the analysis into context and navigates client-side", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      status: "accepted",
+      문자수: 20,
+      기본정보: {
+        보험사: "삼성화재",
+        상품명: "건강보험",
+        계약자: "테스트고객",
+        피보험자: "테스트고객",
+        보험분류: "상해·질병·실손",
+        상품태그: ["질병"],
+      },
+    });
+    const originalLocation = window.location;
+    const assignSpy = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, assign: assignSpy },
+    });
+
+    renderWithProviders(
+      <>
+        <InsuranceUploadForm uploadInsurance={uploadInsurance} />
+        <InsuranceDataProbe />
+      </>,
+    );
+
+    expect(screen.getByTestId("probe")).toHaveTextContent("");
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    // The default onAnalysisComplete must write the uploaded document into the
+    // in-memory context; the probe reflects that write.
+    await waitFor(() => {
+      expect(screen.getByTestId("probe")).toHaveTextContent("insurance.pdf");
+    });
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith("/analysis");
+    });
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    });
   });
 
   test("shows per-file reading status and grounding note while analyzing", async () => {

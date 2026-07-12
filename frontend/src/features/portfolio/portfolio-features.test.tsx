@@ -1,12 +1,19 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { InsuranceAnalysisPage } from "../insurance-analysis/insurance-analysis-page";
-import { saveInsuranceAnalysis } from "../insurance-analysis/insurance-analysis-store";
+// InsuranceAnalysisPage's header logo now guards leaving via LeaveGuardLink,
+// which calls useRouter — mock it so it doesn't need a real App Router.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
-function saveFixture() {
-  saveInsuranceAnalysis({
+import { renderWithProviders } from "../../test-utils/render-with-providers";
+import { InsuranceAnalysisPage } from "../insurance-analysis/insurance-analysis-page";
+import type { InsuranceAnalysis } from "../insurance-analysis/insurance-analysis-store";
+
+function fixture(): InsuranceAnalysis {
+  return {
     generatedAt: "2026-07-11T00:00:00.000Z",
     insuranceDocuments: [
       {
@@ -35,17 +42,15 @@ function saveFixture() {
         },
       },
     ],
-  });
+  };
 }
 
 describe("portfolio features", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    window.sessionStorage.clear();
   });
 
   test("shows counts, totals, and cards in order", async () => {
-    saveFixture();
     const fetchMock = vi.fn().mockImplementation(
       () =>
         new Response(
@@ -67,7 +72,9 @@ describe("portfolio features", () => {
         ),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const { container } = render(<InsuranceAnalysisPage />);
+    const { container } = renderWithProviders(<InsuranceAnalysisPage />, {
+      initialAnalysis: fixture(),
+    });
 
     await screen.findByText("10,000,000원");
     const text = container.textContent ?? "";
@@ -83,7 +90,6 @@ describe("portfolio features", () => {
   });
 
   test("groups every amount basis under the same coverage category", async () => {
-    saveFixture();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation(
@@ -133,7 +139,9 @@ describe("portfolio features", () => {
       ),
     );
 
-    render(<InsuranceAnalysisPage />);
+    renderWithProviders(<InsuranceAnalysisPage />, {
+      initialAnalysis: fixture(),
+    });
 
     const treatmentGroup = await screen.findByRole("rowgroup", {
       name: "치료비",
@@ -175,7 +183,6 @@ describe("portfolio features", () => {
   });
 
   test("starts analysis on first tab entry and keeps chat messages across tabs", async () => {
-    saveFixture();
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
@@ -262,9 +269,11 @@ describe("portfolio features", () => {
       );
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<InsuranceAnalysisPage />);
+    renderWithProviders(<InsuranceAnalysisPage />, {
+      initialAnalysis: fixture(),
+    });
 
-    await user.click(await screen.findByRole("tab", { name: "보험 분석" }));
+    await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
     expect((await screen.findAllByText("10,000,000원")).length).toBeGreaterThan(
       0,
     );
@@ -303,16 +312,91 @@ describe("portfolio features", () => {
     ).toBeInTheDocument();
   });
 
+  test("shows the analysis badge while pending and runs analysis once across tab switches", async () => {
+    const user = userEvent.setup();
+    let resolveAnalysis: ((value: Response) => void) | undefined;
+    const analysisPromise = new Promise<Response>((resolve) => {
+      resolveAnalysis = resolve;
+    });
+    const analysisResponse = () =>
+      new Response(
+        JSON.stringify({
+          status: "complete",
+          policy_count: 1,
+          classification_count: 1,
+          confirmed_total_count: 1,
+          confirmed_total_amount: 10_000_000,
+          indemnity_coverage_count: 0,
+          excluded_coverage_count: 0,
+          excluded_auto_policy_count: 0,
+          age: 35,
+          gender: "여성",
+          life_stage: "성인",
+          prepared_coverages: [],
+          coverage_gaps: [],
+          baseline_notice: "참고 정보예요.",
+          classifications: [],
+          counselor: {
+            overview: "상담 전에 확인한 요약이에요.",
+            strengths: [],
+            gaps: [],
+            amount_review_items: [],
+            next_questions: [],
+            next_steps: [],
+          },
+          notices: [],
+        }),
+      );
+
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input).endsWith("/portfolio/analysis")) return analysisPromise;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            totals: [],
+            indemnity_coverages: [],
+            excluded_coverages: [],
+            excluded_auto_policy_count: 0,
+          }),
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderWithProviders(<InsuranceAnalysisPage />, {
+      initialAnalysis: fixture(),
+    });
+
+    // Analysis starts on 내 보험 entry; the 보험 분석 tab shows a pending badge.
+    expect(await screen.findByText("분석 중…")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/portfolio/analysis"),
+        expect.anything(),
+      ),
+    );
+
+    resolveAnalysis?.(analysisResponse());
+    await waitFor(() =>
+      expect(screen.queryByText("분석 중…")).not.toBeInTheDocument(),
+    );
+
+    // Switching service tabs back and forth reuses the cached result.
+    await user.click(screen.getByRole("tab", { name: "보험 분석" }));
+    expect(
+      await screen.findByText("상담 전에 확인한 요약이에요."),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "내 보험" }));
+    await user.click(screen.getByRole("tab", { name: "보험 분석" }));
+
+    const analysisCalls = (
+      fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit]>
+    ).filter(([input]) => String(input).endsWith("/portfolio/analysis"));
+    expect(analysisCalls).toHaveLength(1);
+  });
+
   test("asks for demographics only when policy demographics are missing", async () => {
-    saveFixture();
-    const stored = JSON.parse(
-      window.sessionStorage.getItem("coverly.insuranceAnalysis") ?? "{}",
-    );
-    delete stored.insuranceDocuments[0].result.기본정보.피보험자정보;
-    window.sessionStorage.setItem(
-      "coverly.insuranceAnalysis",
-      JSON.stringify(stored),
-    );
+    const analysis = fixture();
+    delete analysis.insuranceDocuments[0].result.기본정보!.피보험자정보;
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -327,7 +411,9 @@ describe("portfolio features", () => {
       ),
     );
     const user = userEvent.setup();
-    render(<InsuranceAnalysisPage />);
+    renderWithProviders(<InsuranceAnalysisPage />, {
+      initialAnalysis: analysis,
+    });
 
     await user.click(await screen.findByRole("tab", { name: "보험 분석" }));
     expect(screen.getByLabelText("나이")).toBeInTheDocument();
@@ -335,11 +421,8 @@ describe("portfolio features", () => {
   });
 
   test("sends auto policies so the backend can report their exclusion", async () => {
-    saveFixture();
-    const stored = JSON.parse(
-      window.sessionStorage.getItem("coverly.insuranceAnalysis") ?? "{}",
-    );
-    stored.insuranceDocuments.push({
+    const analysis = fixture();
+    analysis.insuranceDocuments.push({
       id: "auto-1",
       fileName: "auto.pdf",
       result: {
@@ -349,10 +432,6 @@ describe("portfolio features", () => {
         보장목록: [],
       },
     });
-    window.sessionStorage.setItem(
-      "coverly.insuranceAnalysis",
-      JSON.stringify(stored),
-    );
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).endsWith("/portfolio/analysis")) {
         return new Response(
@@ -387,9 +466,11 @@ describe("portfolio features", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
-    render(<InsuranceAnalysisPage />);
+    renderWithProviders(<InsuranceAnalysisPage />, {
+      initialAnalysis: analysis,
+    });
 
-    await user.click(await screen.findByRole("tab", { name: "보험 분석" }));
+    await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
     await screen.findByText("Coverly가 당신 편에서 살펴봤어요");
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]

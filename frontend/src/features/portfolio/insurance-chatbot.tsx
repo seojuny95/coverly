@@ -1,10 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
 import { primaryButtonClassName } from "../../components/coverly-brand";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
-import { askPortfolioQuestion, type ChatHistoryItem } from "./portfolio-api";
+import {
+  askPortfolioQuestion,
+  type ChatHistoryItem,
+  type QaAnswer,
+} from "./portfolio-api";
 
 const INITIAL_SUGGESTIONS = [
   "내 보험에서 확인된 강점은 뭐예요?",
@@ -30,10 +35,20 @@ export function InsuranceChatbot({
     },
   ]);
   const [suggestions, setSuggestions] = useState(INITIAL_SUGGESTIONS);
-  const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const nextMessageId = useRef(1);
+
+  const askMutation = useMutation({
+    mutationFn: ({
+      question: askedQuestion,
+      history,
+    }: {
+      question: string;
+      history: ChatHistoryItem[];
+    }) => askPortfolioQuestion(askedQuestion, documents, history),
+  });
+  const loading = askMutation.isPending;
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -50,6 +65,44 @@ export function InsuranceChatbot({
     await sendQuestion(question);
   }
 
+  function appendAnswer(id: number, answer: QaAnswer) {
+    const sources = answer.citations
+      .map((citation) => ({
+        label: [citation.insurer, citation.product_name, citation.coverage_name]
+          .filter(Boolean)
+          .join(" · "),
+      }))
+      .filter((source) => source.label);
+    setMessages((current) => [
+      ...current,
+      {
+        id: id + 1,
+        role: "assistant",
+        text: answer.sections?.length
+          ? answer.sections
+              .map((section) => `${section.title}\n${section.content}`)
+              .join("\n\n")
+          : answer.answer,
+        sources,
+        limitations: answer.limitations,
+      },
+    ]);
+    setSuggestions(
+      answer.suggestions ?? answer.suggested_questions ?? INITIAL_SUGGESTIONS,
+    );
+  }
+
+  function appendError(id: number) {
+    setMessages((current) => [
+      ...current,
+      {
+        id: id + 1,
+        role: "assistant",
+        text: "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
+      },
+    ]);
+  }
+
   async function sendQuestion(rawQuestion: string) {
     const text = rawQuestion.trim().slice(0, 500);
     if (!text || loading) return;
@@ -61,49 +114,13 @@ export function InsuranceChatbot({
     setQuestion("");
     setSuggestions([]);
     setMessages((current) => [...current, { id, role: "user", text }]);
-    setLoading(true);
-    try {
-      const answer = await askPortfolioQuestion(text, documents, history);
-      const sources = answer.citations
-        .map((citation) => ({
-          label: [
-            citation.insurer,
-            citation.product_name,
-            citation.coverage_name,
-          ]
-            .filter(Boolean)
-            .join(" · "),
-        }))
-        .filter((source) => source.label);
-      setMessages((current) => [
-        ...current,
-        {
-          id: id + 1,
-          role: "assistant",
-          text: answer.sections?.length
-            ? answer.sections
-                .map((section) => `${section.title}\n${section.content}`)
-                .join("\n\n")
-            : answer.answer,
-          sources,
-          limitations: answer.limitations,
-        },
-      ]);
-      setSuggestions(
-        answer.suggestions ?? answer.suggested_questions ?? INITIAL_SUGGESTIONS,
-      );
-    } catch {
-      setMessages((current) => [
-        ...current,
-        {
-          id: id + 1,
-          role: "assistant",
-          text: "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+    askMutation.mutate(
+      { question: text, history },
+      {
+        onSuccess: (answer) => appendAnswer(id, answer),
+        onError: () => appendError(id),
+      },
+    );
   }
 
   if (!open)
