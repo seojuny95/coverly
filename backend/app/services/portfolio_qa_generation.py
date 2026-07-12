@@ -175,6 +175,22 @@ def _system_prompt() -> str:
 - 이전 assistant 답변을 새로운 증거로 취급하는 것."""
 
 
+def _grounding_context(
+    demographics: InsuredDemographics,
+    life_stage_check: LifeStageCheck,
+    catalog: EvidenceCatalog,
+) -> dict[str, object]:
+    """The shared grounding payload both Q&A prompts feed the model."""
+
+    return {
+        "demographics": demographics.model_dump(mode="json"),
+        "life_stage": life_stage_check.life_stage,
+        "confirmed_categories": list(life_stage_check.held),
+        "review_categories": list(life_stage_check.missing),
+        "evidence": [item.model_dump(mode="json") for item in catalog.items],
+    }
+
+
 def _user_prompt(
     question: str,
     demographics: InsuredDemographics,
@@ -187,14 +203,39 @@ def _user_prompt(
         "history": [
             message.model_dump(mode="json") for message in history[-_MAX_HISTORY_MESSAGES:]
         ],
-        "demographics": demographics.model_dump(mode="json"),
-        "life_stage": life_stage_check.life_stage,
-        "confirmed_categories": list(life_stage_check.held),
-        "review_categories": list(life_stage_check.missing),
-        "evidence": [item.model_dump(mode="json") for item in catalog.items],
+        **_grounding_context(demographics, life_stage_check, catalog),
     }
     serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return mask_demographic_identifiers(serialized)
+
+
+def _stream_user_prompt(
+    question: str,
+    demographics: InsuredDemographics,
+    history: list[ConversationMessage],
+    life_stage_check: LifeStageCheck,
+    catalog: EvidenceCatalog,
+) -> str:
+    """Grounding context, then the prior conversation, then the current question.
+
+    Ordering the current question last (and labelling it) keeps the model from
+    drifting back to an earlier turn — it answers what was just asked while still
+    using the transcript for context.
+    """
+
+    context = _grounding_context(demographics, life_stage_check, catalog)
+    sections = [f"[내 보험 근거]\n{json.dumps(context, ensure_ascii=False, separators=(',', ':'))}"]
+
+    recent = history[-_MAX_HISTORY_MESSAGES:]
+    if recent:
+        transcript = "\n".join(
+            f"{'사용자' if message.role == 'user' else '상담사'}: {message.content}"
+            for message in recent
+        )
+        sections.append(f"[이전 대화]\n{transcript}")
+
+    sections.append(f"[지금 답할 질문]\n{question}")
+    return mask_demographic_identifiers("\n\n".join(sections))
 
 
 def _citation(item: ConsultationEvidence) -> AnswerCitation:
@@ -213,6 +254,21 @@ def _stream_system_prompt() -> str:
 제공된 evidence만 근거로 삼아, 사용자에게 보여줄 답변 본문만 자연스럽게 쓰세요.
 친근한 존댓말(~해요체)로, 어려운 용어는 쉬운 말로 풀어서 답하세요.
 
+[대화 맥락]
+- [이전 대화]는 맥락 참고용입니다. 항상 마지막 [지금 답할 질문]에 답하세요.
+- 이전에 이미 말한 내용은 기억하고, 같은 것을 다시 묻지 마세요.
+
+[되묻기]
+- 기본은 되묻지 않고 바로 답하는 것입니다. evidence에 있는 내용은 절대 되묻지 마세요.
+- 특히 사용자의 가입 보험·담보·보장금액·상품명은 [내 보험 근거]에 이미 있으니,
+  "어떤 보장을 받고 있는지" "무슨 보험이 있는지"를 사용자에게 묻지 말고 직접 찾아 답하세요.
+  ("확인해보셨나요?" "어떤 보험인지 말씀해 주세요" 같은 되물음 금지.)
+- 되묻기는 오직 evidence에도 이전 대화에도 없고 사용자만 아는 사고·상황 사실이
+  판단에 꼭 필요할 때만 씁니다(예: 어떤 사고인지, 어디를 다쳤는지, 언제 진단받았는지).
+- 되물을 때만 첫 줄에 정확히 `CLARIFY`만 쓰고 다음 줄에 꼭 필요한 되물음 한 가지만 쓰세요.
+  담보·금액·추측성 답변은 섞지 마세요.
+
+[근거]
 - evidence에 없는 담보·금액·조건을 지어내지 마세요.
   근거가 없으면 "지금 증권만으로는 확인하기 어려워요"라고 솔직하게 말하세요.
 - 금액대를 언급해도 됩니다. 단 공식 기준이 아닌 일반 참고임을 밝히세요.
@@ -259,6 +315,74 @@ def _fallback_stream(fallback: PortfolioQuestionResponse) -> Iterator[QaStreamEv
     }
 
 
+_CLARIFY_TOKEN = "CLARIFY"
+
+
+_CLARIFY_SEPARATORS = " \t\r\n:：-"
+
+
+class _ClarifyHeader:
+    """Strip a leading `CLARIFY` control token from a token stream.
+
+    Answers stream with no delay — the first character that can't extend
+    "CLARIFY" resolves the turn as an answer. Only when the stream actually
+    begins with the token do we buffer, then drop the token plus any trailing
+    separator (newline, space, colon, dash) however the model wrote it —
+    `CLARIFY\\n질문`, `CLARIFY 질문`, `CLARIFY: 질문` all yield just `질문`.
+    """
+
+    def __init__(self) -> None:
+        self._buffer = ""
+        self._decided = False
+        self._trimming = False  # after the token, drop leading separators
+        self.is_clarifying = False
+
+    @property
+    def status(self) -> str:
+        return "clarify" if self.is_clarifying else "answered"
+
+    def _trim_leading(self, text: str) -> str:
+        if not self._trimming:
+            return text
+        cleaned = text.lstrip(_CLARIFY_SEPARATORS)
+        if cleaned:
+            self._trimming = False
+        return cleaned
+
+    def feed(self, delta: str) -> str | None:
+        """Return display text for this delta, or None while still undecided."""
+
+        if self._decided:
+            return self._trim_leading(delta)
+
+        self._buffer += delta
+        probe = self._buffer.lstrip().upper()
+        if probe.startswith(_CLARIFY_TOKEN):
+            self.is_clarifying = True
+            self._decided = True
+            self._trimming = True
+            remainder = self._buffer.lstrip()[len(_CLARIFY_TOKEN) :]
+            self._buffer = ""
+            return self._trim_leading(remainder)
+        if probe == "" or _CLARIFY_TOKEN.startswith(probe):
+            return None  # still could become the CLARIFY token — keep buffering
+        self._decided = True
+        body, self._buffer = self._buffer, ""
+        return body
+
+    def flush(self) -> str:
+        if self._decided:
+            return ""
+        self._decided = True
+        body, self._buffer = self._buffer, ""
+        # Undecided leftover is a prefix of "CLARIFY" (e.g. "CLAR") or the bare
+        # token with no question. A bare token means an empty clarify turn.
+        if body.strip().upper() == _CLARIFY_TOKEN:
+            self.is_clarifying = True
+            return ""
+        return body
+
+
 def stream_consultation_answer(
     *,
     question: str,
@@ -276,32 +400,59 @@ def stream_consultation_answer(
 
     streamer = stream or stream_completion
     system = _stream_system_prompt()
-    user = _user_prompt(question, demographics, history, life_stage_check, catalog)
+    user = _stream_user_prompt(question, demographics, history, life_stage_check, catalog)
 
     parts: list[str] = []
+    header = _ClarifyHeader()
     started = False
     interrupted = False
+
+    def emit(text: str | None) -> Iterator[QaStreamEvent]:
+        # Meta is deferred until the first visible token, so a header-only stream
+        # (empty body) never announces a turn it can't deliver.
+        nonlocal started
+        if not text:
+            return
+        if not started:
+            yield {"type": "meta", "status": header.status, "generation": "llm"}
+            started = True
+        parts.append(text)
+        yield {"type": "delta", "text": text}
+
     try:
         for delta in streamer(system, user):
             if not delta:
                 continue
-            if not started:
-                yield {"type": "meta", "status": "answered", "generation": "llm"}
-                started = True
-            parts.append(delta)
-            yield {"type": "delta", "text": delta}
+            yield from emit(header.feed(delta))
     except Exception:
         interrupted = True
+
+    yield from emit(header.flush())
 
     full = "".join(parts).strip()
     if not started or not full:
         yield from _fallback_stream(fallback)
         return
 
-    end_limitations = list(dict.fromkeys(limitations))
+    end_limitations: list[str] = []
     if interrupted:
         # Mid-stream failure after partial text: the shown answer may be cut off.
-        end_limitations.insert(0, "답변이 도중에 끊겼을 수 있어요. 다시 질문해 주세요.")
+        end_limitations.append("답변이 도중에 끊겼을 수 있어요. 다시 질문해 주세요.")
+
+    if header.is_clarifying:
+        yield {
+            "type": "end",
+            "status": "clarify",
+            "generation": "llm",
+            "citations": [],
+            "limitations": end_limitations,
+            "suggestions": [],
+            "claim_channels": None,
+        }
+        return
+
+    end_limitations.extend(limitations)
+    end_limitations = list(dict.fromkeys(end_limitations))
 
     citations = _relevant_citations(full, catalog)
     channels_payload = None

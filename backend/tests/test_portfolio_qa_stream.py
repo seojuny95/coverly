@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 
 from app.schemas.portfolio import PolicyInput
+from app.schemas.qa import ConversationMessage
 from app.services.portfolio_qa import stream_portfolio_answer
 
 
@@ -132,6 +133,75 @@ def test_stream_llm_answer_has_no_channels_when_not_claim_related() -> None:
     events = list(stream_portfolio_answer("내 보장 강점은?", _policies(), stream=fake_stream))
 
     assert events[-1]["claim_channels"] is None
+
+
+def test_stream_places_current_question_after_prior_conversation() -> None:
+    captured: dict[str, str] = {}
+
+    def fake_stream(_system: str, user: str) -> Iterator[str]:
+        captured["user"] = user
+        yield "네, 확인했어요."
+
+    list(
+        stream_portfolio_answer(
+            "지금은 뭘 봐야 해?",
+            _policies(),
+            history=[
+                ConversationMessage(role="user", content="암진단비 알려줘"),
+                ConversationMessage(role="assistant", content="암진단비는 3천만원이에요"),
+            ],
+            stream=fake_stream,
+        )
+    )
+
+    user = captured["user"]
+    assert "지금은 뭘 봐야 해?" in user
+    assert user.index("암진단비 알려줘") < user.index("지금은 뭘 봐야 해?")
+
+
+def test_stream_clarifying_question_drops_grounding_furniture() -> None:
+    def fake_stream(_system: str, _user: str) -> Iterator[str]:
+        yield "CLARIFY\n"
+        yield "어떤 사고였는지 알려주시겠어요?"
+
+    events = list(stream_portfolio_answer("사고났어 어떻게 해?", _policies(), stream=fake_stream))
+
+    text = "".join(str(e["text"]) for e in events if e["type"] == "delta")
+    assert text == "어떤 사고였는지 알려주시겠어요?"
+    assert "CLARIFY" not in text
+    end = events[-1]
+    assert end["status"] == "clarify"
+    assert end["citations"] == []
+    assert end["limitations"] == []
+    assert end["claim_channels"] is None
+
+
+def test_stream_clarify_strips_token_written_on_the_same_line() -> None:
+    for prefix in ("CLARIFY ", "CLARIFY: ", "clarify\n"):
+
+        def fake_stream(_s: str, _u: str, prefix: str = prefix) -> Iterator[str]:
+            yield f"{prefix}어떤 사고인지 알려주시겠어요?"
+
+        events = list(
+            stream_portfolio_answer("사고 났어 어떻게 해?", _policies(), stream=fake_stream)
+        )
+
+        text = "".join(str(e["text"]) for e in events if e["type"] == "delta")
+        assert text == "어떤 사고인지 알려주시겠어요?", prefix
+        assert "CLARIFY" not in text.upper()
+        assert events[-1]["status"] == "clarify"
+
+
+def test_stream_empty_clarify_falls_back_with_single_meta() -> None:
+    def fake_stream(_s: str, _u: str) -> Iterator[str]:
+        yield "CLARIFY\n"
+
+    events = list(stream_portfolio_answer("사고 났어 어떻게 해?", _policies(), stream=fake_stream))
+
+    metas = [event for event in events if event["type"] == "meta"]
+    assert len(metas) == 1
+    assert events[-1]["type"] == "end"
+    assert events[0]["generation"] == "fallback"
 
 
 def test_stream_falls_back_when_streamer_errors_before_any_token() -> None:

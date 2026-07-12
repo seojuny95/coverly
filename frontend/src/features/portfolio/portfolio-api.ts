@@ -253,7 +253,7 @@ export function askPortfolioQuestion(
 }
 
 export type QaStreamEnd = {
-  status: QaAnswer["status"];
+  status: QaAnswer["status"] | "clarify";
   generation?: "llm" | "fallback";
   citations: QaAnswer["citations"];
   limitations: string[];
@@ -262,7 +262,7 @@ export type QaStreamEnd = {
 };
 
 type QaStreamHandlers = {
-  onMeta?: (meta: { status: QaAnswer["status"] }) => void;
+  onMeta?: (meta: { status: QaStreamEnd["status"] }) => void;
   onDelta: (text: string) => void;
   onEnd: (end: QaStreamEnd) => void;
 };
@@ -304,7 +304,7 @@ export async function streamPortfolioQuestion(
       return; // skip a malformed/keepalive frame rather than aborting the stream
     }
     if (event.type === "meta") {
-      handlers.onMeta?.({ status: event.status as QaAnswer["status"] });
+      handlers.onMeta?.({ status: event.status as QaStreamEnd["status"] });
     } else if (event.type === "delta") {
       handlers.onDelta(String(event.text ?? ""));
     } else if (event.type === "end") {
