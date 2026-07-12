@@ -24,6 +24,7 @@ from app.services.portfolio_summary import (
     PortfolioFacts,
     count_duplicate_indemnity_coverages,
 )
+from app.services.rag.retrieve import RetrievalHit
 
 # Strengths cite held coverages; gaps may also cite existing coverages/실손 to
 # flag over-insurance, not only missing (gap:) categories.
@@ -57,6 +58,8 @@ def generate_counselor(
     life_stage_check: LifeStageCheck,
     catalog: EvidenceCatalog,
     complete: JsonCompleter | None,
+    *,
+    official_guidance: tuple[RetrievalHit, ...] = (),
 ) -> tuple[CounselorAnalysis, GenerationMode]:
     if not facts.policies:
         return fallback, "fallback"
@@ -64,7 +67,7 @@ def generate_counselor(
     try:
         raw = (complete or structured_completer(_LlmCounselorDraft))(
             _system_prompt(),
-            _user_prompt(demographics, life_stage_check, catalog, facts),
+            _user_prompt(demographics, life_stage_check, catalog, facts, official_guidance),
         )
         draft = _LlmCounselorDraft.model_validate(raw)
     except Exception:
@@ -205,6 +208,9 @@ def _system_prompt() -> str:
         "사용할 근거:\n"
         "- 제공된 evidence의 담보명·금액·건수, category_purposes(담보가 대비하는 상황), "
         "monthly_premium_total, duplicate_indemnity_count만 사실로 쓰세요.\n"
+        "- official_guidance는 약관에서 지급사유·면책·감액·보상하지 않는 사항을 왜 "
+        "확인해야 하는지 설명할 때만 쓰세요. 이것으로 strengths/gaps/금액 판단을 "
+        "새로 만들거나 바꾸지 마세요.\n"
         "- 없는 담보·숫자를 지어내지 말고, 인용한 모든 항목에 "
         "실제 존재하는 evidence id를 붙이세요.\n"
         "- 각 strengths/gaps 항목은 자신이 인용한 evidence의 담보와 같은 주제여야 합니다.\n\n"
@@ -238,6 +244,7 @@ def _user_prompt(
     life_stage_check: LifeStageCheck,
     catalog: EvidenceCatalog,
     facts: PortfolioFacts,
+    official_guidance: tuple[RetrievalHit, ...],
 ) -> str:
     categories = list(life_stage_check.held) + list(life_stage_check.missing)
     premium = summarize_premiums(list(facts.policies))
@@ -254,5 +261,21 @@ def _user_prompt(
         "monthly_premium_total": premium.monthly_total,
         "duplicate_indemnity_count": count_duplicate_indemnity_coverages(facts.coverage_summary),
         "evidence": [item.model_dump(mode="json") for item in catalog.items],
+        "official_guidance": [
+            {
+                "id": hit.chunk.id,
+                "source_title": hit.chunk.source_title,
+                "citation_label": hit.chunk.citation_label,
+                "text": _trim_official_guidance(hit.chunk.text),
+            }
+            for hit in official_guidance
+        ],
     }
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _trim_official_guidance(text: str) -> str:
+    compact = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+    if len(compact) <= 700:
+        return compact
+    return compact[:699].rstrip() + "…"

@@ -1,28 +1,36 @@
-"""General explanations for coverages whose 보장내용 is absent (Phase 1, interim).
+"""Official-source assisted explanations for coverages whose 보장내용 is absent.
 
 One batched structured-output call explains every cache-missed name; results
 are cached in-process by 담보명 because a general explanation is independent of
-any particular policy. Phase 2 replaces these with 표준약관-grounded
-explanations — until then the frontend labels them honestly as general.
+any particular policy. Official RAG excerpts are passed as context so the LLM
+uses standard-clause terms and limitations before falling back to broad
+coverage-name meaning.
 
 Never raises: on LLM failure the caller gets cache hits plus ok=False so the
 upload degrades to 분석상태=부분 instead of breaking.
 """
 
+import json
+from collections.abc import Callable
 from functools import lru_cache
 
 from pydantic import BaseModel, ValidationError
 
 from app.services.llm import JsonCompleter, structured_completer
+from app.services.rag.retrieve import RetrievalHit, retrieve
 
 _SYSTEM = (
-    "너는 표준적인 보험 담보를 일반적으로 설명하는 도우미다. "
-    "목록의 각 담보가 일반적으로 무엇을 보장하는지 전문용어 없이 쉬운 말과 "
+    "너는 사용자가 이미 가진 보험의 담보를 이해하도록 돕는 상담사다. "
+    "제공된 공식자료 발췌문이 있으면 그 내용을 우선 근거로 삼고, "
+    "발췌문이 담보를 직접 설명하지 않으면 일반적인 담보명 의미만 조심스럽게 설명하라. "
+    "목록의 각 담보가 무엇을 대비하는지 전문용어 없이 쉬운 말과 "
     "친근한 존댓말(~해요체)로 1~2문장씩 설명하라. "
-    "금액·정확한 면책기간·감액률은 단정하지 말고 '보통', '상품마다 다를 수 있어요'처럼 표현하라. "
-    "지어내지 말고 일반적으로 알려진 내용만 써라. "
-    "일반적으로 알려진 내용이 없는 담보는 결과에서 제외하라."
+    "보험금 지급, 면책, 감액, 금액, 정확한 조건은 단정하지 말고 "
+    "'약관에서 지급사유·면책·감액 조건을 확인해야 해요'처럼 표현하라. "
+    "특정 보험사·상품 조건을 지어내지 마라. 설명할 수 없는 담보는 결과에서 제외하라."
 )
+
+_MAX_EXCERPT_CHARS = 700
 
 
 class _Explanation(BaseModel):
@@ -35,6 +43,7 @@ class _ExplanationBatch(BaseModel):
 
 
 _CACHE: dict[str, str] = {}
+CoverageContextRetriever = Callable[[str], list[RetrievalHit]]
 
 
 @lru_cache
@@ -43,7 +52,9 @@ def _default_completer() -> JsonCompleter:
 
 
 def explain_coverages(
-    names: list[str], complete: JsonCompleter | None = None
+    names: list[str],
+    complete: JsonCompleter | None = None,
+    retrieve_context: CoverageContextRetriever | None = None,
 ) -> tuple[dict[str, str], bool]:
     """(담보명 -> 해설, ok): cache-first, one batch LLM call for the misses."""
     unique = list(dict.fromkeys(name.strip() for name in names if name.strip()))
@@ -54,7 +65,7 @@ def explain_coverages(
 
     completer = complete or _default_completer()
     try:
-        payload = completer(_SYSTEM, "\n".join(f"- {name}" for name in missing))
+        payload = completer(_SYSTEM, _user_prompt(missing, retrieve_context))
     except Exception:
         return explanations, False
 
@@ -71,3 +82,48 @@ def explain_coverages(
             _CACHE[name] = text
             explanations[name] = text
     return explanations, True
+
+
+def _user_prompt(
+    names: list[str],
+    retrieve_context: CoverageContextRetriever | None,
+) -> str:
+    retriever = retrieve_context or _retrieve_official_context
+    payload = {
+        "coverages": [
+            {
+                "name": name,
+                "official_excerpts": [
+                    {
+                        "id": hit.chunk.id,
+                        "source_title": hit.chunk.source_title,
+                        "citation_label": hit.chunk.citation_label,
+                        "text": _trim(hit.chunk.text),
+                    }
+                    for hit in retriever(name)
+                ],
+            }
+            for name in names
+        ],
+        "output": {
+            "설명목록": [
+                {
+                    "담보명": "입력 담보명과 정확히 같은 값",
+                    "해설": "사용자에게 보여줄 쉬운 설명",
+                }
+            ]
+        },
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _retrieve_official_context(name: str) -> list[RetrievalHit]:
+    query = f"{name} 뜻 지급사유 면책 감액 보상하지 않는 사항"
+    return retrieve(query, profile="term_explain", final_k=2)
+
+
+def _trim(text: str) -> str:
+    compact = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+    if len(compact) <= _MAX_EXCERPT_CHARS:
+        return compact
+    return compact[: _MAX_EXCERPT_CHARS - 1].rstrip() + "…"

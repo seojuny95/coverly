@@ -1,6 +1,7 @@
 """Grounded counselor-style analysis over structured portfolio facts."""
 
 from collections import defaultdict
+from functools import lru_cache
 from typing import Literal
 
 from app.schemas.analysis import (
@@ -29,6 +30,7 @@ from app.services.portfolio_summary import (
     build_portfolio_facts,
     count_duplicate_indemnity_coverages,
 )
+from app.services.rag.retrieve import RetrievalHit, retrieve
 
 _UNCLASSIFIED = "미분류"
 
@@ -58,6 +60,7 @@ def analyze_portfolio(
         life_stage_check,
         catalog,
         complete,
+        official_guidance=_official_analysis_guidance(),
     )
 
     classifications = _analyze_classifications(facts)
@@ -246,6 +249,17 @@ def _analysis_limitations(generation: GenerationMode) -> list[str]:
             "AI 분석을 사용할 수 없어 확인된 사실 기반의 기본 점검 결과를 표시합니다."
         )
     return limitations
+
+
+@lru_cache(maxsize=1)
+def _official_analysis_guidance() -> tuple[RetrievalHit, ...]:
+    return tuple(
+        retrieve(
+            "약관에서 지급사유 면책 감액 보상하지 않는 사항을 왜 확인해야 하는지",
+            profile="claim_check",
+            final_k=4,
+        )
+    )
 
 
 def _analyze_classifications(facts: PortfolioFacts) -> list[ClassificationAnalysis]:

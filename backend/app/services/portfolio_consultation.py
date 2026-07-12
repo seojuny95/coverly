@@ -60,7 +60,7 @@ _UNSUPPORTED_GUIDANCE_TERMS = _ADEQUACY_TERMS + (
     "증액",
     "줄이",
     "낮추",
-    "감액",
+    "감액하",
     "가입하",
     "추가하",
     "해지하",

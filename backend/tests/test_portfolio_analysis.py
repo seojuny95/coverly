@@ -1,6 +1,11 @@
+from pytest import MonkeyPatch
+
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
+from app.services import portfolio_analysis
 from app.services.portfolio_analysis import analyze_portfolio
+from app.services.rag.chunking import RagChunk
+from app.services.rag.retrieve import RetrievalHit
 
 
 def _policy(policy_id: str, classification: str, coverage_name: str, amount: str) -> PolicyInput:
@@ -20,6 +25,25 @@ def _policy(policy_id: str, classification: str, coverage_name: str, amount: str
                 }
             ],
         }
+    )
+
+
+def _official_hit(text: str) -> RetrievalHit:
+    return RetrievalHit(
+        chunk=RagChunk(
+            id="official-analysis-1",
+            source_id="standard_terms_annex_15_2026_06_30",
+            source_title="표준약관",
+            source_category="standard_clause",
+            publisher="금융감독원",
+            text=text,
+            page_start=10,
+            page_end=10,
+            citation_label="표준약관 제3조",
+        ),
+        score=1.0,
+        keyword_score=1,
+        rerank_score=1.0,
     )
 
 
@@ -120,6 +144,41 @@ def test_analysis_accepts_only_cited_llm_insights_and_builds_amount_from_fact() 
     assert result.counselor.amount_review_items[0].current_amount == 30_000_000
     assert result.counselor.amount_review_items[0].confidence == "low"
     assert result.counselor.amount_review_items[0].suggested_range is None
+
+
+def test_analysis_passes_official_guidance_without_changing_evidence_judgment(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policy = _policy("p1", "질병", "암진단비", "3,000만원")
+
+    monkeypatch.setattr(
+        portfolio_analysis,
+        "_official_analysis_guidance",
+        lambda: (_official_hit("약관에서 지급사유, 면책, 감액 조건을 확인해야 합니다."),),
+    )
+
+    def complete(_: str, user: str) -> dict[str, object]:
+        assert "official_guidance" in user
+        assert "지급사유" in user
+        return {
+            "strengths": [
+                {
+                    "title": "암 진단 담보가 확인돼요",
+                    "detail": "현재 증권에서 가입 사실을 확인했습니다.",
+                    "evidence_ids": ["coverage:1"],
+                }
+            ],
+            "gaps": [],
+            "amount_review_items": [],
+            "next_questions": ["지급사유와 면책 조건을 약관에서 확인했나요?"],
+            "next_steps": ["약관의 지급사유, 면책, 감액 조건을 함께 확인해 보세요."],
+        }
+
+    result = analyze_portfolio([policy], age=35, gender="여성", complete=complete)
+
+    assert result.generation == "llm"
+    assert result.counselor.strengths[0].evidence_ids == ["coverage:1"]
+    assert result.counselor.next_steps == ["약관의 지급사유, 면책, 감액 조건을 함께 확인해 보세요."]
 
 
 def test_analysis_filters_hallucinated_evidence_and_risky_claims() -> None:
