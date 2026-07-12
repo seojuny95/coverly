@@ -630,6 +630,50 @@ describe("InsuranceUploadForm", () => {
         "이미 올린 보험증권이에요. same-policy-copy.pdf 파일을 제거하고 다시 시도해주세요.",
       ),
     ).toBeInTheDocument();
+    expect(uploadInsurance).not.toHaveBeenCalled();
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
+  });
+
+  test("rejects a byte-identical re-upload against existing documents before uploading", async () => {
+    const user = userEvent.setup();
+    const fingerprintOf = async (file: File) => {
+      const buffer = await file.arrayBuffer();
+      const digest = await crypto.subtle.digest("SHA-256", buffer);
+      return Array.from(new Uint8Array(digest))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+    };
+    const existingDocuments: AnalyzedInsurance[] = [
+      {
+        id: "existing-policy",
+        fileName: "existing-policy.pdf",
+        fileFingerprint: await fingerprintOf(insuranceFile),
+        result: {
+          status: "accepted",
+          문자수: 20,
+          기본정보: {
+            보험사: "삼성화재",
+            상품명: "건강보험",
+            피보험자: "테스트고객",
+            보험분류: "상해·질병·실손",
+            상품태그: ["질병"],
+          },
+        },
+      },
+    ];
+    const uploadInsurance = vi.fn<UploadInsurance>();
+    const onAnalysisComplete = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete, existingDocuments });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "이미 올린 보험증권이에요. insurance.pdf 파일을 제거하고 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(uploadInsurance).not.toHaveBeenCalled();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 

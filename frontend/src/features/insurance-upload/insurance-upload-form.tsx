@@ -8,7 +8,10 @@ import {
   getInsuredPersonName,
   useInsuranceData,
 } from "../insurance-analysis/insurance-analysis-store";
-import { findDuplicatePolicyDocuments } from "../insurance-analysis/policy-identity";
+import {
+  findByteIdenticalDuplicateIndexes,
+  findDuplicatePolicyDocuments,
+} from "../insurance-analysis/policy-identity";
 import {
   type DragEvent,
   type FormEvent,
@@ -149,6 +152,34 @@ export function InsuranceUploadForm({
     selectFiles(event.dataTransfer.files);
   };
 
+  // Shared by both duplicate paths (byte-identical pre-upload check and the
+  // post-parse semantic check): mark the given selected files as duplicates and
+  // surface one "remove and retry" message. Non-duplicate files are left as-is.
+  const rejectDuplicateFiles = (
+    duplicates: Array<{ id: string; fileName: string }>,
+  ) => {
+    const duplicateFileIds = new Set(
+      duplicates.map((duplicate) => duplicate.id),
+    );
+    setSelectedUploadFiles((current) =>
+      current.map((selectedFile) =>
+        duplicateFileIds.has(selectedFile.id)
+          ? {
+              ...selectedFile,
+              status: "failed",
+              errorCode: "DUPLICATE_POLICY",
+              errorMessage: "이미 올린 보험증권이에요.",
+            }
+          : selectedFile,
+      ),
+    );
+    setError(
+      `이미 올린 보험증권이에요. ${duplicates
+        .map((duplicate) => duplicate.fileName)
+        .join(", ")} 파일을 제거하고 다시 시도해주세요.`,
+    );
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (selectedUploadFiles.length === 0 || isAnalyzing) return;
@@ -173,6 +204,24 @@ export function InsuranceUploadForm({
           createFileFingerprint(selectedFile.file),
         ),
       );
+
+      // Catch byte-identical re-uploads before spending a full parse + LLM pass.
+      const byteIdenticalIndexes = findByteIdenticalDuplicateIndexes({
+        fingerprints: fileFingerprints,
+        existingDocuments,
+      });
+      if (byteIdenticalIndexes.size > 0) {
+        rejectDuplicateFiles(
+          selectedUploadFiles
+            .filter((_, index) => byteIdenticalIndexes.has(index))
+            .map((selectedFile) => ({
+              id: selectedFile.id,
+              fileName: selectedFile.file.name,
+            })),
+        );
+        return;
+      }
+
       const uploadResults = await Promise.all(
         selectedUploadFiles.map(async (selectedFile, index) => {
           try {
@@ -298,26 +347,13 @@ export function InsuranceUploadForm({
       existingDocuments,
     });
     if (duplicateDocuments.length > 0) {
-      const duplicateFileIds = new Set(
+      rejectDuplicateFiles(
         duplicateDocuments.flatMap((document) => {
           const selectedFileId = selectedFileIdsByDocumentId.get(document.id);
-          return selectedFileId ? [selectedFileId] : [];
+          return selectedFileId
+            ? [{ id: selectedFileId, fileName: document.fileName }]
+            : [];
         }),
-      );
-      setSelectedUploadFiles((current) =>
-        current.map((selectedFile) =>
-          duplicateFileIds.has(selectedFile.id)
-            ? {
-                ...selectedFile,
-                status: "failed",
-                errorCode: "DUPLICATE_POLICY",
-                errorMessage: "이미 올린 보험증권이에요.",
-              }
-            : selectedFile,
-        ),
-      );
-      setError(
-        `이미 올린 보험증권이에요. ${duplicateDocuments.map((document) => document.fileName).join(", ")} 파일을 제거하고 다시 시도해주세요.`,
       );
       return false;
     }
