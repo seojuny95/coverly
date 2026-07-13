@@ -223,7 +223,6 @@ def test_extract_policy_summary_reads_collapsed_pdf_text() -> None:
     assert 0 <= demographics["나이"] <= 120
 
     assert result == {
-        "보험사": "DB손해보험",
         "상품명": "무배당 프로미라이프 참좋은운전자상해보험(TM)2404",
         "증권번호": "POLICY-TEST-MASKED-001",
         "계약자": "테스트고객A",
@@ -503,36 +502,6 @@ def test_llm_filled_insurer_with_multi_token_brand_requires_every_token() -> Non
         피보험자: 가나
         """,
         llm_extractor=lambda _text: {"보험사": "NH농협손해보험"},
-    )
-
-    assert result["보험사"] == "NH농협손해보험"
-
-
-def test_local_summary_infers_insurer_from_catalog_brand_tokens() -> None:
-    result = extract_policy_summary(
-        """
-        보험증권
-        DB 다이렉트 고객센터 안내
-        상품명: 건강보험
-        증권번호: POLICY-TEST-001
-        피보험자: 가나
-        """,
-        llm_extractor=None,
-    )
-
-    assert result["보험사"] == "DB손해보험"
-
-
-def test_local_summary_prefers_catalog_candidate_with_matching_insurer_kind() -> None:
-    result = extract_policy_summary(
-        """
-        보험증권
-        NH 농협손해 디지털채널팀
-        상품명: 건강보험
-        증권번호: POLICY-TEST-001
-        피보험자: 가나
-        """,
-        llm_extractor=None,
     )
 
     assert result["보험사"] == "NH농협손해보험"

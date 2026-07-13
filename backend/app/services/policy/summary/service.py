@@ -241,28 +241,7 @@ def _first_pattern_match(patterns: list[str], text: str) -> re.Match[str] | None
 
 
 def _extract_insurer_name(text: str) -> str | None:
-    labeled_value = _extract_labeled_value(text, _INSURER_LABELS)
-    if labeled_value:
-        return labeled_value
-
-    return _infer_insurer_from_catalog(text)
-
-
-def _infer_insurer_from_catalog(text: str) -> str | None:
-    candidates = get_insurer_candidates()
-    scored = [
-        (score, candidate)
-        for candidate in candidates
-        if (score := _insurer_grounding_score(candidate, text)) > 0
-    ]
-    if not scored:
-        return None
-
-    scored.sort(reverse=True)
-    best_score, best_candidate = scored[0]
-    if len(scored) > 1 and scored[1][0] == best_score:
-        return None
-    return best_candidate
+    return _extract_labeled_value(text, _INSURER_LABELS)
 
 
 _PRODUCT_NAME_TRAILING_LABELS = _POLICY_NUMBER_LABELS + [
@@ -627,7 +606,6 @@ def _extract_maturity_date(coverage_period: CoveragePeriod | None) -> str | None
 
 _MAX_INPUT_CHARS = 30_000
 _INSURER_CATALOG_PATH = SERVICE_DATA_DIR / "insurer_catalog.json"
-_INSURER_ALIAS_PATH = SERVICE_DATA_DIR / "insurer_aliases.json"
 _SUMMARY_STRING_FIELDS = (
     "보험사",
     "상품명",
@@ -696,24 +674,6 @@ def get_insurer_candidates() -> tuple[str, ...]:
         raise ValueError("insurer catalog must contain at least one insurer")
 
     return candidates
-
-
-@lru_cache
-def _insurer_aliases() -> dict[str, tuple[str, ...]]:
-    if not _INSURER_ALIAS_PATH.exists():
-        return {}
-
-    payload = json.loads(_INSURER_ALIAS_PATH.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("insurer aliases must be a JSON object")
-
-    aliases: dict[str, tuple[str, ...]] = {}
-    for insurer, values in payload.items():
-        if not isinstance(insurer, str) or not isinstance(values, list):
-            raise ValueError("insurer aliases must map strings to string lists")
-        aliases[insurer] = tuple(value for value in values if isinstance(value, str) and value)
-
-    return aliases
 
 
 def extract_policy_summary_with_llm(text: str) -> LlmPolicySummary | None:
@@ -912,7 +872,6 @@ _INSURER_NAME_SUFFIXES = (
 )
 
 _BRAND_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9]+|[가-힣]+")
-_INSURER_KIND_TOKENS = ("손해", "생명", "화재", "해상")
 
 
 def _insurer_grounded(candidate: str, text: str) -> bool:
@@ -936,53 +895,6 @@ def _insurer_grounded(candidate: str, text: str) -> bool:
 
     normalized_text = re.sub(r"\s", "", text).lower()
     return all(token.lower() in normalized_text for token in tokens)
-
-
-def _insurer_grounding_score(candidate: str, text: str) -> int:
-    brand = candidate
-    for suffix in _INSURER_NAME_SUFFIXES:
-        if brand.endswith(suffix) and len(brand) > len(suffix):
-            brand = brand[: -len(suffix)]
-            break
-
-    tokens = [token for token in _BRAND_TOKEN_PATTERN.findall(brand) if len(token) >= 2]
-    normalized_text = re.sub(r"\s", "", text).lower()
-    normalized_text_tokens = {
-        token.lower() for token in _BRAND_TOKEN_PATTERN.findall(text) if len(token) >= 2
-    }
-    if not tokens or not all(
-        _text_has_brand_token(token, normalized_text_tokens) for token in tokens
-    ):
-        alias_score = _insurer_alias_score(candidate, normalized_text)
-        if alias_score > 0:
-            return alias_score
-        return 0
-
-    score = sum(len(token) for token in tokens)
-    for token in _INSURER_KIND_TOKENS:
-        if token in candidate and token in normalized_text:
-            score += len(token)
-    return score
-
-
-def _text_has_brand_token(token: str, text_tokens: set[str]) -> bool:
-    normalized = token.lower()
-    if re.fullmatch(r"[A-Za-z0-9]+", token):
-        return normalized in text_tokens
-    return any(normalized in text_token for text_token in text_tokens)
-
-
-def _insurer_alias_score(candidate: str, normalized_text: str) -> int:
-    aliases = _insurer_aliases().get(candidate, ())
-    matched = [
-        alias
-        for alias in aliases
-        if (normalized_alias := re.sub(r"\s", "", alias).lower())
-        and normalized_alias in normalized_text
-    ]
-    if not matched:
-        return 0
-    return max(len(alias) for alias in matched)
 
 
 def _merge_missing_llm_fields(
