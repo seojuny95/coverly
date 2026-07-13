@@ -16,6 +16,8 @@ and needs a populated index, so it must never run inside the unit test suite
 from __future__ import annotations
 
 import json
+import time
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -52,6 +54,7 @@ class RetrievalEvalReport:
     total: int
     reciprocal_rank_sum: float
     source_precision_sum: float
+    elapsed_seconds: float
     results: tuple[RetrievalEvalResult, ...]
 
     @property
@@ -74,6 +77,13 @@ class RetrievalEvalReport:
             return 0.0
 
         return self.source_precision_sum / self.total
+
+    @property
+    def average_latency_seconds(self) -> float:
+        if self.total == 0:
+            return 0.0
+
+        return self.elapsed_seconds / self.total
 
 
 def load_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[RetrievalEvalCase, ...]:
@@ -100,13 +110,16 @@ def evaluate_retrieval(
 ) -> RetrievalEvalReport:
     active_cases = cases or load_retrieval_eval_cases()
     chunks = None if production else load_official_chunks()
+    started = time.perf_counter()
     results = tuple(_evaluate_case(case, _retrieve_for_case(case, chunks)) for case in active_cases)
+    elapsed_seconds = time.perf_counter() - started
 
     return RetrievalEvalReport(
         passed=sum(1 for result in results if result.passed),
         total=len(results),
         reciprocal_rank_sum=sum(1 / result.rank for result in results if result.rank is not None),
         source_precision_sum=sum(result.source_precision for result in results),
+        elapsed_seconds=elapsed_seconds,
         results=results,
     )
 
@@ -121,11 +134,13 @@ def _retrieve_for_case(
 
 def _evaluate_case(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> RetrievalEvalResult:
     hit_source_ids = tuple(dict.fromkeys(hit.chunk.source_id for hit in hits))
-    rendered = "\n".join(hit.chunk.text for hit in hits)
+    rendered = "\n".join(_rendered_chunk_text(hit) for hit in hits)
     missing_source_ids = tuple(
         source_id for source_id in case.expected_source_ids if source_id not in hit_source_ids
     )
-    missing_terms = tuple(term for term in case.expected_terms if term not in rendered)
+    missing_terms = tuple(
+        term for term in case.expected_terms if _normalize_match_text(term) not in rendered
+    )
     rank = _first_passing_rank(case, hits)
 
     return RetrievalEvalResult(
@@ -143,9 +158,9 @@ def _first_passing_rank(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> in
     for rank in range(1, len(hits) + 1):
         prefix = hits[:rank]
         hit_source_ids = {hit.chunk.source_id for hit in prefix}
-        rendered = "\n".join(hit.chunk.text for hit in prefix)
+        rendered = "\n".join(_rendered_chunk_text(hit) for hit in prefix)
         if all(source_id in hit_source_ids for source_id in case.expected_source_ids) and all(
-            term in rendered for term in case.expected_terms
+            _normalize_match_text(term) in rendered for term in case.expected_terms
         ):
             return rank
     return None
@@ -156,3 +171,13 @@ def _source_precision(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> floa
         return 0.0
     expected_sources = set(case.expected_source_ids)
     return sum(1 for hit in hits if hit.chunk.source_id in expected_sources) / len(hits)
+
+
+def _rendered_chunk_text(hit: RetrievalHit) -> str:
+    parts = [hit.chunk.label or "", hit.chunk.citation_label or "", hit.chunk.text]
+    return _normalize_match_text("\n".join(part for part in parts if part))
+
+
+def _normalize_match_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    return "".join(char for char in normalized if char.isalnum() or ("가" <= char <= "힣"))

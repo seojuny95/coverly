@@ -241,6 +241,7 @@ def test_retrieval_eval_fixture_passes_current_small_corpus() -> None:
     assert report.recall >= 0.4, report.results
     assert 0.0 <= report.mrr <= 1.0
     assert 0.0 <= report.source_precision <= 1.0
+    assert report.average_latency_seconds >= 0.0
 
 
 def test_retrieval_eval_reports_first_passing_rank_and_mrr(
@@ -269,7 +270,7 @@ def test_retrieval_eval_reports_first_passing_rank_and_mrr(
                 source_title="기대 문서",
                 source_category="law",
                 publisher="테스트",
-                text="아직 기대 용어는 없는 내용",
+                text="아직 다른 표현만 있는 내용",
                 page_start=1,
                 page_end=1,
             ),
@@ -319,6 +320,54 @@ def test_retrieval_eval_reports_first_passing_rank_and_mrr(
     assert report.recall == 1.0
     assert report.mrr == 1 / 3
     assert report.source_precision == 2 / 3
+    assert report.average_latency_seconds >= 0.0
+
+
+def test_retrieval_eval_normalizes_terms_against_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hits = [
+        RetrievalHit(
+            chunk=RagChunk(
+                id="right-label",
+                source_id="expected_source",
+                source_title="기대 문서",
+                source_category="law",
+                publisher="테스트",
+                text="본문에는 같은 표현이 없습니다.",
+                page_start=1,
+                page_end=1,
+                label="제18조(설명 의무)",
+                citation_label="기대 문서 제18조(설명 의무)",
+            ),
+            score=0.9,
+            keyword_score=0.0,
+            vector_score=0.9,
+        ),
+    ]
+
+    def _fake_retrieve(
+        *,
+        query: str,
+        chunks: tuple[RagChunk, ...] | None = None,
+        embedder: object | None = None,
+    ) -> list[RetrievalHit]:
+        return hits
+
+    monkeypatch.setattr("app.services.rag.official.evaluation.retrieval.retrieve", _fake_retrieve)
+    cases = (
+        RetrievalEvalCase(
+            id="case",
+            query="질문",
+            expected_source_ids=("expected_source",),
+            expected_terms=("설명의무",),
+        ),
+    )
+
+    report = evaluate_retrieval(cases, production=True)
+
+    assert report.results[0].passed is True
+    assert report.results[0].rank == 1
 
 
 def test_law_snapshots_are_loaded_as_rag_chunks() -> None:

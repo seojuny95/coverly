@@ -9,9 +9,13 @@ from llama_index.core.schema import BaseNode, MetadataMode, TextNode
 from llama_index.core.vector_stores import VectorStoreQuery
 from llama_index.core.vector_stores.types import VectorStoreQueryMode
 from llama_index.vector_stores.postgres import PGVectorStore
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
-from app.services.rag.official.models import RagChunk, RetrievalHit, VectorRecord
+from app.services.rag.official.models import (
+    RagChunk,
+    RetrievalHit,
+    VectorRecord,
+)
 from app.settings import get_settings
 
 
@@ -61,6 +65,15 @@ class PgVectorRagStore:
         """
 
         staging_table_name = f"{self._table_name}_staging"
+        self._drop_table_if_exists(staging_table_name)
+        self._drop_table_if_exists(f"{self._table_name}_old")
+        self._drop_index_if_exists(f"data_{staging_table_name}_embedding_idx")
+        self._drop_constraint_if_exists(
+            f"data_{self._table_name}",
+            f"data_{staging_table_name}_pkey",
+        )
+        self._drop_index_if_exists(f"{staging_table_name}_idx")
+        self._drop_index_if_exists(f"{staging_table_name}_idx_1")
         staging_store = _pg_vector_store_from_database_url(
             self._database_url,
             table_name=staging_table_name,
@@ -77,7 +90,7 @@ class PgVectorRagStore:
         staging_table = f"data_{staging_table_name}"
         backup_table = f"{live_table}_old"
 
-        engine = self._vector_store.client
+        engine = create_engine(self._database_url)
         with engine.begin() as connection:
             connection.execute(text(f'DROP TABLE IF EXISTS "{backup_table}"'))
             connection.execute(
@@ -85,6 +98,30 @@ class PgVectorRagStore:
             )
             connection.execute(text(f'ALTER TABLE "{staging_table}" RENAME TO "{live_table}"'))
             connection.execute(text(f'DROP TABLE IF EXISTS "{backup_table}"'))
+        engine.dispose()
+
+    def _drop_table_if_exists(self, table_name: str) -> None:
+        engine = create_engine(self._database_url)
+        with engine.begin() as connection:
+            connection.execute(text(f'DROP TABLE IF EXISTS "data_{table_name}" CASCADE'))
+        engine.dispose()
+
+    def _drop_index_if_exists(self, index_name: str) -> None:
+        engine = create_engine(self._database_url)
+        with engine.begin() as connection:
+            connection.execute(text(f'DROP INDEX IF EXISTS "{index_name}"'))
+        engine.dispose()
+
+    def _drop_constraint_if_exists(self, table_name: str, constraint_name: str) -> None:
+        engine = create_engine(self._database_url)
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    f'ALTER TABLE IF EXISTS "{table_name}" '
+                    f'DROP CONSTRAINT IF EXISTS "{constraint_name}"'
+                )
+            )
+        engine.dispose()
 
     def query(
         self,

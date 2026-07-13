@@ -17,6 +17,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from collections.abc import Callable
 
 from app.services.rag.embeddings import Embedder, openai_embedder_from_settings
 from app.services.rag.official.models import (
@@ -30,6 +31,7 @@ from app.services.rag.official.pgvector_store import shared_pgvector_store
 from app.settings import get_settings
 
 _TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]+")
+_RRF_K = 20
 
 
 def retrieve(
@@ -57,7 +59,7 @@ def retrieve(
         return []
 
     if chunks is None:
-        return _retrieve_from_pgvector(plan, top_k=final_k)
+        return _retrieve_from_pgvector(plan, candidate_k=candidate_k, final_k=final_k)
 
     if embedder is None:
         raise ValueError("embedder is required when chunks is provided")
@@ -66,15 +68,15 @@ def retrieve(
     if not records:
         return []
 
-    top_k = min(candidate_k, final_k)
-    return _retrieve_from_records(
+    hits = _retrieve_from_records(
         plan,
         records,
         embedder=embedder,
-        top_k=top_k,
+        top_k=candidate_k,
         vector_weight=vector_weight,
         bm25_weight=bm25_weight,
     )
+    return _rerank_with_rrf(plan, hits, top_k=candidate_k)[:final_k]
 
 
 def transform_query(query: str) -> QueryPlan:
@@ -88,16 +90,22 @@ def transform_query(query: str) -> QueryPlan:
     )
 
 
-def _retrieve_from_pgvector(plan: QueryPlan, *, top_k: int) -> list[RetrievalHit]:
+def _retrieve_from_pgvector(
+    plan: QueryPlan,
+    *,
+    candidate_k: int,
+    final_k: int,
+) -> list[RetrievalHit]:
     if not get_settings().database_url:
         raise RuntimeError("DATABASE_URL is required for RAG retrieval")
 
     query_embedding = openai_embedder_from_settings().embed_query(plan.search_query)
-    return shared_pgvector_store().query(
+    hits = shared_pgvector_store().query(
         query_embedding=query_embedding,
         query_text=plan.search_query,
-        top_k=top_k,
+        top_k=max(candidate_k, final_k),
     )
+    return _rerank_with_rrf(plan, hits, top_k=candidate_k)[:final_k]
 
 
 def _retrieve_from_records(
@@ -162,7 +170,75 @@ def _tokens(text: str) -> tuple[str, ...]:
     return tuple(token.casefold() for token in _TOKEN_RE.findall(text) if token.strip())
 
 
+def _rerank_with_rrf(
+    plan: QueryPlan, hits: list[RetrievalHit], *, top_k: int
+) -> list[RetrievalHit]:
+    if not hits:
+        return []
+
+    bm25 = _Bm25.from_chunks(tuple(hit.chunk for hit in hits))
+    keyword_scores = {hit.chunk.id: bm25.score_chunk(hit.chunk, plan.terms) for hit in hits}
+    vector_ranks = _rank_positions(
+        hits,
+        key=lambda hit: (
+            -hit.vector_score,
+            -hit.score,
+            hit.chunk.source_id,
+            hit.chunk.page_start,
+            hit.chunk.id,
+        ),
+    )
+    keyword_ranks = _rank_positions(
+        hits,
+        key=lambda hit: (
+            -keyword_scores[hit.chunk.id],
+            -hit.vector_score,
+            hit.chunk.source_id,
+            hit.chunk.page_start,
+            hit.chunk.id,
+        ),
+    )
+
+    ranked_hits = sorted(
+        hits,
+        key=lambda hit: (
+            -_rrf_score(vector_ranks[hit.chunk.id], keyword_ranks[hit.chunk.id]),
+            -hit.vector_score,
+            -keyword_scores[hit.chunk.id],
+            hit.chunk.source_id,
+            hit.chunk.page_start,
+            hit.chunk.id,
+        ),
+    )
+    return [
+        RetrievalHit(
+            chunk=hit.chunk,
+            score=_rrf_score(vector_ranks[hit.chunk.id], keyword_ranks[hit.chunk.id]),
+            keyword_score=keyword_scores[hit.chunk.id],
+            vector_score=hit.vector_score,
+        )
+        for hit in ranked_hits[:top_k]
+    ]
+
+
+def _rank_positions(
+    hits: list[RetrievalHit],
+    *,
+    key: Callable[[RetrievalHit], tuple[float | str | int, ...]],
+) -> dict[str, int]:
+    ordered = sorted(hits, key=key)
+    return {hit.chunk.id: rank for rank, hit in enumerate(ordered, start=1)}
+
+
+def _rrf_score(*ranks: int, k: int = _RRF_K) -> float:
+    return sum(1 / (k + rank) for rank in ranks)
+
+
 class _Bm25:
+    @classmethod
+    def from_chunks(cls, chunks: tuple[RagChunk, ...]) -> _Bm25:
+        return cls(tuple(VectorRecord(chunk=chunk, embedding=()) for chunk in chunks))
+
     def __init__(self, records: tuple[VectorRecord, ...]) -> None:
         self._documents = {
             record.chunk.id: _tokens(chunk_embedding_text(record.chunk)) for record in records
@@ -172,7 +248,10 @@ class _Bm25:
         self._doc_freqs = self._document_frequencies(self._documents)
 
     def score(self, record: VectorRecord, terms: tuple[str, ...]) -> float:
-        tokens = self._documents[record.chunk.id]
+        return self.score_chunk(record.chunk, terms)
+
+    def score_chunk(self, chunk: RagChunk, terms: tuple[str, ...]) -> float:
+        tokens = self._documents[chunk.id]
         if not tokens or self._avgdl == 0:
             return 0.0
 

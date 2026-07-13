@@ -13,12 +13,14 @@
 
 ## 현재 구현 기준
 
-현재 official RAG retrieval 평가는 `Recall@K`와 `MRR`을 계산한다.
+현재 official RAG retrieval 평가는 `Recall@K`, `MRR`, `source_precision`, `평균 지연 시간`을 함께 본다.
 또한 데이터셋이 문서 단위 관련성 라벨을 갖고 있지 않기 때문에, 엄밀한 `Precision@K` 대신 `source_precision`을 함께 본다.
 
 - `Recall@K`: 상위 검색 결과 묶음 안에 `expected_source_ids`와 `expected_terms`가 모두 포함되면 통과로 본다.
+- `expected_terms`는 `label + citation_label + text`를 합친 문자열에서 검사하며, 공백·대소문자·일부 기호 차이는 정규화해서 비교한다.
 - `MRR`: 상위 결과를 앞에서부터 누적했을 때 `expected_source_ids`와 `expected_terms`가 처음 모두 충족되는 순위의 역수를 평균낸다.
 - `source_precision`: 상위 결과 중 기대 source에서 온 chunk 비율이다. 잡 source가 얼마나 섞이는지 보는 보조 지표다.
+- `평균 지연 시간`: 평가셋 전체를 처리한 시간을 케이스 수로 나눈 값이다. retrieval 개선이 응답 시간을 얼마나 늘리거나 줄이는지 본다.
 
 `source_precision`은 관련 chunk 라벨이 아니라 source 라벨만 사용하므로, 일반적인 `Precision@K`보다 느슨하다.
 정밀한 `Precision@K`가 필요하면 평가셋에 각 질문별 relevant chunk id 또는 relevant source+term 조합을 추가해야 한다.
@@ -27,9 +29,10 @@
 
 production 평가에서 `Recall@K`가 높고 `MRR`이 낮으면 정답이 검색 결과 안에는 있지만 앞쪽에 충분히 안정적으로 나오지 않는다는 뜻이다.
 `source_precision`이 낮으면 질문과 무관한 공식문서 source가 상위 결과에 많이 섞인다는 뜻이다.
+`평균 지연 시간`이 높으면 retrieval 품질이 조금 올라가더라도 운영 경로에 넣기 어렵다는 뜻이다.
 
 따라서 retrieval 개선은 다음 순서로 본다.
 
-1. 명시적 source hint가 있는 질문에서 해당 source를 우선하도록 조정한다.
-2. pgvector에서 더 넓게 가져온 뒤 local rerank로 최종 순위를 정한다.
+1. evaluation false negative를 줄이기 위해 매칭 기준과 데이터셋을 먼저 점검한다.
+2. pgvector 후보 위에서 hybrid ranking을 튜닝한다.
 3. 청크 분할이 source/조항 경계를 흐리는 케이스를 보정한다.
