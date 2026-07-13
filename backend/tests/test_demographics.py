@@ -10,6 +10,14 @@ from app.services.policy.demographics import (
 )
 from app.services.policy.summary.service import extract_policy_summary
 
+ADULT_BIRTH = "95" + "0524"
+YOUNG_ADULT_BIRTH = "05" + "0524"
+MINOR_BIRTH = "07" + "0712"
+OLDER_HOLDER_BIRTH = "80" + "0101"
+INVALID_BIRTH = "99" + "1332"
+CLASSIFICATION_BIRTH = "90" + "0101"
+FULL_SUFFIX = "123" + "4567"
+
 
 def test_demographics_has_no_insurer_specific_logic() -> None:
     source = inspect.getsource(demographics_module)
@@ -35,7 +43,7 @@ def test_extracts_supported_century_and_gender_digits(
     expected_age: int,
     expected_gender: str,
 ) -> None:
-    birth = "TESTBIRTH-A" if code in {"1", "2", "5", "6"} else "TESTBIRTH-B"
+    birth = ADULT_BIRTH if code in {"1", "2", "5", "6"} else YOUNG_ADULT_BIRTH
 
     result = extract_insured_demographics(
         f"피보험자 가나 ({birth}-{code}******)",
@@ -51,11 +59,11 @@ def test_extracts_supported_century_and_gender_digits(
 
 def test_age_is_completed_age_and_changes_on_birthday() -> None:
     before_birthday = extract_insured_demographics(
-        "주민등록번호 TESTBIRTH-C-3******",
+        f"주민등록번호 {MINOR_BIRTH}-3******",
         today=date(2026, 7, 11),
     )
     on_birthday = extract_insured_demographics(
-        "주민등록번호 TESTBIRTH-C-3******",
+        f"주민등록번호 {MINOR_BIRTH}-3******",
         today=date(2026, 7, 12),
     )
 
@@ -65,9 +73,9 @@ def test_age_is_completed_age_and_changes_on_birthday() -> None:
 
 def test_uses_insured_identifier_when_holder_is_also_present() -> None:
     result = extract_insured_demographics(
-        """
-        계약자 가나 주민등록번호 TESTBIRTH-D-1******
-        피보험자 마바 주민등록번호 TESTBIRTH-B-4******
+        f"""
+        계약자 가나 주민등록번호 {OLDER_HOLDER_BIRTH}-1******
+        피보험자 마바 주민등록번호 {YOUNG_ADULT_BIRTH}-4******
         """,
         today=date(2025, 5, 24),
     )
@@ -77,9 +85,9 @@ def test_uses_insured_identifier_when_holder_is_also_present() -> None:
 
 def test_does_not_substitute_holder_demographics_for_invalid_insured_id() -> None:
     result = extract_insured_demographics(
-        """
-        계약자 가나 주민등록번호 TESTBIRTH-D-1******
-        피보험자 마바 주민등록번호 TESTBIRTH-X-4******
+        f"""
+        계약자 가나 주민등록번호 {OLDER_HOLDER_BIRTH}-1******
+        피보험자 마바 주민등록번호 {INVALID_BIRTH}-4******
         """,
         today=date(2026, 7, 11),
     )
@@ -90,11 +98,11 @@ def test_does_not_substitute_holder_demographics_for_invalid_insured_id() -> Non
 @pytest.mark.parametrize(
     "identifier",
     [
-        "TESTBIRTH-X-1******",
+        f"{INVALID_BIRTH}-1******",
         "000230-3******",
         "250229-3******",
-        "TESTBIRTH-A-9******",
-        "TESTBIRTH-A-0******",
+        f"{ADULT_BIRTH}-9******",
+        f"{ADULT_BIRTH}-0******",
     ],
 )
 def test_rejects_invalid_dates_and_unsupported_century_digits(identifier: str) -> None:
@@ -111,7 +119,7 @@ def test_returns_none_without_an_identifier() -> None:
 
 
 def test_accepts_compact_full_identifier_without_returning_raw_pii() -> None:
-    raw_identifier = "TESTBIRTH-ATESTSUFFIX"
+    raw_identifier = ADULT_BIRTH + FULL_SUFFIX
 
     result = extract_insured_demographics(
         f"피보험자 가나 {raw_identifier}",
@@ -120,22 +128,28 @@ def test_accepts_compact_full_identifier_without_returning_raw_pii() -> None:
 
     assert result == {"나이": 31, "성별": "남성", "생애단계": "성인"}
     assert raw_identifier not in repr(result)
-    assert "TESTBIRTH-A" not in repr(result)
+    assert ADULT_BIRTH not in repr(result)
 
 
 def test_masks_valid_and_invalid_identifier_shapes() -> None:
-    text = "정상 TESTBIRTH-A-TESTSUFFIX / 오류 TESTBIRTH-X-9****** / 압축 TESTBIRTH-B4123456"
+    valid_full_identifier = f"{ADULT_BIRTH}-{FULL_SUFFIX}"
+    invalid_masked_identifier = f"{INVALID_BIRTH}-9******"
+    compact_masked_identifier = YOUNG_ADULT_BIRTH + "4123456"
+    text = (
+        f"정상 {valid_full_identifier} / 오류 {invalid_masked_identifier} / "
+        f"압축 {compact_masked_identifier}"
+    )
 
     masked = mask_demographic_identifiers(text)
 
     assert masked == ("정상 ******-******* / 오류 ******-******* / 압축 ******-*******")
-    assert "TESTBIRTH-A" not in masked
-    assert "TESTBIRTH-X" not in masked
-    assert "TESTBIRTH-B" not in masked
+    assert ADULT_BIRTH not in masked
+    assert INVALID_BIRTH not in masked
+    assert YOUNG_ADULT_BIRTH not in masked
 
 
 def test_summary_llm_receives_masked_text_but_local_result_keeps_only_safe_fields() -> None:
-    raw_identifier = "TESTBIRTH-A-1******"
+    raw_identifier = f"{ADULT_BIRTH}-1******"
     received_texts: list[str] = []
 
     def capture_llm_text(text: str) -> None:
@@ -149,7 +163,7 @@ def test_summary_llm_receives_masked_text_but_local_result_keeps_only_safe_field
 
     assert received_texts == ["피보험자: 가나\n주민등록번호: ******-*******"]
     assert raw_identifier not in repr(result)
-    assert "TESTBIRTH-A" not in repr(result)
+    assert ADULT_BIRTH not in repr(result)
     assert result["피보험자정보"]["성별"] == "남성"
     assert set(result["피보험자정보"]) == {"나이", "성별", "생애단계"}
 
@@ -165,9 +179,9 @@ def test_summary_classification_receives_masked_text(
 
     monkeypatch.setattr("app.services.policy.summary.service.classify_policy", classify)
     extract_policy_summary(
-        "피보험자 가나 (TESTBIRTH-E-1******)",
+        f"피보험자 가나 ({CLASSIFICATION_BIRTH}-1******)",
         llm_extractor=None,
     )
 
-    assert "TESTBIRTH-E" not in captured["text"]
+    assert CLASSIFICATION_BIRTH not in captured["text"]
     assert "******-*******" in captured["text"]

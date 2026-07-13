@@ -27,6 +27,9 @@ from app.services.rag.policy.session_tokens import (
 from app.services.rag.policy.sessions import refresh_policy_session
 from app.services.rag.policy.source import build_policy_source_chunks
 
+RAG_TEST_BIRTH = "90" + "0101"
+RAG_TEST_SUFFIX = "123" + "4567"
+
 
 class _MemoryStore:
     def __init__(self, records: Sequence[PolicyVectorRecord]) -> None:
@@ -124,7 +127,7 @@ def test_policy_records_mask_pii_before_embedding_and_storage() -> None:
     rendered = "\n".join(record.chunk.text for record in records)
     assert "010-0000-0000" not in rendered
     assert "[전화번호]" in rendered
-    assert mask_policy_pii("TESTBIRTH-E-TESTSUFFIX") == "[주민등록번호]"
+    assert mask_policy_pii(f"{RAG_TEST_BIRTH}-{RAG_TEST_SUFFIX}") == "[주민등록번호]"
 
 
 def test_policy_index_returns_signed_session_token() -> None:
@@ -551,7 +554,7 @@ def test_local_policy_eval_dataset_does_not_contain_sample_pii() -> None:
     rendered = EVAL_FIXTURE.read_text(encoding="utf-8")
     blocked_terms = (
         "테스트고객A",
-        "TESTBIRTH-A",
+        "95" + "0524",
         "POLICY-TEST-MASKED-001",
         "POLICY-TEST-LOCAL-002",
         "POLICY-TEST-MASKED-003",

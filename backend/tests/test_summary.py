@@ -10,6 +10,10 @@ from app.services.policy.summary.service import (
     get_insurer_candidates,
 )
 
+ADULT_BIRTH = "95" + "0524"
+OLDER_HOLDER_BIRTH = "80" + "0101"
+SECONDARY_ADULT_BIRTH = "TESTBIRTH-F"
+
 
 @pytest.fixture(autouse=True)
 def _stub_classification_llm(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -205,14 +209,16 @@ def test_extract_policy_summary_treats_contract_number_as_policy_number() -> Non
 
 
 def test_extract_policy_summary_reads_collapsed_pdf_text() -> None:
+    masked_identifier = f"{ADULT_BIRTH}-1******"
+
     result = extract_policy_summary(
         "기본정보보험종목무배당 프로미라이프 참좋은운전자상해보험(TM)2404"
         "증권번호POLICY-TEST-MASKED-001계약자테스트고객A"
-        "(TESTBIRTH-A-1******)보험기간2024년 07월 26일 ~ 2044년 07월 26일"
+        f"({masked_identifier})보험기간2024년 07월 26일 ~ 2044년 07월 26일"
         "테스트주소 ******계약사항20년만기 / 20년납 / "
         "월납 / 개인계약 / 신용카드만기보험금수익자테스트고객A"
         "보험료11,670원 [보장보험료 11,668원 / 적립보험료 2원]"
-        "가입정보피보험자테스트고객A (TESTBIRTH-A-1******)판매플랜간편심사플랜"
+        f"가입정보피보험자테스트고객A ({masked_identifier})판매플랜간편심사플랜"
         "홈페이지www.idbins.com",
         llm_extractor=None,
     )
@@ -310,7 +316,7 @@ def test_extract_local_policy_summary_reads_premium_from_doubled_bold_glyphs() -
     # doubled back-to-back (a rendering artifact, e.g. "납입보험료" ->
     # "납납입입보보험험료료"); this mirrors a real NH농협보험증권 fragment.
     result = extract_local_policy_summary(
-        "계계약약자자주주소소 (자택)테스트주소\n"
+        "계계약약자자주주소소 (자택) 테스트주소\n"
         "납납입입보보험험료료 42,615원 납납입입주주기기 월납\n"
         "보보장장보보험험료료 42,615원 적적립립보보험험료료 해당 없음"
     )
@@ -322,9 +328,12 @@ def test_extract_local_policy_summary_truncates_product_name_at_glued_policy_num
     # Some layouts squeeze multiple fields onto one text line, e.g.
     # "보험종목 <상품명> 증권번호 <번호>" with no newline between them; mirrors a
     # real DB운전자보험증권 fragment.
+    masked_identifier = f"{ADULT_BIRTH}-1******"
+
     result = extract_local_policy_summary(
-        "보험종목 무배당 프로미라이프 참좋은운전자상해보험(TM)2404 증권번호 POLICY-TEST-MASKED-001\n"
-        "테스트고객A (TESTBIRTH-A-1******) 보험기간 2024년 07월 26일 ~ 2044년 07월 26일\n"
+        "보험종목 무배당 프로미라이프 참좋은운전자상해보험(TM)2404 "
+        "증권번호 POLICY-TEST-MASKED-001\n"
+        f"테스트고객A ({masked_identifier}) 보험기간 2024년 07월 26일 ~ 2044년 07월 26일\n"
     )
 
     assert result["상품명"] == "무배당 프로미라이프 참좋은운전자상해보험(TM)2404"
@@ -365,10 +374,12 @@ def test_extract_policy_summary_does_not_guess_calendar_maturity_from_lifetime_t
 
 
 def test_extract_policy_summary_reads_collapsed_payment_period_text() -> None:
+    masked_identifier = f"{ADULT_BIRTH}-1******"
+
     result = extract_policy_summary(
         "기본정보보험종목무배당 프로미라이프 참좋은운전자상해보험(TM)2404"
         "증권번호POLICY-TEST-MASKED-001계약자테스트고객A"
-        "(TESTBIRTH-A-1******)보험기간2024년 07월 26일 ~ 2044년 07월 26일"
+        f"({masked_identifier})보험기간2024년 07월 26일 ~ 2044년 07월 26일"
         "테스트주소 ******계약사항20년만기 / 20년납 / "
         "월납 / 개인계약 / 신용카드만기보험금수익자테스트고객A"
         "보험료11,670원 [보장보험료 11,668원 / 적립보험료 2원]",
@@ -409,14 +420,16 @@ def test_two_column_table_layout_defers_to_llm_fill() -> None:
     # POLICY-TEST-003 / 다이렉트개인용자동차보험 appear here only in this unlabeled
     # footer line, so the LLM-filled values below stay grounded even though the
     # two-column table above defeats local extraction for them.
-    text = """
+    holder_identifier = f"{OLDER_HOLDER_BIRTH}-1******"
+    insured_identifier = f"{SECONDARY_ADULT_BIRTH}-1******"
+    text = f"""
     보험증권 발행일
     보험계약자 보험계약자주소
     증권번호
     발행일
-    가나(TESTBIRTH-D-1******) 테스트주소
+    가나({holder_identifier}) 테스트주소
     기명피보험자 피보험자주소
-    다라(TESTBIRTH-F-1******) 테스트주소
+    다라({insured_identifier}) 테스트주소
     안내: 다이렉트개인용자동차보험 POLICY-TEST-003
     """
     local = extract_local_policy_summary(text)

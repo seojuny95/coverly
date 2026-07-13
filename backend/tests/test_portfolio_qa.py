@@ -10,6 +10,9 @@ from app.services.qa.service import answer_portfolio_question
 from app.services.rag.official.answer import RagAnswer, RagCitation
 from app.services.rag.policy import PolicyChunk, PolicyRetrievalHit
 
+ADULT_BIRTH = "95" + "0524"
+YOUNG_ADULT_BIRTH = "05" + "0524"
+
 
 def _policies() -> list[PolicyInput]:
     return [
@@ -429,15 +432,15 @@ def test_qa_passes_recent_history_and_demographics_to_llm() -> None:
 
 def test_qa_masks_identifiers_in_question_and_history_before_llm() -> None:
     captured: dict[str, object] = {}
-    question_identifier = "TESTBIRTH-A-1******"
-    history_identifier = "TESTBIRTH-B4123456"
+    question_identifier = f"{ADULT_BIRTH}-1******"
+    history_identifier = YOUNG_ADULT_BIRTH + "4123456"
 
     def complete(_: str, user: str) -> dict[str, object]:
         captured.update(json.loads(user))
         assert question_identifier not in user
         assert history_identifier not in user
-        assert "TESTBIRTH-A" not in user
-        assert "TESTBIRTH-B" not in user
+        assert ADULT_BIRTH not in user
+        assert YOUNG_ADULT_BIRTH not in user
         return {
             "confirmed_fact": "암 진단 관련 담보의 가입 사실이 확인돼요.",
             "guidance": "일반 가이드로 생활비와 예산을 함께 비교해 보세요.",
