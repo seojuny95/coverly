@@ -9,7 +9,7 @@ import time
 import unicodedata
 import uuid
 from argparse import ArgumentParser
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -34,7 +34,7 @@ class PolicyEvalCase:
     query: str
     session_ids: tuple[str, ...]
     expected_session_id: str
-    expected_terms: tuple[str, ...]
+    expected_term_groups: tuple[tuple[str, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ class PolicyEvalCaseResult:
     precision_at_k: float
     session_precision: float
     expected_session_id: str
-    expected_terms: tuple[str, ...]
+    expected_term_groups: tuple[tuple[str, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -58,6 +58,7 @@ class PolicyEvalReport:
     session_precision_sum: float
     elapsed_seconds: float
     case_results: tuple[PolicyEvalCaseResult, ...]
+    latency_seconds: tuple[float, ...]
 
     @property
     def recall(self) -> float:
@@ -77,7 +78,9 @@ class PolicyEvalReport:
 
     @property
     def average_latency_seconds(self) -> float:
-        return self.elapsed_seconds / self.total if self.total else 0.0
+        if not self.latency_seconds:
+            return 0.0
+        return sum(self.latency_seconds) / len(self.latency_seconds)
 
 
 def evaluate_policy_retrieval(
@@ -96,8 +99,6 @@ def evaluate_policy_retrieval(
     raw = json.loads(path.read_text(encoding="utf-8"))
     source_dir = _resolve_sample_dir(sample_dir, source=str(raw["source"]))
     cases = tuple(_case_from_json(item) for item in raw["cases"])
-    started = time.perf_counter()
-
     if production:
         report = _evaluate_with_store(
             raw["documents"],
@@ -116,12 +117,17 @@ def evaluate_policy_retrieval(
             parse=parse,
             created_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
+        memory_store = _InMemoryPolicyStore(records)
         report = _evaluate_cases(
             cases,
             top_k=top_k,
-            retrieve=lambda case: _rank_in_memory(
-                case.query, case.session_ids, records, active_embedder
-            )[:top_k],
+            retrieve=lambda case: retrieve_policy_context(
+                list(case.session_ids),
+                case.query,
+                top_k=top_k,
+                store=memory_store,
+                embedder=active_embedder,
+            ),
         )
 
     return PolicyEvalReport(
@@ -130,8 +136,9 @@ def evaluate_policy_retrieval(
         reciprocal_rank_sum=report.reciprocal_rank_sum,
         precision_at_k_sum=report.precision_at_k_sum,
         session_precision_sum=report.session_precision_sum,
-        elapsed_seconds=time.perf_counter() - started,
+        elapsed_seconds=report.elapsed_seconds,
         case_results=report.case_results,
+        latency_seconds=report.latency_seconds,
     )
 
 
@@ -146,8 +153,11 @@ def _evaluate_cases(
     session_precision_sum = 0.0
     passed = 0
     case_results: list[PolicyEvalCaseResult] = []
+    latencies: list[float] = []
     for case in cases:
+        started = time.perf_counter()
         ranked = retrieve(case)[:top_k]
+        latencies.append(time.perf_counter() - started)
         rank = _expected_rank(case, ranked)
         precision_at_k = _precision_at_k(case, ranked)
         session_precision = _session_precision(case, ranked)
@@ -165,7 +175,7 @@ def _evaluate_cases(
                 precision_at_k=precision_at_k,
                 session_precision=session_precision,
                 expected_session_id=case.expected_session_id,
-                expected_terms=case.expected_terms,
+                expected_term_groups=case.expected_term_groups,
             )
         )
 
@@ -175,8 +185,9 @@ def _evaluate_cases(
         reciprocal_rank_sum=reciprocal_rank_sum,
         precision_at_k_sum=precision_at_k_sum,
         session_precision_sum=session_precision_sum,
-        elapsed_seconds=0.0,
+        elapsed_seconds=sum(latencies),
         case_results=tuple(case_results),
+        latency_seconds=tuple(latencies),
     )
 
 
@@ -251,27 +262,64 @@ def _records_from_documents(
     return tuple(records)
 
 
+class _InMemoryPolicyStore:
+    def __init__(self, records: tuple[PolicyVectorRecord, ...]) -> None:
+        self._records = list(records)
+
+    def add(self, records: Sequence[PolicyVectorRecord]) -> None:
+        self._records.extend(records)
+
+    def query(
+        self,
+        session_ids: Sequence[str],
+        query_embedding: tuple[float, ...],
+        *,
+        top_k: int,
+    ) -> list[PolicyRetrievalHit]:
+        allowed = set(session_ids)
+        ranked = sorted(
+            (record for record in self._records if record.chunk.session_id in allowed),
+            key=lambda record: (-_cosine(query_embedding, record.embedding), record.chunk.id),
+        )
+        return [
+            PolicyRetrievalHit(
+                chunk=record.chunk,
+                score=_cosine(query_embedding, record.embedding),
+            )
+            for record in ranked[:top_k]
+        ]
+
+    def delete(self, session_id: str) -> None:
+        self._records = [
+            record for record in self._records if record.chunk.session_id != session_id
+        ]
+
+
 def _case_from_json(raw: dict[str, object]) -> PolicyEvalCase:
     session_ids = cast(list[object], raw["session_ids"])
+    expected_term_groups_raw = cast(list[object] | None, raw.get("expected_term_groups"))
     expected_terms_raw = cast(list[object] | None, raw.get("expected_terms"))
-    if expected_terms_raw is None:
-        expected_terms = (str(raw["expected_term"]),)
+    if expected_term_groups_raw is not None:
+        expected_term_groups = tuple(
+            tuple(str(term) for term in cast(list[object], group))
+            for group in expected_term_groups_raw
+        )
+    elif expected_terms_raw is not None:
+        expected_term_groups = tuple((str(item),) for item in expected_terms_raw)
     else:
-        expected_terms = tuple(str(item) for item in expected_terms_raw)
+        expected_term_groups = ((str(raw["expected_term"]),),)
     return PolicyEvalCase(
         id=str(raw["id"]),
         query=str(raw["query"]),
         session_ids=tuple(str(item) for item in session_ids),
         expected_session_id=str(raw["expected_session_id"]),
-        expected_terms=expected_terms,
+        expected_term_groups=expected_term_groups,
     )
 
 
 def _eval_session_map(documents: list[dict[str, object]]) -> dict[str, str]:
     run_id = uuid.uuid4().hex[:12]
-    return {
-        str(raw["session_id"]): f"eval-{run_id}-{raw['session_id']}" for raw in documents
-    }
+    return {str(raw["session_id"]): f"eval-{run_id}-{raw['session_id']}" for raw in documents}
 
 
 def _mapped_case(case: PolicyEvalCase, session_map: dict[str, str]) -> PolicyEvalCase:
@@ -280,37 +328,15 @@ def _mapped_case(case: PolicyEvalCase, session_map: dict[str, str]) -> PolicyEva
         query=case.query,
         session_ids=tuple(session_map[session_id] for session_id in case.session_ids),
         expected_session_id=session_map[case.expected_session_id],
-        expected_terms=case.expected_terms,
+        expected_term_groups=case.expected_term_groups,
     )
-
-
-def _rank_in_memory(
-    query: str,
-    session_ids: tuple[str, ...],
-    records: tuple[PolicyVectorRecord, ...],
-    embedder: Embedder,
-) -> list[PolicyRetrievalHit]:
-    query_embedding = embedder.embed_texts([query])[0]
-    allowed = set(session_ids)
-    candidates = [record for record in records if record.chunk.session_id in allowed]
-    ranked = sorted(
-        candidates,
-        key=lambda record: (-_cosine(query_embedding, record.embedding), record.chunk.id),
-    )
-    return [
-        PolicyRetrievalHit(
-            chunk=record.chunk,
-            score=_cosine(query_embedding, record.embedding),
-        )
-        for record in ranked
-    ]
 
 
 def _expected_rank(case: PolicyEvalCase, hits: list[PolicyRetrievalHit]) -> int | None:
     for rank, hit in enumerate(hits, start=1):
         chunk = hit.chunk
-        if chunk.session_id == case.expected_session_id and _text_matches_any_expected(
-            chunk.text, case.expected_terms
+        if chunk.session_id == case.expected_session_id and _text_matches_expected_group(
+            chunk.text, case.expected_term_groups
         ):
             return rank
     return None
@@ -323,7 +349,7 @@ def _precision_at_k(case: PolicyEvalCase, hits: list[PolicyRetrievalHit]) -> flo
         1
         for hit in hits
         if hit.chunk.session_id == case.expected_session_id
-        and _text_matches_any_expected(hit.chunk.text, case.expected_terms)
+        and _text_matches_expected_group(hit.chunk.text, case.expected_term_groups)
     )
     return relevant / len(hits)
 
@@ -334,8 +360,12 @@ def _session_precision(case: PolicyEvalCase, hits: list[PolicyRetrievalHit]) -> 
     return sum(1 for hit in hits if hit.chunk.session_id == case.expected_session_id) / len(hits)
 
 
-def _text_matches_any_expected(text: str, expected_terms: tuple[str, ...]) -> bool:
-    return any(_text_matches_expected(text, term) for term in expected_terms)
+def _text_matches_expected_group(
+    text: str, expected_term_groups: tuple[tuple[str, ...], ...]
+) -> bool:
+    return any(
+        all(_text_matches_expected(text, term) for term in group) for group in expected_term_groups
+    )
 
 
 def _text_matches_expected(text: str, expected_term: str) -> bool:

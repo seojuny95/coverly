@@ -26,8 +26,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "참좋은운전자상해보험"
+      "expected_term_groups": [
+        [
+          "참좋은운전자상해보험"
+        ]
       ]
     },
     {
@@ -37,8 +39,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "보험기간 2024년 07월 26일 ~ 2044년 07월 26일"
+      "expected_term_groups": [
+        [
+          "보험기간 2024년 07월 26일 ~ 2044년 07월 26일"
+        ]
       ]
     },
     {
@@ -48,8 +52,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "계약사항 20년만기 / 20년납 / 월납"
+      "expected_term_groups": [
+        [
+          "계약사항 20년만기 / 20년납 / 월납"
+        ]
       ]
     },
     {
@@ -59,8 +65,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "보험료 11,670원"
+      "expected_term_groups": [
+        [
+          "보험료 11,670원"
+        ]
       ]
     },
     {
@@ -70,8 +78,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "보장보험료 11,668원"
+      "expected_term_groups": [
+        [
+          "보장보험료 11,668원"
+        ]
       ]
     },
     {
@@ -81,8 +91,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "판매플랜 간편심사플랜"
+      "expected_term_groups": [
+        [
+          "판매플랜 간편심사플랜"
+        ]
       ]
     },
     {
@@ -92,8 +104,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "상해급수 1급"
+      "expected_term_groups": [
+        [
+          "상해급수 1급"
+        ]
       ]
     },
     {
@@ -103,8 +117,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "운행차량 자가용"
+      "expected_term_groups": [
+        [
+          "운행차량 자가용"
+        ]
       ]
     },
     {
@@ -114,8 +130,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "이륜차부담보특약 미가입"
+      "expected_term_groups": [
+        [
+          "이륜차부담보특약 미가입"
+        ]
       ]
     },
     {
@@ -125,8 +143,11 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "100 만원"
+      "expected_term_groups": [
+        [
+          "자동차부상치료비",
+          "100 만원"
+        ]
       ]
     },
     {
@@ -136,8 +157,11 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "1,000 만원"
+      "expected_term_groups": [
+        [
+          "교통상해50%이상후유",
+          "1,000 만원"
+        ]
       ]
     },
     {
@@ -147,8 +171,11 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "10,000 만원"
+      "expected_term_groups": [
+        [
+          "대중교통이용중교통상해사망",
+          "10,000 만원"
+        ]
       ]
     },
     {
@@ -158,8 +185,11 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "고속도로교통상해사망"
+      "expected_term_groups": [
+        [
+          "고속도로교통상해사망",
+          "만원"
+        ]
       ]
     },
     {
@@ -169,8 +199,11 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "20,000 만원"
+      "expected_term_groups": [
+        [
+          "자가용운전자교통사고 처리지원금",
+          "20,000 만원"
+        ]
       ]
     },
     {
@@ -180,8 +213,11 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "1,600 만원"
+      "expected_term_groups": [
+        [
+          "자동차부상치료비Ⅱ",
+          "1,600 만원"
+        ]
       ]
     },
     {
@@ -191,8 +227,11 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "[전화번호]"
+      "expected_term_groups": [
+        [
+          "품질보증",
+          "[전화번호]"
+        ]
       ]
     },
     {
@@ -202,8 +241,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "www.idbins.com"
+      "expected_term_groups": [
+        [
+          "www.idbins.com"
+        ]
       ]
     },
     {
@@ -213,8 +254,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "NH가성비굿플러스어린이보험"
+      "expected_term_groups": [
+        [
+          "NH가성비굿플러스어린이보험"
+        ]
       ]
     },
     {
@@ -224,8 +267,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "2020년04월29일"
+      "expected_term_groups": [
+        [
+          "2020년04월29일"
+        ]
       ]
     },
     {
@@ -235,8 +280,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "2095년04월29일"
+      "expected_term_groups": [
+        [
+          "2095년04월29일"
+        ]
       ]
     },
     {
@@ -246,8 +293,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "100세만기/20년납/자동이체/자유설계"
+      "expected_term_groups": [
+        [
+          "100세만기/20년납/자동이체/자유설계"
+        ]
       ]
     },
     {
@@ -257,8 +306,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "42,615원"
+      "expected_term_groups": [
+        [
+          "42,615원"
+        ]
       ]
     },
     {
@@ -268,8 +319,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "나이/급수 25세/1급"
+      "expected_term_groups": [
+        [
+          "나이/급수 25세/1급"
+        ]
       ]
     },
     {
@@ -279,8 +332,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "대학(원)생"
+      "expected_term_groups": [
+        [
+          "대학(원)생"
+        ]
       ]
     },
     {
@@ -290,8 +345,12 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "3,000"
+      "expected_term_groups": [
+        [
+          "일반상해후유장해",
+          "80%이상",
+          "3,000"
+        ]
       ]
     },
     {
@@ -301,8 +360,11 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "80% 미만"
+      "expected_term_groups": [
+        [
+          "일반상해후유장해",
+          "80%미만"
+        ]
       ]
     },
     {
@@ -312,8 +374,11 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "일반상해사망"
+      "expected_term_groups": [
+        [
+          "일반상해사망",
+          "3,000"
+        ]
       ]
     },
     {
@@ -323,8 +388,12 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "2,000"
+      "expected_term_groups": [
+        [
+          "암진단비",
+          "유사암제외",
+          "2,000"
+        ]
       ]
     },
     {
@@ -334,8 +403,11 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "갑상선암"
+      "expected_term_groups": [
+        [
+          "유사암진단비",
+          "갑상선암"
+        ]
       ]
     },
     {
@@ -345,8 +417,11 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "[전화번호]"
+      "expected_term_groups": [
+        [
+          "권유자연락처",
+          "[전화번호]"
+        ]
       ]
     },
     {
@@ -356,8 +431,10 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "Hicar 다이렉트개인용"
+      "expected_term_groups": [
+        [
+          "Hicar 다이렉트개인용"
+        ]
       ]
     },
     {
@@ -367,8 +444,10 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "2027-06-27"
+      "expected_term_groups": [
+        [
+          "2027-06-27"
+        ]
       ]
     },
     {
@@ -378,8 +457,10 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "1,402,890원"
+      "expected_term_groups": [
+        [
+          "1,402,890원"
+        ]
       ]
     },
     {
@@ -389,8 +470,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "2020"
+      "expected_term_groups": [
+        [
+          "차량연식",
+          "2020"
+        ]
       ]
     },
     {
@@ -400,8 +484,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "2,423만원"
+      "expected_term_groups": [
+        [
+          "차량가액",
+          "2,423만원"
+        ]
       ]
     },
     {
@@ -411,8 +498,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "모델 3"
+      "expected_term_groups": [
+        [
+          "차명",
+          "모델 3"
+        ]
       ]
     },
     {
@@ -422,8 +512,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "기명피보험자 1인한정"
+      "expected_term_groups": [
+        [
+          "운전자범위",
+          "기명피보험자 1인한정"
+        ]
       ]
     },
     {
@@ -433,8 +526,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "만30세이상"
+      "expected_term_groups": [
+        [
+          "운전자연령",
+          "만30세이상"
+        ]
       ]
     },
     {
@@ -444,8 +540,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "1인당 무 한"
+      "expected_term_groups": [
+        [
+          "대인배상Ⅱ",
+          "1인당 무 한"
+        ]
       ]
     },
     {
@@ -455,8 +554,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "1사고당 10억원"
+      "expected_term_groups": [
+        [
+          "대물배상",
+          "1사고당 10억원"
+        ]
       ]
     },
     {
@@ -466,8 +568,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "1인당 5억원"
+      "expected_term_groups": [
+        [
+          "무보험차상해",
+          "1인당 5억원"
+        ]
       ]
     },
     {
@@ -477,8 +582,11 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "견인 100km한도"
+      "expected_term_groups": [
+        [
+          "긴급출동특약",
+          "견인 100km한도"
+        ]
       ]
     },
     {
@@ -488,8 +596,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "맘편한 자녀사랑보험"
+      "expected_term_groups": [
+        [
+          "맘편한 자녀사랑보험"
+        ]
       ]
     },
     {
@@ -499,8 +609,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "2020-05-06 ~ 2095-05-06"
+      "expected_term_groups": [
+        [
+          "2020-05-06 ~ 2095-05-06"
+        ]
       ]
     },
     {
@@ -510,8 +622,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "1회 보험료 79,032원"
+      "expected_term_groups": [
+        [
+          "1회 보험료 79,032원"
+        ]
       ]
     },
     {
@@ -521,8 +635,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "기본:100원 + 특약:78,932원"
+      "expected_term_groups": [
+        [
+          "기본:100원 + 특약:78,932원"
+        ]
       ]
     },
     {
@@ -532,8 +648,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "계약형태 자녀형"
+      "expected_term_groups": [
+        [
+          "계약형태 자녀형"
+        ]
       ]
     },
     {
@@ -543,8 +661,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "대학(원)생"
+      "expected_term_groups": [
+        [
+          "대학(원)생"
+        ]
       ]
     },
     {
@@ -554,8 +674,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "운전차의용도 운전안함"
+      "expected_term_groups": [
+        [
+          "운전차의용도 운전안함"
+        ]
       ]
     },
     {
@@ -565,8 +687,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "1,000만원"
+      "expected_term_groups": [
+        [
+          "일반상해후유장해",
+          "1,000만원"
+        ]
       ]
     },
     {
@@ -576,8 +701,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "3,000만원"
+      "expected_term_groups": [
+        [
+          "질병후유장해",
+          "3,000만원"
+        ]
       ]
     },
     {
@@ -587,8 +715,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "2,000만원"
+      "expected_term_groups": [
+        [
+          "뇌혈관질환진단비",
+          "2,000만원"
+        ]
       ]
     },
     {
@@ -598,8 +729,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "2,000만원"
+      "expected_term_groups": [
+        [
+          "허혈성심질환진단비",
+          "2,000만원"
+        ]
       ]
     },
     {
@@ -609,8 +743,12 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "4,000만원"
+      "expected_term_groups": [
+        [
+          "암진단비",
+          "유사암제외",
+          "4,000만원"
+        ]
       ]
     },
     {
@@ -620,8 +758,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "1,000만원"
+      "expected_term_groups": [
+        [
+          "유사암진단비",
+          "1,000만원"
+        ]
       ]
     },
     {
@@ -631,8 +772,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "500만원"
+      "expected_term_groups": [
+        [
+          "항암방사선약물치료비",
+          "500만원"
+        ]
       ]
     },
     {
@@ -642,8 +786,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "50만원"
+      "expected_term_groups": [
+        [
+          "상해수술비",
+          "50만원"
+        ]
       ]
     },
     {
@@ -653,8 +800,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "50만원"
+      "expected_term_groups": [
+        [
+          "질병수술비",
+          "50만원"
+        ]
       ]
     },
     {
@@ -664,8 +814,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "1,000만원"
+      "expected_term_groups": [
+        [
+          "5대장기이식수술비",
+          "1,000만원"
+        ]
       ]
     },
     {
@@ -675,8 +828,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "2,000만원"
+      "expected_term_groups": [
+        [
+          "각막이식수술비",
+          "2,000만원"
+        ]
       ]
     },
     {
@@ -686,8 +842,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "[전화번호]"
+      "expected_term_groups": [
+        [
+          "콜센터",
+          "[전화번호]"
+        ]
       ]
     },
     {
@@ -697,8 +856,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "만기환급금은 적립부분 순보험료"
+      "expected_term_groups": [
+        [
+          "만기환급금은 적립부분 순보험료"
+        ]
       ]
     },
     {
@@ -708,8 +869,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "제1회 보험료를 받은 때"
+      "expected_term_groups": [
+        [
+          "제1회 보험료를 받은 때"
+        ]
       ]
     },
     {
@@ -719,8 +882,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "1인당 “1억원까지”"
+      "expected_term_groups": [
+        [
+          "1인당 “1억원까지”"
+        ]
       ]
     },
     {
@@ -730,8 +895,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "법정대리인이 서명"
+      "expected_term_groups": [
+        [
+          "법정대리인이 서명"
+        ]
       ]
     },
     {
@@ -741,8 +908,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "자동차사고 부상등급표"
+      "expected_term_groups": [
+        [
+          "자동차사고 부상등급표"
+        ]
       ]
     },
     {
@@ -752,8 +921,10 @@
         "sample-db-driver-policy"
       ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_terms": [
-        "연납 / 6월납 / 3월납 / 월납"
+      "expected_term_groups": [
+        [
+          "연납 / 6월납 / 3월납 / 월납"
+        ]
       ]
     },
     {
@@ -763,8 +934,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "제1회 보험료를 받은때"
+      "expected_term_groups": [
+        [
+          "제1회 보험료를 받은때"
+        ]
       ]
     },
     {
@@ -774,8 +947,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "주소 또는 연락처 변동시 반드시 회사로 통보"
+      "expected_term_groups": [
+        [
+          "주소 또는 연락처 변동시 반드시 회사로 통보"
+        ]
       ]
     },
     {
@@ -785,8 +960,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "특약별 만기가 기본계약의 만기 이전에 종료"
+      "expected_term_groups": [
+        [
+          "특약별 만기가 기본계약의 만기 이전에 종료"
+        ]
       ]
     },
     {
@@ -796,8 +973,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "보상되지 않을 수 있습니다"
+      "expected_term_groups": [
+        [
+          "보상되지 않을 수 있습니다"
+        ]
       ]
     },
     {
@@ -807,8 +986,10 @@
         "sample-nh-child-policy"
       ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_terms": [
-        "지체없이 회사에 알려야"
+      "expected_term_groups": [
+        [
+          "지체없이 회사에 알려야"
+        ]
       ]
     },
     {
@@ -818,8 +999,10 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "발행일 이후의 계약변경 사항은 반영되지 않습니다"
+      "expected_term_groups": [
+        [
+          "발행일 이후의 계약변경 사항은 반영되지 않습니다"
+        ]
       ]
     },
     {
@@ -829,8 +1012,10 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "청약서, 상품설명서, 약관"
+      "expected_term_groups": [
+        [
+          "청약서, 상품설명서, 약관"
+        ]
       ]
     },
     {
@@ -840,8 +1025,10 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "65,077km"
+      "expected_term_groups": [
+        [
+          "65,077km"
+        ]
       ]
     },
     {
@@ -851,8 +1038,10 @@
         "sample-hyundai-car-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "2026-06-30 00시34분24초"
+      "expected_term_groups": [
+        [
+          "2026-06-30 00시34분24초"
+        ]
       ]
     },
     {
@@ -862,8 +1051,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "변경되었을 경우에는 이 사실을 흥국화재로 알려 주시기 바랍니다"
+      "expected_term_groups": [
+        [
+          "변경되었을 경우에는 이 사실을 흥국화재로 알려 주시기 바랍니다"
+        ]
       ]
     },
     {
@@ -873,8 +1064,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "즉시 우리 회사에"
+      "expected_term_groups": [
+        [
+          "즉시 우리 회사에"
+        ]
       ]
     },
     {
@@ -884,9 +1077,11 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "콜센터([전화번호])",
-        "콜센터"
+      "expected_term_groups": [
+        [
+          "콜센터",
+          "[전화번호]"
+        ]
       ]
     },
     {
@@ -896,8 +1091,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "계약전, 계약후 알릴의무"
+      "expected_term_groups": [
+        [
+          "계약전, 계약후 알릴의무"
+        ]
       ]
     },
     {
@@ -907,8 +1104,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "본인이 직접 작성하고 자필로 서명"
+      "expected_term_groups": [
+        [
+          "본인이 직접 작성하고 자필로 서명"
+        ]
       ]
     },
     {
@@ -918,8 +1117,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "3개월이내 해약시 납입하신 보험료를 돌려받을 수"
+      "expected_term_groups": [
+        [
+          "3개월이내 해약시 납입하신 보험료를 돌려받을 수"
+        ]
       ]
     },
     {
@@ -929,8 +1130,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "납입최고기간이 끝나는 달의 다음날 보험계약을 해지"
+      "expected_term_groups": [
+        [
+          "납입최고기간이 끝나는 달의 다음날 보험계약을 해지"
+        ]
       ]
     },
     {
@@ -940,8 +1143,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "갑상선 : 5년"
+      "expected_term_groups": [
+        [
+          "갑상선 : 5년"
+        ]
       ]
     },
     {
@@ -951,8 +1156,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "직업 또는 직무를 변경"
+      "expected_term_groups": [
+        [
+          "직업 또는 직무를 변경"
+        ]
       ]
     },
     {
@@ -962,8 +1169,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "순수보장성으로 만기시 지급되는 금액이 없습니다"
+      "expected_term_groups": [
+        [
+          "순수보장성으로 만기시 지급되는 금액이 없습니다"
+        ]
       ]
     },
     {
@@ -973,8 +1182,10 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "암 보장개시일 이후에 암"
+      "expected_term_groups": [
+        [
+          "암 보장개시일 이후에 암"
+        ]
       ]
     },
     {
@@ -984,30 +1195,45 @@
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "태아보장기간에 해당하는 보험료 납입을 완료하고 출생통지를 한 때"
+      "expected_term_groups": [
+        [
+          "태아보장기간에 해당하는 보험료 납입을 완료하고 출생통지를 한 때"
+        ]
       ]
     },
     {
       "id": "cross-session-car-premium-boundary",
       "query": "자동차보험 납입한 보험료가 얼마야?",
       "session_ids": [
-        "sample-hyundai-car-policy"
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_terms": [
-        "1,402,890원"
+      "expected_term_groups": [
+        [
+          "납입한 보험료",
+          "1,402,890원"
+        ]
       ]
     },
     {
       "id": "cross-session-child-cancer-boundary",
       "query": "자녀보험 암진단비 유사암제외 금액은?",
       "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
         "sample-heungkuk-child-policy"
       ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_terms": [
-        "4,000만원"
+      "expected_term_groups": [
+        [
+          "암진단비",
+          "유사암제외",
+          "4,000만원"
+        ]
       ]
     }
   ]

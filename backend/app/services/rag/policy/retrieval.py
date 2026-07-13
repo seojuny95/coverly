@@ -29,20 +29,7 @@ def retrieve_policy_context(
 
 
 def _normalize_query(query: str) -> str:
-    normalized = " ".join(query.split())
-    hints: list[str] = []
-    if "보험기간" in normalized:
-        hints.extend(["기본정보", "보험기간"])
-    if "납입기간" in normalized or "납입주기" in normalized:
-        hints.extend(["계약사항", "월납"])
-    if "상해급수" in normalized or "몇 급" in normalized or "급수" in normalized:
-        hints.extend(["가입정보", "상해급수"])
-    metadata_terms = ("판매플랜", "운행차량", "이륜차부담보특약", "직업/직무")
-    if any(term in normalized for term in metadata_terms):
-        hints.append("가입정보")
-    if not hints:
-        return normalized
-    return " ".join([normalized, *dict.fromkeys(hints)])
+    return " ".join(query.split())
 
 
 def _dedupe_hits(hits: list[PolicyRetrievalHit]) -> list[PolicyRetrievalHit]:

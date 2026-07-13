@@ -8,7 +8,11 @@ import pytest
 
 from app.services.policy.models import ParsedDocument
 from app.services.rag.embeddings import HashingEmbedder
-from app.services.rag.policy.evaluation.retrieval import EVAL_FIXTURE, evaluate_policy_retrieval
+from app.services.rag.policy.evaluation.retrieval import (
+    EVAL_FIXTURE,
+    _text_matches_expected_group,
+    evaluate_policy_retrieval,
+)
 from app.services.rag.policy.indexing import build_policy_vector_records
 from app.services.rag.policy.models import PolicyRetrievalHit, PolicyVectorRecord
 from app.services.rag.policy.pii import mask_policy_pii
@@ -141,7 +145,7 @@ def test_policy_retrieval_dedupes_identical_chunks() -> None:
     assert len(rendered) == len(set(rendered))
 
 
-def test_policy_retrieval_normalizes_metadata_queries() -> None:
+def test_policy_retrieval_normalizes_query_whitespace_only() -> None:
     class _CapturingEmbedder:
         def __init__(self) -> None:
             self.calls: list[list[str]] = []
@@ -153,12 +157,12 @@ def test_policy_retrieval_normalizes_metadata_queries() -> None:
     embedder = _CapturingEmbedder()
     retrieve_policy_context(
         ["session-1"],
-        "보험기간은 언제까지야?",
+        "  보험기간은   언제까지야?  ",
         store=_MemoryStore(()),
         embedder=embedder,
     )
 
-    assert embedder.calls == [["보험기간은 언제까지야? 기본정보 보험기간"]]
+    assert embedder.calls == [["보험기간은 언제까지야?"]]
 
 
 def test_policy_retrieval_evaluation_passes_fixture() -> None:
@@ -186,14 +190,14 @@ def test_policy_retrieval_evaluation_passes_fixture() -> None:
                 "query": "암진단비 가입금액은 얼마야?",
                 "session_ids": ["session-a"],
                 "expected_session_id": "session-a",
-                "expected_terms": ["3천만원"],
+                "expected_term_groups": [["암진단비", "3천만원"]],
             },
             {
                 "id": "premium",
                 "query": "월 보험료는 얼마야?",
                 "session_ids": ["session-b"],
                 "expected_session_id": "session-b",
-                "expected_terms": ["87,000원"],
+                "expected_term_groups": [["월 보험료", "87,000원"]],
             },
         ],
     }
@@ -241,7 +245,7 @@ def test_policy_retrieval_evaluation_can_use_production_embedder(
                 "query": "월 보험료는 얼마야?",
                 "session_ids": ["session-a"],
                 "expected_session_id": "session-a",
-                "expected_terms": ["87,000원"],
+                "expected_term_groups": [["월 보험료", "87,000원"]],
             },
         ],
     }
@@ -360,7 +364,7 @@ def test_policy_eval_accepts_masked_or_plain_phone_numbers() -> None:
                 "query": "연락처는?",
                 "session_ids": ["session-a"],
                 "expected_session_id": "session-a",
-                "expected_terms": ["[전화번호]"],
+                "expected_term_groups": [["권유자 연락처", "[전화번호]"]],
             },
         ],
     }
@@ -399,7 +403,10 @@ def test_policy_eval_accepts_any_expected_term_variant() -> None:
                 "query": "납입기간과 납입주기는?",
                 "session_ids": ["session-a"],
                 "expected_session_id": "session-a",
-                "expected_terms": ["납입기간 20년납 월납", "20년만기 / 20년납 / 월납"],
+                "expected_term_groups": [
+                    ["납입기간", "20년납", "월납"],
+                    ["20년만기 / 20년납 / 월납"],
+                ],
             },
         ],
     }
@@ -419,3 +426,64 @@ def test_policy_eval_accepts_any_expected_term_variant() -> None:
         )
 
     assert report.recall == 1.0
+
+
+def test_policy_eval_requires_all_terms_in_expected_group() -> None:
+    assert _text_matches_expected_group(
+        "암진단비 가입금액은 3천만원입니다.",
+        (("암진단비", "3천만원"),),
+    )
+    assert not _text_matches_expected_group(
+        "상해사망 가입금액은 3천만원입니다.",
+        (("암진단비", "3천만원"),),
+    )
+
+
+def test_policy_eval_session_precision_uses_all_requested_sessions() -> None:
+    documents = {
+        "policy-a.pdf": ParsedDocument(
+            text="월 보험료는 87,000원입니다.",
+            layout_text="",
+            tables=(),
+        ),
+        "policy-b.pdf": ParsedDocument(
+            text="월 보험료는 42,000원입니다.",
+            layout_text="",
+            tables=(),
+        ),
+    }
+    raw = {
+        "source": "sample-insurance-input",
+        "documents": [
+            {"session_id": "session-a", "filename": "policy-a.pdf"},
+            {"session_id": "session-b", "filename": "policy-b.pdf"},
+        ],
+        "cases": [
+            {
+                "id": "premium",
+                "query": "월 보험료는 얼마야?",
+                "session_ids": ["session-a", "session-b"],
+                "expected_session_id": "session-a",
+                "expected_term_groups": [["87,000원"]],
+            },
+        ],
+    }
+
+    with TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        sample_dir = root / "sample-insurance-input"
+        sample_dir.mkdir()
+        for filename in documents:
+            (sample_dir / filename).write_bytes(b"fake-pdf")
+        dataset = root / "evaluation_dataset.json"
+        dataset.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+        calls = iter(documents.values())
+        report = evaluate_policy_retrieval(
+            path=dataset,
+            sample_dir=sample_dir,
+            parse=lambda _: next(calls),
+            top_k=2,
+        )
+
+    assert report.session_precision < 1.0
