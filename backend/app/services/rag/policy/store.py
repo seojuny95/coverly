@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from datetime import datetime
 from functools import lru_cache
 from typing import Protocol
 
@@ -14,6 +15,7 @@ from app.services.rag.policy.models import PolicyChunk, PolicyRetrievalHit, Poli
 from app.settings import get_settings
 
 _TABLE_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
+POLICY_RAG_TABLE_NAME = "policy_rag_chunks"
 
 
 class PolicyRagStore(Protocol):
@@ -26,6 +28,8 @@ class PolicyRagStore(Protocol):
         *,
         top_k: int,
     ) -> list[PolicyRetrievalHit]: ...
+
+    def extend(self, session_id: str, expires_at: datetime) -> bool: ...
 
     def delete(self, session_id: str) -> None: ...
 
@@ -118,6 +122,16 @@ class PgVectorPolicyStore:
         with psycopg.connect(self._database_url) as connection:
             connection.execute(statement, (session_id,))
 
+    def extend(self, session_id: str, expires_at: datetime) -> bool:
+        statement = sql.SQL(
+            """UPDATE {}
+               SET expires_at = %s
+               WHERE session_id = %s AND expires_at > now()"""
+        ).format(sql.Identifier(self._table_name))
+        with psycopg.connect(self._database_url) as connection:
+            cursor = connection.execute(statement, (expires_at, session_id))
+            return cursor.rowcount > 0
+
 
 @lru_cache(maxsize=1)
 def shared_policy_store() -> PgVectorPolicyStore:
@@ -126,7 +140,7 @@ def shared_policy_store() -> PgVectorPolicyStore:
         raise RuntimeError("DATABASE_URL is required for policy RAG")
     return PgVectorPolicyStore(
         settings.database_url,
-        table_name=settings.policy_rag_pg_table,
+        table_name=POLICY_RAG_TABLE_NAME,
     )
 
 

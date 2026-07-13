@@ -1,10 +1,11 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { renderWithProviders } from "../../test-utils/render-with-providers";
 import { InsuranceAnalysisPage } from "./insurance-analysis-page";
 import type { InsuranceAnalysis } from "./insurance-analysis-store";
+import { POLICY_SESSION_REFRESH_INTERVAL_MS } from "./use-policy-session-refresh";
 import type { UploadInsurance } from "../insurance-upload/insurance-upload-form";
 
 // The upload modal renders InsuranceUploadForm, which calls useRouter even
@@ -43,6 +44,7 @@ describe("InsuranceAnalysisPage", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -360,6 +362,117 @@ describe("InsuranceAnalysisPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "보험증권 올리기" }),
+    ).toHaveAttribute("href", "/upload");
+  });
+
+  test("refreshes document session tokens while the analysis page is open", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/policies/sessions/refresh")) {
+        return new Response(
+          JSON.stringify({
+            문서세션ID: "new-session-token",
+            expiresAt: "2026-07-14T00:15:00+00:00",
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          totals: [],
+          indemnity_coverages: [],
+          excluded_coverages: [],
+          excluded_auto_policy_count: 0,
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const initialAnalysis: InsuranceAnalysis = {
+      generatedAt: "2026-07-09T07:30:00.000Z",
+      insuranceDocuments: [
+        {
+          id: "insurance-1",
+          fileName: "health.pdf",
+          result: {
+            status: "accepted",
+            문자수: 100,
+            문서세션ID: "old-session-token",
+          },
+        },
+      ],
+    };
+
+    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
+
+    act(() => {
+      vi.advanceTimersByTime(POLICY_SESSION_REFRESH_INTERVAL_MS);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/policies/sessions/refresh",
+      expect.objectContaining({
+        body: JSON.stringify({ 문서세션ID: "old-session-token" }),
+      }),
+    );
+  });
+
+  test("shows a session expiration notice when refresh is rejected", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/policies/sessions/refresh")) {
+        return new Response(
+          JSON.stringify({ error: { code: "INVALID_POLICY_SESSION" } }),
+          { status: 403 },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          totals: [],
+          indemnity_coverages: [],
+          excluded_coverages: [],
+          excluded_auto_policy_count: 0,
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const initialAnalysis: InsuranceAnalysis = {
+      generatedAt: "2026-07-09T07:30:00.000Z",
+      insuranceDocuments: [
+        {
+          id: "insurance-1",
+          fileName: "health.pdf",
+          result: {
+            status: "accepted",
+            문자수: 100,
+            문서세션ID: "expired-session-token",
+          },
+        },
+      ],
+    };
+
+    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
+
+    act(() => {
+      vi.advanceTimersByTime(POLICY_SESSION_REFRESH_INTERVAL_MS);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText("분석 세션이 만료됐어요")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "개인정보 보호를 위해 업로드한 문서 연결이 종료되었어요. 다시 분석하려면 보험증권을 다시 올려주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "보험증권 다시 올리기" }),
     ).toHaveAttribute("href", "/upload");
   });
 

@@ -26,8 +26,10 @@ const INITIAL_ONLY_LIMITATIONS = [
 
 export function InsuranceChatbot({
   documents,
+  sessionExpired = false,
 }: {
   documents: AnalyzedInsurance[];
+  sessionExpired?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -105,7 +107,7 @@ export function InsuranceChatbot({
 
   async function sendQuestion(rawQuestion: string) {
     const text = rawQuestion.trim().slice(0, 500);
-    if (!text || streaming) return;
+    if (!text || streaming || sessionExpired) return;
     const userId = nextMessageId.current;
     const assistantId = userId + 1;
     nextMessageId.current += 2;
@@ -144,8 +146,11 @@ export function InsuranceChatbot({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="fixed right-5 bottom-5 z-40 min-h-14 rounded-2xl bg-blue-600 px-6 py-4 text-base font-semibold text-white shadow-xl sm:right-8 sm:bottom-8"
+        onClick={() => {
+          if (!sessionExpired) setOpen(true);
+        }}
+        disabled={sessionExpired}
+        className="fixed right-5 bottom-5 z-40 min-h-14 rounded-2xl bg-blue-600 px-6 py-4 text-base font-semibold text-white shadow-xl disabled:cursor-not-allowed disabled:bg-zinc-300 sm:right-8 sm:bottom-8"
       >
         AI 상담사에게 질문하기
       </button>
@@ -187,13 +192,21 @@ export function InsuranceChatbot({
       </div>
 
       <div className="border-t border-zinc-100 bg-white p-4">
+        {sessionExpired ? (
+          <div
+            role="status"
+            className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"
+          >
+            분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.
+          </div>
+        ) : null}
         {suggestions.length ? (
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
             {suggestions.map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
-                disabled={streaming}
+                disabled={streaming || sessionExpired}
                 onClick={() => void sendQuestion(suggestion)}
                 className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
               >
@@ -213,15 +226,16 @@ export function InsuranceChatbot({
               maxLength={500}
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
+              disabled={sessionExpired}
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
               placeholder="예: 겹치는 보장이 있나요?"
-              className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600"
+              className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600 disabled:bg-zinc-100 disabled:text-zinc-500"
             />
             <button
               type="submit"
-              disabled={!question.trim() || streaming}
+              disabled={!question.trim() || streaming || sessionExpired}
               className={primaryButtonClassName}
             >
               질문하기

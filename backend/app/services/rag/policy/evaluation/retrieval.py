@@ -10,7 +10,7 @@ import unicodedata
 import uuid
 from argparse import ArgumentParser
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
@@ -21,6 +21,7 @@ from app.services.rag.embeddings import Embedder, HashingEmbedder, openai_embedd
 from app.services.rag.policy.indexing import build_policy_vector_records
 from app.services.rag.policy.models import PolicyRetrievalHit, PolicyVectorRecord
 from app.services.rag.policy.retrieval import retrieve_policy_context
+from app.services.rag.policy.session_tokens import sign_policy_session_id
 from app.services.rag.policy.store import PolicyRagStore, shared_policy_store
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "retrieval_dataset.json"
@@ -110,16 +111,18 @@ def evaluate_policy_retrieval(
             parse=parse,
         )
     else:
+        created_at = datetime.now(UTC)
         records = _records_from_documents(
             raw["documents"],
             active_embedder,
             source_dir,
             parse=parse,
-            created_at=datetime(2026, 1, 1, tzinfo=UTC),
+            created_at=created_at,
         )
         memory_store = _InMemoryPolicyStore(records)
+        expires_at = created_at + timedelta(hours=1)
         report = _evaluate_cases(
-            cases,
+            tuple(_case_with_session_tokens(case, expires_at=expires_at) for case in cases),
             top_k=top_k,
             retrieve=lambda case: retrieve_policy_context(
                 list(case.session_ids),
@@ -212,11 +215,18 @@ def _evaluate_with_store(
         session_map=session_map,
     )
     eval_session_ids = tuple(session_map.values())
+    expires_at = created_at + timedelta(hours=1)
 
     try:
         store.add(records)
         return _evaluate_cases(
-            tuple(_mapped_case(case, session_map) for case in cases),
+            tuple(
+                _case_with_session_tokens(
+                    _mapped_case(case, session_map),
+                    expires_at=expires_at,
+                )
+                for case in cases
+            ),
             top_k=top_k,
             retrieve=lambda case: retrieve_policy_context(
                 list(case.session_ids),
@@ -289,6 +299,23 @@ class _InMemoryPolicyStore:
             for record in ranked[:top_k]
         ]
 
+    def extend(self, session_id: str, expires_at: datetime) -> bool:
+        updated = False
+        records: list[PolicyVectorRecord] = []
+        for record in self._records:
+            if record.chunk.session_id != session_id:
+                records.append(record)
+                continue
+            updated = True
+            records.append(
+                PolicyVectorRecord(
+                    chunk=replace(record.chunk, expires_at=expires_at),
+                    embedding=record.embedding,
+                )
+            )
+        self._records = records
+        return updated
+
     def delete(self, session_id: str) -> None:
         self._records = [
             record for record in self._records if record.chunk.session_id != session_id
@@ -328,6 +355,23 @@ def _mapped_case(case: PolicyEvalCase, session_map: dict[str, str]) -> PolicyEva
         query=case.query,
         session_ids=tuple(session_map[session_id] for session_id in case.session_ids),
         expected_session_id=session_map[case.expected_session_id],
+        expected_term_groups=case.expected_term_groups,
+    )
+
+
+def _case_with_session_tokens(case: PolicyEvalCase, *, expires_at: datetime) -> PolicyEvalCase:
+    return PolicyEvalCase(
+        id=case.id,
+        query=case.query,
+        session_ids=tuple(
+            sign_policy_session_id(
+                session_id,
+                expires_at,
+                max_expires_at=expires_at,
+            )
+            for session_id in case.session_ids
+        ),
+        expected_session_id=case.expected_session_id,
         expected_term_groups=case.expected_term_groups,
     )
 

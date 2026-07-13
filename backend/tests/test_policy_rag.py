@@ -1,5 +1,6 @@
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -13,16 +14,24 @@ from app.services.rag.policy.evaluation.retrieval import (
     _text_matches_expected_group,
     evaluate_policy_retrieval,
 )
-from app.services.rag.policy.indexing import build_policy_vector_records
+from app.services.rag.policy.indexing import build_policy_vector_records, index_policy_document
 from app.services.rag.policy.models import PolicyRetrievalHit, PolicyVectorRecord
 from app.services.rag.policy.pii import mask_policy_pii
 from app.services.rag.policy.retrieval import retrieve_policy_context
+from app.services.rag.policy.session_tokens import (
+    InvalidPolicySessionToken,
+    sign_policy_session_id,
+    verify_policy_session_claims,
+    verify_policy_session_token,
+)
+from app.services.rag.policy.sessions import refresh_policy_session
 from app.services.rag.policy.source import build_policy_source_chunks
 
 
 class _MemoryStore:
     def __init__(self, records: Sequence[PolicyVectorRecord]) -> None:
         self.records = list(records)
+        self.queries: list[tuple[str, ...]] = []
 
     def add(self, records: Sequence[PolicyVectorRecord]) -> None:
         self.records.extend(records)
@@ -34,6 +43,7 @@ class _MemoryStore:
         *,
         top_k: int,
     ) -> list[PolicyRetrievalHit]:
+        self.queries.append(tuple(session_ids))
         allowed = set(session_ids)
         ranked = sorted(
             (record for record in self.records if record.chunk.session_id in allowed),
@@ -49,6 +59,39 @@ class _MemoryStore:
 
     def delete(self, session_id: str) -> None:
         self.records = [record for record in self.records if record.chunk.session_id != session_id]
+
+    def extend(self, session_id: str, expires_at: datetime) -> bool:
+        updated = False
+        records: list[PolicyVectorRecord] = []
+        for record in self.records:
+            if record.chunk.session_id != session_id:
+                records.append(record)
+                continue
+            updated = True
+            records.append(
+                PolicyVectorRecord(
+                    chunk=replace(record.chunk, expires_at=expires_at),
+                    embedding=record.embedding,
+                )
+            )
+        self.records = records
+        return updated
+
+
+class _FailingEmbedder:
+    def embed_texts(self, texts: list[str]) -> list[tuple[float, ...]]:
+        raise AssertionError("embedder should not be called")
+
+
+@pytest.fixture(autouse=True)
+def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services.rag.policy import session_tokens
+
+    class _Settings:
+        policy_rag_session_secret = "test-policy-rag-session-secret-32"
+        database_url = "postgresql://example/test"
+
+    monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 
 
 def _document() -> ParsedDocument:
@@ -84,6 +127,157 @@ def test_policy_records_mask_pii_before_embedding_and_storage() -> None:
     assert mask_policy_pii("TESTBIRTH-E-TESTSUFFIX") == "[주민등록번호]"
 
 
+def test_policy_index_returns_signed_session_token() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    store = _MemoryStore(())
+    token = index_policy_document(
+        _document(),
+        store=store,
+        embedder=HashingEmbedder(),
+        now=now,
+    )
+
+    assert token is not None
+    claims = verify_policy_session_claims(token, now=now)
+    assert len(claims.session_id) == 32
+    assert claims.expires_at == now + timedelta(minutes=15)
+    assert claims.max_expires_at == now + timedelta(hours=2)
+    assert {record.chunk.session_id for record in store.records} == {claims.session_id}
+
+
+def test_policy_session_token_rejects_forgery_and_expiry() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    token = sign_policy_session_id(
+        "session-1",
+        now + timedelta(hours=1),
+        max_expires_at=now + timedelta(hours=2),
+        secret="test-secret",
+    )
+
+    assert verify_policy_session_token(token, secret="test-secret", now=now) == "session-1"
+
+    forged = token.replace("session-1", "session-2")
+    with pytest.raises(InvalidPolicySessionToken):
+        verify_policy_session_token(forged, secret="test-secret", now=now)
+
+    with pytest.raises(InvalidPolicySessionToken):
+        verify_policy_session_token(
+            token,
+            secret="test-secret",
+            now=now + timedelta(hours=3),
+        )
+
+
+def test_policy_session_token_requires_configured_secret_when_database_is_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.rag.policy import session_tokens
+
+    class _Settings:
+        policy_rag_session_secret = ""
+        database_url = "postgresql://example/test"
+
+    monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
+
+    with pytest.raises(RuntimeError, match="POLICY_RAG_SESSION_SECRET"):
+        sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
+
+
+def test_policy_session_token_rejects_placeholder_configured_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.rag.policy import session_tokens
+
+    class _Settings:
+        policy_rag_session_secret = "replace-with-random-secret"
+        database_url = "postgresql://example/test"
+
+    monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
+
+    with pytest.raises(RuntimeError, match="random secret"):
+        sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
+
+
+def test_policy_session_token_rejects_weak_configured_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.rag.policy import session_tokens
+
+    class _Settings:
+        policy_rag_session_secret = "short-secret"
+        database_url = "postgresql://example/test"
+
+    monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
+
+    with pytest.raises(RuntimeError, match="at least 32 bytes"):
+        sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
+
+
+def test_policy_index_validates_secret_before_embedding_or_storage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.rag.policy import session_tokens
+
+    class _Settings:
+        policy_rag_session_secret = ""
+        database_url = "postgresql://example/test"
+
+    store = _MemoryStore(())
+    monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
+
+    with pytest.raises(RuntimeError, match="POLICY_RAG_SESSION_SECRET"):
+        index_policy_document(
+            _document(),
+            store=store,
+            embedder=_FailingEmbedder(),
+            now=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+
+    assert store.records == []
+
+
+def test_policy_session_refresh_extends_idle_expiry_within_absolute_limit() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    embedder = HashingEmbedder()
+    records = build_policy_vector_records(
+        _document(),
+        session_id="session-1",
+        created_at=now,
+        expires_at=now + timedelta(minutes=5),
+        embedder=embedder,
+    )
+    store = _MemoryStore(records)
+    token = sign_policy_session_id(
+        "session-1",
+        now + timedelta(minutes=5),
+        max_expires_at=now + timedelta(hours=2),
+    )
+
+    refreshed = refresh_policy_session(
+        token,
+        store=store,
+        now=now + timedelta(minutes=4),
+    )
+
+    claims = verify_policy_session_claims(refreshed.token, now=now + timedelta(minutes=4))
+    assert claims.session_id == "session-1"
+    assert claims.expires_at == now + timedelta(minutes=19)
+    assert claims.max_expires_at == now + timedelta(hours=2)
+    assert {record.chunk.expires_at for record in store.records} == {claims.expires_at}
+
+
+def test_policy_session_refresh_refuses_deleted_session() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    token = sign_policy_session_id(
+        "session-1",
+        now + timedelta(minutes=5),
+        max_expires_at=now + timedelta(hours=2),
+    )
+
+    with pytest.raises(InvalidPolicySessionToken):
+        refresh_policy_session(token, store=_MemoryStore(()), now=now)
+
+
 def test_policy_retrieval_is_limited_to_requested_sessions() -> None:
     now = datetime(2026, 1, 1, tzinfo=UTC)
     embedder = HashingEmbedder()
@@ -102,15 +296,74 @@ def test_policy_retrieval_is_limited_to_requested_sessions() -> None:
         embedder=embedder,
     )
 
+    token = sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
+    store = _MemoryStore((*first, *other))
     hits = retrieve_policy_context(
-        ["session-1"],
+        [token],
         "암진단비 가입금액",
-        store=_MemoryStore((*first, *other)),
+        store=store,
         embedder=embedder,
     )
 
     assert hits
     assert {hit.chunk.session_id for hit in hits} == {"session-1"}
+    assert store.queries == [("session-1",)]
+
+
+def test_policy_retrieval_rejects_raw_or_forged_session_ids() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    embedder = HashingEmbedder()
+    records = build_policy_vector_records(
+        _document(),
+        session_id="session-1",
+        created_at=now,
+        expires_at=now + timedelta(hours=1),
+        embedder=embedder,
+    )
+    store = _MemoryStore(records)
+
+    assert (
+        retrieve_policy_context(
+            ["session-1"],
+            "암진단비 가입금액",
+            store=store,
+            embedder=embedder,
+        )
+        == []
+    )
+    assert store.queries == []
+
+
+def test_policy_retrieval_keeps_valid_sessions_when_one_token_is_invalid() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    embedder = HashingEmbedder()
+    first = build_policy_vector_records(
+        _document(),
+        session_id="session-1",
+        created_at=now,
+        expires_at=now + timedelta(hours=1),
+        embedder=embedder,
+    )
+    second = build_policy_vector_records(
+        ParsedDocument(text="다른 증권 담보", layout_text="", tables=()),
+        session_id="session-2",
+        created_at=now,
+        expires_at=now + timedelta(hours=1),
+        embedder=embedder,
+    )
+
+    token = sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
+    store = _MemoryStore((*first, *second))
+    hits = retrieve_policy_context(
+        [token, "not-a-server-issued-token"],
+        "암진단비 가입금액",
+        store=store,
+        embedder=embedder,
+    )
+
+    assert hits
+    assert {hit.chunk.session_id for hit in hits} == {"session-1"}
+    assert store.queries == [("session-1",)]
 
 
 def test_policy_retrieval_dedupes_identical_chunks() -> None:
@@ -131,9 +384,10 @@ def test_policy_retrieval_dedupes_identical_chunks() -> None:
         expires_at=now + timedelta(hours=1),
         embedder=embedder,
     )
+    token = sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
 
     hits = retrieve_policy_context(
-        ["session-1"],
+        [token],
         "상품명은?",
         store=_MemoryStore(records),
         embedder=embedder,
@@ -155,8 +409,9 @@ def test_policy_retrieval_normalizes_query_whitespace_only() -> None:
             return [(1.0, 0.0) for _ in texts]
 
     embedder = _CapturingEmbedder()
+    token = sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
     retrieve_policy_context(
-        ["session-1"],
+        [token],
         "  보험기간은   언제까지야?  ",
         store=_MemoryStore(()),
         embedder=embedder,

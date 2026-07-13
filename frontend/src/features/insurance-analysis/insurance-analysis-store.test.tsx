@@ -148,4 +148,48 @@ describe("InsuranceDataProvider", () => {
     expect(result.current.hasData).toBe(false);
     expect(result.current.analysis).toBeNull();
   });
+
+  it("replaces multiple policy session tokens in one state update", () => {
+    const { result } = renderHook(() => useInsuranceData(), {
+      wrapper: InsuranceDataProvider,
+    });
+    act(() =>
+      result.current.setAnalysis({
+        generatedAt: "2026-07-12T00:00:00.000Z",
+        insuranceDocuments: [
+          {
+            id: "a",
+            fileName: "a.pdf",
+            result: {
+              status: "accepted",
+              문자수: 1,
+              문서세션ID: "old-token-a",
+            },
+          },
+          {
+            id: "b",
+            fileName: "b.pdf",
+            result: {
+              status: "accepted",
+              문자수: 1,
+              문서세션ID: "old-token-b",
+            },
+          },
+        ],
+      }),
+    );
+
+    act(() =>
+      result.current.replaceDocumentSessionTokens([
+        { currentToken: "old-token-a", nextToken: "new-token-a" },
+        { currentToken: "old-token-b", nextToken: "new-token-b" },
+      ]),
+    );
+
+    expect(
+      result.current.analysis?.insuranceDocuments.map(
+        (document) => document.result.문서세션ID,
+      ),
+    ).toEqual(["new-token-a", "new-token-b"]);
+  });
 });

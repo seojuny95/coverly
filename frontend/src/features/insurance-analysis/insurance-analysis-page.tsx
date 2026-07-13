@@ -30,6 +30,7 @@ import {
 } from "./insurance-analysis-store";
 import { LeaveGuardLink } from "./leave-guard-link";
 import { normalizeInsurerName } from "./policy-identity";
+import { usePolicySessionRefresh } from "./use-policy-session-refresh";
 import { useDialogA11y } from "./use-dialog-a11y";
 import { useBeforeUnloadGuard } from "./use-leave-guard";
 import type {
@@ -97,7 +98,15 @@ type InsuranceAnalysisPageProps = {
 export function InsuranceAnalysisPage({
   uploadInsurance,
 }: InsuranceAnalysisPageProps = {}) {
-  const { analysis, hasData, mergeDocuments, clear } = useInsuranceData();
+  const {
+    analysis,
+    hasData,
+    sessionExpired,
+    mergeDocuments,
+    replaceDocumentSessionTokens,
+    expireSession,
+    clear,
+  } = useInsuranceData();
   useBeforeUnloadGuard(hasData);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"insurance" | "analysis">(
@@ -125,6 +134,12 @@ export function InsuranceAnalysisPage({
     () => analysis?.insuranceDocuments ?? [],
     [analysis],
   );
+  usePolicySessionRefresh({
+    documents: insuranceDocuments,
+    enabled: hasData && !sessionExpired,
+    onTokensRefreshed: replaceDocumentSessionTokens,
+    onExpired: expireSession,
+  });
   const groupedInsuranceDocuments = useMemo(
     () => groupInsuranceDocuments(insuranceDocuments),
     [insuranceDocuments],
@@ -236,6 +251,7 @@ export function InsuranceAnalysisPage({
             보험 분석
           </TabButton>
         </nav>
+        {sessionExpired ? <PolicySessionExpiredNotice /> : null}
         {activeTab === "insurance" ? (
           <div
             id="insurance-tabpanel"
@@ -418,7 +434,10 @@ export function InsuranceAnalysisPage({
         )}
       </section>
 
-      <InsuranceChatbot documents={insuranceDocuments} />
+      <InsuranceChatbot
+        documents={insuranceDocuments}
+        sessionExpired={sessionExpired}
+      />
 
       {isUploadModalOpen ? (
         <UploadInsuranceModal
@@ -463,6 +482,24 @@ const TabButton = forwardRef<
     </button>
   );
 });
+
+function PolicySessionExpiredNotice() {
+  return (
+    <div
+      role="status"
+      className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950"
+    >
+      <p className="font-semibold">분석 세션이 만료됐어요</p>
+      <p className="mt-1 leading-6">
+        개인정보 보호를 위해 업로드한 문서 연결이 종료되었어요. 다시 분석하려면
+        보험증권을 다시 올려주세요.
+      </p>
+      <Link href="/upload" className={`mt-3 ${primaryButtonClassName}`}>
+        보험증권 다시 올리기
+      </Link>
+    </div>
+  );
+}
 
 function InsuranceDetail({
   insuranceDocument,

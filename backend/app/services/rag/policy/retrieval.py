@@ -2,12 +2,13 @@
 
 from app.services.rag.embeddings import Embedder, openai_embedder_from_settings
 from app.services.rag.policy.models import PolicyRetrievalHit
+from app.services.rag.policy.session_tokens import verified_policy_session_ids
 from app.services.rag.policy.store import PolicyRagStore, shared_policy_store
 from app.services.rag.text import normalize_text
 
 
 def retrieve_policy_context(
-    session_ids: list[str],
+    session_tokens: list[str],
     query: str,
     *,
     top_k: int = 4,
@@ -16,7 +17,10 @@ def retrieve_policy_context(
     embedder: Embedder | None = None,
 ) -> list[PolicyRetrievalHit]:
     normalized = _normalize_query(query)
-    if not session_ids or not normalized or top_k <= 0:
+    if not session_tokens or not normalized or top_k <= 0:
+        return []
+    session_ids = verified_policy_session_ids(session_tokens)
+    if not session_ids:
         return []
     active_embedder = embedder or openai_embedder_from_settings()
     query_embedding = active_embedder.embed_texts([normalized])[0]

@@ -1,8 +1,22 @@
+from datetime import UTC, datetime
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services.policy.pipeline import EmptyTextError, PipelineResult
+from app.services.rag.policy.session_tokens import sign_policy_session_id
+
+
+@pytest.fixture(autouse=True)
+def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services.rag.policy import session_tokens
+
+    class _Settings:
+        policy_rag_session_secret = "test-policy-rag-session-secret-32"
+        database_url = "postgresql://example/test"
+
+    monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 
 
 def test_parse_rejects_non_pdf_upload() -> None:
@@ -138,8 +152,89 @@ def test_delete_policy_text_session(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(policies, "delete_policy_session", deleted.append)
 
     client = TestClient(app)
-    response = client.delete("/policies/sessions/session-1")
+    response = client.post(
+        "/policies/sessions/delete",
+        json={"문서세션ID": "session-1"},
+    )
 
     assert response.status_code == 200
     assert response.json() == {"status": "deleted"}
     assert deleted == ["session-1"]
+
+
+def test_delete_policy_text_session_rejects_invalid_token() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/policies/sessions/delete",
+        json={"문서세션ID": "not-a-server-issued-token"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "INVALID_POLICY_SESSION"
+
+
+def test_delete_policy_text_session_deletes_verified_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.rag.policy import sessions
+
+    deleted: list[str] = []
+
+    class _Store:
+        def delete(self, session_id: str) -> None:
+            deleted.append(session_id)
+
+    monkeypatch.setattr(sessions, "shared_policy_store", lambda: _Store())
+    token = sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
+
+    client = TestClient(app)
+    response = client.post(
+        "/policies/sessions/delete",
+        json={"문서세션ID": token},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "deleted"}
+    assert deleted == ["session-1"]
+
+
+def test_refresh_policy_text_session_returns_new_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.rag.policy import sessions
+
+    extended: list[tuple[str, datetime]] = []
+
+    class _Store:
+        def extend(self, session_id: str, expires_at: datetime) -> bool:
+            extended.append((session_id, expires_at))
+            return True
+
+    monkeypatch.setattr(sessions, "shared_policy_store", lambda: _Store())
+    token = sign_policy_session_id(
+        "session-1",
+        datetime(2030, 1, 1, 0, 0, tzinfo=UTC),
+        max_expires_at=datetime(2030, 1, 1, 1, 0, tzinfo=UTC),
+    )
+
+    client = TestClient(app)
+    response = client.post("/policies/sessions/refresh", json={"문서세션ID": token})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["문서세션ID"] != token
+    assert payload["expiresAt"]
+    assert extended[0][0] == "session-1"
+
+
+def test_refresh_policy_text_session_rejects_invalid_token() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/policies/sessions/refresh",
+        json={"문서세션ID": "not-a-server-issued-token"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "INVALID_POLICY_SESSION"
