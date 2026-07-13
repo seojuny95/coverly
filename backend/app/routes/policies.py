@@ -3,15 +3,26 @@
 import asyncio
 
 from fastapi import APIRouter, UploadFile
+from pydantic import BaseModel
 
 from app.errors import ApiError
 from app.services.policy.pipeline import EmptyTextError, run_pipeline
-from app.services.rag.policy import delete_policy_session
+from app.services.rag.policy import delete_policy_session, refresh_policy_session
+from app.services.rag.policy.session_tokens import InvalidPolicySessionToken
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
 MAX_PDF_BYTES = 10 * 1024 * 1024
 _CHUNK_SIZE = 1024 * 1024
+
+
+class PolicySessionRequest(BaseModel):
+    문서세션ID: str
+
+
+class PolicySessionRefreshResponse(BaseModel):
+    문서세션ID: str
+    expiresAt: str
 
 
 async def _read_pdf(file: UploadFile) -> bytes:
@@ -47,7 +58,32 @@ async def parse_policy(file: UploadFile) -> dict[str, object]:
     return {"status": "accepted", **result}
 
 
-@router.delete("/sessions/{session_id}")
-def delete_policy_text_session(session_id: str) -> dict[str, str]:
-    delete_policy_session(session_id)
+@router.post("/sessions/delete")
+def delete_policy_text_session(request: PolicySessionRequest) -> dict[str, str]:
+    try:
+        delete_policy_session(request.문서세션ID)
+    except InvalidPolicySessionToken:
+        raise ApiError(
+            status_code=403,
+            code="INVALID_POLICY_SESSION",
+            message="분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.",
+        ) from None
     return {"status": "deleted"}
+
+
+@router.post("/sessions/refresh", response_model=PolicySessionRefreshResponse)
+def refresh_policy_text_session(
+    request: PolicySessionRequest,
+) -> PolicySessionRefreshResponse:
+    try:
+        refreshed = refresh_policy_session(request.문서세션ID)
+    except InvalidPolicySessionToken:
+        raise ApiError(
+            status_code=403,
+            code="INVALID_POLICY_SESSION",
+            message="분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.",
+        ) from None
+    return PolicySessionRefreshResponse(
+        문서세션ID=refreshed.token,
+        expiresAt=refreshed.expires_at.isoformat(),
+    )

@@ -9,6 +9,10 @@ from app.services.policy.models import ParsedDocument
 from app.services.rag.embeddings import Embedder, openai_embedder_from_settings
 from app.services.rag.policy.models import PolicyChunk, PolicyVectorRecord
 from app.services.rag.policy.pii import mask_policy_pii
+from app.services.rag.policy.session_tokens import (
+    ensure_policy_session_secret_configured,
+    sign_policy_session_id,
+)
 from app.services.rag.policy.source import build_policy_source_chunks
 from app.services.rag.policy.store import PolicyRagStore, shared_policy_store
 from app.settings import get_settings
@@ -60,9 +64,11 @@ def index_policy_document(
     embedder: Embedder | None = None,
     now: datetime | None = None,
 ) -> str | None:
+    ensure_policy_session_secret_configured()
     created_at = now or datetime.now(UTC)
     settings = get_settings()
     expires_at = created_at + timedelta(seconds=settings.policy_rag_ttl_seconds)
+    max_expires_at = created_at + timedelta(seconds=settings.policy_rag_max_ttl_seconds)
     session_id = uuid.uuid4().hex
     records = build_policy_vector_records(
         doc,
@@ -74,4 +80,8 @@ def index_policy_document(
     if not records:
         return None
     (store or shared_policy_store()).add(records)
-    return session_id
+    return sign_policy_session_id(
+        session_id,
+        expires_at,
+        max_expires_at=max_expires_at,
+    )

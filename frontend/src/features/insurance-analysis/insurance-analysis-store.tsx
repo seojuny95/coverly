@@ -69,9 +69,19 @@ export function getInsuredPersonName(
 type InsuranceDataValue = {
   analysis: InsuranceAnalysis | null;
   hasData: boolean;
+  sessionExpired: boolean;
   setAnalysis: (next: InsuranceAnalysis) => void;
   mergeDocuments: (next: InsuranceAnalysis) => void;
+  replaceDocumentSessionTokens: (
+    replacements: readonly PolicySessionTokenReplacement[],
+  ) => void;
+  expireSession: () => void;
   clear: () => void;
+};
+
+export type PolicySessionTokenReplacement = {
+  currentToken: string;
+  nextToken: string;
 };
 
 const InsuranceDataContext = createContext<InsuranceDataValue | null>(null);
@@ -87,20 +97,60 @@ export function InsuranceDataProvider({
   const [analysis, setAnalysisState] = useState<InsuranceAnalysis | null>(
     initialAnalysis,
   );
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const setAnalysis = useCallback((next: InsuranceAnalysis) => {
+    setSessionExpired(false);
     setAnalysisState(next);
   }, []);
 
   const mergeDocuments = useCallback((next: InsuranceAnalysis) => {
+    setSessionExpired(false);
     setAnalysisState((current) =>
       current ? mergeInsuranceAnalysis(current, next) : next,
     );
   }, []);
 
+  const replaceDocumentSessionTokens = useCallback(
+    (replacements: readonly PolicySessionTokenReplacement[]) => {
+      if (!replacements.length) return;
+      const nextTokensByCurrent = new Map(
+        replacements.map(({ currentToken, nextToken }) => [
+          currentToken,
+          nextToken,
+        ]),
+      );
+      setAnalysisState((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          insuranceDocuments: current.insuranceDocuments.map((document) => {
+            const currentToken = document.result.문서세션ID;
+            if (!currentToken) return document;
+            const nextToken = nextTokensByCurrent.get(currentToken);
+            if (!nextToken) return document;
+            return {
+              ...document,
+              result: {
+                ...document.result,
+                문서세션ID: nextToken,
+              },
+            };
+          }),
+        };
+      });
+    },
+    [],
+  );
+
+  const expireSession = useCallback(() => {
+    setSessionExpired(true);
+  }, []);
+
   // Discard the in-memory analysis. Called when the user leaves the analysis
   // screen so the "data disappears when you leave" warning stays true.
   const clear = useCallback(() => {
+    setSessionExpired(false);
     setAnalysisState(null);
   }, []);
 
@@ -108,11 +158,22 @@ export function InsuranceDataProvider({
     () => ({
       analysis,
       hasData: (analysis?.insuranceDocuments.length ?? 0) > 0,
+      sessionExpired,
       setAnalysis,
       mergeDocuments,
+      replaceDocumentSessionTokens,
+      expireSession,
       clear,
     }),
-    [analysis, setAnalysis, mergeDocuments, clear],
+    [
+      analysis,
+      sessionExpired,
+      setAnalysis,
+      mergeDocuments,
+      replaceDocumentSessionTokens,
+      expireSession,
+      clear,
+    ],
   );
 
   return (
