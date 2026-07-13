@@ -304,8 +304,12 @@ describe("InsuranceUploadForm", () => {
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
-      await screen.findByText(
-        "피보험자를 확인할 수 없는 증권이 있어요. 피보험자가 확인된 증권만 분석할 수 있어요.",
+      await screen.findByText("피보험자를 확인할 수 없는 증권이에요."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("피보험자 미확인")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "피보험자를 확인할 수 없는 증권이에요. insurance.pdf 파일을 제거하고 다시 시도해주세요.",
       ),
     ).toBeInTheDocument();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
@@ -333,10 +337,9 @@ describe("InsuranceUploadForm", () => {
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
-      await screen.findByText(
-        "피보험자를 확인할 수 없는 증권이 있어요. 피보험자가 확인된 증권만 분석할 수 있어요.",
-      ),
+      await screen.findByText("피보험자를 확인할 수 없는 증권이에요."),
     ).toBeInTheDocument();
+    expect(screen.getByText("피보험자 미확인")).toBeInTheDocument();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
     expect(navigateToAnalysis).not.toHaveBeenCalled();
   });

@@ -373,8 +373,15 @@ export function useUploadOrchestration({
       (insuranceDocument) => !getInsuredPersonName(insuranceDocument),
     );
     if (insuranceDocumentsWithoutName.length > 0) {
-      setError(
-        "피보험자를 확인할 수 없는 증권이 있어요. 피보험자가 확인된 증권만 분석할 수 있어요.",
+      failSelectedFiles(
+        insuranceDocumentsWithoutName.flatMap((document) => {
+          const selectedFileId = selectedFileIdsByDocumentId.get(document.id);
+          return selectedFileId
+            ? [{ id: selectedFileId, fileName: document.fileName }]
+            : [];
+        }),
+        "MISSING_INSURED_PERSON",
+        "피보험자를 확인할 수 없는 증권이에요.",
       );
       return false;
     }

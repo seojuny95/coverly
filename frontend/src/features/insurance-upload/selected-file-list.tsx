@@ -100,6 +100,7 @@ export function SelectedFileList({
 function failedBadgeLabel(errorCode?: string): string {
   if (errorCode === "INVALID_PDF") return "PDF 형식 아님";
   if (errorCode === "DUPLICATE_POLICY") return "중복 증권";
+  if (errorCode === "MISSING_INSURED_PERSON") return "피보험자 미확인";
   return "읽을 수 없는 PDF";
 }
 
