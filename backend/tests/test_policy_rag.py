@@ -109,6 +109,58 @@ def test_policy_retrieval_is_limited_to_requested_sessions() -> None:
     assert {hit.chunk.session_id for hit in hits} == {"session-1"}
 
 
+def test_policy_retrieval_dedupes_identical_chunks() -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    embedder = HashingEmbedder()
+    duplicate_doc = ParsedDocument(
+        text="중복 문구",
+        layout_text="",
+        tables=(
+            (("항목", "값"), ("상품명", "테스트보험")),
+            (("항목", "값"), ("상품명", "테스트보험")),
+        ),
+    )
+    records = build_policy_vector_records(
+        duplicate_doc,
+        session_id="session-1",
+        created_at=now,
+        expires_at=now + timedelta(hours=1),
+        embedder=embedder,
+    )
+
+    hits = retrieve_policy_context(
+        ["session-1"],
+        "상품명은?",
+        store=_MemoryStore(records),
+        embedder=embedder,
+        top_k=4,
+        candidate_k=8,
+    )
+
+    rendered = [hit.chunk.text for hit in hits]
+    assert len(rendered) == len(set(rendered))
+
+
+def test_policy_retrieval_normalizes_metadata_queries() -> None:
+    class _CapturingEmbedder:
+        def __init__(self) -> None:
+            self.calls: list[list[str]] = []
+
+        def embed_texts(self, texts: list[str]) -> list[tuple[float, ...]]:
+            self.calls.append(texts)
+            return [(1.0, 0.0) for _ in texts]
+
+    embedder = _CapturingEmbedder()
+    retrieve_policy_context(
+        ["session-1"],
+        "보험기간은 언제까지야?",
+        store=_MemoryStore(()),
+        embedder=embedder,
+    )
+
+    assert embedder.calls == [["보험기간은 언제까지야? 기본정보 보험기간"]]
+
+
 def test_policy_retrieval_evaluation_passes_fixture() -> None:
     documents = {
         "policy-a.pdf": ParsedDocument(
@@ -134,14 +186,14 @@ def test_policy_retrieval_evaluation_passes_fixture() -> None:
                 "query": "암진단비 가입금액은 얼마야?",
                 "session_ids": ["session-a"],
                 "expected_session_id": "session-a",
-                "expected_term": "3천만원",
+                "expected_terms": ["3천만원"],
             },
             {
                 "id": "premium",
                 "query": "월 보험료는 얼마야?",
                 "session_ids": ["session-b"],
                 "expected_session_id": "session-b",
-                "expected_term": "87,000원",
+                "expected_terms": ["87,000원"],
             },
         ],
     }
@@ -189,7 +241,7 @@ def test_policy_retrieval_evaluation_can_use_production_embedder(
                 "query": "월 보험료는 얼마야?",
                 "session_ids": ["session-a"],
                 "expected_session_id": "session-a",
-                "expected_term": "87,000원",
+                "expected_terms": ["87,000원"],
             },
         ],
     }
@@ -213,15 +265,18 @@ def test_policy_retrieval_evaluation_can_use_production_embedder(
         dataset = root / "evaluation_dataset.json"
         dataset.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
 
+        store = _MemoryStore(())
         report = evaluate_policy_retrieval(
             path=dataset,
             sample_dir=sample_dir,
             production=True,
+            store=store,
             parse=lambda _: next(iter(documents.values())),
         )
 
     assert report.recall == 1.0
     assert calls
+    assert store.records == []
 
 
 def test_local_policy_eval_dataset_has_product_scale_cases() -> None:
@@ -247,3 +302,120 @@ def test_local_policy_eval_dataset_does_not_contain_sample_pii() -> None:
     )
 
     assert not any(term in rendered for term in blocked_terms)
+
+
+def test_policy_eval_normalizes_expected_term_matching() -> None:
+    documents = {
+        "policy-a.pdf": ParsedDocument(
+            text="보험기간은 2020-05-06~2095-05-06 입니다.",
+            layout_text="",
+            tables=(),
+        ),
+    }
+    raw = {
+        "source": "sample-insurance-input",
+        "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
+        "cases": [
+            {
+                "id": "period",
+                "query": "보험기간은?",
+                "session_ids": ["session-a"],
+                "expected_session_id": "session-a",
+                "expected_terms": ["2020-05-06 ~ 2095-05-06"],
+            },
+        ],
+    }
+
+    with TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        sample_dir = root / "sample-insurance-input"
+        sample_dir.mkdir()
+        (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
+        dataset = root / "evaluation_dataset.json"
+        dataset.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+        report = evaluate_policy_retrieval(
+            path=dataset,
+            sample_dir=sample_dir,
+            parse=lambda _: next(iter(documents.values())),
+        )
+
+    assert report.recall == 1.0
+
+
+def test_policy_eval_accepts_masked_or_plain_phone_numbers() -> None:
+    documents = {
+        "policy-a.pdf": ParsedDocument(
+            text="권유자 연락처는 1644-8470 입니다.",
+            layout_text="",
+            tables=(),
+        ),
+    }
+    raw = {
+        "source": "sample-insurance-input",
+        "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
+        "cases": [
+            {
+                "id": "phone",
+                "query": "연락처는?",
+                "session_ids": ["session-a"],
+                "expected_session_id": "session-a",
+                "expected_terms": ["[전화번호]"],
+            },
+        ],
+    }
+
+    with TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        sample_dir = root / "sample-insurance-input"
+        sample_dir.mkdir()
+        (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
+        dataset = root / "evaluation_dataset.json"
+        dataset.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+        report = evaluate_policy_retrieval(
+            path=dataset,
+            sample_dir=sample_dir,
+            parse=lambda _: next(iter(documents.values())),
+        )
+
+    assert report.recall == 1.0
+
+
+def test_policy_eval_accepts_any_expected_term_variant() -> None:
+    documents = {
+        "policy-a.pdf": ParsedDocument(
+            text="계약사항 20년만기 / 20년납 / 월납",
+            layout_text="",
+            tables=(),
+        ),
+    }
+    raw = {
+        "source": "sample-insurance-input",
+        "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
+        "cases": [
+            {
+                "id": "payment-term",
+                "query": "납입기간과 납입주기는?",
+                "session_ids": ["session-a"],
+                "expected_session_id": "session-a",
+                "expected_terms": ["납입기간 20년납 월납", "20년만기 / 20년납 / 월납"],
+            },
+        ],
+    }
+
+    with TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        sample_dir = root / "sample-insurance-input"
+        sample_dir.mkdir()
+        (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
+        dataset = root / "evaluation_dataset.json"
+        dataset.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+        report = evaluate_policy_retrieval(
+            path=dataset,
+            sample_dir=sample_dir,
+            parse=lambda _: next(iter(documents.values())),
+        )
+
+    assert report.recall == 1.0

@@ -22,632 +22,993 @@
     {
       "id": "db-product-name",
       "query": "DB 운전자상해보험 상품명이 뭐야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "참좋은운전자상해보험"
+      "expected_terms": [
+        "참좋은운전자상해보험"
+      ]
     },
     {
       "id": "db-policy-period",
       "query": "DB손해보험 운전자상해보험 보험기간은 언제까지야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "2044년 07월 26일"
+      "expected_terms": [
+        "보험기간 2024년 07월 26일 ~ 2044년 07월 26일"
+      ]
     },
     {
       "id": "db-payment-term",
       "query": "DB 운전자보험 납입기간과 납입주기는 어떻게 돼?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "20년납 / 월납"
+      "expected_terms": [
+        "계약사항 20년만기 / 20년납 / 월납"
+      ]
     },
     {
       "id": "db-premium-total",
       "query": "DB 운전자보험 월 보험료가 얼마야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "11,670원"
+      "expected_terms": [
+        "보험료 11,670원"
+      ]
     },
     {
       "id": "db-premium-breakdown",
       "query": "DB 운전자보험 보장보험료와 적립보험료가 어떻게 나뉘어 있어?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "보장보험료 11,668원"
+      "expected_terms": [
+        "보장보험료 11,668원"
+      ]
     },
     {
       "id": "db-plan",
       "query": "DB 운전자보험 판매플랜은 뭐야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "간편심사플랜"
+      "expected_terms": [
+        "판매플랜 간편심사플랜"
+      ]
     },
     {
       "id": "db-injury-grade",
       "query": "DB 증권의 상해급수는 몇 급이야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "상해급수"
+      "expected_terms": [
+        "상해급수 1급"
+      ]
     },
     {
       "id": "db-vehicle-use",
       "query": "DB 운전자보험 운행차량은 뭐로 되어 있어?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "자가용"
+      "expected_terms": [
+        "운행차량 자가용"
+      ]
     },
     {
       "id": "db-motorcycle-exclusion",
       "query": "DB 운전자보험 이륜차부담보특약 가입 여부는?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "미가입"
+      "expected_terms": [
+        "이륜차부담보특약 미가입"
+      ]
     },
     {
       "id": "db-car-treatment-1-to-7",
       "query": "자동차부상치료비 1~7급 가입금액은 얼마야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "100 만원"
+      "expected_terms": [
+        "100 만원"
+      ]
     },
     {
       "id": "db-traffic-disability",
       "query": "교통상해 50% 이상 후유장해 가입금액은?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "1,000 만원"
+      "expected_terms": [
+        "1,000 만원"
+      ]
     },
     {
       "id": "db-public-transport-death",
       "query": "대중교통이용중 교통상해 사망 가입금액은 얼마야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "10,000 만원"
+      "expected_terms": [
+        "10,000 만원"
+      ]
     },
     {
       "id": "db-highway-death",
       "query": "고속도로교통상해사망은 얼마로 가입됐어?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "고속도로교통상해사망"
+      "expected_terms": [
+        "고속도로교통상해사망"
+      ]
     },
     {
       "id": "db-legal-support-limit",
       "query": "자가용운전자 교통사고 처리지원금 한도는?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "20,000 만원"
+      "expected_terms": [
+        "20,000 만원"
+      ]
     },
     {
       "id": "db-second-car-treatment",
       "query": "자동차부상치료비Ⅱ 1급 금액은 얼마야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "1,600 만원"
+      "expected_terms": [
+        "1,600 만원"
+      ]
     },
     {
       "id": "db-quality-phone-masked",
       "query": "DB 증권 품질보증 담당자 연락처가 있어?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "[전화번호]"
+      "expected_terms": [
+        "[전화번호]"
+      ]
     },
     {
       "id": "db-website",
       "query": "DB 증권에 적힌 홈페이지 주소가 뭐야?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "www.idbins.com"
+      "expected_terms": [
+        "www.idbins.com"
+      ]
     },
     {
       "id": "nh-product-name",
       "query": "NH 어린이보험 상품명을 알려줘",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "NH가성비굿플러스어린이보험"
+      "expected_terms": [
+        "NH가성비굿플러스어린이보험"
+      ]
     },
     {
       "id": "nh-contract-date",
       "query": "NH 어린이보험 계약일자는 언제야?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "2020년04월29일"
+      "expected_terms": [
+        "2020년04월29일"
+      ]
     },
     {
       "id": "nh-policy-period",
       "query": "NH 어린이보험 보험기간은 언제까지야?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "2095년04월29일"
+      "expected_terms": [
+        "2095년04월29일"
+      ]
     },
     {
       "id": "nh-payment-term",
       "query": "NH 어린이보험 계약조건은 어떻게 되어 있어?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "100세만기/20년납/자동이체/자유설계"
+      "expected_terms": [
+        "100세만기/20년납/자동이체/자유설계"
+      ]
     },
     {
       "id": "nh-premium",
       "query": "NH농협 어린이보험 월 보험료는 얼마야?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "42,615원"
+      "expected_terms": [
+        "42,615원"
+      ]
     },
     {
       "id": "nh-age-grade",
       "query": "NH 증권의 나이와 급수는 어떻게 적혀 있어?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "25세/1급"
+      "expected_terms": [
+        "나이/급수 25세/1급"
+      ]
     },
     {
       "id": "nh-job",
       "query": "NH 어린이보험 피보험자 직업은 뭐야?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "대학(원)생"
+      "expected_terms": [
+        "대학(원)생"
+      ]
     },
     {
       "id": "nh-basic-disability-80",
       "query": "NH 기본계약 일반상해후유장해 80% 이상 가입금액은?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "3,000"
+      "expected_terms": [
+        "3,000"
+      ]
     },
     {
       "id": "nh-basic-disability-under-80",
       "query": "NH 일반상해후유장해 80% 미만 가입금액은?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "80% 미만"
+      "expected_terms": [
+        "80% 미만"
+      ]
     },
     {
       "id": "nh-injury-death",
       "query": "NH 일반상해사망 가입금액은 얼마야?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "일반상해사망"
+      "expected_terms": [
+        "일반상해사망"
+      ]
     },
     {
       "id": "nh-cancer-diagnosis",
       "query": "NH 암진단비 유사암제외 가입금액은?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "2,000"
+      "expected_terms": [
+        "2,000"
+      ]
     },
     {
       "id": "nh-similar-cancer",
       "query": "NH 유사암진단비는 어떤 암을 말해?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "갑상선암"
+      "expected_terms": [
+        "갑상선암"
+      ]
     },
     {
       "id": "nh-solicitor-phone",
       "query": "NH 증권 권유자 연락처가 있어?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "[전화번호]"
+      "expected_terms": [
+        "[전화번호]"
+      ]
     },
     {
       "id": "hyundai-product-name",
       "query": "현대해상 자동차보험 상품명이 뭐야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "Hicar 다이렉트개인용"
+      "expected_terms": [
+        "Hicar 다이렉트개인용"
+      ]
     },
     {
       "id": "hyundai-policy-period",
       "query": "현대해상 자동차보험 기간은 언제까지야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "2027-06-27"
+      "expected_terms": [
+        "2027-06-27"
+      ]
     },
     {
       "id": "hyundai-premium",
       "query": "현대해상 자동차보험 보험료는 얼마야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "1,402,890원"
+      "expected_terms": [
+        "1,402,890원"
+      ]
     },
     {
       "id": "hyundai-vehicle-year",
       "query": "현대해상 자동차보험 차량연식은?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "2020"
+      "expected_terms": [
+        "2020"
+      ]
     },
     {
       "id": "hyundai-vehicle-value",
       "query": "현대해상 자동차보험 차량가액은 얼마야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "2,423만원"
+      "expected_terms": [
+        "2,423만원"
+      ]
     },
     {
       "id": "hyundai-car-model",
       "query": "현대해상 자동차보험 차명은 뭐야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "모델 3"
+      "expected_terms": [
+        "모델 3"
+      ]
     },
     {
       "id": "hyundai-driver-scope",
       "query": "현대해상 자동차보험 운전자범위는?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "기명피보험자 1인한정"
+      "expected_terms": [
+        "기명피보험자 1인한정"
+      ]
     },
     {
       "id": "hyundai-driver-age",
       "query": "자동차보험 운전자연령 조건이 뭐야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "만30세이상"
+      "expected_terms": [
+        "만30세이상"
+      ]
     },
     {
       "id": "hyundai-personal-injury-2",
       "query": "현대해상 대인배상Ⅱ 한도는?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "1인당 무 한"
+      "expected_terms": [
+        "1인당 무 한"
+      ]
     },
     {
       "id": "hyundai-property-liability",
       "query": "현대해상 대물배상 한도는 얼마야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "1사고당 10억원"
+      "expected_terms": [
+        "1사고당 10억원"
+      ]
     },
     {
       "id": "hyundai-uninsured-car",
       "query": "현대해상 무보험차상해 한도는?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "1인당 5억원"
+      "expected_terms": [
+        "1인당 5억원"
+      ]
     },
     {
       "id": "hyundai-emergency-service",
       "query": "현대해상 긴급출동 특약 견인 한도는?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "견인 100km한도"
+      "expected_terms": [
+        "견인 100km한도"
+      ]
     },
     {
       "id": "heungkuk-product-name",
       "query": "흥국화재 맘편한 자녀사랑보험 상품명 알려줘",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "맘편한 자녀사랑보험"
+      "expected_terms": [
+        "맘편한 자녀사랑보험"
+      ]
     },
     {
       "id": "heungkuk-policy-period",
       "query": "흥국화재 자녀보험 보험기간은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "2020-05-06 ~ 2095-05-06"
+      "expected_terms": [
+        "2020-05-06 ~ 2095-05-06"
+      ]
     },
     {
       "id": "heungkuk-premium",
       "query": "흥국화재 자녀보험 월 보험료가 얼마야?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "79,032원"
+      "expected_terms": [
+        "1회 보험료 79,032원"
+      ]
     },
     {
       "id": "heungkuk-premium-breakdown",
       "query": "흥국화재 보험료 기본과 특약 금액은 어떻게 나뉘어 있어?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "기본:100원 + 특약:78,932원"
+      "expected_terms": [
+        "기본:100원 + 특약:78,932원"
+      ]
     },
     {
       "id": "heungkuk-contract-type",
       "query": "흥국화재 계약형태는 뭐야?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "자녀형"
+      "expected_terms": [
+        "계약형태 자녀형"
+      ]
     },
     {
       "id": "heungkuk-job",
       "query": "흥국화재 피보험자 직업명은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "대학(원)생"
+      "expected_terms": [
+        "대학(원)생"
+      ]
     },
     {
       "id": "heungkuk-driving-use",
       "query": "흥국화재 피보험자 운전차의용도는?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "운전안함"
+      "expected_terms": [
+        "운전차의용도 운전안함"
+      ]
     },
     {
       "id": "heungkuk-general-injury-disability",
       "query": "흥국화재 일반상해후유장해 80% 이상 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "1,000만원"
+      "expected_terms": [
+        "1,000만원"
+      ]
     },
     {
       "id": "heungkuk-disease-disability",
       "query": "흥국화재 질병후유장해 가입금액은 얼마야?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "3,000만원"
+      "expected_terms": [
+        "3,000만원"
+      ]
     },
     {
       "id": "heungkuk-cerebrovascular",
       "query": "흥국화재 뇌혈관질환진단비 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "2,000만원"
+      "expected_terms": [
+        "2,000만원"
+      ]
     },
     {
       "id": "heungkuk-ischemic-heart",
       "query": "흥국화재 허혈성심질환진단비 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "2,000만원"
+      "expected_terms": [
+        "2,000만원"
+      ]
     },
     {
       "id": "heungkuk-cancer-diagnosis",
       "query": "흥국화재 암진단비 유사암제외 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "4,000만원"
+      "expected_terms": [
+        "4,000만원"
+      ]
     },
     {
       "id": "heungkuk-similar-cancer",
       "query": "흥국화재 유사암진단비 가입금액은 얼마야?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "1,000만원"
+      "expected_terms": [
+        "1,000만원"
+      ]
     },
     {
       "id": "heungkuk-anticancer-treatment",
       "query": "흥국화재 항암방사선약물치료비 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "500만원"
+      "expected_terms": [
+        "500만원"
+      ]
     },
     {
       "id": "heungkuk-injury-surgery",
       "query": "흥국화재 상해수술비 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "50만원"
+      "expected_terms": [
+        "50만원"
+      ]
     },
     {
       "id": "heungkuk-disease-surgery",
       "query": "흥국화재 질병수술비 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "50만원"
+      "expected_terms": [
+        "50만원"
+      ]
     },
     {
       "id": "heungkuk-organ-transplant",
       "query": "흥국화재 5대장기이식수술비 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "1,000만원"
+      "expected_terms": [
+        "1,000만원"
+      ]
     },
     {
       "id": "heungkuk-corneal-transplant",
       "query": "흥국화재 각막이식수술비 가입금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "2,000만원"
+      "expected_terms": [
+        "2,000만원"
+      ]
     },
     {
       "id": "heungkuk-call-center-masked",
       "query": "흥국화재 증권에 적힌 상담 전화번호가 뭐야?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "[전화번호]"
+      "expected_terms": [
+        "[전화번호]"
+      ]
     },
     {
       "id": "db-late-page-maturity-refund",
       "query": "DB 운전자보험 마지막 유의사항의 만기환급금 설명은?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "만기환급금은 적립부분 순보험료"
+      "expected_terms": [
+        "만기환급금은 적립부분 순보험료"
+      ]
     },
     {
       "id": "db-late-page-coverage-start",
       "query": "DB 가입자유의사항에서 보장개시는 언제 시작된다고 해?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "제1회 보험료를 받은 때"
+      "expected_terms": [
+        "제1회 보험료를 받은 때"
+      ]
     },
     {
       "id": "db-late-page-deposit-protection",
       "query": "DB 가입자유의사항 예금자보호 한도는?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "1인당 “1억원까지”"
+      "expected_terms": [
+        "1인당 “1억원까지”"
+      ]
     },
     {
       "id": "db-late-page-minor-signature",
       "query": "DB 유의사항에서 미성년자 계약 서명은 누가 해야 해?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "법정대리인이 서명"
+      "expected_terms": [
+        "법정대리인이 서명"
+      ]
     },
     {
       "id": "db-late-page-premium-waiver",
       "query": "DB 보험료 납입면제는 어떤 경우에 언급돼?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "자동차사고 부상등급표"
+      "expected_terms": [
+        "자동차사고 부상등급표"
+      ]
     },
     {
       "id": "db-late-page-substitute-premium",
       "query": "DB 적립보험료 납입대체 최저보험료 표에는 어떤 납입주기가 있어?",
-      "session_ids": ["sample-db-driver-policy"],
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
       "expected_session_id": "sample-db-driver-policy",
-      "expected_term": "연납 / 6월납 / 3월납 / 월납"
+      "expected_terms": [
+        "연납 / 6월납 / 3월납 / 월납"
+      ]
     },
     {
       "id": "nh-notice-coverage-start",
       "query": "NH 유의사항에서 회사의 보장개시는 언제부터야?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "제1회 보험료를 받은때"
+      "expected_terms": [
+        "제1회 보험료를 받은때"
+      ]
     },
     {
       "id": "nh-notice-address-change",
       "query": "NH 유의사항에서 주소나 연락처가 바뀌면 어떻게 하라고 해?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "주소 또는 연락처 변동시 반드시 회사로 통보"
+      "expected_terms": [
+        "주소 또는 연락처 변동시 반드시 회사로 통보"
+      ]
     },
     {
       "id": "nh-notice-special-term-expiry",
       "query": "NH 유의사항에서 특약별 만기는 어떻게 확인하라고 해?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "특약별 만기가 기본계약의 만기 이전에 종료"
+      "expected_terms": [
+        "특약별 만기가 기본계약의 만기 이전에 종료"
+      ]
     },
     {
       "id": "nh-notice-application-truth",
       "query": "NH 유의사항에서 청약서 주요내용을 사실대로 쓰지 않으면 어떻게 돼?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "보상되지 않을 수 있습니다"
+      "expected_terms": [
+        "보상되지 않을 수 있습니다"
+      ]
     },
     {
       "id": "nh-notice-motorcycle-duty",
       "query": "NH 유의사항에서 이륜자동차를 계속 사용하게 되면 어떻게 해야 해?",
-      "session_ids": ["sample-nh-child-policy"],
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
       "expected_session_id": "sample-nh-child-policy",
-      "expected_term": "지체없이 회사에 알려야"
+      "expected_terms": [
+        "지체없이 회사에 알려야"
+      ]
     },
     {
       "id": "hyundai-notice-contract-change",
       "query": "현대해상 안내사항에서 발행일 이후 계약변경 사항은 어떻게 된다고 해?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "발행일 이후의 계약변경 사항은 반영되지 않습니다"
+      "expected_terms": [
+        "발행일 이후의 계약변경 사항은 반영되지 않습니다"
+      ]
     },
     {
       "id": "hyundai-notice-reference-documents",
       "query": "현대해상 안내사항에서 세부 가입 내용은 무엇을 참고하라고 해?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "청약서, 상품설명서, 약관"
+      "expected_terms": [
+        "청약서, 상품설명서, 약관"
+      ]
     },
     {
       "id": "hyundai-notice-mileage",
       "query": "현대해상 Eco 마일리지 특약의 최초고지주행거리는?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "65,077km"
+      "expected_terms": [
+        "65,077km"
+      ]
     },
     {
       "id": "hyundai-notice-issued-at",
       "query": "현대해상 자동차보험 발행일시는 언제야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "2026-06-30 00시34분24초"
+      "expected_terms": [
+        "2026-06-30 00시34분24초"
+      ]
     },
     {
       "id": "heungkuk-confirm-address-change",
       "query": "흥국화재 계약 확인사항에서 주소가 변경되면 어떻게 하라고 해?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "주소가 변경되었을 경우에는 이 사실을 흥국화재로 알려"
+      "expected_terms": [
+        "변경되었을 경우에는 이 사실을 흥국화재로 알려 주시기 바랍니다"
+      ]
     },
     {
       "id": "heungkuk-confirm-policy-mismatch",
       "query": "흥국화재 계약 확인사항에서 증권 내용이 청약사항과 다르면 어떻게 해야 해?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "즉시 우리 회사에"
+      "expected_terms": [
+        "즉시 우리 회사에"
+      ]
     },
     {
       "id": "heungkuk-confirm-consultation",
       "query": "흥국화재 보험상담 안내는 어디로 문의하라고 해?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "콜센터"
+      "expected_terms": [
+        "콜센터([전화번호])",
+        "콜센터"
+      ]
     },
     {
       "id": "heungkuk-confirm-duty-to-notify",
       "query": "흥국화재 안내에서 계약전 계약후 알릴의무를 알아두라고 하나?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "계약전, 계약후 알릴의무"
+      "expected_terms": [
+        "계약전, 계약후 알릴의무"
+      ]
     },
     {
       "id": "heungkuk-confirm-self-signature",
       "query": "흥국화재 안내에서 청약서는 누가 서명해야 한다고 해?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "본인이 직접 작성하고 자필로 서명"
+      "expected_terms": [
+        "본인이 직접 작성하고 자필로 서명"
+      ]
     },
     {
       "id": "heungkuk-confirm-basic-three",
       "query": "흥국화재 3대 기본지키기를 불이행하면 어떻게 된다고 해?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "3개월이내 해약시 납입하신 보험료를 돌려받을 수"
+      "expected_terms": [
+        "3개월이내 해약시 납입하신 보험료를 돌려받을 수"
+      ]
     },
     {
       "id": "heungkuk-confirm-premium-overdue",
       "query": "흥국화재 보험료가 납입되지 않으면 계약은 어떻게 돼?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "납입최고기간이 끝나는 달의 다음날 보험계약을 해지"
+      "expected_terms": [
+        "납입최고기간이 끝나는 달의 다음날 보험계약을 해지"
+      ]
     },
     {
       "id": "heungkuk-late-page-specific-disease",
       "query": "흥국화재 마지막 페이지 부담보 특정질병 또는 부위는 무엇이야?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "갑상선 : 5년"
+      "expected_terms": [
+        "갑상선 : 5년"
+      ]
     },
     {
       "id": "heungkuk-late-page-notification-duty",
       "query": "흥국화재 계약 후 알릴 의무는 어떤 변경을 말해?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "직업 또는 직무를 변경"
+      "expected_terms": [
+        "직업 또는 직무를 변경"
+      ]
     },
     {
       "id": "heungkuk-late-page-maturity-refund",
       "query": "흥국화재 마지막 페이지 만기환급금 설명은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "순수보장성으로 만기시 지급되는 금액이 없습니다"
+      "expected_terms": [
+        "순수보장성으로 만기시 지급되는 금액이 없습니다"
+      ]
     },
     {
       "id": "heungkuk-late-page-premium-waiver",
       "query": "흥국화재 보험료 납입면제 사유에는 어떤 진단확정이 있어?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "암 보장개시일 이후에 암"
+      "expected_terms": [
+        "암 보장개시일 이후에 암"
+      ]
     },
     {
       "id": "heungkuk-late-page-fetus-refund",
       "query": "흥국화재 태아보장기간 중도환급금은 언제 지급한다고 해?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "태아보장기간에 해당하는 보험료 납입을 완료하고 출생통지를 한 때"
+      "expected_terms": [
+        "태아보장기간에 해당하는 보험료 납입을 완료하고 출생통지를 한 때"
+      ]
     },
     {
       "id": "cross-session-car-premium-boundary",
       "query": "자동차보험 납입한 보험료가 얼마야?",
-      "session_ids": ["sample-hyundai-car-policy"],
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
       "expected_session_id": "sample-hyundai-car-policy",
-      "expected_term": "1,402,890원"
+      "expected_terms": [
+        "1,402,890원"
+      ]
     },
     {
       "id": "cross-session-child-cancer-boundary",
       "query": "자녀보험 암진단비 유사암제외 금액은?",
-      "session_ids": ["sample-heungkuk-child-policy"],
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
       "expected_session_id": "sample-heungkuk-child-policy",
-      "expected_term": "4,000만원"
+      "expected_terms": [
+        "4,000만원"
+      ]
     }
   ]
 }
