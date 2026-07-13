@@ -552,3 +552,15 @@ def test_llm_summary_model_rejects_extra_fields() -> None:
         "보험료",
         "차량정보",
     }
+
+
+def test_llm_summary_coercion_treats_literal_null_as_missing() -> None:
+    summary = _coerce_policy_summary(
+        {
+            "보험사": "null",
+            "차량정보": {"차량명": "null", "차량번호": "없음", "연식": "N/A"},
+        },
+        ("테스트손해보험",),
+    )
+
+    assert summary == {}

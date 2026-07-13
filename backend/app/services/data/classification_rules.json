@@ -1,6 +1,10 @@
 {
   "categories": [
-    {"classification": "자동차", "tags": ["자동차"], "terms": ["자동차보험"]},
+    {
+      "classification": "자동차",
+      "tags": ["자동차"],
+      "terms": ["자동차보험", "개인용자동차보험", "다이렉트개인용"]
+    },
     {"classification": "배상·화재·기타", "tags": ["운전자"], "terms": ["운전자보험", "운전자상해보험"]},
     {"classification": "상해·질병·실손", "tags": ["실손"], "terms": ["실손의료보험", "실손의료비", "실비보험"]},
     {"classification": "배상·화재·기타", "tags": ["화재"], "terms": ["화재보험", "주택화재보험"]},
@@ -8,7 +12,11 @@
     {"classification": "생명·연금", "tags": ["종신"], "terms": ["종신보험"]},
     {"classification": "생명·연금", "tags": ["정기"], "terms": ["정기보험"]},
     {"classification": "상해·질병·실손", "tags": ["간병"], "terms": ["간병보험", "장기요양보험"]},
-    {"classification": "상해·질병·실손", "tags": ["어린이"], "terms": ["어린이보험", "자녀보험"]},
+    {
+      "classification": "상해·질병·실손",
+      "tags": ["어린이"],
+      "terms": ["어린이보험", "자녀보험", "자녀사랑보험"]
+    },
     {"classification": "상해·질병·실손", "tags": ["암"], "terms": ["암보험"]},
     {"classification": "상해·질병·실손", "tags": ["상해"], "terms": ["상해보험"]},
     {"classification": "상해·질병·실손", "tags": ["질병"], "terms": ["질병보험", "건강보험"]}

@@ -76,6 +76,7 @@ _POLICY_NUMBER_EXTRACTION_PATTERNS = [
     rf"계약자\s+[가-힣A-Za-z]+\s+증권번호\s+({_POLICY_NUMBER_VALUE_PATTERN})",
 ]
 _POLICY_HOLDER_EXTRACTION_PATTERNS = [
+    rf"보험계약자\s*({_PERSON_NAME_VALUE_PATTERN})\s*\(",
     r"계약자\s+([가-힣A-Za-z]+)\s+증권번호",
     rf"증권번호\s*{_POLICY_NUMBER_VALUE_PATTERN}\s*계약자\s*({_PERSON_NAME_VALUE_PATTERN})",
     rf"계약자\s*({_PERSON_NAME_VALUE_PATTERN})\s*\([^)]*\)\s*보험기간",
@@ -243,7 +244,12 @@ def _extract_insurer_name(text: str) -> str | None:
     return _extract_labeled_value(text, _INSURER_LABELS)
 
 
-_PRODUCT_NAME_TRAILING_LABELS = _POLICY_NUMBER_LABELS + ["계약자", "보험기간"]
+_PRODUCT_NAME_TRAILING_LABELS = _POLICY_NUMBER_LABELS + [
+    "계약자",
+    "보험계약자",
+    "기명피보험자",
+    "보험기간",
+]
 
 
 def _truncate_before_trailing_label(value: str, labels: list[str]) -> str:
@@ -286,7 +292,7 @@ def _extract_product_name(text: str) -> str | None:
     inline_name = _extract_between_markers(
         text,
         _PRODUCT_NAME_LABELS,
-        _POLICY_NUMBER_LABELS + ["계약자", "보험기간"],
+        _PRODUCT_NAME_TRAILING_LABELS,
     )
     if inline_name and inline_name not in _GENERIC_PRODUCT_NAMES:
         return inline_name
@@ -794,6 +800,8 @@ def _coerce_non_empty_string(value: object) -> str | None:
         return None
 
     normalized = value.strip()
+    if normalized.lower() in {"null", "none", "n/a"} or normalized in {"없음", "미상"}:
+        return None
     return normalized or None
 
 
@@ -813,6 +821,7 @@ _LLM_FILLABLE_FIELDS = [
     "보험료",
     "차량정보",
 ]
+_LLM_TRIGGER_FIELDS = [field for field in _LLM_FILLABLE_FIELDS if field != "차량정보"]
 
 
 def extract_policy_summary(
@@ -838,7 +847,7 @@ def extract_policy_summary(
 
 
 def _needs_llm_fill(summary: PolicySummary) -> bool:
-    return any(field not in summary for field in _LLM_FILLABLE_FIELDS)
+    return any(field not in summary for field in _LLM_TRIGGER_FIELDS)
 
 
 # Identity fields whose value must be traceable back to the source document.

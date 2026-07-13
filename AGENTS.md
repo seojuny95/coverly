@@ -36,7 +36,7 @@ pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
 ## Project Structure
 
 - **`frontend/`** — Next.js App Router + TypeScript + Tailwind. → [frontend/AGENTS.md](frontend/AGENTS.md)
-- **`backend/`** — FastAPI + uv. → [backend/AGENTS.md](backend/AGENTS.md)
+- **`backend/`** — FastAPI + uv. → [backend/AGENTS.md](backend/AGENTS.md), LLM 프롬프트 가이드 → [backend/PROMPTING.md](backend/PROMPTING.md)
 - **`.github/`** — GitHub Actions CI + PR 템플릿.
 
 ## 문서 유지보수

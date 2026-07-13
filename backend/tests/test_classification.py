@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 
 from app.services.llm import JsonCompleter
-from app.services.policy.classification import CLASSIFICATION_UNKNOWN, classify_policy
+from app.services.policy.classification import (
+    _SYSTEM,
+    CLASSIFICATION_UNKNOWN,
+    _classification_user_prompt,
+    classify_policy,
+)
 
 _RULES_PATH = (
     Path(__file__).resolve().parents[1] / "app" / "services" / "data" / "classification_rules.json"
@@ -123,3 +128,17 @@ def test_classify_policy_signature_accepts_json_completer_type() -> None:
     )
 
     assert result["보험분류"] == "자동차"
+
+
+def test_classification_llm_prompt_is_structured_and_conservative() -> None:
+    prompt = _classification_user_prompt("무배당 든든한 종합보장 플랜")
+
+    assert "# 역할" in _SYSTEM
+    assert "# 선택 가능한 보험분류" in _SYSTEM
+    assert "# 작업 순서" in _SYSTEM
+    assert "# 해야 할 것" in _SYSTEM
+    assert "# 하지 말아야 할 것" in _SYSTEM
+    assert "근거가 부족하면 미분류" in _SYSTEM
+    assert "운전자보험이나 운전자상해보험을 자동차로 분류하지 않는다" in _SYSTEM
+    assert "# 입력" in prompt
+    assert "# 분류 대상 텍스트" in prompt
