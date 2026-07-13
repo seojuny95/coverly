@@ -14,7 +14,7 @@ from typing import NotRequired, TypedDict
 
 from app.services.coverage import extract_coverages
 from app.services.parsing import parse_document
-from app.services.session_rag import store_policy_text
+from app.services.rag.policy import index_policy_document
 from app.services.summary import extract_policy_summary
 from app.services.types import Coverage, ParsedDocument, PolicySummary
 
@@ -37,6 +37,7 @@ def run_pipeline(
     parse: Callable[[bytes], ParsedDocument] = parse_document,
     summarize: Callable[[str], PolicySummary] = extract_policy_summary,
     extract: Callable[[ParsedDocument], tuple[list[Coverage], str]] = extract_coverages,
+    index: Callable[[ParsedDocument], str | None] = index_policy_document,
 ) -> PipelineResult:
     doc = parse(pdf_bytes)
     if not doc.text:
@@ -49,7 +50,10 @@ def run_pipeline(
         "분석상태": status,
         "문자수": len(doc.text),
     }
-    session_id = store_policy_text(doc.text)
+    try:
+        session_id = index(doc)
+    except Exception:
+        session_id = None
     if session_id:
         result["문서세션ID"] = session_id
     return result

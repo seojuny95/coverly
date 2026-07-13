@@ -6,7 +6,7 @@ from app.schemas.consultation import ConsultationEvidence, InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.services.coverage_taxonomy import classify_coverage
 from app.services.portfolio_summary import PortfolioFacts
-from app.services.session_rag import SessionRagHit
+from app.services.rag.policy import PolicyRetrievalHit
 
 _UNSUPPORTED_CONCLUSIONS = (
     "보험금이 지급",
@@ -103,7 +103,9 @@ class EvidenceCatalog:
     coverage_ids_by_category: dict[str, tuple[str, ...]]
 
 
-def with_session_evidence(catalog: EvidenceCatalog, hits: list[SessionRagHit]) -> EvidenceCatalog:
+def with_session_evidence(
+    catalog: EvidenceCatalog, hits: list[PolicyRetrievalHit]
+) -> EvidenceCatalog:
     """Append ephemeral uploaded-document chunks to the consultation catalog."""
     if not hits:
         return catalog

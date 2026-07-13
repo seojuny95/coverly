@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     database_url: str = ""
     rag_pg_table: str = "official_rag_chunks"
     rag_embedding_dim: int = 1536
+    policy_rag_pg_table: str = "policy_rag_chunks"
+    policy_rag_ttl_seconds: int = 60 * 60
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[1] / ".env",

@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime, timedelta
 
 from pytest import MonkeyPatch
 
@@ -7,7 +8,7 @@ from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import ConversationMessage
 from app.services.portfolio_qa import answer_portfolio_question
 from app.services.rag.answer import RagAnswer, RagCitation
-from app.services.session_rag import SessionRagChunk, SessionRagHit
+from app.services.rag.policy import PolicyChunk, PolicyRetrievalHit
 
 
 def _policies() -> list[PolicyInput]:
@@ -568,13 +569,17 @@ def test_qa_adds_session_policy_text_to_llm_context(monkeypatch: MonkeyPatch) ->
 
     policy = _policies()[0]
     policy.문서세션ID = "session-1"
-    hit = SessionRagHit(
-        chunk=SessionRagChunk(
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    hit = PolicyRetrievalHit(
+        chunk=PolicyChunk(
             id="session:session-1:1",
             session_id="session-1",
             text="암진단비 특별약관 원문에 진단확정 문구가 있습니다.",
-            embedding=(1.0,),
-            created_at=1.0,
+            content_type="text",
+            chunk_index=1,
+            table_index=None,
+            created_at=now,
+            expires_at=now + timedelta(hours=1),
         ),
         score=1.0,
     )

@@ -37,7 +37,7 @@ from app.services.portfolio_summary import (
     is_auto_policy,
 )
 from app.services.rag.answer import RagAnswer, RagCitation, answer_official_question
-from app.services.session_rag import retrieve_policy_context
+from app.services.rag.policy import retrieve_policy_context
 
 # "How do I claim?" is procedural — answer with the deterministic channel directory.
 _CLAIM_HOWTO_TERMS = ("청구", "신청", "접수", "서류")
@@ -264,7 +264,11 @@ def _with_session_context(
     session_ids = [policy.문서세션ID for policy in policies if policy.문서세션ID is not None]
     if not session_ids:
         return catalog
-    return with_session_evidence(catalog, retrieve_policy_context(session_ids, question))
+    try:
+        hits = retrieve_policy_context(session_ids, question)
+    except Exception:
+        return catalog
+    return with_session_evidence(catalog, hits)
 
 
 def _answer_with_official_rag(

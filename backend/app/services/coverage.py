@@ -33,6 +33,7 @@ from app.services.demographics import mask_demographic_identifiers
 from app.services.explain import explain_coverages
 from app.services.grounding import normalize_amount, wording_grounded
 from app.services.llm import JsonCompleter, structured_completer
+from app.services.table_text import serialize_table
 from app.services.types import Coverage, ParsedDocument
 
 STATUS_OK = "완료"
@@ -109,42 +110,6 @@ def _select_coverage_tables(tables: list[_TableRows]) -> list[_TableRows]:
     return [table for table in tables if _is_coverage_table(table, require_amount=False)]
 
 
-def _join_cell_lines(cell: str) -> str:
-    """Rejoin a cell that pdfplumber split across visual lines.
-
-    A markdown cell must be one line, so cell-internal newlines are rejoined with
-    a single space. pdfplumber drops the wrap space inconsistently and a mid-word
-    wrap ('한'+'하여') is indistinguishable from a word-boundary wrap
-    ('수술을'+'받은'), so a space is the safe default: it never merges distinct
-    words (a rare mid-word wrap only gains a harmless space). This replaces the
-    old ' / ' marker, which leaked into 보장내용 as a stray slash the reader could
-    not tell apart from a real '/'. Only whitespace is rewritten, so a genuine
-    '/' in the policy text is untouched.
-    """
-    return re.sub(r"\s+", " ", cell.replace("\n", " ")).strip()
-
-
-def _serialize_table(rows: _TableRows) -> str:
-    """Render a table as markdown so column-row associations survive.
-
-    Cell-internal line wraps are rejoined (see _join_cell_lines). Returns '' for
-    non-tables (<2 rows or <2 columns).
-    """
-    clean = [[_join_cell_lines(cell or "") for cell in row] for row in rows]
-    clean = [row for row in clean if any(row)]
-    if len(clean) < 2 or len(clean[0]) < 2:
-        return ""
-    width = len(clean[0])
-    lines = [
-        "| " + " | ".join(clean[0]) + " |",
-        "| " + " | ".join(["---"] * width) + " |",
-    ]
-    for row in clean[1:]:
-        cells = (row + [""] * width)[:width]
-        lines.append("| " + " | ".join(cells) + " |")
-    return "\n".join(lines)
-
-
 def build_coverage_source(doc: ParsedDocument) -> str:
     """LLM input for coverage extraction, via the tiered detection above."""
     tables: list[_TableRows] = []
@@ -153,10 +118,10 @@ def build_coverage_source(doc: ParsedDocument) -> str:
 
     selected = _select_coverage_tables(tables)
     if selected:
-        source = "\n\n".join(md for table in selected if (md := _serialize_table(table)))
+        source = "\n\n".join(md for table in selected if (md := serialize_table(table)))
     else:
         # Tier 3: no coverage table detected — hand the LLM everything we have.
-        parts = [md for table in tables if (md := _serialize_table(table))]
+        parts = [md for table in tables if (md := serialize_table(table))]
         if doc.layout_text:
             parts.append(doc.layout_text)
         source = "\n".join(parts).strip()

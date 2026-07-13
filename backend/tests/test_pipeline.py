@@ -51,10 +51,6 @@ def test_auto_policy_is_not_skipped() -> None:
 
 
 def test_result_shape(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.services import pipeline
-
-    monkeypatch.setattr(pipeline, "store_policy_text", lambda _text: "session-1")
-
     def fake_summarize(text: str) -> PolicySummary:
         return {"보험분류": "실손", "상품태그": []}
 
@@ -68,6 +64,7 @@ def test_result_shape(monkeypatch: pytest.MonkeyPatch) -> None:
         parse=_fake_parse("일반 증권"),
         summarize=fake_summarize,
         extract=fake_extract,
+        index=lambda _doc: "session-1",
     )
     assert set(result) == {"기본정보", "보장목록", "분석상태", "문자수", "문서세션ID"}
     assert result["문서세션ID"] == "session-1"

@@ -48,6 +48,7 @@ export type InsuranceCoverage = {
 export type InsuranceUploadResult = {
   status: "accepted";
   문자수: number;
+  문서세션ID?: string;
   기본정보?: InsuranceBasicInfo;
   보장목록?: InsuranceCoverage[];
   분석상태?: "완료" | "부분";

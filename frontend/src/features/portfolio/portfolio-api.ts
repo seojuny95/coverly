@@ -201,6 +201,7 @@ function toPolicies(insuranceDocuments: AnalyzedInsurance[]) {
     기본정보: result.기본정보,
     보장목록: result.보장목록,
     분석상태: result.분석상태,
+    문서세션ID: result.문서세션ID,
   }));
 }
 
