@@ -605,7 +605,7 @@ def test_policy_eval_normalizes_expected_term_matching() -> None:
 def test_policy_eval_accepts_masked_or_plain_phone_numbers() -> None:
     documents = {
         "policy-a.pdf": ParsedDocument(
-            text="권유자 연락처는 1644-8470 입니다.",
+            text="권유자 연락처는 000-0000-0000 입니다.",
             layout_text="",
             tables=(),
         ),
