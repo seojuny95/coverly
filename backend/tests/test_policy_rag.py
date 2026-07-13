@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
+from app.services.policy.models import ParsedDocument
 from app.services.rag.embeddings import HashingEmbedder
 from app.services.rag.policy.evaluation import EVAL_FIXTURE, evaluate_policy_retrieval
 from app.services.rag.policy.indexing import build_policy_vector_records
@@ -13,7 +14,6 @@ from app.services.rag.policy.models import PolicyRetrievalHit, PolicyVectorRecor
 from app.services.rag.policy.pii import mask_policy_pii
 from app.services.rag.policy.retrieval import retrieve_policy_context
 from app.services.rag.policy.source import build_policy_source_chunks
-from app.services.types import ParsedDocument
 
 
 class _MemoryStore:

@@ -3,12 +3,12 @@ from datetime import date
 
 import pytest
 
-from app.services import demographics as demographics_module
-from app.services.demographics import (
+from app.services.policy import demographics as demographics_module
+from app.services.policy.demographics import (
     extract_insured_demographics,
     mask_demographic_identifiers,
 )
-from app.services.summary import extract_policy_summary
+from app.services.policy.summary.service import extract_policy_summary
 
 
 def test_demographics_has_no_insurer_specific_logic() -> None:
@@ -163,7 +163,7 @@ def test_summary_classification_receives_masked_text(
         captured["text"] = text
         return {"보험분류": "미분류", "상품태그": []}
 
-    monkeypatch.setattr("app.services.summary.classify_policy", classify)
+    monkeypatch.setattr("app.services.policy.summary.service.classify_policy", classify)
     extract_policy_summary(
         "피보험자 가나 (TESTBIRTH-E-1******)",
         llm_extractor=None,

@@ -8,7 +8,6 @@ URLs. Insurer names live only in the data file, never in this module.
 import json
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 from app.schemas.qa import (
@@ -17,8 +16,9 @@ from app.schemas.qa import (
     ClaimChannelInsurer,
     ClaimChannelLink,
 )
+from app.services.paths import SERVICE_DATA_DIR
 
-_DATA = Path(__file__).resolve().parent / "data" / "claim_channels.json"
+_DATA = SERVICE_DATA_DIR / "claim_channels.json"
 
 
 @dataclass(frozen=True)

@@ -1,4 +1,4 @@
-from app.services.explain import explain_coverages
+from app.services.policy.coverage.explanation import explain_coverages
 from app.services.rag.models import RagChunk, RetrievalHit
 
 

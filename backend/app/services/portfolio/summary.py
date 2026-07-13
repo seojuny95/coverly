@@ -14,7 +14,7 @@ from app.schemas.portfolio import (
     PolicyInput,
     PortfolioCoverageSummary,
 )
-from app.services.coverage_name_matching import (
+from app.services.coverage_knowledge.matching import (
     canonicalize_coverage_name,
     choose_display_name,
 )

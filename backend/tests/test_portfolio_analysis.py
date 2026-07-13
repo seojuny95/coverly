@@ -2,8 +2,8 @@ from pytest import MonkeyPatch
 
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.services import portfolio_analysis
-from app.services.portfolio_analysis import analyze_portfolio
+from app.services.analysis import service as portfolio_analysis
+from app.services.analysis.service import analyze_portfolio
 from app.services.rag.models import RagChunk, RetrievalHit
 
 

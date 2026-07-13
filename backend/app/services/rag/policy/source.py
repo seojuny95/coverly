@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.services.policy.models import ParsedDocument
 from app.services.rag.chunking import normalize_text, split_within_char_limit
 from app.services.rag.policy.models import PolicyContentType
 from app.services.table_text import serialize_table
-from app.services.types import ParsedDocument
 
 
 @dataclass(frozen=True)

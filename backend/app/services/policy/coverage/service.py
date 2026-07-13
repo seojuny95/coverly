@@ -29,12 +29,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
-from app.services.demographics import mask_demographic_identifiers
-from app.services.explain import explain_coverages
 from app.services.grounding import normalize_amount, wording_grounded
 from app.services.llm import JsonCompleter, structured_completer
+from app.services.policy.coverage.explanation import explain_coverages
+from app.services.policy.demographics import mask_demographic_identifiers
+from app.services.policy.models import Coverage, ParsedDocument
 from app.services.table_text import serialize_table
-from app.services.types import Coverage, ParsedDocument
 
 STATUS_OK = "완료"
 STATUS_PARTIAL = "부분"

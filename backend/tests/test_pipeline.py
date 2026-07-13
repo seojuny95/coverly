@@ -2,8 +2,8 @@ from collections.abc import Callable
 
 import pytest
 
-from app.services.pipeline import EmptyTextError, run_pipeline
-from app.services.types import Coverage, ParsedDocument, PolicySummary, Table
+from app.services.policy.models import Coverage, ParsedDocument, PolicySummary, Table
+from app.services.policy.pipeline import EmptyTextError, run_pipeline
 
 
 def _fake_parse(text: str, tables: tuple[Table, ...] = ()) -> Callable[[bytes], ParsedDocument]:

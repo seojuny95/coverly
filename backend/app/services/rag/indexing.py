@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from app.services.rag.embeddings import Embedder, openai_embedder_from_settings
 from app.services.rag.loaders import load_official_chunks
-from app.services.rag.models import RagChunk, VectorRecord
+from app.services.rag.models import RagChunk, VectorRecord, chunk_embedding_text
 from app.services.rag.pgvector_store import shared_pgvector_store
 
 
@@ -26,7 +26,9 @@ def build_vector_records(
 
     active_embedder = embedder or openai_embedder_from_settings()
     active_chunks = chunks if chunks is not None else load_official_chunks()
-    embeddings = active_embedder.embed_texts([_embedding_text(chunk) for chunk in active_chunks])
+    embeddings = active_embedder.embed_texts(
+        [chunk_embedding_text(chunk) for chunk in active_chunks]
+    )
 
     return tuple(
         VectorRecord(chunk=chunk, embedding=embedding)
@@ -40,11 +42,6 @@ def index_official_sources(*, embedder: Embedder | None = None) -> int:
     records = build_vector_records(embedder=embedder)
     shared_pgvector_store().replace_all(records)
     return len(records)
-
-
-def _embedding_text(chunk: RagChunk) -> str:
-    label = chunk.label or ""
-    return f"{chunk.source_title}\n{label}\n{chunk.text}".strip()
 
 
 def main() -> None:

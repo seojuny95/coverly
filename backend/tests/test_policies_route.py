@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.pipeline import EmptyTextError, PipelineResult
+from app.services.policy.pipeline import EmptyTextError, PipelineResult
 
 
 def test_parse_rejects_non_pdf_upload() -> None:

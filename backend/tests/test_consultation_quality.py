@@ -3,8 +3,8 @@ import json
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import ConversationMessage
-from app.services.portfolio_analysis import analyze_portfolio
-from app.services.portfolio_qa import answer_portfolio_question
+from app.services.analysis.service import analyze_portfolio
+from app.services.qa.service import answer_portfolio_question
 
 
 def _policies() -> list[PolicyInput]:

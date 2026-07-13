@@ -2,8 +2,8 @@ import io
 
 from pypdf import PdfWriter
 
-from app.services.parsing import parse_document
-from app.services.types import ParsedDocument
+from app.services.policy.models import ParsedDocument
+from app.services.policy.parsing import parse_document
 
 
 def _blank_pdf() -> bytes:

@@ -1,7 +1,5 @@
 """LLM generation and filtering for counselor-style portfolio analysis."""
 
-import json
-
 from pydantic import BaseModel, Field
 
 from app.schemas.analysis import (
@@ -10,17 +8,23 @@ from app.schemas.analysis import (
     CounselorInsight,
 )
 from app.schemas.consultation import GenerationMode, InsuredDemographics
-from app.services.coverage_purpose import coverage_purpose
-from app.services.coverage_taxonomy import LifeStageCheck, classify_coverage
-from app.services.llm import JsonCompleter, structured_completer
-from app.services.portfolio_consultation import (
+from app.services.coverage_knowledge.purpose import coverage_purpose
+from app.services.coverage_knowledge.taxonomy import LifeStageCheck, classify_coverage
+from app.services.evidence.catalog import (
     EvidenceCatalog,
+    filter_safe_unique_texts,
     is_safe_analysis_text,
     is_safe_general_guidance,
     valid_evidence_ids,
 )
-from app.services.portfolio_premium import summarize_premiums
-from app.services.portfolio_summary import (
+from app.services.llm import (
+    JsonCompleter,
+    compact_prompt_text,
+    dump_prompt_json,
+    structured_completer,
+)
+from app.services.portfolio.premium import summarize_premiums
+from app.services.portfolio.summary import (
     PortfolioFacts,
     count_duplicate_indemnity_coverages,
 )
@@ -76,8 +80,14 @@ def generate_counselor(
     strengths = _filter_insights(draft.strengths, catalog, allowed_prefixes=_STRENGTH_PREFIXES)
     gaps = _filter_insights(draft.gaps, catalog, allowed_prefixes=_GAP_PREFIXES)
     amount_reviews = _filter_amount_reviews(draft.amount_review_items, catalog)
-    next_questions = _filter_guidance_list(draft.next_questions)
-    next_steps = _filter_guidance_list(draft.next_steps)
+    next_questions = filter_safe_unique_texts(
+        draft.next_questions,
+        is_safe=is_safe_general_guidance,
+    )
+    next_steps = filter_safe_unique_texts(
+        draft.next_steps,
+        is_safe=is_safe_general_guidance,
+    )
     accepted_count = sum(
         len(items) for items in (strengths, gaps, amount_reviews, next_questions, next_steps)
     )
@@ -190,16 +200,6 @@ def _filter_amount_reviews(
     return items
 
 
-def _filter_guidance_list(items: list[str]) -> list[str]:
-    accepted: list[str] = []
-    for item in items:
-        cleaned = item.strip()
-        if not is_safe_general_guidance(cleaned) or cleaned in accepted:
-            continue
-        accepted.append(cleaned)
-    return accepted
-
-
 def _system_prompt() -> str:
     return (
         "당신은 사용자의 편에서 이미 가입한 보험을 함께 살펴보는 보험 상담 분석가입니다.\n"
@@ -266,16 +266,9 @@ def _user_prompt(
                 "id": hit.chunk.id,
                 "source_title": hit.chunk.source_title,
                 "citation_label": hit.chunk.citation_label,
-                "text": _trim_official_guidance(hit.chunk.text),
+                "text": compact_prompt_text(hit.chunk.text, 700),
             }
             for hit in official_guidance
         ],
     }
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-
-
-def _trim_official_guidance(text: str) -> str:
-    compact = "\n".join(line.strip() for line in text.splitlines() if line.strip())
-    if len(compact) <= 700:
-        return compact
-    return compact[:699].rstrip() + "…"
+    return dump_prompt_json(payload)

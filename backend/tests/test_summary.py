@@ -1,9 +1,10 @@
 import pytest
 
-from app.services import classification as classification_module
-from app.services import summary as summary_module
-from app.services.summary import (
-    _build_response_format,
+from app.services.policy import classification as classification_module
+from app.services.policy.summary import service as summary_module
+from app.services.policy.summary.service import (
+    _coerce_policy_summary,
+    _LlmPolicySummaryExtraction,
     extract_local_policy_summary,
     extract_policy_summary,
     get_insurer_candidates,
@@ -523,27 +524,23 @@ def test_llm_filled_insurer_brand_absent_is_still_dropped() -> None:
     assert "보험사" not in result
 
 
-def test_llm_insurer_field_is_constrained_to_catalog() -> None:
+def test_llm_insurer_field_is_filtered_to_catalog() -> None:
     candidates = get_insurer_candidates()
 
     assert {"DB손해보험", "NH농협손해보험", "현대해상화재보험", "흥국화재"}.issubset(
         set(candidates)
     )
 
-    response_format = _build_response_format(candidates)
-    insurer_schema = response_format["format"]["schema"]["properties"]["보험사"]
+    summary = _coerce_policy_summary({"보험사": "후보밖보험"}, candidates)
 
-    assert insurer_schema["type"] == ["string", "null"]
-    assert insurer_schema["enum"] == [*candidates, None]
+    assert "보험사" not in summary
 
 
-def test_llm_response_format_uses_strict_json_schema() -> None:
-    response_format = _build_response_format(get_insurer_candidates())
+def test_llm_summary_model_rejects_extra_fields() -> None:
+    schema = _LlmPolicySummaryExtraction.model_json_schema()
 
-    assert response_format["format"]["type"] == "json_schema"
-    assert response_format["format"]["strict"] is True
-    assert response_format["format"]["schema"]["additionalProperties"] is False
-    assert set(response_format["format"]["schema"]["required"]) == {
+    assert schema["additionalProperties"] is False
+    assert set(schema["required"]) == {
         "보험사",
         "상품명",
         "증권번호",

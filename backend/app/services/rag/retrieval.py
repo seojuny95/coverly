@@ -19,7 +19,13 @@ import re
 from collections import Counter
 
 from app.services.rag.embeddings import Embedder, openai_embedder_from_settings
-from app.services.rag.models import QueryPlan, RagChunk, RetrievalHit, VectorRecord
+from app.services.rag.models import (
+    QueryPlan,
+    RagChunk,
+    RetrievalHit,
+    VectorRecord,
+    chunk_embedding_text,
+)
 from app.services.rag.pgvector_store import shared_pgvector_store
 from app.settings import get_settings
 
@@ -144,16 +150,12 @@ def _retrieve_from_records(
 def _records_from_chunks(
     chunks: tuple[RagChunk, ...], *, embedder: Embedder
 ) -> tuple[VectorRecord, ...]:
-    embeddings = embedder.embed_texts([_embedding_text(chunk) for chunk in chunks])
+    embeddings = embedder.embed_texts([chunk_embedding_text(chunk) for chunk in chunks])
 
     return tuple(
         VectorRecord(chunk=chunk, embedding=embedding)
         for chunk, embedding in zip(chunks, embeddings, strict=True)
     )
-
-
-def _embedding_text(chunk: RagChunk) -> str:
-    return f"{chunk.source_title}\n{chunk.label or ''}\n{chunk.text}".strip()
 
 
 def _tokens(text: str) -> tuple[str, ...]:
@@ -163,7 +165,7 @@ def _tokens(text: str) -> tuple[str, ...]:
 class _Bm25:
     def __init__(self, records: tuple[VectorRecord, ...]) -> None:
         self._documents = {
-            record.chunk.id: _tokens(_embedding_text(record.chunk)) for record in records
+            record.chunk.id: _tokens(chunk_embedding_text(record.chunk)) for record in records
         }
         self._doc_count = len(records)
         self._avgdl = self._average_document_length()

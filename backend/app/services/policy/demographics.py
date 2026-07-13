@@ -9,7 +9,7 @@ import re
 from collections.abc import Iterator
 from datetime import date
 
-from app.services.types import InsuredDemographics, InsuredGender, LifeStage
+from app.services.policy.models import InsuredDemographics, InsuredGender, LifeStage
 
 _MASKED_IDENTIFIER = "******-*******"
 

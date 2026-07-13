@@ -12,11 +12,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
-from app.services.parsing import parse_document
+from app.services.policy.models import ParsedDocument
+from app.services.policy.parsing import parse_document
 from app.services.rag.embeddings import Embedder, HashingEmbedder, openai_embedder_from_settings
 from app.services.rag.policy.indexing import build_policy_vector_records
 from app.services.rag.policy.models import PolicyVectorRecord
-from app.services.types import ParsedDocument
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "evaluation_dataset.json"
 _SAMPLE_DIR_ENV = "POLICY_RAG_EVAL_SAMPLE_DIR"

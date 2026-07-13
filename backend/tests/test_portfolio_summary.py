@@ -1,7 +1,7 @@
 import pytest
 
 from app.schemas.portfolio import PolicyInput
-from app.services.portfolio_summary import (
+from app.services.portfolio.summary import (
     build_portfolio_facts,
     normalize_coverage_name,
     summarize_portfolio_coverages,
@@ -496,7 +496,7 @@ def test_build_portfolio_facts_reuses_the_same_summary_contract() -> None:
 
 
 def test_counts_distinct_indemnity_coverages_duplicated_across_insurers() -> None:
-    from app.services.portfolio_summary import count_duplicate_indemnity_coverages
+    from app.services.portfolio.summary import count_duplicate_indemnity_coverages
 
     policies = [
         _policy("p1", "실손", "보험사A", [{"담보명": "실손의료비", "지급유형": "실손"}]),
@@ -511,7 +511,7 @@ def test_counts_distinct_indemnity_coverages_duplicated_across_insurers() -> Non
 
 
 def test_indemnity_held_at_single_insurer_is_not_counted_as_duplicate() -> None:
-    from app.services.portfolio_summary import count_duplicate_indemnity_coverages
+    from app.services.portfolio.summary import count_duplicate_indemnity_coverages
 
     policies = [
         _policy("p1", "실손", "보험사A", [{"담보명": "실손의료비", "지급유형": "실손"}]),

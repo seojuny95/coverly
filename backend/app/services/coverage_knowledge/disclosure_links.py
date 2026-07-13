@@ -3,10 +3,11 @@
 import json
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, Literal
 
-_DATA = Path(__file__).resolve().parent / "data" / "disclosure_links.json"
+from app.services.paths import SERVICE_DATA_DIR
+
+_DATA = SERVICE_DATA_DIR / "disclosure_links.json"
 
 DisclosureKind = Literal["life", "non_life", "integrated"]
 

@@ -13,7 +13,7 @@ import io
 
 import pdfplumber
 
-from app.services.types import ParsedDocument, Table
+from app.services.policy.models import ParsedDocument, Table
 
 
 def parse_document(pdf_bytes: bytes) -> ParsedDocument:

@@ -6,7 +6,7 @@ from pytest import MonkeyPatch
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import ConversationMessage
-from app.services.portfolio_qa import answer_portfolio_question
+from app.services.qa.service import answer_portfolio_question
 from app.services.rag.answer import RagAnswer, RagCitation
 from app.services.rag.policy import PolicyChunk, PolicyRetrievalHit
 
@@ -565,7 +565,7 @@ def test_qa_does_not_call_llm_for_deterministic_amount_questions() -> None:
 
 
 def test_qa_adds_session_policy_text_to_llm_context(monkeypatch: MonkeyPatch) -> None:
-    from app.services import portfolio_qa
+    from app.services.qa import service as portfolio_qa
 
     policy = _policies()[0]
     policy.문서세션ID = "session-1"

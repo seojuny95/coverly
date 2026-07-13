@@ -5,12 +5,12 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from app.services.policy.models import ParsedDocument
 from app.services.rag.embeddings import Embedder, openai_embedder_from_settings
 from app.services.rag.policy.models import PolicyChunk, PolicyVectorRecord
 from app.services.rag.policy.pii import mask_policy_pii
 from app.services.rag.policy.source import build_policy_source_chunks
 from app.services.rag.policy.store import PolicyRagStore, shared_policy_store
-from app.services.types import ParsedDocument
 from app.settings import get_settings
 
 

@@ -53,3 +53,10 @@ class RetrievalHit:
     score: float
     keyword_score: float
     vector_score: float
+
+
+def chunk_embedding_text(chunk: RagChunk) -> str:
+    """Canonical text representation used for both indexing and hybrid search."""
+
+    label = chunk.label or ""
+    return f"{chunk.source_title}\n{label}\n{chunk.text}".strip()

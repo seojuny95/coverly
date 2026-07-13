@@ -1,11 +1,13 @@
 """Shared grounding helpers for portfolio analysis and Q&A."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.schemas.consultation import ConsultationEvidence, InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.services.coverage_taxonomy import classify_coverage
-from app.services.portfolio_summary import PortfolioFacts
+from app.schemas.qa import AnswerCitation
+from app.services.coverage_knowledge.taxonomy import classify_coverage
+from app.services.portfolio.summary import PortfolioFacts
 from app.services.rag.policy import PolicyRetrievalHit
 
 _UNSUPPORTED_CONCLUSIONS = (
@@ -292,6 +294,30 @@ def is_safe_analysis_text(text: str) -> bool:
     if any(term in compact for term in _SALES_PUSH_TERMS):
         return False
     return not any(term in cleaned for term in _DIRECT_ACTION_TERMS)
+
+
+def filter_safe_unique_texts(
+    items: list[str],
+    *,
+    is_safe: Callable[[str], bool],
+) -> list[str]:
+    accepted: list[str] = []
+    for item in items:
+        cleaned = item.strip()
+        if not is_safe(cleaned) or cleaned in accepted:
+            continue
+        accepted.append(cleaned)
+    return accepted
+
+
+def citation_from_evidence(item: ConsultationEvidence) -> AnswerCitation:
+    return AnswerCitation(
+        evidence_id=item.id,
+        policy_id=item.policy_id,
+        insurer=item.insurer,
+        product_name=item.product_name,
+        coverage_name=item.coverage_name,
+    )
 
 
 def valid_evidence_ids(evidence_ids: list[str], catalog: EvidenceCatalog) -> tuple[str, ...] | None:

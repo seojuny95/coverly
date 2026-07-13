@@ -1,6 +1,6 @@
-from app.services import coverage_taxonomy
-from app.services.coverage_purpose import coverage_purpose
-from app.services.portfolio_consultation import is_safe_confirmed_fact
+from app.services.coverage_knowledge import taxonomy as coverage_taxonomy
+from app.services.coverage_knowledge.purpose import coverage_purpose
+from app.services.evidence.catalog import is_safe_confirmed_fact
 
 _CATEGORIES = (
     coverage_taxonomy.CANCER,

@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import ConversationMessage
-from app.services.portfolio_qa import stream_portfolio_answer
+from app.services.qa.service import stream_portfolio_answer
 from app.services.rag.answer import RagAnswer, RagCitation
 
 

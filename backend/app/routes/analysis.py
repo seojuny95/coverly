@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from app.schemas.analysis import PortfolioAnalysisRequest, PortfolioAnalysisResponse
-from app.services.portfolio_analysis import analyze_portfolio
+from app.services.analysis.service import analyze_portfolio
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 

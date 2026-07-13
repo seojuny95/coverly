@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from app.services.parsing import parse_document
-from app.services.summary import extract_policy_summary
+from app.services.policy.parsing import parse_document
+from app.services.policy.summary.service import extract_policy_summary
 from tests.summary_helpers import EXPECTED_PATH, SAMPLE_PDF_DIR, flatten_summary
 
 pytestmark = pytest.mark.skipif(

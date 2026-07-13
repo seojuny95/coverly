@@ -1,6 +1,6 @@
 """Deterministic claim-channel directory lookup (curated data, not RAG)."""
 
-from app.services.claim_channels import channels_for
+from app.services.qa.claim_channels import channels_for
 
 
 def test_channels_for_matches_insurer_by_containment() -> None:

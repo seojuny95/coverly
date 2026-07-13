@@ -1,4 +1,4 @@
-"""Thin HTTP route for non-RAG portfolio questions."""
+"""Thin HTTP route for grounded portfolio Q&A."""
 
 import json
 from collections.abc import Iterator
@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.schemas.qa import PortfolioQuestionRequest, PortfolioQuestionResponse
-from app.services.portfolio_qa import answer_portfolio_question, stream_portfolio_answer
+from app.services.qa.service import answer_portfolio_question, stream_portfolio_answer
 
 router = APIRouter(tags=["qa"])
 

@@ -15,17 +15,17 @@ from app.schemas.analysis import (
 )
 from app.schemas.consultation import Gender, GenerationMode, InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.services.coverage_purpose import coverage_purpose
-from app.services.coverage_taxonomy import LifeStageCheck, check_life_stage
-from app.services.llm import JsonCompleter
-from app.services.portfolio_analysis_generation import generate_counselor
-from app.services.portfolio_consultation import (
+from app.services.analysis.generation import generate_counselor
+from app.services.coverage_knowledge.purpose import coverage_purpose
+from app.services.coverage_knowledge.taxonomy import LifeStageCheck, check_life_stage
+from app.services.evidence.catalog import (
     EvidenceCatalog,
     build_evidence_catalog,
 )
-from app.services.portfolio_demographics import resolve_portfolio_demographics
-from app.services.portfolio_premium import summarize_premiums
-from app.services.portfolio_summary import (
+from app.services.llm import JsonCompleter
+from app.services.portfolio.demographics import resolve_portfolio_demographics
+from app.services.portfolio.premium import summarize_premiums
+from app.services.portfolio.summary import (
     PortfolioFacts,
     build_portfolio_facts,
     count_duplicate_indemnity_coverages,

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Literal
 
-from app.services.coverage_name_rules import (
+from app.services.coverage_knowledge.rules import (
     CoverageMatchingRules,
     apply_coverage_replacements,
     default_matching_rules,

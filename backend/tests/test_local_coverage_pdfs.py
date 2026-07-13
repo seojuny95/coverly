@@ -15,8 +15,8 @@ asserts verbatim limits on core coverages and name-only rider rows.
 
 import pytest
 
-from app.services.coverage import STATUS_OK, extract_coverages
-from app.services.parsing import parse_document
+from app.services.policy.coverage.service import STATUS_OK, extract_coverages
+from app.services.policy.parsing import parse_document
 from app.settings import get_settings
 from tests.summary_helpers import SAMPLE_PDF_DIR
 

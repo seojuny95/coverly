@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from app.services.parsing import parse_document
-from app.services.summary import extract_policy_summary
+from app.services.policy.parsing import parse_document
+from app.services.policy.summary.service import extract_policy_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_PDF_DIR = REPO_ROOT / "sample-insurance-input"

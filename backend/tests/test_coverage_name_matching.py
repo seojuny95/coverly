@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from app.services.coverage_name_matching import (
+from app.services.coverage_knowledge.matching import (
     canonicalize_coverage_name,
     choose_display_name,
     match_coverage_names,
     query_contains_canonical_name,
 )
-from app.services.coverage_name_rules import default_matching_rules, load_matching_rules
+from app.services.coverage_knowledge.rules import default_matching_rules, load_matching_rules
 
 
 @pytest.mark.parametrize(

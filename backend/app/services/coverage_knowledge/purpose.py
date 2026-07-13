@@ -5,7 +5,7 @@ so the copy passes is_safe_confirmed_fact (no digits, adequacy terms, money
 units, or action verbs). This is what turns "가입 사실 확인" into a reason.
 """
 
-from app.services import coverage_taxonomy
+from app.services.coverage_knowledge import taxonomy as coverage_taxonomy
 
 _PURPOSES: dict[str, str] = {
     coverage_taxonomy.CANCER: "암을 진단받은 초기에 목돈이 드는 상황에 대응하는 성격이에요.",

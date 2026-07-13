@@ -10,13 +10,17 @@ Never raises: on LLM failure the caller gets cache hits plus ok=False so the
 upload degrades to 분석상태=부분 instead of breaking.
 """
 
-import json
 from collections.abc import Callable
 from functools import lru_cache
 
 from pydantic import BaseModel, ValidationError
 
-from app.services.llm import JsonCompleter, structured_completer
+from app.services.llm import (
+    JsonCompleter,
+    compact_prompt_text,
+    dump_prompt_json,
+    structured_completer,
+)
 from app.services.rag.models import RetrievalHit
 from app.services.rag.retrieval import retrieve
 
@@ -100,7 +104,7 @@ def _user_prompt(
                         "id": hit.chunk.id,
                         "source_title": hit.chunk.source_title,
                         "citation_label": hit.chunk.citation_label,
-                        "text": _trim(hit.chunk.text),
+                        "text": compact_prompt_text(hit.chunk.text, _MAX_EXCERPT_CHARS),
                     }
                     for hit in retriever(name)
                 ],
@@ -116,16 +120,9 @@ def _user_prompt(
             ]
         },
     }
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return dump_prompt_json(payload)
 
 
 def _retrieve_official_context(name: str) -> list[RetrievalHit]:
     query = f"{name} 뜻 지급사유 면책 감액 보상하지 않는 사항"
     return retrieve(query, final_k=2)
-
-
-def _trim(text: str) -> str:
-    compact = "\n".join(line.strip() for line in text.splitlines() if line.strip())
-    if len(compact) <= _MAX_EXCERPT_CHARS:
-        return compact
-    return compact[: _MAX_EXCERPT_CHARS - 1].rstrip() + "…"

@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from app.services.classification import CLASSIFICATION_UNKNOWN, classify_policy
 from app.services.llm import JsonCompleter
+from app.services.policy.classification import CLASSIFICATION_UNKNOWN, classify_policy
 
 _RULES_PATH = (
     Path(__file__).resolve().parents[1] / "app" / "services" / "data" / "classification_rules.json"

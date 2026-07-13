@@ -5,9 +5,9 @@ from pydantic import ValidationError
 
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.services.portfolio_analysis import analyze_portfolio
-from app.services.portfolio_demographics import resolve_portfolio_demographics
-from app.services.portfolio_qa import answer_portfolio_question
+from app.services.analysis.service import analyze_portfolio
+from app.services.portfolio.demographics import resolve_portfolio_demographics
+from app.services.qa.service import answer_portfolio_question
 
 
 def _policy(

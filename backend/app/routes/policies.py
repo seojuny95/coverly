@@ -1,9 +1,11 @@
+"""HTTP boundary for single-policy parsing and uploaded-text sessions."""
+
 import asyncio
 
 from fastapi import APIRouter, UploadFile
 
 from app.errors import ApiError
-from app.services.pipeline import EmptyTextError, run_pipeline
+from app.services.policy.pipeline import EmptyTextError, run_pipeline
 from app.services.rag.policy import delete_policy_session
 
 router = APIRouter(prefix="/policies", tags=["policies"])

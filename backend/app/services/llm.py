@@ -1,4 +1,4 @@
-"""Thin OpenAI boundary shared by coverage services.
+"""Thin OpenAI boundary shared by LLM-backed services.
 
 Isolates the network call behind the JsonCompleter type so services stay
 testable — tests inject a plain function instead of hitting the API. Raises on
@@ -6,6 +6,7 @@ a missing key or API failure; callers isolate failures (the coverage pipeline
 degrades to 확인필요/부분 instead of breaking the upload).
 """
 
+import json
 from collections.abc import Callable, Iterator
 from functools import lru_cache
 from typing import Any, cast
@@ -35,6 +36,7 @@ def structured_completer(schema: type[BaseModel]) -> JsonCompleter:
         settings = get_settings()
         if not settings.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY is not configured")
+
         response = _get_client(settings.openai_api_key).responses.parse(
             model=settings.openai_model,
             input=cast(
@@ -47,6 +49,7 @@ def structured_completer(schema: type[BaseModel]) -> JsonCompleter:
             text_format=schema,
             temperature=0,
         )
+
         parsed = response.output_parsed
         return parsed.model_dump(mode="json") if parsed else {}
 
@@ -59,6 +62,7 @@ def stream_completion(system: str, user: str) -> Iterator[str]:
     settings = get_settings()
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
+
     stream = _get_client(settings.openai_api_key).chat.completions.create(
         model=settings.openai_model,
         messages=[
@@ -68,6 +72,7 @@ def stream_completion(system: str, user: str) -> Iterator[str]:
         temperature=0,
         stream=True,
     )
+
     for chunk in stream:
         delta = chunk.choices[0].delta.content if chunk.choices else None
         if delta:
@@ -78,12 +83,30 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     """Embed texts through the configured OpenAI embedding model."""
     if not texts:
         return []
+
     settings = get_settings()
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
+
     response = _get_client(settings.openai_api_key).embeddings.create(
         model=settings.openai_embedding_model,
         input=texts,
         dimensions=settings.openai_embedding_dimensions,
     )
+
     return [list(item.embedding) for item in response.data]
+
+
+def compact_prompt_text(text: str, max_chars: int) -> str:
+    """Normalize excerpt whitespace and cap prompt context with an ellipsis."""
+
+    compact = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+    if len(compact) <= max_chars:
+        return compact
+    return compact[: max_chars - 1].rstrip() + "…"
+
+
+def dump_prompt_json(payload: object) -> str:
+    """Serialize prompt payloads consistently across LLM call sites."""
+
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

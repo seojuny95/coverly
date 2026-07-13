@@ -26,19 +26,19 @@ determination of insurance category.
 import json
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel
 
 from app.services.llm import JsonCompleter, structured_completer
-from app.services.types import PolicyClassification
+from app.services.paths import SERVICE_DATA_DIR
+from app.services.policy.models import PolicyClassification
 
 CLASSIFICATION_UNKNOWN = "미분류"
 
 _HEAD_CHARS = 3_000
 
-_RULES_PATH = Path(__file__).with_name("data") / "classification_rules.json"
+_RULES_PATH = SERVICE_DATA_DIR / "classification_rules.json"
 _RAW_RULES = json.loads(_RULES_PATH.read_text(encoding="utf-8"))
 TAG_ORDER: list[str] = _RAW_RULES["tag_order"]
 

@@ -2,7 +2,7 @@
 
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.services.portfolio_summary import is_auto_policy
+from app.services.portfolio.summary import is_auto_policy
 
 
 def resolve_portfolio_demographics(

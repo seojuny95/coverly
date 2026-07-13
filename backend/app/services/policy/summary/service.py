@@ -10,19 +10,18 @@ import json
 import re
 from collections.abc import Callable
 from functools import lru_cache
-from pathlib import Path
-from typing import Any, cast
 
-from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
-from openai.types.responses import EasyInputMessageParam, ResponseTextConfigParam
+from pydantic import BaseModel, ConfigDict
 
-from app.services.classification import classify_policy
-from app.services.demographics import (
+from app.services.grounding import wording_grounded
+from app.services.llm import JsonCompleter, structured_completer
+from app.services.paths import SERVICE_DATA_DIR
+from app.services.policy.classification import classify_policy
+from app.services.policy.demographics import (
     extract_insured_demographics,
     mask_demographic_identifiers,
 )
-from app.services.grounding import wording_grounded
-from app.services.types import (
+from app.services.policy.models import (
     CoveragePeriod,
     PolicyCoreSummary,
     PolicySummary,
@@ -236,6 +235,10 @@ def _extract_labeled_value(text: str, labels: list[str]) -> str | None:
     return None
 
 
+def _first_pattern_match(patterns: list[str], text: str) -> re.Match[str] | None:
+    return next((match for pattern in patterns if (match := re.search(pattern, text))), None)
+
+
 def _extract_insurer_name(text: str) -> str | None:
     return _extract_labeled_value(text, _INSURER_LABELS)
 
@@ -358,77 +361,84 @@ def _extract_policy_number(text: str) -> str | None:
 
 
 def _extract_policy_holder(text: str) -> str | None:
-    lines = _normalized_lines(text)
-    for pattern in _POLICY_HOLDER_EXTRACTION_PATTERNS:
-        match = re.search(pattern, text)
-        if match:
-            candidate = _clean_value(match.group(1))
-            if _valid_person_name(candidate):
-                return candidate.split("(")[0].strip()
-
-    for index, line in enumerate(lines):
-        if line not in {"보험계약자", "계약자", "◆ 계약자"}:
-            continue
-        for offset in range(1, 3):
-            next_index = index + offset
-            if next_index >= len(lines):
-                break
-            candidate = _clean_value(lines[next_index])
-            if _valid_person_name(candidate):
-                return candidate.split("(")[0].strip()
-
-    inline_value = _extract_between_markers(
+    return _extract_person_name(
         text,
-        ["계약자"],
-        ["보험기간", "증권번호", "피보험자", "계약사항", "만기보험금수익자"],
+        patterns=_POLICY_HOLDER_EXTRACTION_PATTERNS,
+        exact_labels={"보험계약자", "계약자", "◆ 계약자"},
+        inline_start_labels=["계약자"],
+        inline_end_labels=["보험기간", "증권번호", "피보험자", "계약사항", "만기보험금수익자"],
+        value_labels=_POLICY_HOLDER_LABELS,
     )
-    if inline_value:
-        holder_match = re.match(rf"({_PERSON_NAME_VALUE_PATTERN})", inline_value)
-        if holder_match and _valid_person_name(holder_match.group(1)):
-            return holder_match.group(1)
-
-    labeled_value = _extract_labeled_value(text, _POLICY_HOLDER_LABELS)
-    if labeled_value and _valid_person_name(labeled_value):
-        return labeled_value.split("(")[0].strip()
-
-    return None
 
 
 def _extract_insured_person(text: str) -> str | None:
+    return _extract_person_name(
+        text,
+        patterns=_INSURED_PERSON_EXTRACTION_PATTERNS,
+        exact_labels={"기명피보험자", "피보험자성명", "(주)피보험자", "피보험자"},
+        inline_start_labels=_INSURED_PERSON_LABELS,
+        inline_end_labels=[
+            "판매플랜",
+            "상해급수",
+            "직업/직무",
+            "운행차량",
+            "보험기간",
+            "가입담보",
+            "증권번호",
+        ],
+        value_labels=_INSURED_PERSON_LABELS,
+    )
+
+
+def _extract_person_name(
+    text: str,
+    *,
+    patterns: list[str],
+    exact_labels: set[str],
+    inline_start_labels: list[str],
+    inline_end_labels: list[str],
+    value_labels: list[str],
+) -> str | None:
     lines = _normalized_lines(text)
-    for pattern in _INSURED_PERSON_EXTRACTION_PATTERNS:
+    for pattern in patterns:
         match = re.search(pattern, text)
         if match:
             candidate = _clean_value(match.group(1))
-            if _valid_person_name(candidate):
-                return candidate.split("(")[0].strip()
+            normalized = _normalize_person_name(candidate)
+            if normalized:
+                return normalized
 
     for index, line in enumerate(lines):
-        if line not in {"기명피보험자", "피보험자성명", "(주)피보험자", "피보험자"}:
+        if line not in exact_labels:
             continue
         for offset in range(1, 3):
             next_index = index + offset
             if next_index >= len(lines):
                 break
             candidate = _clean_value(lines[next_index])
-            if _valid_person_name(candidate):
-                return candidate.split("(")[0].strip()
+            normalized = _normalize_person_name(candidate)
+            if normalized:
+                return normalized
 
     inline_value = _extract_between_markers(
         text,
-        _INSURED_PERSON_LABELS,
-        ["판매플랜", "상해급수", "직업/직무", "운행차량", "보험기간", "가입담보", "증권번호"],
+        inline_start_labels,
+        inline_end_labels,
     )
     if inline_value:
-        insured_match = re.match(rf"({_PERSON_NAME_VALUE_PATTERN})", inline_value)
-        if insured_match and _valid_person_name(insured_match.group(1)):
-            return insured_match.group(1)
+        inline_match = re.match(rf"({_PERSON_NAME_VALUE_PATTERN})", inline_value)
+        if inline_match and _valid_person_name(inline_match.group(1)):
+            return inline_match.group(1)
 
-    labeled_value = _extract_labeled_value(text, _INSURED_PERSON_LABELS)
-    if labeled_value and _valid_person_name(labeled_value):
-        return labeled_value.split("(")[0].strip()
+    labeled_value = _extract_labeled_value(text, value_labels)
+    if labeled_value:
+        return _normalize_person_name(labeled_value)
 
     return None
+
+
+def _normalize_person_name(candidate: str) -> str | None:
+    return candidate.split("(")[0].strip() if _valid_person_name(candidate) else None
 
 
 def _normalize_date(value: str) -> str | None:
@@ -518,8 +528,7 @@ def _extract_premium(text: str) -> PremiumSummary | None:
             "납입주기": match.group(2),
         }
 
-    candidates = [re.search(pattern, text) for pattern in _PREMIUM_AMOUNT_PATTERNS]
-    amount_match = next((match for match in candidates if match), None)
+    amount_match = _first_pattern_match(_PREMIUM_AMOUNT_PATTERNS, text)
     if not amount_match:
         raw_value = _extract_labeled_value(text, ["보험료", "월보험료", "납입보험료"])
         if not raw_value:
@@ -559,10 +568,9 @@ def _extract_payment_cycle(value: str) -> str:
 
 
 def _extract_payment_period(text: str) -> str | None:
-    for pattern in _PAYMENT_PERIOD_PATTERNS:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1)
+    match = _first_pattern_match(_PAYMENT_PERIOD_PATTERNS, text)
+    if match:
+        return match.group(1)
 
     collapsed = " ".join(_normalized_lines(text))
     contract_terms = _extract_between_markers(
@@ -573,10 +581,9 @@ def _extract_payment_period(text: str) -> str | None:
     if not contract_terms:
         return None
 
-    for pattern in _PAYMENT_PERIOD_PATTERNS:
-        match = re.search(pattern, contract_terms)
-        if match:
-            return match.group(1)
+    match = _first_pattern_match(_PAYMENT_PERIOD_PATTERNS, contract_terms)
+    if match:
+        return match.group(1)
 
     return None
 
@@ -591,12 +598,8 @@ def _extract_maturity_date(coverage_period: CoveragePeriod | None) -> str | None
 # LLM extraction
 # --------------------------------------------------------------------------
 
-JsonObject = dict[str, Any]
-
 _MAX_INPUT_CHARS = 30_000
-_INSURER_CATALOG_PATH = Path(__file__).with_name("data") / "insurer_catalog.json"
-_STRING_OR_NULL_SCHEMA: JsonObject = {"type": ["string", "null"]}
-_INTEGER_OR_NULL_SCHEMA: JsonObject = {"type": ["integer", "null"]}
+_INSURER_CATALOG_PATH = SERVICE_DATA_DIR / "insurer_catalog.json"
 _SUMMARY_STRING_FIELDS = (
     "보험사",
     "상품명",
@@ -606,18 +609,6 @@ _SUMMARY_STRING_FIELDS = (
     "만기일",
     "납입기간",
 )
-_SUMMARY_REQUIRED_FIELDS = [
-    "보험사",
-    "상품명",
-    "증권번호",
-    "계약자",
-    "피보험자",
-    "보험기간",
-    "만기일",
-    "납입기간",
-    "보험료",
-    "차량정보",
-]
 _SYSTEM_PROMPT = (
     "너는 한국 보험증권 PDF에서 표시용 핵심 필드만 추출한다. "
     "보험사는 보험계약을 인수하거나 증권을 발행한 보험회사명이다. "
@@ -627,6 +618,43 @@ _SYSTEM_PROMPT = (
     "홈페이지 주소, 콜센터 안내 등)를 후보 목록과 연결해 판단하라. "
     "그래도 어느 후보인지 확인할 수 없으면 null로 둔다."
 )
+
+
+class _LlmCoveragePeriod(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    시작일: str | None
+    종료일: str | None
+
+
+class _LlmPremium(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    금액: int | None
+    납입주기: str | None
+
+
+class _LlmVehicleInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    차량명: str | None
+    차량번호: str | None
+    연식: str | None
+
+
+class _LlmPolicySummaryExtraction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    보험사: str | None
+    상품명: str | None
+    증권번호: str | None
+    계약자: str | None
+    피보험자: str | None
+    보험기간: _LlmCoveragePeriod | None
+    만기일: str | None
+    납입기간: str | None
+    보험료: _LlmPremium | None
+    차량정보: _LlmVehicleInfo | None
 
 
 @lru_cache
@@ -642,174 +670,46 @@ def get_insurer_candidates() -> tuple[str, ...]:
     return candidates
 
 
-@lru_cache
-def _get_openai_client(api_key: str) -> OpenAI:
-    return OpenAI(api_key=api_key)
-
-
 def extract_policy_summary_with_llm(text: str) -> LlmPolicySummary | None:
     settings = get_settings()
     if not settings.openai_api_key:
         return None
 
     insurer_candidates = get_insurer_candidates()
-    response_text = _request_summary_text(
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-        response_format=_build_response_format(insurer_candidates),
-        messages=_build_messages(text, insurer_candidates),
-    )
-    if response_text is None:
-        return None
-
-    raw_summary = _parse_json_object(response_text)
-    if raw_summary is None:
+    try:
+        raw_summary = _default_summary_completer()(
+            _SYSTEM_PROMPT,
+            _summary_user_prompt(text, insurer_candidates),
+        )
+    except Exception:
         return None
 
     return _coerce_policy_summary(raw_summary, insurer_candidates)
 
 
-def _build_messages(text: str, insurer_candidates: tuple[str, ...]) -> list[EasyInputMessageParam]:
+@lru_cache
+def _default_summary_completer() -> JsonCompleter:
+    return structured_completer(_LlmPolicySummaryExtraction)
+
+
+def _summary_user_prompt(text: str, insurer_candidates: tuple[str, ...]) -> str:
     insurer_list = "\n".join(f"- {insurer}" for insurer in insurer_candidates)
     truncated_text = text[:_MAX_INPUT_CHARS]
 
-    return [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": (
-                "다음 텍스트에서 보험사, 상품명, 증권번호, 계약자, 피보험자, "
-                "보험기간, 만기일, 납입기간, 보험료를 추출해.\n"
-                "보험사 후보 목록:\n"
-                f"{insurer_list}\n\n"
-                "보험사에는 후보 목록에 없는 상품명이나 브랜드명을 넣지 마. "
-                "후보 목록의 실제 보험회사와 명확히 연결되는 경우에만 후보명을 선택해.\n\n"
-                "차량정보(차량명·차량번호·연식)도 추출해. 자동차보험이 아니면 null로 둬.\n\n"
-                f"{truncated_text}"
-            ),
-        },
-    ]
-
-
-def _build_response_format(insurer_candidates: tuple[str, ...]) -> JsonObject:
-    return {
-        "format": {
-            "type": "json_schema",
-            "name": "policy_summary_extraction",
-            "strict": True,
-            "schema": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "보험사": {
-                        "type": ["string", "null"],
-                        "enum": [*insurer_candidates, None],
-                    },
-                    "상품명": _STRING_OR_NULL_SCHEMA,
-                    "증권번호": _STRING_OR_NULL_SCHEMA,
-                    "계약자": _STRING_OR_NULL_SCHEMA,
-                    "피보험자": _STRING_OR_NULL_SCHEMA,
-                    "보험기간": _build_coverage_period_schema(),
-                    "만기일": _STRING_OR_NULL_SCHEMA,
-                    "납입기간": _STRING_OR_NULL_SCHEMA,
-                    "보험료": _build_premium_schema(),
-                    "차량정보": _build_vehicle_info_schema(),
-                },
-                "required": _SUMMARY_REQUIRED_FIELDS,
-            },
-        }
-    }
-
-
-def _build_coverage_period_schema() -> JsonObject:
-    return {
-        "type": ["object", "null"],
-        "additionalProperties": False,
-        "properties": {
-            "시작일": _STRING_OR_NULL_SCHEMA,
-            "종료일": _STRING_OR_NULL_SCHEMA,
-        },
-        "required": ["시작일", "종료일"],
-    }
-
-
-def _build_premium_schema() -> JsonObject:
-    return {
-        "type": ["object", "null"],
-        "additionalProperties": False,
-        "properties": {
-            "금액": _INTEGER_OR_NULL_SCHEMA,
-            "납입주기": _STRING_OR_NULL_SCHEMA,
-        },
-        "required": ["금액", "납입주기"],
-    }
-
-
-def _build_vehicle_info_schema() -> JsonObject:
-    return {
-        "type": ["object", "null"],
-        "additionalProperties": False,
-        "properties": {
-            "차량명": _STRING_OR_NULL_SCHEMA,
-            "차량번호": _STRING_OR_NULL_SCHEMA,
-            "연식": _STRING_OR_NULL_SCHEMA,
-        },
-        "required": ["차량명", "차량번호", "연식"],
-    }
-
-
-def _request_summary_text(
-    *,
-    api_key: str,
-    model: str,
-    response_format: JsonObject,
-    messages: list[EasyInputMessageParam],
-) -> str | None:
-    client = _get_openai_client(api_key)
-
-    try:
-        response = client.responses.create(
-            model=model,
-            input=cast(Any, messages),
-            text=cast(ResponseTextConfigParam, response_format),
-            temperature=0,
-        )
-    except (APIConnectionError, APIStatusError, APITimeoutError):
-        return None
-
-    response_text = response.output_text
-    if not isinstance(response_text, str):
-        return None
-
-    normalized = response_text.strip()
-    return normalized or None
-
-
-def _parse_json_object(value: str) -> JsonObject | None:
-    try:
-        parsed = json.loads(_strip_json_code_fence(value))
-    except json.JSONDecodeError:
-        return None
-
-    return parsed if isinstance(parsed, dict) else None
-
-
-def _strip_json_code_fence(value: str) -> str:
-    stripped = value.strip()
-    if not stripped.startswith("```"):
-        return stripped
-
-    lines = stripped.splitlines()
-    if lines and lines[0].startswith("```"):
-        lines = lines[1:]
-    if lines and lines[-1].strip() == "```":
-        lines = lines[:-1]
-
-    return "\n".join(lines).strip()
+    return (
+        "다음 텍스트에서 보험사, 상품명, 증권번호, 계약자, 피보험자, "
+        "보험기간, 만기일, 납입기간, 보험료를 추출해.\n"
+        "보험사 후보 목록:\n"
+        f"{insurer_list}\n\n"
+        "보험사에는 후보 목록에 없는 상품명이나 브랜드명을 넣지 마. "
+        "후보 목록의 실제 보험회사와 명확히 연결되는 경우에만 후보명을 선택해.\n\n"
+        "차량정보(차량명·차량번호·연식)도 추출해. 자동차보험이 아니면 null로 둬.\n\n"
+        f"{truncated_text}"
+    )
 
 
 def _coerce_policy_summary(
-    raw_summary: JsonObject,
+    raw_summary: dict[str, object],
     insurer_candidates: tuple[str, ...],
 ) -> LlmPolicySummary:
     summary: LlmPolicySummary = {}

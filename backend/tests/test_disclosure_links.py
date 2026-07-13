@@ -1,4 +1,4 @@
-from app.services.disclosure_links import disclosure_links_for_insurer
+from app.services.coverage_knowledge.disclosure_links import disclosure_links_for_insurer
 
 
 def test_disclosure_links_route_life_and_non_life_insurers_to_association_portals() -> None:

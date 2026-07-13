@@ -18,7 +18,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run p
 
 ## Project Structure
 
-`app/services/`는 도메인이 아니라 **파이프라인 단계 = 파일**로 나눈다. 증권 1건 파싱 계열과 여러 건을 묶는 포트폴리오 계열로 구성된다.
+`app/services/`는 런타임 파이프라인과 의존 방향이 드러나도록 나눈다. 상위 use case(`analysis`, `qa`)는 하위 사실 계층(`policy`, `portfolio`, `evidence`, `coverage_knowledge`, `rag`)을 사용하지만, 하위 계층은 상위 use case를 import하지 않는다. 새 코드는 아래 패키지 경로를 직접 import한다.
 
 ```text
 app/
@@ -30,29 +30,43 @@ app/
 │   ├── analysis.py        # POST /portfolio/analysis — 상담 전 검토
 │   └── qa.py              # POST /qa — 근거 기반 Q&A
 └── services/
-    # 증권 1건 파싱 파이프라인
-    ├── types.py           # ParsedDocument, Coverage, PolicySummary 등 도메인 타입
-    ├── parsing.py         # pdfplumber 1회 파싱 → ParsedDocument
-    ├── classification.py  # 보험종류 분류 (공식 종목 매핑 + LLM fallback)
-    ├── summary.py         # 기본정보 (regex 로컬 + LLM 보완)
+    ├── llm.py             # OpenAI 경계: structured/text/stream completion
     ├── grounding.py       # 금액·문구 anti-hallucination (공유)
-    ├── coverage.py        # 담보 추출 (표 선택 → LLM 정규화 → grounding)
-    ├── explain.py         # 보장내용 없는 담보의 일반 해설
-    ├── pipeline.py        # 오케스트레이터: parse → classify+summary → coverage
-    ├── coverage_taxonomy.py / coverage_name_matching.py / coverage_name_rules.py
-    │                       # 담보명 정규화·대분류·교차 매칭 (합산/중복 판정 근거)
-    ├── demographics.py     # 피보험자 나이·성별·생애단계 추출
-    # 여러 증권을 묶는 포트폴리오 계열
-    ├── portfolio_summary.py       # 보장 합산·실손/중복 구분
-    ├── portfolio_analysis.py      # 상담 전 검토 집계 (강점·공백·금액검토)
-    ├── portfolio_analysis_generation.py / portfolio_consultation.py
-    │                               # 상담사 관점 생성 (LLM + fallback)
-    ├── portfolio_demographics.py  # 포트폴리오 단위 인구정보 판정
-    ├── portfolio_qa.py / portfolio_qa_generation.py  # Q&A 근거 수집 + 답변 생성
-    ├── llm.py             # OpenAI 경계
-    └── data/              # insurer_catalog.json, classification_rules.json,
-                           # coverage_matching_rules.json
+    ├── paths.py           # services/data 공통 경로
+    ├── data/              # insurer_catalog.json, classification_rules.json 등
+    ├── policy/            # 증권 1건 처리
+    │   ├── models.py      # ParsedDocument, Coverage, PolicySummary 등 타입
+    │   ├── parsing.py     # pdfplumber 1회 파싱 → ParsedDocument
+    │   ├── classification.py  # 보험종류 분류 (규칙 + LLM fallback)
+    │   ├── demographics.py    # 피보험자 나이·성별·생애단계 추출
+    │   ├── pipeline.py        # parse → summary/classification → coverage
+    │   ├── summary/service.py # 기본정보 (regex 로컬 + LLM 보완)
+    │   └── coverage/
+    │       ├── service.py     # 담보 추출 (표 선택 → LLM 정규화 → grounding)
+    │       └── explanation.py # 보장내용 없는 담보의 약관/RAG 기반 해설
+    ├── coverage_knowledge/
+    │   ├── taxonomy.py        # 담보 대분류·생애단계 체크
+    │   ├── matching.py        # 담보명 정규화·교차 매칭
+    │   ├── rules.py           # coverage_matching_rules.json 로딩/검증
+    │   ├── purpose.py         # 담보 목적 설명
+    │   └── disclosure_links.py
+    ├── portfolio/             # 여러 증권의 결정적 사실 집계
+    │   ├── summary.py         # 보장 합산·실손/중복·제외 사유
+    │   ├── premium.py         # 보험료 집계
+    │   └── demographics.py    # 포트폴리오 단위 인구정보 판정
+    ├── evidence/
+    │   └── catalog.py         # 분석/Q&A 공용 근거 카탈로그·안전 필터
+    ├── analysis/
+    │   ├── service.py         # POST /portfolio/analysis use case
+    │   └── generation.py      # 상담사 관점 LLM 생성 + fallback 검증
+    ├── qa/
+    │   ├── service.py         # POST /qa use case
+    │   ├── generation.py      # Q&A LLM 생성/streaming
+    │   └── claim_channels.py  # 청구 채널 결정적 안내
+    └── rag/                   # 공식 약관/제도 RAG + 업로드 세션 RAG
 ```
+
+의존 방향은 `routes -> policy/portfolio/analysis/qa`, `analysis/qa -> portfolio/evidence/coverage_knowledge/rag/llm`, `portfolio -> policy models/coverage_knowledge`, `policy -> llm/grounding/rag` 순서다. `analysis`와 `qa`는 서로 import하지 않고, 공통 판단은 `portfolio`, `evidence`, `coverage_knowledge`로 내려서 공유한다.
 
 전역 원칙(내 편·판매원 아님, grounding)은 [../AGENTS.md](../AGENTS.md)에 있고, 아래는 백엔드에서 그걸 강제하는 규칙이다.
 
@@ -85,4 +99,3 @@ app/
 
 - Python 버전은 `.python-version`의 3.12를 따른다.
 - 시크릿과 실제 증권 원본은 커밋하지 않는다.
-

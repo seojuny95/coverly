@@ -1,5 +1,5 @@
 from app.schemas.portfolio import PolicyInput
-from app.services.portfolio_premium import summarize_premiums
+from app.services.portfolio.premium import summarize_premiums
 
 
 def _policy(policy_id: str, premium: dict[str, object] | None) -> PolicyInput:

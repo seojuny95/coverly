@@ -4,7 +4,6 @@ from collections.abc import Callable, Iterator
 
 from app.schemas.consultation import (
     AnswerSection,
-    ConsultationEvidence,
     InsuredDemographics,
 )
 from app.schemas.portfolio import PolicyInput
@@ -13,28 +12,29 @@ from app.schemas.qa import (
     ConversationMessage,
     PortfolioQuestionResponse,
 )
-from app.services.claim_channels import claim_channel_block
-from app.services.coverage_name_matching import (
+from app.services.coverage_knowledge.matching import (
     canonicalize_coverage_name,
     query_contains_canonical_name,
 )
-from app.services.coverage_taxonomy import LifeStageCheck, check_life_stage
-from app.services.llm import JsonCompleter, TextStreamer
-from app.services.portfolio_consultation import (
+from app.services.coverage_knowledge.taxonomy import LifeStageCheck, check_life_stage
+from app.services.evidence.catalog import (
     EvidenceCatalog,
     build_evidence_catalog,
+    citation_from_evidence,
     with_session_evidence,
 )
-from app.services.portfolio_demographics import resolve_portfolio_demographics
-from app.services.portfolio_qa_generation import (
-    QaStreamEvent,
-    generate_consultation_answer,
-    stream_consultation_answer,
-)
-from app.services.portfolio_summary import (
+from app.services.llm import JsonCompleter, TextStreamer
+from app.services.portfolio.demographics import resolve_portfolio_demographics
+from app.services.portfolio.summary import (
     PortfolioFacts,
     build_portfolio_facts,
     is_auto_policy,
+)
+from app.services.qa.claim_channels import claim_channel_block
+from app.services.qa.generation import (
+    QaStreamEvent,
+    generate_consultation_answer,
+    stream_consultation_answer,
 )
 from app.services.rag.answer import RagAnswer, RagCitation, answer_official_question
 from app.services.rag.policy import retrieve_policy_context
@@ -461,7 +461,7 @@ def _fact_response(
         answer=content,
         sections=[section],
         citations=[
-            _citation(catalog.by_id[evidence_id])
+            citation_from_evidence(catalog.by_id[evidence_id])
             for evidence_id in dict.fromkeys(evidence_ids)
             if evidence_id in catalog.by_id
         ],
@@ -515,7 +515,7 @@ def _consultation_fallback(
         answer="\n\n".join(f"{section.title}\n{section.content}" for section in sections),
         sections=sections,
         citations=[
-            _citation(catalog.by_id[evidence_id])
+            citation_from_evidence(catalog.by_id[evidence_id])
             for evidence_id in dict.fromkeys(evidence_ids)
             if evidence_id in catalog.by_id
         ],
@@ -573,16 +573,6 @@ def _life_stage_check(demographics: InsuredDemographics, facts: PortfolioFacts) 
 
 def _is_overall_amount_question(question: str) -> bool:
     return any(term in question for term in ("전체", "총합", "모든", "총액"))
-
-
-def _citation(item: ConsultationEvidence) -> AnswerCitation:
-    return AnswerCitation(
-        evidence_id=item.id,
-        policy_id=item.policy_id,
-        insurer=item.insurer,
-        product_name=item.product_name,
-        coverage_name=item.coverage_name,
-    )
 
 
 def _demographic_notice(demographics: InsuredDemographics) -> str | None:

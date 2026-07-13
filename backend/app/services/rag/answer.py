@@ -10,13 +10,17 @@ The answer flow stays intentionally small:
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.services.llm import JsonCompleter, structured_completer
+from app.services.llm import (
+    JsonCompleter,
+    compact_prompt_text,
+    dump_prompt_json,
+    structured_completer,
+)
 from app.services.rag.models import RagChunk, RetrievalHit
 from app.services.rag.retrieval import retrieve
 
@@ -151,7 +155,7 @@ def _user_prompt(question: str, hits: list[RetrievalHit]) -> str:
                 "source_title": hit.chunk.source_title,
                 "citation_label": hit.chunk.citation_label,
                 "version": hit.chunk.version_label,
-                "text": _trim(hit.chunk.text),
+                "text": compact_prompt_text(hit.chunk.text, _MAX_CONTEXT_CHARS),
             }
             for hit in hits
         ],
@@ -161,14 +165,7 @@ def _user_prompt(question: str, hits: list[RetrievalHit]) -> str:
             "missing_context": ["개별 판단에 추가로 필요한 정보"],
         },
     }
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-
-
-def _trim(text: str) -> str:
-    compact = "\n".join(line.strip() for line in text.splitlines() if line.strip())
-    if len(compact) <= _MAX_CONTEXT_CHARS:
-        return compact
-    return compact[: _MAX_CONTEXT_CHARS - 1].rstrip() + "…"
+    return dump_prompt_json(payload)
 
 
 def _valid_citation_ids(ids: list[str], hits: list[RetrievalHit]) -> list[str]:

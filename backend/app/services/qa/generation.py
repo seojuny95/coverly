@@ -1,13 +1,11 @@
 """LLM generation and filtering for conversational portfolio Q&A."""
 
-import json
 from collections.abc import Iterator
 
 from pydantic import BaseModel, Field
 
 from app.schemas.consultation import (
     AnswerSection,
-    ConsultationEvidence,
     InsuredDemographics,
 )
 from app.schemas.qa import (
@@ -15,19 +13,27 @@ from app.schemas.qa import (
     ConversationMessage,
     PortfolioQuestionResponse,
 )
-from app.services.claim_channels import claim_channel_block
-from app.services.coverage_name_matching import (
+from app.services.coverage_knowledge.matching import (
     canonicalize_coverage_name,
     query_contains_canonical_name,
 )
-from app.services.coverage_taxonomy import LifeStageCheck
-from app.services.demographics import mask_demographic_identifiers
-from app.services.llm import JsonCompleter, TextStreamer, stream_completion, structured_completer
-from app.services.portfolio_consultation import (
+from app.services.coverage_knowledge.taxonomy import LifeStageCheck
+from app.services.evidence.catalog import (
     EvidenceCatalog,
+    citation_from_evidence,
+    filter_safe_unique_texts,
     is_safe_analysis_text,
     valid_evidence_ids,
 )
+from app.services.llm import (
+    JsonCompleter,
+    TextStreamer,
+    dump_prompt_json,
+    stream_completion,
+    structured_completer,
+)
+from app.services.policy.demographics import mask_demographic_identifiers
+from app.services.qa.claim_channels import claim_channel_block
 
 _MAX_HISTORY_MESSAGES = 12
 
@@ -118,12 +124,14 @@ def generate_consultation_answer(
     if guidance and not is_safe_analysis_text(guidance):
         guidance = ""
 
-    suggestions = [
-        item.strip() for item in draft.suggestions if is_safe_analysis_text(item.strip())
-    ]
-    limitations = [
-        item.strip() for item in draft.limitations if is_safe_analysis_text(item.strip())
-    ]
+    suggestions = filter_safe_unique_texts(
+        draft.suggestions,
+        is_safe=is_safe_analysis_text,
+    )
+    limitations = filter_safe_unique_texts(
+        draft.limitations,
+        is_safe=is_safe_analysis_text,
+    )
     limitations.extend(standard_limitations)
     confirmed_content = " · ".join(catalog.by_id[evidence_id].fact for evidence_id in evidence_ids)
     sections = [
@@ -145,9 +153,11 @@ def generate_consultation_answer(
         status="answered",
         answer="\n\n".join(f"{section.title}\n{section.content}" for section in sections),
         sections=sections,
-        citations=[_citation(catalog.by_id[evidence_id]) for evidence_id in evidence_ids],
+        citations=[
+            citation_from_evidence(catalog.by_id[evidence_id]) for evidence_id in evidence_ids
+        ],
         limitations=list(dict.fromkeys(limitations)),
-        suggestions=list(dict.fromkeys(suggestions)),
+        suggestions=suggestions,
         generation="llm",
     )
 
@@ -205,7 +215,7 @@ def _user_prompt(
         ],
         **_grounding_context(demographics, life_stage_check, catalog),
     }
-    serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    serialized = dump_prompt_json(payload)
     return mask_demographic_identifiers(serialized)
 
 
@@ -224,7 +234,7 @@ def _stream_user_prompt(
     """
 
     context = _grounding_context(demographics, life_stage_check, catalog)
-    sections = [f"[내 보험 근거]\n{json.dumps(context, ensure_ascii=False, separators=(',', ':'))}"]
+    sections = [f"[내 보험 근거]\n{dump_prompt_json(context)}"]
 
     recent = history[-_MAX_HISTORY_MESSAGES:]
     if recent:
@@ -236,16 +246,6 @@ def _stream_user_prompt(
 
     sections.append(f"[지금 답할 질문]\n{question}")
     return mask_demographic_identifiers("\n\n".join(sections))
-
-
-def _citation(item: ConsultationEvidence) -> AnswerCitation:
-    return AnswerCitation(
-        evidence_id=item.id,
-        policy_id=item.policy_id,
-        insurer=item.insurer,
-        product_name=item.product_name,
-        coverage_name=item.coverage_name,
-    )
 
 
 def _stream_system_prompt() -> str:
@@ -320,7 +320,7 @@ def _relevant_citations(answer: str, catalog: EvidenceCatalog) -> list[AnswerCit
         normalized = canonicalize_coverage_name(base_name).normalized_key
         if query_contains_canonical_name(answer, normalized):
             seen.add(item.id)
-            cited.append(_citation(item))
+            cited.append(citation_from_evidence(item))
     return cited
 
 

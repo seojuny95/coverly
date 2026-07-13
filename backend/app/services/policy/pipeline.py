@@ -12,11 +12,11 @@ coverage failures degrade to 부분 inside extract_coverages.
 from collections.abc import Callable
 from typing import NotRequired, TypedDict
 
-from app.services.coverage import extract_coverages
-from app.services.parsing import parse_document
+from app.services.policy.coverage.service import extract_coverages
+from app.services.policy.models import Coverage, ParsedDocument, PolicySummary
+from app.services.policy.parsing import parse_document
+from app.services.policy.summary.service import extract_policy_summary
 from app.services.rag.policy import index_policy_document
-from app.services.summary import extract_policy_summary
-from app.services.types import Coverage, ParsedDocument, PolicySummary
 
 
 class PipelineResult(TypedDict):

@@ -8,16 +8,16 @@ they exercise pdfplumber table detection on real documents, not synthetic rows.
 
 import pytest
 
-from app.services import coverage as coverage_module
-from app.services.coverage import (
+from app.services.policy.coverage import service as coverage_module
+from app.services.policy.coverage.service import (
     STATUS_OK,
     STATUS_PARTIAL,
     build_coverage_source,
     extract_coverages,
     normalize_coverages,
 )
-from app.services.parsing import parse_document
-from app.services.types import Coverage, ParsedDocument, Table
+from app.services.policy.models import Coverage, ParsedDocument, Table
+from app.services.policy.parsing import parse_document
 from tests.summary_helpers import SAMPLE_PDF_DIR
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
-_RULES_PATH = Path(__file__).with_name("data") / "coverage_matching_rules.json"
+from app.services.paths import SERVICE_DATA_DIR
+
+_RULES_PATH = SERVICE_DATA_DIR / "coverage_matching_rules.json"
 _FORMATTING_PATTERN = re.compile(r"[^0-9A-Za-z가-힣%~]")
 _SPACES_PATTERN = re.compile(r"\s+")
 

@@ -1,4 +1,4 @@
-from app.services.types import Coverage, ParsedDocument, Table
+from app.services.policy.models import Coverage, ParsedDocument, Table
 
 
 def test_parsed_document_is_frozen_and_carries_text_and_tables() -> None:
@@ -41,7 +41,7 @@ def test_coverage_optional_type_field() -> None:
 
 
 def test_vehicle_info_shape() -> None:
-    from app.services.types import PolicyCoreSummary, VehicleInfo
+    from app.services.policy.models import PolicyCoreSummary, VehicleInfo
 
     vehicle: VehicleInfo = {"차량명": "아이오닉5", "차량번호": "TEST-PLATE-001", "연식": "2024"}
     summary: PolicyCoreSummary = {"차량정보": vehicle}
