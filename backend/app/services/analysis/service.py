@@ -30,8 +30,8 @@ from app.services.portfolio.summary import (
     build_portfolio_facts,
     count_duplicate_indemnity_coverages,
 )
-from app.services.rag.models import RetrievalHit
-from app.services.rag.retrieval import retrieve
+from app.services.rag.official.models import RetrievalHit
+from app.services.rag.official.retrieval import retrieve
 
 _UNCLASSIFIED = "미분류"
 

@@ -21,8 +21,8 @@ from app.services.llm import (
     dump_prompt_json,
     structured_completer,
 )
-from app.services.rag.models import RetrievalHit
-from app.services.rag.retrieval import retrieve
+from app.services.rag.official.models import RetrievalHit
+from app.services.rag.official.retrieval import retrieve
 
 _SYSTEM = (
     "너는 사용자가 이미 가진 보험의 담보를 이해하도록 돕는 상담사다. "

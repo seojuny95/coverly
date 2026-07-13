@@ -20,11 +20,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.services.rag.embeddings import HashingEmbedder
-from app.services.rag.loaders import load_official_chunks
-from app.services.rag.models import RagChunk, RetrievalHit
-from app.services.rag.retrieval import retrieve
+from app.services.rag.official.loaders import load_official_chunks
+from app.services.rag.official.models import RagChunk, RetrievalHit
+from app.services.rag.official.retrieval import retrieve
 
-EVAL_FIXTURE = Path(__file__).resolve().parent / "retrieval_eval.json"
+EVAL_FIXTURE = Path(__file__).resolve().parent / "retrieval_dataset.json"
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,8 @@ class RetrievalEvalCase:
 class RetrievalEvalResult:
     case_id: str
     passed: bool
+    rank: int | None
+    source_precision: float
     hit_source_ids: tuple[str, ...]
     missing_source_ids: tuple[str, ...]
     missing_terms: tuple[str, ...]
@@ -48,6 +50,8 @@ class RetrievalEvalResult:
 class RetrievalEvalReport:
     passed: int
     total: int
+    reciprocal_rank_sum: float
+    source_precision_sum: float
     results: tuple[RetrievalEvalResult, ...]
 
     @property
@@ -56,6 +60,20 @@ class RetrievalEvalReport:
             return 0.0
 
         return self.passed / self.total
+
+    @property
+    def mrr(self) -> float:
+        if self.total == 0:
+            return 0.0
+
+        return self.reciprocal_rank_sum / self.total
+
+    @property
+    def source_precision(self) -> float:
+        if self.total == 0:
+            return 0.0
+
+        return self.source_precision_sum / self.total
 
 
 def load_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[RetrievalEvalCase, ...]:
@@ -87,6 +105,8 @@ def evaluate_retrieval(
     return RetrievalEvalReport(
         passed=sum(1 for result in results if result.passed),
         total=len(results),
+        reciprocal_rank_sum=sum(1 / result.rank for result in results if result.rank is not None),
+        source_precision_sum=sum(result.source_precision for result in results),
         results=results,
     )
 
@@ -106,11 +126,33 @@ def _evaluate_case(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> Retriev
         source_id for source_id in case.expected_source_ids if source_id not in hit_source_ids
     )
     missing_terms = tuple(term for term in case.expected_terms if term not in rendered)
+    rank = _first_passing_rank(case, hits)
 
     return RetrievalEvalResult(
         case_id=case.id,
-        passed=not missing_source_ids and not missing_terms,
+        passed=rank is not None,
+        rank=rank,
+        source_precision=_source_precision(case, hits),
         hit_source_ids=hit_source_ids,
         missing_source_ids=missing_source_ids,
         missing_terms=missing_terms,
     )
+
+
+def _first_passing_rank(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> int | None:
+    for rank in range(1, len(hits) + 1):
+        prefix = hits[:rank]
+        hit_source_ids = {hit.chunk.source_id for hit in prefix}
+        rendered = "\n".join(hit.chunk.text for hit in prefix)
+        if all(source_id in hit_source_ids for source_id in case.expected_source_ids) and all(
+            term in rendered for term in case.expected_terms
+        ):
+            return rank
+    return None
+
+
+def _source_precision(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> float:
+    if not hits:
+        return 0.0
+    expected_sources = set(case.expected_source_ids)
+    return sum(1 for hit in hits if hit.chunk.source_id in expected_sources) / len(hits)

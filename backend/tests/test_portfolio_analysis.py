@@ -4,7 +4,7 @@ from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.services.analysis import service as portfolio_analysis
 from app.services.analysis.service import analyze_portfolio
-from app.services.rag.models import RagChunk, RetrievalHit
+from app.services.rag.official.models import RagChunk, RetrievalHit
 
 
 def _policy(policy_id: str, classification: str, coverage_name: str, amount: str) -> PolicyInput:

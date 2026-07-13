@@ -1,5 +1,8 @@
-"""Official-source RAG package.
+"""RAG package.
 
-The main pipeline entrypoints are indexing.py, retrieval.py, and answer.py.
-Other files support loading, chunking, embeddings, storage, and evaluation.
+Two retrieval pipelines live here:
+- ``official``: downloaded public insurance sources.
+- ``policy``: short-lived user-uploaded policy documents.
+
+Shared helpers such as embeddings and text splitting stay at this package root.
 """

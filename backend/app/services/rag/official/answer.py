@@ -21,8 +21,8 @@ from app.services.llm import (
     dump_prompt_json,
     structured_completer,
 )
-from app.services.rag.models import RagChunk, RetrievalHit
-from app.services.rag.retrieval import retrieve
+from app.services.rag.official.models import RagChunk, RetrievalHit
+from app.services.rag.official.retrieval import retrieve
 
 # answer_official_question always returns "general" now that profile-based mode
 # classification was removed. "term_explain"/"claim_check" stay in the type

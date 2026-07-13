@@ -12,9 +12,10 @@ from functools import lru_cache
 
 import pdfplumber
 
-from app.services.rag.chunking import build_chunks, split_within_char_limit
-from app.services.rag.models import RagChunk
-from app.services.rag.sources import OfficialSource, rag_sources
+from app.services.rag.official.chunking import build_chunks
+from app.services.rag.official.models import RagChunk
+from app.services.rag.official.sources import OfficialSource, rag_sources
+from app.services.rag.text import split_within_char_limit
 
 
 @lru_cache(maxsize=1)

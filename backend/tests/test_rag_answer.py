@@ -1,5 +1,5 @@
-from app.services.rag.answer import answer_official_question
-from app.services.rag.models import RagChunk, RetrievalHit
+from app.services.rag.official.answer import answer_official_question
+from app.services.rag.official.models import RagChunk, RetrievalHit
 
 
 def _hit(chunk: RagChunk) -> RetrievalHit:

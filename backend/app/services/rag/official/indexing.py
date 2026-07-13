@@ -7,9 +7,9 @@ chunk them, embed each chunk, then save the vector store.
 from __future__ import annotations
 
 from app.services.rag.embeddings import Embedder, openai_embedder_from_settings
-from app.services.rag.loaders import load_official_chunks
-from app.services.rag.models import RagChunk, VectorRecord, chunk_embedding_text
-from app.services.rag.pgvector_store import shared_pgvector_store
+from app.services.rag.official.loaders import load_official_chunks
+from app.services.rag.official.models import RagChunk, VectorRecord, chunk_embedding_text
+from app.services.rag.official.pgvector_store import shared_pgvector_store
 
 
 def build_vector_records(

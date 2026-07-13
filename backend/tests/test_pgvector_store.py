@@ -1,9 +1,9 @@
 import pytest
 from pytest import raises
 
-from app.services.rag import pgvector_store as pgvector_store_module
-from app.services.rag.models import RagChunk, VectorRecord
-from app.services.rag.pgvector_store import (
+from app.services.rag.official import pgvector_store as pgvector_store_module
+from app.services.rag.official.models import RagChunk, VectorRecord
+from app.services.rag.official.pgvector_store import (
     PgVectorRagStore,
     _chunk_from_node,
     _node_from_record,
@@ -34,7 +34,7 @@ def test_pgvector_node_round_trip_keeps_chunk_metadata() -> None:
 
 
 def test_pgvector_node_requires_real_database_name() -> None:
-    from app.services.rag.pgvector_store import _pg_vector_store_from_database_url
+    from app.services.rag.official.pgvector_store import _pg_vector_store_from_database_url
 
     with raises(RuntimeError, match="database name"):
         _pg_vector_store_from_database_url(

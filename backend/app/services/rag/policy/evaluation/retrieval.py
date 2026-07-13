@@ -18,7 +18,7 @@ from app.services.rag.embeddings import Embedder, HashingEmbedder, openai_embedd
 from app.services.rag.policy.indexing import build_policy_vector_records
 from app.services.rag.policy.models import PolicyVectorRecord
 
-EVAL_FIXTURE = Path(__file__).resolve().parent / "evaluation_dataset.json"
+EVAL_FIXTURE = Path(__file__).resolve().parent / "retrieval_dataset.json"
 _SAMPLE_DIR_ENV = "POLICY_RAG_EVAL_SAMPLE_DIR"
 
 

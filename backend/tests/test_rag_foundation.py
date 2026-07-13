@@ -2,18 +2,18 @@ from pathlib import Path
 
 import pytest
 
-from app.services.rag.chunking import build_chunks
 from app.services.rag.embeddings import HashingEmbedder, openai_embedder_from_settings
-from app.services.rag.evaluation import (
+from app.services.rag.official.chunking import build_chunks
+from app.services.rag.official.evaluation import (
     RetrievalEvalCase,
     evaluate_retrieval,
     load_retrieval_eval_cases,
 )
-from app.services.rag.indexing import build_vector_records
-from app.services.rag.loaders import _load_law_xml_chunks, load_official_chunks
-from app.services.rag.models import RagChunk, RetrievalHit
-from app.services.rag.retrieval import retrieve, transform_query
-from app.services.rag.sources import OfficialSource, rag_sources, verify_downloaded_sources
+from app.services.rag.official.indexing import build_vector_records
+from app.services.rag.official.loaders import _load_law_xml_chunks, load_official_chunks
+from app.services.rag.official.models import RagChunk, RetrievalHit
+from app.services.rag.official.retrieval import retrieve, transform_query
+from app.services.rag.official.sources import OfficialSource, rag_sources, verify_downloaded_sources
 
 
 def test_rag_sources_are_verified_and_small() -> None:
@@ -123,7 +123,7 @@ def test_build_vector_records_defaults_to_the_openai_embedder(
             return [(1.0, 0.0) for _ in texts]
 
     monkeypatch.setattr(
-        "app.services.rag.indexing.openai_embedder_from_settings",
+        "app.services.rag.official.indexing.openai_embedder_from_settings",
         lambda: _StubEmbedder(),
     )
     chunks = (
@@ -239,6 +239,86 @@ def test_retrieval_eval_fixture_passes_current_small_corpus() -> None:
 
     assert report.total == 60
     assert report.recall >= 0.4, report.results
+    assert 0.0 <= report.mrr <= 1.0
+    assert 0.0 <= report.source_precision <= 1.0
+
+
+def test_retrieval_eval_reports_first_passing_rank_and_mrr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hits = [
+        RetrievalHit(
+            chunk=RagChunk(
+                id="wrong",
+                source_id="wrong_source",
+                source_title="다른 문서",
+                source_category="law",
+                publisher="테스트",
+                text="관련 없는 내용",
+                page_start=1,
+                page_end=1,
+            ),
+            score=1.0,
+            keyword_score=0.0,
+            vector_score=1.0,
+        ),
+        RetrievalHit(
+            chunk=RagChunk(
+                id="right-source",
+                source_id="expected_source",
+                source_title="기대 문서",
+                source_category="law",
+                publisher="테스트",
+                text="아직 기대 용어는 없는 내용",
+                page_start=1,
+                page_end=1,
+            ),
+            score=0.9,
+            keyword_score=0.0,
+            vector_score=0.9,
+        ),
+        RetrievalHit(
+            chunk=RagChunk(
+                id="right-term",
+                source_id="expected_source",
+                source_title="기대 문서",
+                source_category="law",
+                publisher="테스트",
+                text="기대용어가 있는 내용",
+                page_start=2,
+                page_end=2,
+            ),
+            score=0.8,
+            keyword_score=0.0,
+            vector_score=0.8,
+        ),
+    ]
+
+    def _fake_retrieve(
+        *,
+        query: str,
+        chunks: tuple[RagChunk, ...] | None = None,
+        embedder: object | None = None,
+    ) -> list[RetrievalHit]:
+        return hits
+
+    monkeypatch.setattr("app.services.rag.official.evaluation.retrieval.retrieve", _fake_retrieve)
+    cases = (
+        RetrievalEvalCase(
+            id="case",
+            query="질문",
+            expected_source_ids=("expected_source",),
+            expected_terms=("기대용어",),
+        ),
+    )
+
+    report = evaluate_retrieval(cases, production=True)
+
+    assert report.results[0].rank == 3
+    assert report.results[0].source_precision == 2 / 3
+    assert report.recall == 1.0
+    assert report.mrr == 1 / 3
+    assert report.source_precision == 2 / 3
 
 
 def test_law_snapshots_are_loaded_as_rag_chunks() -> None:
@@ -308,7 +388,7 @@ def test_evaluate_retrieval_production_flag_skips_in_memory_chunks(
         calls.append(chunks)
         return []
 
-    monkeypatch.setattr("app.services.rag.evaluation.retrieve", _fake_retrieve)
+    monkeypatch.setattr("app.services.rag.official.evaluation.retrieval.retrieve", _fake_retrieve)
     cases = (RetrievalEvalCase(id="case", query="질문", expected_source_ids=(), expected_terms=()),)
 
     evaluate_retrieval(cases, production=True)

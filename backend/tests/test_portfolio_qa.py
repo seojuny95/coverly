@@ -7,7 +7,7 @@ from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import ConversationMessage
 from app.services.qa.service import answer_portfolio_question
-from app.services.rag.answer import RagAnswer, RagCitation
+from app.services.rag.official.answer import RagAnswer, RagCitation
 from app.services.rag.policy import PolicyChunk, PolicyRetrievalHit
 
 

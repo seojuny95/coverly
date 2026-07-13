@@ -1,5 +1,5 @@
 from app.services.policy.coverage.explanation import explain_coverages
-from app.services.rag.models import RagChunk, RetrievalHit
+from app.services.rag.official.models import RagChunk, RetrievalHit
 
 
 def _hit(text: str) -> RetrievalHit:

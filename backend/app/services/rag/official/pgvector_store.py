@@ -11,7 +11,7 @@ from llama_index.core.vector_stores.types import VectorStoreQueryMode
 from llama_index.vector_stores.postgres import PGVectorStore
 from sqlalchemy import text
 
-from app.services.rag.models import RagChunk, RetrievalHit, VectorRecord
+from app.services.rag.official.models import RagChunk, RetrievalHit, VectorRecord
 from app.settings import get_settings
 
 

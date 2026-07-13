@@ -19,14 +19,14 @@ import re
 from collections import Counter
 
 from app.services.rag.embeddings import Embedder, openai_embedder_from_settings
-from app.services.rag.models import (
+from app.services.rag.official.models import (
     QueryPlan,
     RagChunk,
     RetrievalHit,
     VectorRecord,
     chunk_embedding_text,
 )
-from app.services.rag.pgvector_store import shared_pgvector_store
+from app.services.rag.official.pgvector_store import shared_pgvector_store
 from app.settings import get_settings
 
 _TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]+")

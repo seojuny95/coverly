@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-DATA_ROOT = Path(__file__).resolve().parents[3] / "data"
+DATA_ROOT = Path(__file__).resolve().parents[4] / "data"
 REGISTRY_PATH = DATA_ROOT / "official-sources/source_registry.json"
 
 

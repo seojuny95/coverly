@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from statistics import median
 
 from app.services.rag.embeddings import HashingEmbedder
-from app.services.rag.evaluation import RetrievalEvalCase, load_retrieval_eval_cases
-from app.services.rag.loaders import load_official_chunks
-from app.services.rag.models import RagChunk, RetrievalHit
-from app.services.rag.retrieval import retrieve
+from app.services.rag.official.evaluation import RetrievalEvalCase, load_retrieval_eval_cases
+from app.services.rag.official.loaders import load_official_chunks
+from app.services.rag.official.models import RagChunk, RetrievalHit
+from app.services.rag.official.retrieval import retrieve
 
 _VISIBLE_CONTEXT_CHARS = 900
 

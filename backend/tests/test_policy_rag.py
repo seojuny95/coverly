@@ -8,7 +8,7 @@ import pytest
 
 from app.services.policy.models import ParsedDocument
 from app.services.rag.embeddings import HashingEmbedder
-from app.services.rag.policy.evaluation import EVAL_FIXTURE, evaluate_policy_retrieval
+from app.services.rag.policy.evaluation.retrieval import EVAL_FIXTURE, evaluate_policy_retrieval
 from app.services.rag.policy.indexing import build_policy_vector_records
 from app.services.rag.policy.models import PolicyRetrievalHit, PolicyVectorRecord
 from app.services.rag.policy.pii import mask_policy_pii
@@ -201,7 +201,7 @@ def test_policy_retrieval_evaluation_can_use_production_embedder(
             return [(1.0, 0.0) for _ in texts]
 
     monkeypatch.setattr(
-        "app.services.rag.policy.evaluation.openai_embedder_from_settings",
+        "app.services.rag.policy.evaluation.retrieval.openai_embedder_from_settings",
         lambda: _StubProductionEmbedder(),
     )
 

@@ -9,8 +9,9 @@ from __future__ import annotations
 import hashlib
 import re
 
-from app.services.rag.models import RagChunk
-from app.services.rag.sources import OfficialSource
+from app.services.rag.official.models import RagChunk
+from app.services.rag.official.sources import OfficialSource
+from app.services.rag.text import normalize_text, split_within_char_limit
 
 _ARTICLE_RE = re.compile(r"제\s*\d+\s*조\s*\([^)]*\)")
 _TOC_LINE_RE = re.compile(
@@ -18,9 +19,7 @@ _TOC_LINE_RE = re.compile(
     r"(?P<label>[가-힣A-Za-z0-9()·\s]+?)\s*[·.…]{3,}\s*(?P<page>\d+)\s*$"
 )
 _SECTION_HEADING_RE = re.compile(r"^(?:[Ⅰ-Ⅹ]+|[0-9]+)\s+[^\n]{2,80}$")
-_WHITESPACE_RE = re.compile(r"[ \t]+")
 _MIN_ARTICLE_BODY_CHARS = 30
-_MAX_PAGE_CHUNK_CHARS = 1400
 
 
 def build_chunks(source: OfficialSource, pages: list[str]) -> list[RagChunk]:
@@ -28,17 +27,6 @@ def build_chunks(source: OfficialSource, pages: list[str]) -> list[RagChunk]:
     if source.category == "standard_clause":
         return _standard_clause_chunks(source, pages)
     return _page_or_section_chunks(source, pages)
-
-
-def normalize_text(text: str) -> str:
-    lines = [_WHITESPACE_RE.sub(" ", line).strip() for line in text.splitlines()]
-    kept: list[str] = []
-    for line in lines:
-        if line:
-            kept.append(line)
-        elif kept and kept[-1] != "":
-            kept.append("")
-    return "\n".join(kept).strip()
 
 
 def _standard_clause_chunks(source: OfficialSource, pages: list[str]) -> list[RagChunk]:
@@ -131,50 +119,6 @@ def _split_heading_blocks(text: str) -> list[str]:
         end = starts[index + 1] if index + 1 < len(starts) else len(lines)
         blocks.append("\n".join(lines[start:end]))
     return blocks
-
-
-def split_within_char_limit(text: str) -> list[str]:
-    if len(text) <= _MAX_PAGE_CHUNK_CHARS:
-        return [text]
-    units = [unit.strip() for unit in text.split("\n\n") if unit.strip()]
-    return _pack_units(units) or [text[:_MAX_PAGE_CHUNK_CHARS]]
-
-
-def _pack_units(units: list[str]) -> list[str]:
-    """Greedily pack units under the size cap, splitting oversized units first."""
-    blocks: list[str] = []
-    current = ""
-    for unit in units:
-        for piece in _fit_unit(unit):
-            candidate = f"{current}\n{piece}" if current else piece
-            if current and len(candidate) > _MAX_PAGE_CHUNK_CHARS:
-                blocks.append(current)
-                current = piece
-                continue
-            current = candidate
-    if current:
-        blocks.append(current)
-    return blocks
-
-
-def _fit_unit(unit: str) -> list[str]:
-    """Split one over-cap unit by line, then hard-slice as a last resort.
-
-    A unit here is a paragraph (or, on retry, a line). Real annex tables can
-    run for pages without a blank line between rows, so falling back to plain
-    character slicing keeps every chunk under the OpenAI embedding input limit.
-    """
-    if len(unit) <= _MAX_PAGE_CHUNK_CHARS:
-        return [unit]
-
-    lines = [line.strip() for line in unit.split("\n") if line.strip()]
-    if len(lines) > 1:
-        return _pack_units(lines)
-
-    return [
-        unit[start : start + _MAX_PAGE_CHUNK_CHARS]
-        for start in range(0, len(unit), _MAX_PAGE_CHUNK_CHARS)
-    ]
 
 
 def _first_line(text: str) -> str | None:

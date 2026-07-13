@@ -36,7 +36,7 @@ from app.services.qa.generation import (
     generate_consultation_answer,
     stream_consultation_answer,
 )
-from app.services.rag.answer import RagAnswer, RagCitation, answer_official_question
+from app.services.rag.official.answer import RagAnswer, RagCitation, answer_official_question
 from app.services.rag.policy import retrieve_policy_context
 
 # "How do I claim?" is procedural — answer with the deterministic channel directory.
