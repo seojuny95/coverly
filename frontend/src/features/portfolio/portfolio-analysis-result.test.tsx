@@ -34,9 +34,7 @@ describe("PortfolioAnalysisResultView", () => {
   it("renders the header with the insured name and headline metrics", () => {
     render(<PortfolioAnalysisResultView result={base} insuredName="가나" />);
 
-    expect(
-      screen.getByText(/Coverly AI가 가나님 편에서/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Coverly AI가 가나님 편에서/)).toBeInTheDocument();
     expect(screen.getByText("35세 ·", { exact: false })).toBeInTheDocument();
     // formatWon(90000) monthly premium
     expect(screen.getByText("90,000원")).toBeInTheDocument();

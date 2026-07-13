@@ -309,7 +309,7 @@ def _is_parenthesized_id_mask(line: str, match: re.Match[str]) -> bool:
     """True when a policy-number-shaped match is actually a masked ID in parens.
 
     Korean policy documents commonly show a name followed by a masked
-    resident-registration number, e.g. `가나(TESTBIRTH-D-1******)`. That value
+    resident-registration number in parentheses. That value
     is shape-compatible with a policy number but is wrapped tightly in
     parentheses immediately after a name — a structural signal, not an
     insurer-specific string, that distinguishes it from a real policy number.

@@ -90,7 +90,9 @@ describe("InsuranceAnalysisPage", () => {
       await screen.findByText("내 보험을 종류별로 정리했어요"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("테스트고객님의 보험 2개를 종류별로 보기 쉽게 정리했어요."),
+      screen.getByText(
+        "테스트고객님의 보험 2개를 종류별로 보기 쉽게 정리했어요.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "보험증권 더 올리기" }),
@@ -489,7 +491,9 @@ describe("InsuranceAnalysisPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(
-      screen.getByText("테스트고객님의 보험 1개를 종류별로 보기 쉽게 정리했어요."),
+      screen.getByText(
+        "테스트고객님의 보험 1개를 종류별로 보기 쉽게 정리했어요.",
+      ),
     ).toBeInTheDocument();
   });
 });
