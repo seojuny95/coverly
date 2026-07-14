@@ -1,6 +1,7 @@
 """Conversational Q&A grounded in uploaded portfolio facts."""
 
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from app.schemas.consultation import (
@@ -358,19 +359,21 @@ def _answer_question_plan(
     answered = False
     generation: GenerationMode = "fallback"
     claim_channels = None
+    insurance_answers = _answer_insurance_questions(
+        context,
+        question_plan,
+        complete,
+        official_answer,
+    )
 
-    for planned in question_plan.questions:
+    for index, planned in enumerate(question_plan.questions):
         if planned.scope == "out_of_scope":
             answer = "보험과 관련 없는 정보는 답변하기 어려워요."
         elif planned.scope == "greeting":
             answer = "안녕하세요. 가입한 보험과 보장에 관해 궁금한 내용을 물어봐 주세요."
             answered = True
         else:
-            response = _answer_context(
-                _context_with_question(context, planned.resolved),
-                complete,
-                official_answer,
-            )
+            response = insurance_answers[index]
             answer = response.answer
             answered = answered or response.status == "answered"
             generation = "llm" if response.generation == "llm" else generation
@@ -393,6 +396,42 @@ def _answer_question_plan(
         demographics=context.insured,
         claim_channels=claim_channels,
     )
+
+
+def _answer_insurance_questions(
+    context: _QaContext,
+    question_plan: QuestionPlan,
+    complete: JsonCompleter | None,
+    official_answer: OfficialAnswerer | None,
+) -> dict[int, PortfolioQuestionResponse]:
+    tasks = [
+        (index, planned)
+        for index, planned in enumerate(question_plan.questions)
+        if planned.scope == "insurance"
+    ]
+    if not tasks:
+        return {}
+    if len(tasks) == 1:
+        index, planned = tasks[0]
+        return {
+            index: _answer_context(
+                _context_with_question(context, planned.resolved),
+                complete,
+                official_answer,
+            )
+        }
+
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        futures = {
+            index: executor.submit(
+                _answer_context,
+                _context_with_question(context, planned.resolved),
+                complete,
+                official_answer,
+            )
+            for index, planned in tasks
+        }
+        return {index: future.result() for index, future in futures.items()}
 
 
 def _unique_citations(citations: list[AnswerCitation]) -> list[AnswerCitation]:

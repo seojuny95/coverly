@@ -1,11 +1,13 @@
 import json
 from datetime import UTC, datetime, timedelta
+from threading import Barrier
+from typing import Any
 
 from pytest import MonkeyPatch
 
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.schemas.qa import ConversationMessage
+from app.schemas.qa import ConversationMessage, PortfolioQuestionResponse
 from app.services.qa.service import answer_portfolio_question
 from app.services.rag.official.answer import RagAnswer, RagCitation
 from app.services.rag.policy import PolicyChunk, PolicyRetrievalHit
@@ -639,6 +641,57 @@ def test_qa_scope_only_plan_skips_portfolio_context(monkeypatch: MonkeyPatch) ->
 
     assert result.status == "refused"
     assert "보험과 관련 없는 정보" in result.answer
+
+
+def test_qa_answers_multiple_insurance_questions_in_parallel(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    from app.services.qa import service as portfolio_qa
+
+    barrier = Barrier(2, timeout=1)
+    seen_questions: list[str] = []
+
+    def fake_answer_context(context: Any, *_args: object) -> PortfolioQuestionResponse:
+        question = context.question
+        seen_questions.append(question)
+        barrier.wait()
+        return PortfolioQuestionResponse(
+            status="answered",
+            answer=f"{question} 답변",
+            citations=[],
+            limitations=[],
+        )
+
+    monkeypatch.setattr(portfolio_qa, "_answer_context", fake_answer_context)
+
+    result = portfolio_qa.answer_portfolio_question(
+        "암진단비하고 실손의료비 알려줘",
+        _policies(),
+        plan=lambda _system, _user: {
+            "questions": [
+                {
+                    "original": "암진단비",
+                    "resolved": "암진단비 가입금액은 얼마야?",
+                    "scope": "insurance",
+                },
+                {
+                    "original": "실손의료비",
+                    "resolved": "실손의료비 가입 여부는 어때?",
+                    "scope": "insurance",
+                },
+            ],
+            "clarification": None,
+        },
+    )
+
+    assert set(seen_questions) == {
+        "암진단비 가입금액은 얼마야?",
+        "실손의료비 가입 여부는 어때?",
+    }
+    assert result.answer.split("\n\n") == [
+        "암진단비\n암진단비 가입금액은 얼마야? 답변",
+        "실손의료비\n실손의료비 가입 여부는 어때? 답변",
+    ]
 
 
 def test_qa_adds_session_policy_text_to_llm_context(monkeypatch: MonkeyPatch) -> None:
