@@ -1,5 +1,3 @@
-"use client";
-
 import { formatWon } from "./money-format";
 import type {
   AnalysisEvidence,
