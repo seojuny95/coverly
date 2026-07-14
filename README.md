@@ -18,6 +18,12 @@ pnpm dev
 
 ## 검증
 
+커밋 전 백엔드와 프론트엔드 포맷/린트 훅을 사용하려면 다음을 한 번 실행한다.
+
+```bash
+pre-commit install
+```
+
 ```bash
 cd backend
 uv run ruff check .
