@@ -38,7 +38,7 @@ def _demographics() -> InsuredDemographics:
     return InsuredDemographics(age=35, gender="여성", source="policy")
 
 
-def test_analysis_accepts_cited_llm_guidance_and_marks_low_confidence() -> None:
+def test_analysis_ignores_unsupported_amount_review_output() -> None:
     def complete(_system: str, _user: str) -> dict[str, object]:
         return {
             "strengths": [
@@ -66,84 +66,7 @@ def test_analysis_accepts_cited_llm_guidance_and_marks_low_confidence() -> None:
 
     assert result.generation == "llm"
     assert result.counselor.strengths[0].evidence_ids == ["coverage:1"]
-    assert result.counselor.amount_review_items[0].current_amount == 30_000_000
-    assert result.counselor.amount_review_items[0].confidence == "low"
-    assert result.counselor.amount_review_items[0].basis == "general_guidance"
-    assert result.counselor.amount_review_items[0].requires_personal_context is True
-    assert result.counselor.amount_review_items[0].required_context == [
-        "소득",
-        "치료·회복 기간 생활비",
-        "부양 책임",
-        "가용 예산",
-    ]
-
-
-def test_analysis_rewrites_direct_amount_actions_and_adequacy_conclusions() -> None:
-    unsafe_phrases = (
-        "1억원으로 늘리세요",
-        "현재 금액이면 충분해요",
-        "소득을 고려하면 1억원이 필요해요",
-    )
-
-    for phrase in unsafe_phrases:
-
-        def complete(_system: str, _user: str, phrase: str = phrase) -> dict[str, object]:
-            return {
-                "strengths": [],
-                "gaps": [],
-                "amount_review_items": [
-                    {
-                        "coverage_evidence_id": "coverage:1",
-                        "title": "암 진단비 금액 검토",
-                        "guidance": phrase,
-                        "rationale": "소득과 생활비를 함께 봐야 해요",
-                        "suggested_range": None,
-                    }
-                ],
-                "next_questions": [],
-                "next_steps": [],
-            }
-
-        result = analyze_portfolio(_policies(), demographics=_demographics(), complete=complete)
-
-        assert result.generation == "llm"
-        assert phrase not in result.model_dump_json()
-        review = result.counselor.amount_review_items[0]
-        assert review.suggested_range is None
-        assert review.confidence == "low"
-        assert review.basis == "general_guidance"
-        assert review.requires_personal_context is True
-
-
-def test_analysis_supplies_required_personal_context_deterministically() -> None:
-    def complete(_system: str, _user: str) -> dict[str, object]:
-        return {
-            "strengths": [],
-            "gaps": [],
-            "amount_review_items": [
-                {
-                    "coverage_evidence_id": "coverage:1",
-                    "title": "암 진단비 금액 검토",
-                    "guidance": "일반 가이드의 범위를 참고해 보세요",
-                    "rationale": "다른 가입자와 비교할 수 있어요",
-                    "suggested_range": None,
-                }
-            ],
-            "next_questions": [],
-            "next_steps": [],
-        }
-
-    result = analyze_portfolio(_policies(), demographics=_demographics(), complete=complete)
-
-    assert result.generation == "llm"
-    review = result.counselor.amount_review_items[0]
-    assert "다른 가입자와 비교" not in review.rationale
-    assert review.required_context == [
-        "소득",
-        "치료·회복 기간 생활비",
-        "부양 책임",
-        "가용 예산",
-    ]
+    assert result.counselor.amount_review_items == []
 
 
 def test_analysis_rejects_semantically_mismatched_strength_and_gap_evidence() -> None:

@@ -76,7 +76,7 @@ export type PortfolioAnalysisResult = {
     reason: string;
   }>;
   premium: {
-    monthly_total: number;
+    monthly_total: number | null;
     monthly_policy_count: number;
     unconfirmed_policy_count: number;
     items: Array<{
@@ -95,17 +95,7 @@ export type PortfolioAnalysisResult = {
     product_name?: string;
   }>;
   notices: string[];
-  evidence?: Array<{
-    id?: string;
-    label?: string;
-    detail?: string;
-    fact?: string;
-    policy_id?: string;
-    insurer?: string;
-    product_name?: string;
-    coverage_name?: string;
-    amount?: number;
-  }>;
+  evidence?: AnalysisEvidence[];
   limitations?: string[];
   demographics?: {
     age: number | null;
@@ -123,6 +113,21 @@ export type PortfolioAnalysisResult = {
   generation?: "llm" | "fallback";
 };
 
+export type AnalysisEvidence = {
+  id?: string;
+  label?: string;
+  detail?: string;
+  fact?: string;
+  source_title?: string;
+  publisher?: string;
+  citation_label?: string;
+  policy_id?: string;
+  insurer?: string;
+  product_name?: string;
+  coverage_name?: string;
+  amount?: number;
+};
+
 export type ReviewItem = {
   title: string;
   detail: string;
@@ -137,7 +142,15 @@ export type AmountReviewItem = {
   rationale: string;
   suggested_range: string | null;
   confidence: "high" | "medium" | "low";
+  basis?: "confirmed_fact" | "general_guidance" | "personal_context";
+  requires_personal_context?: boolean;
+  required_context?: string[];
   evidence_ids: string[];
+};
+
+export type AnalysisContextAnswer = {
+  question: string;
+  answer: string;
 };
 
 export type ClaimChannelLink = { label: string; url: string };
@@ -223,6 +236,7 @@ export function requestPortfolioAnalysis(
     gender: string;
     source?: "policy" | "user" | "unknown";
   },
+  personalContext: AnalysisContextAnswer[] = [],
   signal?: AbortSignal,
 ) {
   return post<PortfolioAnalysisResult>(
@@ -234,6 +248,7 @@ export function requestPortfolioAnalysis(
         gender: demographics.gender,
         source: demographics.source ?? "user",
       },
+      personal_context: personalContext,
     },
     signal,
   );

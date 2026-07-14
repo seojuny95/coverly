@@ -28,6 +28,26 @@ def test_analysis_route_contract() -> None:
     assert "counselor" in response.json()
 
 
+def test_analysis_route_accepts_bounded_personal_context() -> None:
+    response = _client().post(
+        "/portfolio/analysis",
+        json={
+            "policies": [],
+            "age": 35,
+            "gender": "여성",
+            "personal_context": [
+                {
+                    "question": "치료 중 필요한 생활비는 얼마인가요?",
+                    "answer": "매달 250만원 정도예요.",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert "personal_context" not in response.json()
+
+
 def test_analysis_route_verifies_policy_demographics_instead_of_client_source() -> None:
     response = _client().post(
         "/portfolio/analysis",

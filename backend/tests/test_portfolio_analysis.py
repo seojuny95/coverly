@@ -1,8 +1,10 @@
 from pytest import MonkeyPatch
 
+from app.schemas.analysis import AnalysisContextAnswer
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.services.analysis import service as portfolio_analysis
+from app.services.analysis.generation import _system_prompt
 from app.services.analysis.service import analyze_portfolio
 from app.services.rag.official.models import RagChunk, RetrievalHit
 
@@ -104,7 +106,28 @@ def test_analysis_does_not_make_adequacy_claims() -> None:
     assert "가입하세요" not in rendered
 
 
-def test_analysis_accepts_only_cited_llm_insights_and_builds_amount_from_fact() -> None:
+def test_analysis_recognizes_indemnity_from_payment_type() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험분류": "질병"},
+            "보장목록": [
+                {
+                    "담보명": "질병입원의료비",
+                    "가입금액": "5,000만원",
+                    "지급유형": "실손",
+                }
+            ],
+        }
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert "실손의료" in result.prepared_coverages
+    assert all(gap.category != "실손의료" for gap in result.coverage_gaps)
+
+
+def test_analysis_accepts_only_cited_llm_insights_and_ignores_amount_review() -> None:
     policy = _policy("p1", "질병", "암진단비", "3,000만원")
 
     def complete(_: str, user: str) -> dict[str, object]:
@@ -140,9 +163,7 @@ def test_analysis_accepts_only_cited_llm_insights_and_builds_amount_from_fact() 
 
     assert result.generation == "llm"
     assert result.counselor.strengths[0].evidence_ids == ["coverage:1"]
-    assert result.counselor.amount_review_items[0].current_amount == 30_000_000
-    assert result.counselor.amount_review_items[0].confidence == "low"
-    assert result.counselor.amount_review_items[0].suggested_range is None
+    assert result.counselor.amount_review_items == []
 
 
 def test_analysis_passes_official_guidance_without_changing_evidence_judgment(
@@ -158,13 +179,16 @@ def test_analysis_passes_official_guidance_without_changing_evidence_judgment(
 
     def complete(_: str, user: str) -> dict[str, object]:
         assert "official_guidance" in user
+        assert '"id":"official:1"' in user
+        assert '"evidence_id":"official:1"' in user
+        assert "official-analysis-1" not in user
         assert "지급사유" in user
         return {
             "strengths": [
                 {
                     "title": "암 진단 담보가 확인돼요",
-                    "detail": "현재 증권에서 가입 사실을 확인했습니다.",
-                    "evidence_ids": ["coverage:1"],
+                    "detail": "공식 기준상 지급사유와 면책 조건 확인이 필요해요.",
+                    "evidence_ids": ["coverage:1", "official:1"],
                 }
             ],
             "gaps": [],
@@ -176,8 +200,298 @@ def test_analysis_passes_official_guidance_without_changing_evidence_judgment(
     result = analyze_portfolio([policy], age=35, gender="여성", complete=complete)
 
     assert result.generation == "llm"
+    assert result.counselor.strengths[0].evidence_ids == ["coverage:1", "official:1"]
+    assert result.evidence[-1].id == "official:1"
+    assert result.evidence[-1].source_title == "표준약관"
+    assert result.evidence[-1].publisher == "금융감독원"
+    assert result.evidence[-1].citation_label == "표준약관 제3조"
+    assert len(result.evidence[-1].fact) < 800
+    assert result.counselor.next_steps == ["약관의 지급사유, 면책, 감액 조건을 함께 확인해 보세요."]
+
+
+def test_analysis_rejects_official_guidance_as_standalone_user_coverage_evidence(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policy = _policy("p1", "질병", "암진단비", "3,000만원")
+
+    monkeypatch.setattr(
+        portfolio_analysis,
+        "_official_analysis_guidance",
+        lambda: (_official_hit("약관에서 지급사유, 면책, 감액 조건을 확인해야 합니다."),),
+    )
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "strengths": [
+                {
+                    "title": "공식자료 기준 점검",
+                    "detail": "공식 기준상 지급사유와 면책 조건 확인이 필요해요.",
+                    "evidence_ids": ["official:1"],
+                }
+            ],
+            "gaps": [],
+            "amount_review_items": [],
+            "next_questions": [],
+            "next_steps": ["약관의 지급사유, 면책, 감액 조건을 함께 확인해 보세요."],
+        }
+
+    result = analyze_portfolio([policy], age=35, gender="여성", complete=complete)
+
+    assert result.generation == "llm"
     assert result.counselor.strengths[0].evidence_ids == ["coverage:1"]
     assert result.counselor.next_steps == ["약관의 지급사유, 면책, 감액 조건을 함께 확인해 보세요."]
+
+
+def test_analysis_rejects_personal_adequacy_claim_even_with_official_evidence(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policy = _policy("p1", "질병", "암진단비", "3,000만원")
+
+    monkeypatch.setattr(
+        portfolio_analysis,
+        "_official_analysis_guidance",
+        lambda: (_official_hit("약관에서 지급사유와 면책 조건을 확인해야 합니다."),),
+    )
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "strengths": [
+                {
+                    "title": "암 진단 담보가 확인돼요",
+                    "detail": "공식 기준상 현재 가입금액은 충분합니다.",
+                    "evidence_ids": ["coverage:1", "official:1"],
+                }
+            ],
+            "gaps": [],
+            "amount_review_items": [],
+            "next_questions": [],
+            "next_steps": [],
+        }
+
+    result = analyze_portfolio([policy], age=35, gender="여성", complete=complete)
+
+    assert result.generation == "llm"
+    assert "공식 기준상" not in result.counselor.strengths[0].detail
+    assert "충분합니다" not in result.counselor.strengths[0].detail
+    assert result.counselor.strengths[0].evidence_ids == ["coverage:1", "official:1"]
+
+
+def test_analysis_does_not_auto_attach_official_evidence_from_keywords(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policy = _policy("p1", "실손", "실손의료비", "5,000만원")
+
+    monkeypatch.setattr(
+        portfolio_analysis,
+        "_official_analysis_guidance",
+        lambda: (_official_hit("약관상 보상하지 않는 사항과 자기부담금을 확인해야 합니다."),),
+    )
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "strengths": [
+                {
+                    "title": "실손의료비 담보가 확인돼요",
+                    "detail": "치료비 부담을 약관상 한도와 자기부담금에 따라 보전하는 성격이에요.",
+                    "evidence_ids": ["coverage:1"],
+                }
+            ],
+            "gaps": [],
+            "amount_review_items": [],
+            "next_questions": [],
+            "next_steps": [],
+        }
+
+    result = analyze_portfolio([policy], age=35, gender="여성", complete=complete)
+
+    assert result.generation == "llm"
+    assert result.counselor.strengths[0].evidence_ids == ["coverage:1"]
+
+
+def test_analysis_keeps_useful_questions_and_steps_without_sales_language() -> None:
+    policy = _policy("p1", "질병", "암진단비", "3,000만원")
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "strengths": [],
+            "gaps": [],
+            "amount_review_items": [],
+            "next_questions": [
+                "현재 보험료를 계속 유지할 수 있는 월 예산은 얼마인가요?",
+            ],
+            "next_steps": [
+                "현재 금액이 생활비를 얼마나 준비할 수 있는지 비교해보면 좋아요.",
+                "암보험 추가 가입을 고려해 보세요.",
+                "추가적인 보장 항목을 확인하는 것이 좋습니다.",
+                "필요한 보장 항목을 점검해보세요.",
+            ],
+        }
+
+    result = analyze_portfolio([policy], age=35, gender="여성", complete=complete)
+
+    assert result.generation == "llm"
+    assert result.counselor.next_questions == [
+        "현재 보험료를 계속 유지할 수 있는 월 예산은 얼마인가요?"
+    ]
+    assert result.counselor.next_steps == [
+        "현재 금액이 생활비를 얼마나 준비할 수 있는지 비교해보면 좋아요."
+    ]
+
+
+def test_analysis_passes_user_answers_as_personal_context() -> None:
+    policy = _policy("p1", "질병", "암진단비", "3,000만원")
+
+    def complete(_: str, user: str) -> dict[str, object]:
+        assert '"personal_context"' in user
+        assert '"question":"치료 중 필요한 생활비는 얼마인가요?"' in user
+        assert '"answer":"매달 250만원 정도예요."' in user
+        return {
+            "overview": "사용자가 알려준 월 생활비와 현재 가입금액을 함께 살펴봤어요.",
+            "strengths": [],
+            "gaps": [],
+            "amount_review_items": [{"coverage_evidence_id": "coverage:1"}],
+            "next_questions": [
+                "치료 기간의 월 생활비는 얼마인가요?",
+                "보험료로 유지 가능한 예산은 얼마인가요?",
+            ],
+            "next_steps": ["현재 가입금액을 생활비와 비교해 보세요."],
+        }
+
+    result = analyze_portfolio(
+        [policy],
+        age=35,
+        gender="여성",
+        complete=complete,
+        personal_context=(
+            AnalysisContextAnswer(
+                question="치료 중 필요한 생활비는 얼마인가요?",
+                answer="매달 250만원 정도예요.",
+            ),
+        ),
+    )
+
+    assert result.generation == "llm"
+    assert "월 생활비" in result.counselor.overview
+    assert result.counselor.next_questions == ["보험료로 유지 가능한 예산은 얼마인가요?"]
+    assert result.counselor.amount_review_items == []
+
+
+def test_analysis_removes_answered_topics_from_fallback_questions() -> None:
+    policy = _policy("p1", "질병", "암진단비", "3,000만원")
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "overview": "확인된 가입금액과 개인 맥락을 함께 살펴봤어요.",
+            "strengths": [],
+            "gaps": [],
+            "amount_review_items": [{"coverage_evidence_id": "coverage:1"}],
+            "next_questions": ["치료 중 필요한 생활비는 얼마인가요?"],
+            "next_steps": [],
+        }
+
+    result = analyze_portfolio(
+        [policy],
+        age=35,
+        gender="여성",
+        complete=complete,
+        personal_context=(
+            AnalysisContextAnswer(
+                question="치료 중 필요한 생활비는 얼마인가요?",
+                answer="매달 250만원 정도예요.",
+            ),
+        ),
+    )
+
+    assert "치료 중 필요한 생활비는 얼마인가요?" not in result.counselor.next_questions
+    assert result.counselor.next_questions
+
+
+def test_analysis_keeps_safe_overview_sentences_when_one_is_sales_language() -> None:
+    policy = _policy("p1", "질병", "암진단비", "3,000만원")
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "overview": (
+                "암 진단비 담보가 확인됐어요. "
+                "다른 증권에 있는 담보도 이어서 확인할 수 있어요. "
+                "추가적인 보장 항목을 확인하는 것이 좋습니다."
+            ),
+            "strengths": [],
+            "gaps": [],
+            "amount_review_items": [{"coverage_evidence_id": "coverage:1"}],
+            "next_questions": [],
+            "next_steps": ["다른 증권의 담보도 확인해 보세요."],
+        }
+
+    result = analyze_portfolio([policy], age=35, gender="여성", complete=complete)
+
+    assert result.counselor.overview == (
+        "암 진단비 담보가 확인됐어요. 다른 증권에 있는 담보도 이어서 확인할 수 있어요."
+    )
+    assert "추가적인 보장" not in result.counselor.overview
+
+
+def test_analysis_completes_short_overview_with_portfolio_scope() -> None:
+    policies = [
+        _policy("p1", "질병", "암진단비", "3,000만원"),
+        _policy("p2", "질병", "뇌혈관질환진단비", "1,000만원"),
+    ]
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "overview": "진단비 담보를 확인했어요.",
+            "strengths": [],
+            "gaps": [],
+            "next_questions": [],
+            "next_steps": ["원본 증권의 세부 조건을 확인해 보세요."],
+        }
+
+    result = analyze_portfolio(policies, age=35, gender="여성", complete=complete)
+
+    assert result.counselor.overview.startswith("보험사별로 흩어진 같은 성격의 담보는 하나로 합쳐")
+
+
+def test_analysis_prompt_allows_grounded_official_guidance_without_inventing_it() -> None:
+    prompt = _system_prompt()
+
+    assert "# 역할" in prompt
+    assert "# 제품 목적" in prompt
+    assert "# evidence 사용 규칙" in prompt
+    assert "# 작업 순서" in prompt
+    assert "# amount_review_items 작성 규칙" not in prompt
+    assert "# overview 작성 규칙" in prompt
+    assert "보험 분석가" in prompt
+    assert "official_guidance와 official: evidence는 공식자료에서 검색된 보조 근거" in prompt
+    assert "제도 설명, 통계가 들어 있으면" in prompt
+    assert "그 근거 범위 안에서 설명할 수 있습니다" in prompt
+    assert "official_guidance에 없는 공식 기준·통계·수치를 새로 만들지 마세요" in prompt
+    assert "official: evidence만 단독으로 strengths/gaps를 만들지 않습니다" in prompt
+    assert "관련 official: evidence id도 함께 인용합니다" in prompt
+    assert '예: ["indemnity:1", "official:1"]' in prompt
+    assert "공식자료 내용이 항목 설명에 직접 쓰이지 않으면" in prompt
+    assert "공식자료, 증권, 계산 근거가 있을 때" in prompt
+    assert "overview는 3~5문장으로 작성합니다" in prompt
+    assert "여러 보험사와 여러 증권에 흩어진 보장을 하나의 포트폴리오로" in prompt
+    assert "모든 증권을 함께 봤을 때 새롭게 알 수 있는 사실" in prompt
+    assert "strengths/gaps의 제목과 detail을 그대로 다시 나열하거나 복사하지 않습니다" in prompt
+    assert "detail은 2문장으로 씁니다" in prompt
+    assert "어떤 비용·생활 변화와 관련돼 있어 확인할 가치가 있는지" in prompt
+    assert "너무 짧은 한 문장으로 끝내지 않습니다" in prompt
+    assert "서로 다른 문장 구조로 씁니다" in prompt
+    assert '"대응하는 성격이에요" 같은 같은 어미와 표현을 반복하지 않습니다' in prompt
+    assert "category_purposes 문장을 그대로 복사하지 말고" in prompt
+    assert "가입 필요로 읽히는 표현을 쓰지 않습니다" in prompt
+    assert '"추가적인 보장", "추가 보장 항목", "보장 항목을 더 준비"' in prompt
+    assert "다른 증권 확인이나 개인 맥락 확인으로 마무리합니다" in prompt
+    assert "기준·통계·제도·지급 구조를 설명할 수 있습니다" in prompt
+    assert "근거가 없을 때만" in prompt
+    assert "개인별 적정 가입금액, 실제 보험금 지급 가능성" in prompt
+    assert "만들거나 단정하지 않습니다" in prompt
+    assert "치료비 부담을 약관상 조건에 따라 보전하는 성격" in prompt
+    assert '"돌려받아", "보장받을 수 있습니다", "보상받을 수 있습니다"' in prompt
+    assert "약관상 조건, 한도," in prompt
+    assert "자기부담금에 따라 보전하는 성격" in prompt
+    assert "특정 상품의 추가 가입을 고려하라고 말하지 않습니다" in prompt
 
 
 def test_analysis_filters_hallucinated_evidence_and_risky_claims() -> None:
@@ -205,9 +519,16 @@ def test_analysis_filters_hallucinated_evidence_and_risky_claims() -> None:
 
     result = analyze_portfolio([policy], age=35, gender="여성", complete=complete)
 
-    assert result.generation == "fallback"
+    assert result.generation == "llm"
     assert "치매" not in result.model_dump_json()
     assert "보험금이 지급됩니다" not in result.model_dump_json()
+    assert [item.model_dump(mode="json") for item in result.counselor.strengths] == [
+        {
+            "title": "암진단비 담보가 확인돼요",
+            "detail": "현재 증권에서 확인했습니다.",
+            "evidence_ids": ["coverage:1"],
+        }
+    ]
 
 
 def test_analysis_uses_deterministic_fallback_when_completer_fails() -> None:
@@ -222,7 +543,7 @@ def test_analysis_uses_deterministic_fallback_when_completer_fails() -> None:
     )
 
     assert result.generation == "fallback"
-    assert result.counselor.amount_review_items[0].suggested_range is None
+    assert result.counselor.amount_review_items == []
     assert any("AI 분석" in limitation for limitation in result.limitations)
 
 
@@ -322,4 +643,5 @@ def test_fallback_gaps_explain_why() -> None:
     # are non-empty and every missing category has a purpose sentence.
     assert result.generation == "fallback"
     gap_details = " ".join(item.detail for item in result.counselor.gaps)
-    assert "성격이에요" in gap_details
+    assert "확인되지 않았어요" in gap_details
+    assert any(term in gap_details for term in ("점검", "참고", "핵심", "항목"))
