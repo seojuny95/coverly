@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     reference_schema: str = "reference"
     premium_benchmark_table: str = "premium_benchmarks"
     reference_source_table: str = "sources"
+    policy_change_table: str = "policy_change_notes"
     rag_embedding_dim: int = 1536
     policy_rag_ttl_seconds: int = 15 * 60
     policy_rag_max_ttl_seconds: int = 2 * 60 * 60

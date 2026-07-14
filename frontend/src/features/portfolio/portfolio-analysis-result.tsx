@@ -44,6 +44,8 @@ export function PortfolioAnalysisResultView({
     result.counselor?.overview ??
     `${result.life_stage} 기준으로 보험 ${result.policy_count}건에서 확인 가능한 보장을 정리했어요.`;
   const priorityChecks = result.priority_checks ?? [];
+  const claimConditionChecks = result.claim_condition_checks ?? [];
+  const policyChangeChecks = result.policy_change_checks ?? [];
 
   return (
     <div className="space-y-5">
@@ -80,6 +82,13 @@ export function PortfolioAnalysisResultView({
 
       {priorityChecks.length ? (
         <PriorityChecks items={priorityChecks} evidenceById={evidenceById} />
+      ) : null}
+
+      {result.coverage_amount_status ? (
+        <CoverageAmountStatusSection
+          status={result.coverage_amount_status}
+          evidenceById={evidenceById}
+        />
       ) : null}
 
       {analyzedTitles.length ? (
@@ -140,6 +149,14 @@ export function PortfolioAnalysisResultView({
         evidenceById={evidenceById}
         empty="원본 약관과 최신 계약 상태도 함께 확인해보세요."
       />
+
+      {claimConditionChecks.length || policyChangeChecks.length ? (
+        <AnalysisDetailGrid
+          claimConditionChecks={claimConditionChecks}
+          policyChangeChecks={policyChangeChecks}
+          evidenceById={evidenceById}
+        />
+      ) : null}
 
       <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
         <h2 className="text-sm font-semibold">확인 범위와 한계</h2>
@@ -288,6 +305,139 @@ function PriorityChecks({
         ))}
       </ol>
     </section>
+  );
+}
+
+function CoverageAmountStatusSection({
+  status,
+  evidenceById,
+}: {
+  status: NonNullable<PortfolioAnalysisResult["coverage_amount_status"]>;
+  evidenceById: Map<string, AnalysisEvidence>;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-blue-700">보장금액 상태</p>
+          <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+            {status.title}
+          </h2>
+        </div>
+        <p className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600">
+          총 {formatWon(status.confirmed_total_amount)}
+        </p>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-zinc-500">{status.detail}</p>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <Metric
+          label="금액 확인 항목"
+          value={`${status.confirmed_category_count}개`}
+        />
+        <Metric
+          label="확인된 합계"
+          value={formatWon(status.confirmed_total_amount)}
+        />
+        <Metric
+          label="금액 미확인"
+          value={`${status.unconfirmed_coverage_count}개`}
+        />
+      </div>
+
+      {status.items.length ? (
+        <ul className="mt-4 space-y-3">
+          {status.items.map((item) => (
+            <li
+              key={item.title}
+              className="rounded-xl bg-zinc-50 px-4 py-3 text-sm"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="font-medium text-zinc-800">{item.title}</p>
+                <span className="text-xs text-zinc-500">
+                  {item.coverage_count}개 담보
+                </span>
+              </div>
+              <p className="mt-2 leading-6 text-zinc-500">{item.detail}</p>
+              <EvidenceDetails
+                evidenceIds={item.evidence_ids}
+                evidenceById={evidenceById}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+function AnalysisDetailGrid({
+  claimConditionChecks,
+  policyChangeChecks,
+  evidenceById,
+}: {
+  claimConditionChecks: NonNullable<
+    PortfolioAnalysisResult["claim_condition_checks"]
+  >;
+  policyChangeChecks: NonNullable<
+    PortfolioAnalysisResult["policy_change_checks"]
+  >;
+  evidenceById: Map<string, AnalysisEvidence>;
+}) {
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      {claimConditionChecks.length ? (
+        <section className="rounded-2xl border border-zinc-200 p-6">
+          <p className="text-xs font-semibold text-blue-700">
+            받을 때 확인할 조건
+          </p>
+          <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+            보험금은 약관 조건을 통과해야 해요
+          </h2>
+          <ul className="mt-4 space-y-3">
+            {claimConditionChecks.map((item) => (
+              <li
+                key={item.title}
+                className="rounded-xl bg-zinc-50 px-4 py-3 text-sm"
+              >
+                <p className="font-medium text-zinc-800">{item.title}</p>
+                <p className="mt-2 leading-6 text-zinc-500">{item.detail}</p>
+                <EvidenceDetails
+                  evidenceIds={item.evidence_ids}
+                  evidenceById={evidenceById}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {policyChangeChecks.length ? (
+        <section className="rounded-2xl border border-zinc-200 p-6">
+          <p className="text-xs font-semibold text-blue-700">최근 제도 변화</p>
+          <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+            내 보험과 연결해서 볼 변화
+          </h2>
+          <ul className="mt-4 space-y-3">
+            {policyChangeChecks.map((item) => (
+              <li
+                key={item.title}
+                className="rounded-xl bg-zinc-50 px-4 py-3 text-sm"
+              >
+                <p className="font-medium text-zinc-800">{item.title}</p>
+                <p className="mt-2 leading-6 text-zinc-500">{item.summary}</p>
+                <p className="mt-2 leading-6 text-zinc-600">
+                  {item.user_impact}
+                </p>
+                <p className="mt-3 text-xs leading-5 text-zinc-500">
+                  {item.source.label} 기준이에요. {item.source.caveat}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
   );
 }
 

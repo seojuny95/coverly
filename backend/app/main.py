@@ -9,12 +9,14 @@ from app.routes.analysis import router as analysis_router
 from app.routes.policies import router as policies_router
 from app.routes.portfolio import router as portfolio_router
 from app.routes.qa import router as qa_router
+from app.services.reference.policy_change import warm_policy_change_cache
 from app.services.reference.premium_benchmark import warm_premium_benchmark_cache
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     warm_premium_benchmark_cache()
+    warm_policy_change_cache()
     yield
 
 

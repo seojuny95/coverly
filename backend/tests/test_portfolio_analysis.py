@@ -1,6 +1,12 @@
 from pytest import MonkeyPatch
 
-from app.schemas.analysis import AnalysisContextAnswer, PremiumBenchmark, PremiumBenchmarkSource
+from app.schemas.analysis import (
+    AnalysisContextAnswer,
+    PolicyChangeCheck,
+    PolicyChangeSource,
+    PremiumBenchmark,
+    PremiumBenchmarkSource,
+)
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.services.analysis import service as portfolio_analysis
@@ -730,6 +736,63 @@ def test_analysis_prioritizes_duplicate_and_gap_checks() -> None:
     assert result.priority_checks[0].kind == "duplicate"
     assert result.priority_checks[0].evidence_ids
     assert any(check.kind == "coverage_gap" for check in result.priority_checks)
+
+
+def test_analysis_exposes_amount_status_and_claim_conditions() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "테스트보험", "상품명": "상품-p1", "보험분류": "질병"},
+            "보장목록": [
+                {"담보명": "암진단비", "가입금액": "3,000만원", "지급유형": "정액"},
+                {"담보명": "특정질환보장", "가입금액": "별도 약정"},
+            ],
+        }
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert result.coverage_amount_status.confirmed_total_amount == 30_000_000
+    assert result.coverage_amount_status.confirmed_category_count == 1
+    assert result.coverage_amount_status.unconfirmed_coverage_count == 1
+    assert result.coverage_amount_status.items[0].evidence_ids == ["coverage:1"]
+    assert any(check.kind == "fixed" for check in result.claim_condition_checks)
+    assert any(check.kind == "contract" for check in result.claim_condition_checks)
+
+
+def test_analysis_links_relevant_policy_changes(monkeypatch: MonkeyPatch) -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "테스트보험", "상품명": "실손", "보험분류": "실손"},
+            "보장목록": [{"담보명": "실손의료비", "가입금액": "1억원", "지급유형": "실손"}],
+        }
+    )
+    change = PolicyChangeCheck(
+        title="실손보험 청구 전산화가 의원·약국까지 확대 예정이에요",
+        summary="서류 전송을 요청하면 전자문서가 전달되는 방식이에요.",
+        user_impact="실손 담보가 있다면 청구를 놓치지 않았는지 확인하기 쉬워질 수 있어요.",
+        effective_from="2025-10-25",
+        applies_to="의원급 의료기관과 약국의 실손보험 청구",
+        related_tags=["실손의료"],
+        source=PolicyChangeSource(
+            label="금융위원회 · 실손보험 청구 전산화 카드뉴스",
+            url="https://www.fsc.go.kr/edu/cardnews?cnId=1976",
+            published_at="2023-11-20",
+            reliability="official",
+            caveat="의료기관 참여 여부에 따라 달라질 수 있어요.",
+        ),
+    )
+    monkeypatch.setattr(
+        portfolio_analysis,
+        "policy_changes_for_tags",
+        lambda tags, limit=2: [change] if "실손의료" in tags else [],
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert result.policy_change_checks == [change]
+    assert "related_tags" not in result.model_dump()["policy_change_checks"][0]
 
 
 def test_fallback_gaps_explain_why() -> None:

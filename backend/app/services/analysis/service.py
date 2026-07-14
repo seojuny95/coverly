@@ -7,20 +7,28 @@ from typing import Literal
 from app.schemas.analysis import (
     AnalysisContextAnswer,
     AnalysisSource,
+    ClaimConditionCheck,
     ClassificationAnalysis,
     CounselorAnalysis,
     CounselorInsight,
+    CoverageAmountStatus,
+    CoverageAmountStatusItem,
     CoverageGap,
+    PolicyChangeCheck,
     PortfolioAnalysisResponse,
     PremiumBenchmark,
     PremiumOverview,
     PriorityCheck,
 )
 from app.schemas.consultation import Gender, GenerationMode, InsuredDemographics
-from app.schemas.portfolio import PolicyInput
+from app.schemas.portfolio import CoverageTotalItem, PolicyInput, PortfolioCoverageSummary
 from app.services.analysis.generation import generate_counselor
 from app.services.coverage_knowledge.purpose import coverage_purpose
-from app.services.coverage_knowledge.taxonomy import LifeStageCheck, check_life_stage
+from app.services.coverage_knowledge.taxonomy import (
+    INDEMNITY,
+    LifeStageCheck,
+    check_life_stage,
+)
 from app.services.evidence.catalog import (
     EvidenceCatalog,
     build_evidence_catalog,
@@ -36,6 +44,7 @@ from app.services.portfolio.summary import (
 )
 from app.services.rag.official.models import RetrievalHit
 from app.services.rag.official.retrieval import retrieve
+from app.services.reference.policy_change import policy_changes_for_tags
 from app.services.reference.premium_benchmark import premium_benchmark_for_age
 
 _UNCLASSIFIED = "미분류"
@@ -124,6 +133,9 @@ def analyze_portfolio(
             premium,
             premium_benchmark,
         ),
+        coverage_amount_status=_coverage_amount_status(summary, catalog),
+        claim_condition_checks=_claim_condition_checks(summary, catalog),
+        policy_change_checks=_policy_change_checks(facts, life_stage_check),
         generation=generation,
     )
 
@@ -326,6 +338,118 @@ def _premium_priority_check(
         )
 
     return PriorityCheck(kind="premium", title=title, detail=detail)
+
+
+def _coverage_amount_status(
+    summary: PortfolioCoverageSummary,
+    catalog: EvidenceCatalog,
+) -> CoverageAmountStatus:
+    confirmed_total = sum(item.total_amount for item in summary.totals)
+    top_items = sorted(summary.totals, key=lambda item: item.total_amount, reverse=True)[:5]
+    evidence_ids_by_item = {
+        id(item): f"coverage:{index}" for index, item in enumerate(summary.totals, start=1)
+    }
+
+    return CoverageAmountStatus(
+        title="확인된 보장금액만 먼저 모았어요",
+        detail=(
+            "아래 금액은 증권에서 숫자로 확인된 정액형 담보만 합산한 값이에요. "
+            "충분하거나 부족하다는 뜻은 아니고, 큰 금액부터 약관 조건을 확인하기 위한 출발점이에요."
+        ),
+        confirmed_total_amount=confirmed_total,
+        confirmed_category_count=len(summary.totals),
+        unconfirmed_coverage_count=len(summary.excluded_coverages),
+        items=[
+            _coverage_amount_status_item(item, evidence_ids_by_item, catalog) for item in top_items
+        ],
+    )
+
+
+def _coverage_amount_status_item(
+    item: CoverageTotalItem,
+    evidence_ids_by_item: dict[int, str],
+    catalog: EvidenceCatalog,
+) -> CoverageAmountStatusItem:
+    evidence_id = evidence_ids_by_item[id(item)]
+    evidence_ids = [evidence_id] if evidence_id in catalog.by_id else []
+    composition_count = len(item.composition)
+    detail = (
+        f"{composition_count}개 담보에서 숫자로 확인된 금액을 합산했어요. "
+        "실제 지급은 진단명, 지급사유, 면책·감액 조건에 따라 달라질 수 있어요."
+    )
+    return CoverageAmountStatusItem(
+        category=item.display_name,
+        amount=item.total_amount,
+        coverage_count=item.coverage_count,
+        title=f"{item.display_name} {item.total_amount:,}원 확인",
+        detail=detail,
+        evidence_ids=evidence_ids,
+    )
+
+
+def _claim_condition_checks(
+    summary: PortfolioCoverageSummary,
+    catalog: EvidenceCatalog,
+) -> list[ClaimConditionCheck]:
+    checks: list[ClaimConditionCheck] = []
+
+    if summary.totals:
+        evidence_ids = [
+            f"coverage:{index}"
+            for index, _ in enumerate(summary.totals[:3], start=1)
+            if f"coverage:{index}" in catalog.by_id
+        ]
+        checks.append(
+            ClaimConditionCheck(
+                kind="fixed",
+                title="정액형 보장은 지급사유와 감액기간을 확인하세요",
+                detail=(
+                    "진단비·수술비처럼 정해진 금액을 받는 담보도 약관상 진단확정, "
+                    "수술분류표, 면책기간, 감액기간 조건을 충족해야 해요."
+                ),
+                evidence_ids=evidence_ids,
+            )
+        )
+
+    if summary.indemnity_coverages:
+        evidence_ids = [item.id for item in catalog.items if item.id.startswith("indemnity:")][:3]
+        checks.append(
+            ClaimConditionCheck(
+                kind="indemnity",
+                title="실손형 보장은 실제 병원비와 자기부담 조건을 봐야 해요",
+                detail=(
+                    "실손형 담보는 가입금액을 모두 받는 구조가 아니라 실제 부담한 의료비, "
+                    "급여·비급여 구분, 자기부담금, 보장한도에 따라 달라져요."
+                ),
+                evidence_ids=evidence_ids,
+            )
+        )
+
+    if summary.excluded_coverages or summary.totals:
+        checks.append(
+            ClaimConditionCheck(
+                kind="contract",
+                title="큰 금액 담보부터 원문 약관을 같이 확인하세요",
+                detail=(
+                    "화면의 금액은 증권에서 읽은 가입금액이에요. 실제 받을 수 있는지는 "
+                    "보험기간, 면책, 감액, 보상하지 않는 사항을 약관 원문으로 확인해야 해요."
+                ),
+            )
+        )
+
+    return checks[:3]
+
+
+def _policy_change_checks(
+    facts: PortfolioFacts,
+    life_stage_check: LifeStageCheck,
+) -> list[PolicyChangeCheck]:
+    tags: set[str] = set()
+    if facts.coverage_summary.indemnity_coverages:
+        tags.add(INDEMNITY)
+    if INDEMNITY in life_stage_check.held or INDEMNITY in life_stage_check.missing:
+        tags.add(INDEMNITY)
+    return policy_changes_for_tags(tags, limit=2)
 
 
 def _profile_label(demographics: InsuredDemographics) -> str:

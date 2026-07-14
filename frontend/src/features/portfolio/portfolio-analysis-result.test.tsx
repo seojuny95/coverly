@@ -109,6 +109,79 @@ describe("PortfolioAnalysisResultView", () => {
     expect(screen.getByText("근거 보기")).toBeInTheDocument();
   });
 
+  it("shows amount status, claim conditions, and relevant policy changes", () => {
+    render(
+      <PortfolioAnalysisResultView
+        result={{
+          ...base,
+          coverage_amount_status: {
+            title: "확인된 보장금액만 먼저 모았어요",
+            detail: "충분하거나 부족하다는 뜻은 아니에요.",
+            confirmed_total_amount: 30_000_000,
+            confirmed_category_count: 1,
+            unconfirmed_coverage_count: 1,
+            items: [
+              {
+                category: "암 진단비",
+                amount: 30_000_000,
+                coverage_count: 1,
+                title: "암 진단비 30,000,000원 확인",
+                detail: "숫자로 확인된 금액을 합산했어요.",
+                evidence_ids: ["coverage:1"],
+              },
+            ],
+          },
+          claim_condition_checks: [
+            {
+              kind: "fixed",
+              title: "정액형 보장은 지급사유와 감액기간을 확인하세요",
+              detail: "진단확정, 면책기간, 감액기간 조건을 확인해야 해요.",
+              evidence_ids: ["coverage:1"],
+            },
+          ],
+          policy_change_checks: [
+            {
+              title: "실손보험 청구 전산화가 의원·약국까지 확대 예정이에요",
+              summary: "서류 전송을 요청하면 전자문서가 전달되는 방식이에요.",
+              user_impact:
+                "실손 담보가 있다면 청구를 놓치지 않았는지 보기 쉬워질 수 있어요.",
+              effective_from: "2025-10-25",
+              applies_to: "의원급 의료기관과 약국의 실손보험 청구",
+              source: {
+                label: "금융위원회 · 실손보험 청구 전산화 카드뉴스",
+                url: "https://www.fsc.go.kr/edu/cardnews?cnId=1976",
+                published_at: "2023-11-20",
+                reliability: "official",
+                caveat: "의료기관 참여 여부에 따라 달라질 수 있어요.",
+              },
+            },
+          ],
+          evidence: [
+            {
+              id: "coverage:1",
+              coverage_name: "암 진단비",
+              amount: 30_000_000,
+              product_name: "건강보험",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("보장금액 상태")).toBeInTheDocument();
+    expect(
+      screen.getByText("확인된 보장금액만 먼저 모았어요"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("30,000,000원").length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(screen.getByText("받을 때 확인할 조건")).toBeInTheDocument();
+    expect(screen.getByText("최근 제도 변화")).toBeInTheDocument();
+    expect(
+      screen.getByText("실손보험 청구 전산화가 의원·약국까지 확대 예정이에요"),
+    ).toBeInTheDocument();
+  });
+
   it("uses the full KB benchmark bands through age 70+", () => {
     render(
       <PortfolioAnalysisResultView

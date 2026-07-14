@@ -133,6 +133,52 @@ class PriorityCheck(BaseModel):
     evidence_ids: list[str] = Field(default_factory=list)
 
 
+class CoverageAmountStatusItem(BaseModel):
+    category: str
+    amount: int
+    coverage_count: int
+    title: str
+    detail: str
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class CoverageAmountStatus(BaseModel):
+    title: str
+    detail: str
+    confirmed_total_amount: int
+    confirmed_category_count: int
+    unconfirmed_coverage_count: int
+    items: list[CoverageAmountStatusItem]
+
+
+ClaimConditionKind = Literal["fixed", "indemnity", "contract"]
+
+
+class ClaimConditionCheck(BaseModel):
+    kind: ClaimConditionKind
+    title: str
+    detail: str
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class PolicyChangeSource(BaseModel):
+    label: str
+    url: str
+    published_at: str
+    reliability: str
+    caveat: str
+
+
+class PolicyChangeCheck(BaseModel):
+    title: str
+    summary: str
+    user_impact: str
+    effective_from: str | None = None
+    applies_to: str
+    related_tags: list[str] = Field(default_factory=list, exclude=True)
+    source: PolicyChangeSource
+
+
 class PortfolioAnalysisResponse(BaseModel):
     status: Literal["complete", "partial", "empty"]
     policy_count: int
@@ -159,4 +205,7 @@ class PortfolioAnalysisResponse(BaseModel):
     premium: PremiumOverview
     premium_benchmark: PremiumBenchmark | None = None
     priority_checks: list[PriorityCheck] = Field(default_factory=list, max_length=3)
+    coverage_amount_status: CoverageAmountStatus
+    claim_condition_checks: list[ClaimConditionCheck] = Field(default_factory=list)
+    policy_change_checks: list[PolicyChangeCheck] = Field(default_factory=list)
     generation: GenerationMode

@@ -106,6 +106,41 @@ export type PortfolioAnalysisResult = {
     detail: string;
     evidence_ids: string[];
   }>;
+  coverage_amount_status?: {
+    title: string;
+    detail: string;
+    confirmed_total_amount: number;
+    confirmed_category_count: number;
+    unconfirmed_coverage_count: number;
+    items: Array<{
+      category: string;
+      amount: number;
+      coverage_count: number;
+      title: string;
+      detail: string;
+      evidence_ids: string[];
+    }>;
+  };
+  claim_condition_checks?: Array<{
+    kind: "fixed" | "indemnity" | "contract";
+    title: string;
+    detail: string;
+    evidence_ids: string[];
+  }>;
+  policy_change_checks?: Array<{
+    title: string;
+    summary: string;
+    user_impact: string;
+    effective_from: string | null;
+    applies_to: string;
+    source: {
+      label: string;
+      url: string;
+      published_at: string;
+      reliability: string;
+      caveat: string;
+    };
+  }>;
   baseline_notice: string;
   classifications: ClassificationAnalysis[];
   sources: Array<{
