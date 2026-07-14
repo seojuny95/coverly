@@ -6,20 +6,10 @@ from collections.abc import Iterator
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from app.schemas.qa import PortfolioQuestionRequest, PortfolioQuestionResponse
-from app.services.qa.service import answer_portfolio_question, stream_portfolio_answer
+from app.schemas.qa import PortfolioQuestionRequest
+from app.services.qa.service import stream_portfolio_answer
 
 router = APIRouter(tags=["qa"])
-
-
-@router.post("/qa", response_model=PortfolioQuestionResponse)
-def ask_portfolio_question(request: PortfolioQuestionRequest) -> PortfolioQuestionResponse:
-    return answer_portfolio_question(
-        request.question,
-        request.policies,
-        demographics=request.demographics,
-        history=request.history,
-    )
 
 
 @router.post("/qa/stream")

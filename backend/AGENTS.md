@@ -6,7 +6,7 @@ FastAPI + uv 백엔드. 전체 프로젝트 가이드: [../AGENTS.md](../AGENTS.
 
 ## 프로젝트 소개
 
-Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 분류·상담·Q&A 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 엔드포인트는 두 갈래다: 증권 1건을 처리하는 파싱 파이프라인(`POST /policies/parse`)과, 파싱 결과 여러 건을 묶어 다루는 포트폴리오 기능(`POST /portfolio/summary`·`/portfolio/analysis`·`POST /qa`).
+Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 분류·상담·Q&A 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 엔드포인트는 두 갈래다: 증권 1건을 처리하는 파싱 파이프라인(`POST /policies/parse`)과, 파싱 결과 여러 건을 묶어 다루는 포트폴리오 기능(`POST /portfolio/summary`·`/portfolio/analysis`·`POST /qa/stream`).
 
 ## Development Commands
 
@@ -28,7 +28,7 @@ app/
 │   ├── policies.py        # POST /policies/parse — 증권 1건 파싱
 │   ├── portfolio.py       # POST /portfolio/summary — 보험금 합계
 │   ├── analysis.py        # POST /portfolio/analysis — 상담 전 검토
-│   └── qa.py              # POST /qa — 근거 기반 Q&A
+│   └── qa.py              # POST /qa/stream — 근거 기반 Q&A 스트리밍
 └── services/
     ├── llm.py             # OpenAI 경계: structured/text/stream completion
     ├── grounding.py       # 금액·문구 anti-hallucination (공유)
@@ -60,7 +60,7 @@ app/
     │   ├── service.py         # POST /portfolio/analysis use case
     │   └── generation.py      # 상담사 관점 LLM 생성 + fallback 검증
     ├── qa/
-    │   ├── service.py         # POST /qa use case
+    │   ├── service.py         # POST /qa/stream use case
     │   ├── generation.py      # Q&A LLM 생성/streaming
     │   └── claim_channels.py  # 청구 채널 결정적 안내
     └── rag/                   # 공식 약관/제도 RAG + 업로드 세션 RAG

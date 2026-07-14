@@ -239,20 +239,6 @@ export function requestPortfolioAnalysis(
   );
 }
 
-export function askPortfolioQuestion(
-  question: string,
-  insuranceDocuments: AnalyzedInsurance[],
-  history: ChatHistoryItem[],
-) {
-  const demographics = getPolicyDemographics(insuranceDocuments);
-  return post<QaAnswer>("/qa", {
-    question: normalizeQuestion(question),
-    policies: toPolicies(insuranceDocuments),
-    demographics,
-    history: prepareChatHistory(history),
-  });
-}
-
 export type QaStreamEnd = {
   status: QaAnswer["status"] | "clarify";
   generation?: "llm" | "fallback";
