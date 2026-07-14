@@ -78,7 +78,7 @@ export function AnalysisProgress({
           : "fixed inset-0 z-50 flex items-center justify-center bg-white/90 px-6 py-10 text-center backdrop-blur-sm"
       }`}
     >
-      <div className="flex w-full max-w-[560px] flex-col items-center">
+      <div className="flex w-full max-w-[760px] flex-col items-center">
         <div className="analysis-pixel-loader grid size-16 grid-cols-3 gap-1.5 rounded-2xl border border-zinc-200 bg-white p-3 shadow-[7px_7px_0_#e8edff]">
           {Array.from({ length: 9 }).map((_, index) => (
             <span key={index} />
@@ -106,12 +106,12 @@ export function AnalysisProgress({
         {files.length > 0 ? (
           <ul
             aria-label="파일별 진행 상태"
-            className="mt-5 max-h-40 w-full space-y-1.5 overflow-y-auto text-left"
+            className="mt-5 grid w-full grid-cols-1 gap-1.5 text-left sm:grid-cols-2"
           >
             {files.map((file, index) => (
               <li
                 key={`${file.name}-${index}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-100 bg-white px-3 py-2 text-xs text-zinc-600"
+                className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-zinc-100 bg-white px-3 py-2 text-xs text-zinc-600"
               >
                 <span className="truncate">{file.name}</span>
                 {file.status === "done" ? (
