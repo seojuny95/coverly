@@ -72,4 +72,14 @@ describe("CoverageSummaryTable", () => {
     expect(screen.getByRole("rowgroup", { name: "입원" })).toBeInTheDocument();
     expect(screen.getByRole("rowgroup", { name: "기타" })).toBeInTheDocument();
   });
+
+  it("keeps amount columns top-aligned when a row is expanded", () => {
+    render(<CoverageSummaryTable summary={summary} />);
+
+    expect(screen.getByRole("table")).toHaveClass("table-fixed");
+    expect(screen.getByText("3,000만원").closest("td")).toHaveClass(
+      "align-top",
+    );
+    expect(screen.getByText("2개 합산").closest("td")).toHaveClass("align-top");
+  });
 });

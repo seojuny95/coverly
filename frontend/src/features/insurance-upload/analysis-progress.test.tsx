@@ -41,6 +41,35 @@ describe("AnalysisProgress", () => {
     expect(screen.getByText("읽는 중")).toBeInTheDocument();
   });
 
+  it("centers a single file instead of leaving it in the first grid column", () => {
+    render(
+      <AnalysisProgress
+        progress={{ completed: 0, total: 1 }}
+        files={[{ name: "only.pdf", status: "reading" }]}
+        surface="page"
+      />,
+    );
+
+    expect(screen.getByLabelText("파일별 진행 상태")).toHaveClass("max-w-md");
+  });
+
+  it("keeps the two-column grid for multiple files", () => {
+    render(
+      <AnalysisProgress
+        progress={{ completed: 0, total: 2 }}
+        files={[
+          { name: "a.pdf", status: "reading" },
+          { name: "b.pdf", status: "reading" },
+        ]}
+        surface="page"
+      />,
+    );
+
+    expect(screen.getByLabelText("파일별 진행 상태")).toHaveClass(
+      "sm:grid-cols-2",
+    );
+  });
+
   it("stays at 0 with no files/progress", () => {
     render(
       <AnalysisProgress

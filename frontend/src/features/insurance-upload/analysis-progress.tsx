@@ -68,6 +68,10 @@ export function AnalysisProgress({
   const statusMessage = statusMessages[messageIndex % statusMessages.length];
   // Real milestones floor the trickle so completed files always show through.
   const percent = Math.round(Math.max(displayPercent, milestonePercent));
+  const fileListClassName =
+    files.length === 1
+      ? "mt-5 grid w-full max-w-md grid-cols-1 gap-1.5 text-left"
+      : "mt-5 grid w-full grid-cols-1 gap-1.5 text-left sm:grid-cols-2";
 
   return (
     <section
@@ -104,10 +108,7 @@ export function AnalysisProgress({
           />
         </div>
         {files.length > 0 ? (
-          <ul
-            aria-label="파일별 진행 상태"
-            className="mt-5 grid w-full grid-cols-1 gap-1.5 text-left sm:grid-cols-2"
-          >
+          <ul aria-label="파일별 진행 상태" className={fileListClassName}>
             {files.map((file, index) => (
               <li
                 key={`${file.name}-${index}`}

@@ -63,8 +63,13 @@ export function CoverageSummaryTable({
     <div className="overflow-x-auto">
       <table
         aria-labelledby="coverage-total-title"
-        className="w-full min-w-[42rem] text-left text-sm"
+        className="w-full min-w-[42rem] table-fixed text-left text-sm"
       >
+        <colgroup>
+          <col className="w-[52%]" />
+          <col className="w-[23%]" />
+          <col className="w-[25%]" />
+        </colgroup>
         <thead className="bg-zinc-50 text-xs text-zinc-500">
           <tr>
             <th scope="col" className="px-6 py-3 font-medium">
@@ -112,9 +117,9 @@ function CoverageTableRow({ row }: { row: CoverageRow }) {
 function SummedCoverage({ row }: { row: SummedCoverageRow }) {
   return (
     <tr>
-      <th scope="row" className="px-6 py-4 font-medium text-zinc-800">
+      <th scope="row" className="px-6 py-4 align-top font-medium text-zinc-800">
         <CoverageDisclosure label={row.displayName}>
-          <ul className="mt-3 space-y-1.5 text-xs font-normal text-zinc-500">
+          <ul className="mt-3 space-y-1.5 text-xs font-normal break-words text-zinc-500">
             {row.composition.map((source, index) => (
               <li key={`${source.policy_id ?? "policy"}-${index}`}>
                 {coverageSourceLabel(source)} · {source.coverage_name} ·{" "}
@@ -124,10 +129,10 @@ function SummedCoverage({ row }: { row: SummedCoverageRow }) {
           </ul>
         </CoverageDisclosure>
       </th>
-      <td className="px-6 py-4 text-right font-semibold text-blue-600">
+      <td className="px-6 py-4 text-right align-top font-semibold text-blue-600">
         {formatKoreanWon(row.totalAmount)}
       </td>
-      <td className="px-6 py-4 text-right">
+      <td className="px-6 py-4 text-right align-top">
         <CoverageBasis tone="summed">
           {summedBasisLabel(row.coverageCount)}
         </CoverageBasis>
@@ -139,12 +144,12 @@ function SummedCoverage({ row }: { row: SummedCoverageRow }) {
 function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
   return (
     <tr>
-      <th scope="row" className="px-6 py-4 font-medium text-zinc-800">
+      <th scope="row" className="px-6 py-4 align-top font-medium text-zinc-800">
         <CoverageDisclosure
           label={row.displayName}
           badge={row.crossInsurerDuplicate ? <DuplicateBadge /> : null}
         >
-          <p className="mt-3 text-xs font-normal text-zinc-500">
+          <p className="mt-3 text-xs font-normal break-words text-zinc-500">
             {coverageSourceLabel({
               insurer: row.insurer,
               product_name: row.productName,
@@ -157,10 +162,10 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
           ) : null}
         </CoverageDisclosure>
       </th>
-      <td className="px-6 py-4 text-right font-medium text-zinc-700">
+      <td className="px-6 py-4 text-right align-top font-medium text-zinc-700">
         {row.originalAmount || "금액 확인 필요"}
       </td>
-      <td className="px-6 py-4 text-right">
+      <td className="px-6 py-4 text-right align-top">
         <CoverageBasis tone="indemnity">실손형 보장</CoverageBasis>
       </td>
     </tr>
@@ -170,21 +175,23 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
 function IndividualCoverage({ row }: { row: IndividualCoverageRow }) {
   return (
     <tr>
-      <th scope="row" className="px-6 py-4 font-medium text-zinc-800">
+      <th scope="row" className="px-6 py-4 align-top font-medium text-zinc-800">
         <CoverageDisclosure label={row.displayName}>
-          <p className="mt-3 text-xs font-normal text-zinc-500">
+          <p className="mt-3 text-xs font-normal break-words text-zinc-500">
             {coverageSourceLabel({
               insurer: row.insurer,
               product_name: row.productName,
             })}
           </p>
-          <p className="mt-1 text-xs font-normal text-zinc-400">{row.reason}</p>
+          <p className="mt-1 text-xs font-normal break-words text-zinc-400">
+            {row.reason}
+          </p>
         </CoverageDisclosure>
       </th>
-      <td className="px-6 py-4 text-right font-medium text-zinc-700">
+      <td className="px-6 py-4 text-right align-top font-medium text-zinc-700">
         {row.originalAmount || "금액 확인 필요"}
       </td>
-      <td className="px-6 py-4 text-right">
+      <td className="px-6 py-4 text-right align-top">
         <CoverageBasis tone="individual">그대로 보는 보장</CoverageBasis>
       </td>
     </tr>
@@ -202,8 +209,11 @@ function CoverageDisclosure({
 }) {
   return (
     <details>
-      <summary className="cursor-pointer marker:text-zinc-400">
-        <span className="inline-flex flex-wrap items-center gap-2">
+      <summary className="flex cursor-pointer list-none items-start gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
+        <span aria-hidden="true" className="mt-0.5 w-3 shrink-0 text-zinc-400">
+          ›
+        </span>
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-2 break-words">
           {label}
           {badge}
         </span>
