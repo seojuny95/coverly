@@ -120,8 +120,19 @@ backend/app/services/prompts/
 | 분류 | 정확도, enum별 혼동, `미분류` 적절성, 규칙 hit율 |
 | 표 정규화 | 담보 row recall, 금액 grounding 통과율, 원문 없는 보장내용 제거율, degrade 비율 |
 | RAG 답변 | citation 정확도, no-evidence 판정, retrieval hit 적합도, 약관 왜곡 수 |
+| Policy RAG 생성 | 고정 evidence 기반 답변 계약, citation precision, 금지 근거 미사용, PII 마스킹 유지, 판매·지급 단정 방지 |
 | 상담/분석 생성 | evidence 일치율, 판매·공포 문구 발생률, 중복 insight, next action 품질 |
 | 스트리밍 | non-stream parity, citation 후처리 성공률, `CLARIFY` 처리, fallback 안정성 |
+
+RAG 평가는 retrieval과 generation을 분리해서 본다.
+Retrieval 평가는 질문에 맞는 근거를 찾아오는지 측정하고, generation 평가는 이미 주어진 고정 근거만으로 답변 계약을 지키는지 측정한다.
+따라서 generation 평가셋에는 검색 랭킹을 기대값으로 넣지 않고, `required_evidence_ids`, `allowed_evidence_ids`, `forbidden_evidence_ids`, `must_include_groups`, `must_not_include`처럼 답변이 어떤 근거를 사용해야 하고 어떤 근거를 쓰면 안 되는지를 명시한다.
+특히 업로드 증권(policy) RAG generation 평가는 실제 사용자의 증권 원문 조각을 다루므로, 평가 fixture에는 개인정보 원문을 넣지 않고 `[전화번호]`, `[주민등록번호]`, `[이메일]`, `[계좌번호]` 같은 마스킹 토큰만 둔다.
+다중 증권, 같은 담보명 충돌, OCR 노이즈, 프롬프트 인젝션, 긴 distractor, 근거 부족 fallback처럼 generation 단계에서 흔히 깨지는 edge case를 별도 케이스로 유지한다.
+
+Policy RAG generation 평가는 practice와 test를 분리한다. practice는 실패 원인을 분석하고 프롬프트·후처리를 반복 개선하는 데 사용하며, 단일 fixture인 `app/services/rag/policy/evaluation/generation_dataset.json`에 둔다. 정답 근거가 첫 위치에 몰리지 않도록 3개 이상의 근거, 다중 근거 정답, 관련 있어 보이는 근거 부족 사례, 실제 샘플 증권에서 비식별화한 edge case를 충분히 포함한다. test는 `app/services/rag/policy/evaluation/generation_test_dataset.json`에 따로 두고 practice 개선을 끝낸 뒤 별도 fixture로 한 번만 실행한다. test 결과를 본 뒤 같은 test에 맞춰 수정하지 않으며, 추가 개선이 필요하면 해당 실패 유형은 다음 practice에 반영하고 새로운 test로 다시 검증한다. 질문을 읽지 않고 첫 근거만 고르는 baseline도 함께 측정해 평가셋 자체가 지나치게 쉽지 않은지 확인한다.
+
+Policy RAG generation은 공용 상담 생성기가 아니라 `app/services/rag/policy/generation.py`의 독립 생성기를 사용한다. 평가 러너도 이 생성기를 직접 호출해 검색 품질이나 공용 QA 후처리 변경 없이 policy 답변 계약만 측정한다.
 
 ## 현재 결정
 
