@@ -5,10 +5,9 @@ channel block so answers can point to the right place without an LLM inventing
 URLs. Insurer names live only in the data file, never in this module.
 """
 
-import json
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
 
 from app.schemas.qa import (
     ClaimChannelBlock,
@@ -17,6 +16,7 @@ from app.schemas.qa import (
     ClaimChannelLink,
 )
 from app.services.paths import SERVICE_DATA_DIR
+from app.services.reference_data import load_reference_data
 
 _DATA = SERVICE_DATA_DIR / "claim_channels.json"
 
@@ -53,8 +53,13 @@ class ClaimChannelSet:
 
 @lru_cache(maxsize=1)
 def _directory() -> dict[str, Any]:
-    result: dict[str, Any] = json.loads(_DATA.read_text(encoding="utf-8"))
-    return result
+    return load_reference_data("claim_channels", _DATA, _validate_directory)
+
+
+def _validate_directory(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or not isinstance(value.get("보험사"), list):
+        raise ValueError("claim channels must contain an insurer list")
+    return cast(dict[str, Any], value)
 
 
 def _match(insurer: str, entries: list[dict[str, Any]]) -> dict[str, Any] | None:

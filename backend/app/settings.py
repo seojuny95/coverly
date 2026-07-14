@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
     database_url: str = ""
+    reference_data_database_enabled: bool = True
     rag_pg_table: str = "official_rag_chunks"
     rag_embedding_dim: int = 1536
     policy_rag_ttl_seconds: int = 15 * 60

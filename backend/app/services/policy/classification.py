@@ -23,24 +23,22 @@ The result is UI-oriented display metadata for browsing policies, not a legal
 determination of insurance category.
 """
 
-import json
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel
 
 from app.services.llm import JsonCompleter, structured_completer
 from app.services.paths import SERVICE_DATA_DIR
 from app.services.policy.models import PolicyClassification
+from app.services.reference_data import load_reference_data
 
 CLASSIFICATION_UNKNOWN = "미분류"
 
 _HEAD_CHARS = 3_000
 
 _RULES_PATH = SERVICE_DATA_DIR / "classification_rules.json"
-_RAW_RULES = json.loads(_RULES_PATH.read_text(encoding="utf-8"))
-TAG_ORDER: list[str] = _RAW_RULES["tag_order"]
 
 _ClassificationLiteral = Literal[
     "자동차", "상해·질병·실손", "배상·화재·기타", "생명·연금", "미분류"
@@ -100,6 +98,20 @@ class _Category:
     terms: list[str]
 
 
+def _validate_rules_payload(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError("classification rules must be an object")
+    if not isinstance(value.get("categories"), list):
+        raise ValueError("classification rules must contain categories")
+    if not isinstance(value.get("tag_order"), list):
+        raise ValueError("classification rules must contain tag_order")
+    if not isinstance(value.get("tag_terms"), dict):
+        raise ValueError("classification rules must contain tag_terms")
+    return cast(dict[str, Any], value)
+
+
+_RAW_RULES = load_reference_data("classification_rules", _RULES_PATH, _validate_rules_payload)
+TAG_ORDER: list[str] = _RAW_RULES["tag_order"]
 _CATEGORIES = [
     _Category(
         classification=category["classification"],

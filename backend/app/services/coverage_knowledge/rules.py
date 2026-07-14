@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import cast
 
 from app.services.paths import SERVICE_DATA_DIR
+from app.services.reference_data import load_reference_data
 
 _RULES_PATH = SERVICE_DATA_DIR / "coverage_matching_rules.json"
 _FORMATTING_PATTERN = re.compile(r"[^0-9A-Za-z가-힣%~]")
@@ -37,6 +38,10 @@ def load_matching_rules(path: Path = _RULES_PATH) -> CoverageMatchingRules:
     """Load a complete, internally consistent matching configuration."""
 
     payload = cast(object, json.loads(path.read_text(encoding="utf-8")))
+    return _parse_matching_rules(payload)
+
+
+def _parse_matching_rules(payload: object) -> CoverageMatchingRules:
     if not isinstance(payload, dict):
         raise ValueError("coverage matching rules must be an object")
 
@@ -68,7 +73,7 @@ def load_matching_rules(path: Path = _RULES_PATH) -> CoverageMatchingRules:
 
 @lru_cache(maxsize=1)
 def default_matching_rules() -> CoverageMatchingRules:
-    return load_matching_rules()
+    return load_reference_data("coverage_matching_rules", _RULES_PATH, _parse_matching_rules)
 
 
 def format_coverage_key(value: str) -> str:

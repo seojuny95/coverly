@@ -6,7 +6,6 @@ Combines three extraction layers into one flat module:
   3. Classification merge — attaches 보험분류/상품태그 via `classify_policy`.
 """
 
-import json
 import re
 from collections.abc import Callable
 from functools import lru_cache
@@ -28,6 +27,7 @@ from app.services.policy.models import (
     PremiumSummary,
     VehicleInfo,
 )
+from app.services.reference_data import load_reference_data
 from app.settings import get_settings
 
 LlmPolicySummary = PolicyCoreSummary
@@ -718,7 +718,12 @@ class _LlmPolicySummaryExtraction(BaseModel):
 
 @lru_cache
 def get_insurer_candidates() -> tuple[str, ...]:
-    payload = json.loads(_INSURER_CATALOG_PATH.read_text(encoding="utf-8"))
+    return load_reference_data(
+        "insurer_catalog", _INSURER_CATALOG_PATH, _validate_insurer_candidates
+    )
+
+
+def _validate_insurer_candidates(payload: object) -> tuple[str, ...]:
     if not isinstance(payload, list):
         raise ValueError("insurer catalog must be a JSON list")
 
@@ -744,13 +749,8 @@ def get_insurer_aliases() -> dict[str, tuple[str, ...]]:
 def get_insurer_contact_evidence() -> tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]:
     """Return catalog insurers with official homepage domains and call-center digits."""
 
-    payload = json.loads(_CLAIM_CHANNELS_PATH.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        return ()
-
-    entries = payload.get("보험사")
-    if not isinstance(entries, list):
-        return ()
+    payload = load_reference_data("claim_channels", _CLAIM_CHANNELS_PATH, _validate_contact_data)
+    entries = payload["보험사"]
 
     evidence: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
     for entry in entries:
@@ -775,6 +775,16 @@ def get_insurer_contact_evidence() -> tuple[tuple[str, tuple[str, ...], tuple[st
         evidence.append((insurer, domains, tuple(value for value in phones if value)))
 
     return tuple(evidence)
+
+
+def _validate_contact_data(payload: object) -> dict[str, list[object]]:
+    if not isinstance(payload, dict):
+        raise ValueError("claim channels must be an object")
+
+    entries = payload.get("보험사")
+    if not isinstance(entries, list):
+        raise ValueError("claim channels must contain an insurer list")
+    return {"보험사": entries}
 
 
 def _domain_evidence(url: str) -> tuple[str, ...]:

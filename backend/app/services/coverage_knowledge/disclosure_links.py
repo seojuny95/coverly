@@ -1,11 +1,11 @@
 """Deterministic insurer disclosure/terms links (not RAG)."""
 
-import json
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from app.services.paths import SERVICE_DATA_DIR
+from app.services.reference_data import load_reference_data
 
 _DATA = SERVICE_DATA_DIR / "disclosure_links.json"
 
@@ -22,8 +22,13 @@ class DisclosureLink:
 
 @lru_cache(maxsize=1)
 def _directory() -> dict[str, Any]:
-    result: dict[str, Any] = json.loads(_DATA.read_text(encoding="utf-8"))
-    return result
+    return load_reference_data("disclosure_links", _DATA, _validate_directory)
+
+
+def _validate_directory(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or not isinstance(value.get("association_links"), list):
+        raise ValueError("disclosure links must contain an association link list")
+    return cast(dict[str, Any], value)
 
 
 def disclosure_links_for_insurer(insurer: str | None) -> tuple[DisclosureLink, ...]:
