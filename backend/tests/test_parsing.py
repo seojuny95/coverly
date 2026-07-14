@@ -27,6 +27,15 @@ def _encrypted_blank_pdf(password: str) -> bytes:
     return buffer.getvalue()
 
 
+def _owner_only_encrypted_blank_pdf(owner_password: str) -> bytes:
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.encrypt("", owner_password=owner_password)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
 def test_parse_document_returns_parsed_document_shape() -> None:
     result = parse_document(_blank_pdf())
     assert isinstance(result, ParsedDocument)
@@ -70,4 +79,9 @@ def test_parse_document_rejects_wrong_password_for_encrypted_pdf() -> None:
 
 def test_parse_document_accepts_correct_password_for_encrypted_pdf() -> None:
     result = parse_document(_encrypted_blank_pdf("secret"), password="secret")
+    assert isinstance(result, ParsedDocument)
+
+
+def test_parse_document_accepts_owner_only_encrypted_pdf_without_password() -> None:
+    result = parse_document(_owner_only_encrypted_blank_pdf("owner-secret"))
     assert isinstance(result, ParsedDocument)

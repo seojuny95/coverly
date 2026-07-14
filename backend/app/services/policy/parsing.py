@@ -37,7 +37,9 @@ def _check_pdf_password(pdf_bytes: bytes, password: str | None) -> None:
         return
 
     if not password:
-        raise PdfPasswordRequiredError
+        if reader.decrypt("") == 0:
+            raise PdfPasswordRequiredError
+        return
 
     if reader.decrypt(password) == 0:
         raise PdfPasswordIncorrectError
