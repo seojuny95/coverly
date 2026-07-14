@@ -37,7 +37,11 @@ from app.services.qa.generation import (
     stream_consultation_answer,
 )
 from app.services.rag.official.answer import RagAnswer, RagCitation, answer_official_question
-from app.services.rag.policy import retrieve_policy_context
+from app.services.rag.policy import (
+    PolicyGenerationResult,
+    generate_policy_answer,
+    retrieve_policy_context,
+)
 
 # "How do I claim?" is procedural — answer with the deterministic channel directory.
 _CLAIM_HOWTO_TERMS = ("청구", "신청", "접수", "서류")
@@ -110,7 +114,16 @@ def answer_portfolio_question(
         return _with_demographics(channels, insured)
 
     fallback = _consultation_fallback(facts, insured, life_stage_check, catalog)
-    catalog = _with_session_context(catalog, policies, normalized_question)
+    policy_catalog = _policy_session_catalog(catalog, policies, normalized_question)
+    if policy_catalog is not None:
+        result = generate_policy_answer(
+            normalized_question,
+            policy_catalog.items,
+            complete=complete,
+        )
+        response = _policy_generation_response(result, policy_catalog, fallback)
+        return _with_demographics(response, insured)
+
     response = generate_consultation_answer(
         fallback=fallback,
         question=normalized_question,
@@ -200,7 +213,18 @@ def stream_portfolio_answer(
     fallback = _with_demographics(
         _consultation_fallback(facts, insured, life_stage_check, catalog), insured
     )
-    catalog = _with_session_context(catalog, policies, normalized_question)
+    policy_catalog = _policy_session_catalog(catalog, policies, normalized_question)
+    if policy_catalog is not None:
+        # Policy generation validates a complete structured draft before streaming,
+        # so this path emits the finalized policy answer as one response delta.
+        result = generate_policy_answer(
+            normalized_question,
+            policy_catalog.items,
+        )
+        response = _policy_generation_response(result, policy_catalog, fallback)
+        yield from _stream_response(_with_demographics(response, insured))
+        return
+
     limitations = list(_standard_limitations(facts))
     notice = _demographic_notice(insured)
     if notice:
@@ -256,19 +280,47 @@ def _base_normalized_key(coverage_name: str) -> str:
     return canonicalize_coverage_name(base_name).normalized_key
 
 
-def _with_session_context(
+def _policy_session_catalog(
     catalog: EvidenceCatalog,
     policies: list[PolicyInput],
     question: str,
-) -> EvidenceCatalog:
+) -> EvidenceCatalog | None:
     session_ids = [policy.문서세션ID for policy in policies if policy.문서세션ID is not None]
     if not session_ids:
-        return catalog
+        return None
     try:
         hits = retrieve_policy_context(session_ids, question)
     except Exception:
-        return catalog
+        return None
+    if not hits:
+        return None
     return with_session_evidence(catalog, hits)
+
+
+def _policy_generation_response(
+    result: PolicyGenerationResult,
+    catalog: EvidenceCatalog,
+    fallback: PortfolioQuestionResponse,
+) -> PortfolioQuestionResponse:
+    if result.generation == "fallback":
+        return fallback
+
+    section = AnswerSection(
+        title="업로드 증권 근거",
+        content=result.answer,
+        basis="confirmed_fact",
+    )
+    return PortfolioQuestionResponse(
+        status="answered",
+        answer=result.answer,
+        sections=[section],
+        citations=[
+            citation_from_evidence(catalog.by_id[item_id]) for item_id in result.evidence_ids
+        ],
+        limitations=list(result.limitations),
+        suggestions=list(result.suggestions),
+        generation="llm",
+    )
 
 
 def _answer_with_official_rag(
