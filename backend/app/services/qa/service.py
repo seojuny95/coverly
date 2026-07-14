@@ -1,9 +1,11 @@
 """Conversational Q&A grounded in uploaded portfolio facts."""
 
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 
 from app.schemas.consultation import (
     AnswerSection,
+    GenerationMode,
     InsuredDemographics,
 )
 from app.schemas.portfolio import PolicyInput
@@ -36,6 +38,7 @@ from app.services.qa.generation import (
     generate_consultation_answer,
     stream_consultation_answer,
 )
+from app.services.qa.planning import QuestionPlan, plan_questions
 from app.services.rag.official.answer import RagAnswer, RagCitation, answer_official_question
 from app.services.rag.policy import (
     PolicyGenerationResult,
@@ -73,8 +76,21 @@ _OFFICIAL_CLAIM_CHECK_TERMS = (
     "받을수",
     "면책",
 )
+_MAX_SUGGESTIONS = 3
 
 OfficialAnswerer = Callable[[str], RagAnswer]
+
+
+@dataclass(frozen=True)
+class _QaContext:
+    question: str
+    policies: list[PolicyInput]
+    history: list[ConversationMessage]
+    insured: InsuredDemographics
+    facts: PortfolioFacts
+    auto_policies: tuple[PolicyInput, ...]
+    life_stage_check: LifeStageCheck
+    catalog: EvidenceCatalog
 
 
 def answer_portfolio_question(
@@ -85,56 +101,45 @@ def answer_portfolio_question(
     history: list[ConversationMessage] | None = None,
     complete: JsonCompleter | None = None,
     official_answer: OfficialAnswerer | None = None,
+    plan: JsonCompleter | None = None,
 ) -> PortfolioQuestionResponse:
     """Answer with cited facts, or refuse conclusions that require policy terms."""
 
-    insured = resolve_portfolio_demographics(policies, demographics)
-    facts = build_portfolio_facts(policies)
-    auto_policies = tuple(policy for policy in policies if is_auto_policy(policy))
-    normalized_question = question.strip()
-    life_stage_check = _life_stage_check(insured, facts)
-    catalog = build_evidence_catalog(facts, insured, life_stage_check.missing, auto_policies)
+    context = _build_qa_context(question, policies, demographics, history)
+    question_plan = plan_questions(context.question, context.history, complete=plan)
+    if question_plan is not None:
+        return _answer_question_plan(context, question_plan, complete, official_answer)
+    return _answer_context(context, complete, official_answer)
 
-    official_response = None
-    if complete is None or official_answer is not None:
-        official_response = _answer_with_official_rag(normalized_question, official_answer)
-    if official_response is not None:
-        return _with_demographics(official_response, insured)
 
-    if not facts.policies and not auto_policies:
-        return _with_demographics(_no_uploaded_policies_response(), insured)
-    if any(term in normalized_question for term in _AMOUNT_TERMS):
-        return _with_demographics(_answer_amount(normalized_question, facts, catalog), insured)
-    if any(term in normalized_question for term in _STATUS_TERMS):
-        return _with_demographics(_answer_status(facts, catalog, auto_policies), insured)
-    if any(term in normalized_question for term in _HOLDING_TERMS):
-        return _with_demographics(_answer_holdings(facts, catalog, auto_policies), insured)
-    if any(term in normalized_question for term in _CLAIM_HOWTO_TERMS):
-        channels = _answer_claim_channels(policies, facts, normalized_question)
-        return _with_demographics(channels, insured)
+def _answer_context(
+    context: _QaContext,
+    complete: JsonCompleter | None,
+    official_answer: OfficialAnswerer | None,
+) -> PortfolioQuestionResponse:
+    response = _resolve_precomputed_answer(
+        context,
+        try_official=complete is None or official_answer is not None,
+        official_answer=official_answer,
+        complete=complete,
+        pass_complete=True,
+    )
+    if response is not None:
+        return response
 
-    fallback = _consultation_fallback(facts, insured, life_stage_check, catalog)
-    policy_catalog = _policy_session_catalog(catalog, policies, normalized_question)
-    if policy_catalog is not None:
-        result = generate_policy_answer(
-            normalized_question,
-            policy_catalog.items,
-            complete=complete,
-        )
-        response = _policy_generation_response(result, policy_catalog, fallback)
-        return _with_demographics(response, insured)
+    fallback = _context_fallback(context)
 
     response = generate_consultation_answer(
         fallback=fallback,
-        question=normalized_question,
-        demographics=insured,
-        history=history or [],
-        life_stage_check=life_stage_check,
-        catalog=catalog,
-        standard_limitations=_standard_limitations(facts),
+        question=context.question,
+        demographics=context.insured,
+        history=context.history,
+        life_stage_check=context.life_stage_check,
+        catalog=context.catalog,
+        standard_limitations=_standard_limitations(context.facts),
         complete=complete,
     )
-    return _with_demographics(response, insured)
+    return _with_demographics(response, context.insured)
 
 
 def _no_uploaded_policies_response() -> PortfolioQuestionResponse:
@@ -143,7 +148,7 @@ def _no_uploaded_policies_response() -> PortfolioQuestionResponse:
         answer="살펴볼 보험 정보가 아직 없어요.",
         citations=[],
         limitations=["보험증권을 먼저 업로드해 주세요."],
-        suggestions=["보험증권을 업로드한 뒤 다시 질문해 주세요."],
+        suggestions=["업로드한 증권에서 어떤 보장을 확인할 수 있어?"],
     )
 
 
@@ -173,73 +178,284 @@ def stream_portfolio_answer(
     history: list[ConversationMessage] | None = None,
     stream: TextStreamer | None = None,
     official_answer: OfficialAnswerer | None = None,
+    plan: JsonCompleter | None = None,
 ) -> Iterator[QaStreamEvent]:
     """Stream the answer: deterministic routes emit at once, the LLM route streams."""
 
-    insured = resolve_portfolio_demographics(policies, demographics)
-    facts = build_portfolio_facts(policies)
-    auto_policies = tuple(policy for policy in policies if is_auto_policy(policy))
-    normalized_question = question.strip()
-    life_stage_check = _life_stage_check(insured, facts)
-    catalog = build_evidence_catalog(facts, insured, life_stage_check.missing, auto_policies)
+    context = _build_qa_context(question, policies, demographics, history)
+    question_plan = plan_questions(context.question, context.history, complete=plan)
+    if question_plan is not None:
+        if question_plan.clarification is not None:
+            yield from _stream_clarification(question_plan.clarification)
+            return
+        if len(question_plan.questions) != 1 or question_plan.questions[0].scope != "insurance":
+            response = _answer_question_plan(context, question_plan, None, official_answer)
+            yield from _stream_response(response)
+            return
+        context = _context_with_question(context, question_plan.questions[0].resolved)
 
-    official_response = None
-    if stream is None or official_answer is not None:
-        official_response = _answer_with_official_rag(normalized_question, official_answer)
-    if official_response is not None:
-        yield from _stream_response(_with_demographics(official_response, insured))
-        return
+    yield from _stream_context(context, stream, official_answer)
 
-    if not facts.policies and not auto_policies:
-        yield from _stream_response(_with_demographics(_no_uploaded_policies_response(), insured))
-        return
-    if any(term in normalized_question for term in _AMOUNT_TERMS):
-        response = _answer_amount(normalized_question, facts, catalog)
-        yield from _stream_response(_with_demographics(response, insured))
-        return
-    if any(term in normalized_question for term in _STATUS_TERMS):
-        status = _answer_status(facts, catalog, auto_policies)
-        yield from _stream_response(_with_demographics(status, insured))
-        return
-    if any(term in normalized_question for term in _HOLDING_TERMS):
-        holdings = _answer_holdings(facts, catalog, auto_policies)
-        yield from _stream_response(_with_demographics(holdings, insured))
-        return
-    if any(term in normalized_question for term in _CLAIM_HOWTO_TERMS):
-        channels = _answer_claim_channels(policies, facts, normalized_question)
-        yield from _stream_response(_with_demographics(channels, insured))
-        return
 
-    fallback = _with_demographics(
-        _consultation_fallback(facts, insured, life_stage_check, catalog), insured
+def _stream_clarification(question: str) -> Iterator[QaStreamEvent]:
+    yield {"type": "meta", "status": "clarify", "generation": "fallback"}
+    yield {"type": "delta", "text": question}
+    yield {
+        "type": "end",
+        "status": "clarify",
+        "generation": "fallback",
+        "citations": [],
+        "limitations": [],
+        "suggestions": [],
+        "claim_channels": None,
+    }
+
+
+def _stream_context(
+    context: _QaContext,
+    stream: TextStreamer | None,
+    official_answer: OfficialAnswerer | None,
+) -> Iterator[QaStreamEvent]:
+    response = _resolve_precomputed_answer(
+        context,
+        try_official=stream is None or official_answer is not None,
+        official_answer=official_answer,
+        complete=None,
+        pass_complete=False,
     )
-    policy_catalog = _policy_session_catalog(catalog, policies, normalized_question)
-    if policy_catalog is not None:
-        # Policy generation validates a complete structured draft before streaming,
-        # so this path emits the finalized policy answer as one response delta.
-        result = generate_policy_answer(
-            normalized_question,
-            policy_catalog.items,
-        )
-        response = _policy_generation_response(result, policy_catalog, fallback)
-        yield from _stream_response(_with_demographics(response, insured))
+    if response is not None:
+        yield from _stream_response(response)
         return
 
-    limitations = list(_standard_limitations(facts))
-    notice = _demographic_notice(insured)
+    fallback = _with_demographics(_context_fallback(context), context.insured)
+    limitations = list(_standard_limitations(context.facts))
+    notice = _demographic_notice(context.insured)
     if notice:
         limitations.append(notice)
     yield from stream_consultation_answer(
-        question=normalized_question,
-        demographics=insured,
+        question=context.question,
+        demographics=context.insured,
+        history=context.history,
+        life_stage_check=context.life_stage_check,
+        catalog=context.catalog,
+        limitations=limitations,
+        suggestions=_contextual_suggestions(context),
+        fallback=fallback,
+        claim_targets=_claim_targets(context.policies, _medical_indemnity_names(context.facts)),
+        stream=stream,
+    )
+
+
+def _build_qa_context(
+    question: str,
+    policies: list[PolicyInput],
+    demographics: InsuredDemographics | None,
+    history: list[ConversationMessage] | None,
+) -> _QaContext:
+    insured = resolve_portfolio_demographics(policies, demographics)
+    facts = build_portfolio_facts(policies)
+    auto_policies = tuple(policy for policy in policies if is_auto_policy(policy))
+    life_stage_check = _life_stage_check(insured, facts)
+    catalog = build_evidence_catalog(facts, insured, life_stage_check.missing, auto_policies)
+
+    return _QaContext(
+        question=question.strip(),
+        policies=policies,
         history=history or [],
+        insured=insured,
+        facts=facts,
+        auto_policies=auto_policies,
         life_stage_check=life_stage_check,
         catalog=catalog,
-        limitations=limitations,
-        suggestions=["다른 담보나 보장 공백도 이어서 물어보세요."],
-        fallback=fallback,
-        claim_targets=_claim_targets(policies, _medical_indemnity_names(facts)),
-        stream=stream,
+    )
+
+
+def _context_with_question(context: _QaContext, question: str) -> _QaContext:
+    return _QaContext(
+        question=question.strip(),
+        policies=context.policies,
+        history=context.history,
+        insured=context.insured,
+        facts=context.facts,
+        auto_policies=context.auto_policies,
+        life_stage_check=context.life_stage_check,
+        catalog=context.catalog,
+    )
+
+
+def _answer_question_plan(
+    context: _QaContext,
+    question_plan: QuestionPlan,
+    complete: JsonCompleter | None,
+    official_answer: OfficialAnswerer | None,
+) -> PortfolioQuestionResponse:
+    if question_plan.clarification is not None:
+        return PortfolioQuestionResponse(
+            status="clarify",
+            answer=question_plan.clarification,
+            citations=[],
+            limitations=[],
+            suggestions=[],
+        )
+
+    answers: list[str] = []
+    citations: list[AnswerCitation] = []
+    limitations: list[str] = []
+    suggestions: list[str] = []
+    answered = False
+    generation: GenerationMode = "fallback"
+    claim_channels = None
+
+    for planned in question_plan.questions:
+        if planned.scope == "out_of_scope":
+            answer = "보험과 관련 없는 정보는 답변하기 어려워요."
+        elif planned.scope == "greeting":
+            answer = "안녕하세요. 가입한 보험과 보장에 관해 궁금한 내용을 물어봐 주세요."
+            answered = True
+        else:
+            response = _answer_context(
+                _context_with_question(context, planned.resolved),
+                complete,
+                official_answer,
+            )
+            answer = response.answer
+            answered = answered or response.status == "answered"
+            generation = "llm" if response.generation == "llm" else generation
+            citations.extend(response.citations)
+            limitations.extend(response.limitations)
+            suggestions.extend(response.suggestions)
+            claim_channels = claim_channels or response.claim_channels
+        if len(question_plan.questions) == 1:
+            answers.append(answer)
+        else:
+            answers.append(f"{planned.original}\n{answer}")
+
+    return PortfolioQuestionResponse(
+        status="answered" if answered else "refused",
+        answer="\n\n".join(answers),
+        citations=_unique_citations(citations),
+        limitations=list(dict.fromkeys(limitations)),
+        suggestions=_question_suggestions(*suggestions, *_contextual_suggestions(context)),
+        generation=generation,
+        demographics=context.insured,
+        claim_channels=claim_channels,
+    )
+
+
+def _unique_citations(citations: list[AnswerCitation]) -> list[AnswerCitation]:
+    unique: list[AnswerCitation] = []
+    seen: set[str] = set()
+    for citation in citations:
+        key = citation.model_dump_json()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(citation)
+    return unique
+
+
+def _contextual_suggestions(context: _QaContext) -> list[str]:
+    totals = context.facts.coverage_summary.totals
+    if totals:
+        coverage_name = totals[0].display_name
+        candidates = [
+            f"{coverage_name} 가입금액은 얼마야?",
+            f"{coverage_name} 지급 조건은 뭐야?",
+            "가입한 보험은 몇 개야?",
+        ]
+    else:
+        candidates = [
+            "가입한 보험은 몇 개야?",
+            "분석 상태는 어때?",
+            "실손 청구는 어디서 해?",
+        ]
+    if context.facts.coverage_summary.indemnity_coverages:
+        candidates.append("실손 청구는 어디서 해?")
+    return _question_suggestions(*candidates)
+
+
+def _fact_suggestions(facts: PortfolioFacts) -> list[str]:
+    totals = facts.coverage_summary.totals
+    if not totals:
+        return _question_suggestions("가입한 보험은 몇 개야?", "분석 상태는 어때?")
+    coverage_name = totals[0].display_name
+    return _question_suggestions(
+        f"{coverage_name} 가입금액은 얼마야?",
+        f"{coverage_name} 지급 조건은 뭐야?",
+        "가입한 보험은 몇 개야?",
+    )
+
+
+def _question_suggestions(*candidates: str) -> list[str]:
+    suggestions: list[str] = []
+    for candidate in candidates:
+        cleaned = " ".join(candidate.split())
+        if not cleaned or cleaned in suggestions:
+            continue
+        if not cleaned.endswith("?"):
+            continue
+        suggestions.append(cleaned)
+        if len(suggestions) == _MAX_SUGGESTIONS:
+            break
+    return suggestions
+
+
+def _resolve_precomputed_answer(
+    context: _QaContext,
+    *,
+    try_official: bool,
+    official_answer: OfficialAnswerer | None,
+    complete: JsonCompleter | None,
+    pass_complete: bool,
+) -> PortfolioQuestionResponse | None:
+    if try_official:
+        response = _answer_with_official_rag(context.question, official_answer)
+        if response is not None:
+            return _with_demographics(response, context.insured)
+
+    if not context.facts.policies and not context.auto_policies:
+        return _with_demographics(_no_uploaded_policies_response(), context.insured)
+    if any(term in context.question for term in _AMOUNT_TERMS):
+        response = _answer_amount(context.question, context.facts, context.catalog)
+        return _with_demographics(response, context.insured)
+    if any(term in context.question for term in _STATUS_TERMS):
+        response = _answer_status(context.facts, context.catalog, context.auto_policies)
+        return _with_demographics(response, context.insured)
+    if any(term in context.question for term in _HOLDING_TERMS):
+        response = _answer_holdings(context.facts, context.catalog, context.auto_policies)
+        return _with_demographics(response, context.insured)
+    if any(term in context.question for term in _CLAIM_HOWTO_TERMS):
+        response = _answer_claim_channels(context.policies, context.facts, context.question)
+        return _with_demographics(response, context.insured)
+
+    policy_catalog = _policy_session_catalog(
+        context.catalog,
+        context.policies,
+        context.question,
+    )
+    if policy_catalog is None:
+        return None
+
+    # Policy generation validates a complete structured draft before streaming,
+    # so this path is always returned as one finalized response.
+    if pass_complete:
+        result = generate_policy_answer(
+            context.question,
+            policy_catalog.items,
+            complete=complete,
+        )
+    else:
+        result = generate_policy_answer(context.question, policy_catalog.items)
+    response = _policy_generation_response(result, policy_catalog, _context_fallback(context))
+    return _with_demographics(response, context.insured)
+
+
+def _context_fallback(context: _QaContext) -> PortfolioQuestionResponse:
+    return _consultation_fallback(
+        context.facts,
+        context.insured,
+        context.life_stage_check,
+        context.catalog,
     )
 
 
@@ -388,8 +604,11 @@ def _official_citation(citation: RagCitation) -> AnswerCitation:
 
 def _official_suggestions(result: RagAnswer) -> list[str]:
     if result.mode == "claim_check":
-        return ["가입한 상품의 실제 약관과 보험사 심사 기준을 함께 확인해 주세요."]
-    return ["업로드한 증권의 담보명이나 보장내용과 함께 다시 물어보세요."]
+        return _question_suggestions("내 증권 기준으로도 보상 조건을 확인할 수 있어?")
+    return _question_suggestions(
+        "이 약관 내용이 내 증권에도 들어 있어?",
+        "내 담보의 지급 조건은 뭐야?",
+    )
 
 
 def _medical_indemnity_names(facts: PortfolioFacts) -> set[str]:
@@ -445,7 +664,7 @@ def _answer_amount(
                 ),
                 citations=[],
                 limitations=_standard_limitations(facts),
-                suggestions=["확인할 담보명 하나와 함께 가입금액을 질문해 주세요."],
+                suggestions=_question_suggestions("담보별 가입금액은 얼마야?"),
             )
         selected_totals = matches
 
@@ -455,7 +674,7 @@ def _answer_amount(
             answer="올린 증권에서 질문한 담보의 확인 가능한 가입금액을 찾지 못했습니다.",
             citations=[],
             limitations=_standard_limitations(facts),
-            suggestions=["담보명을 증권에 적힌 표현으로 다시 질문해 보세요."],
+            suggestions=_fact_suggestions(facts),
         )
 
     total_amount = sum(item.total_amount for item in selected_totals)
@@ -518,7 +737,7 @@ def _fact_response(
             if evidence_id in catalog.by_id
         ],
         limitations=_standard_limitations(facts),
-        suggestions=["다른 담보나 보장 공백도 이어서 물어보세요."],
+        suggestions=_fact_suggestions(facts),
     )
 
 
@@ -599,7 +818,7 @@ def _answer_claim_channels(
             "청구 방법만 안내했어요. "
             "보상 가능 여부와 지급액은 약관·보험사 안내를 확인해야 정확합니다."
         ],
-        suggestions=["가입한 담보와 금액처럼 증권에서 확인 가능한 내용도 물어보세요."],
+        suggestions=_fact_suggestions(facts),
         claim_channels=block,
     )
 

@@ -122,7 +122,8 @@ backend/app/services/prompts/
 | RAG 답변 | citation 정확도, no-evidence 판정, retrieval hit 적합도, 약관 왜곡 수 |
 | Policy RAG 생성 | 고정 evidence 기반 답변 계약, citation precision, 금지 근거 미사용, PII 마스킹 유지, 판매·지급 단정 방지 |
 | 상담/분석 생성 | evidence 일치율, 판매·공포 문구 발생률, 중복 insight, next action 품질 |
-| 스트리밍 | non-stream parity, citation 후처리 성공률, `CLARIFY` 처리, fallback 안정성 |
+| Q&A planner | planner 호출률, 지시어 해소 정확도, 복합 질문 분리, 도메인 밖 질문 제한, planner 장애 시 fallback 안정성 |
+| 스트리밍 | non-stream parity, citation 후처리 성공률, `CLARIFY` 처리, fallback 안정성, 질문 추천 형식 |
 
 RAG 평가는 retrieval과 generation을 분리해서 본다.
 Retrieval 평가는 질문에 맞는 근거를 찾아오는지 측정하고, generation 평가는 이미 주어진 고정 근거만으로 답변 계약을 지키는지 측정한다.
@@ -140,3 +141,8 @@ Policy RAG generation은 공용 상담 생성기가 아니라 `app/services/rag/
 - 두 fallback은 제거하지 않는다. deterministic rule이 먼저 잡으면 호출하지 않고, 규칙이 실패할 때만 fallback으로 둔다.
 - 보험사 추출은 특정 보험사 alias, 도메인, 브랜드 전용 데이터로 보정하지 않는다. false positive가 더 위험하므로 LLM fallback과 grounding에 맡긴다.
 - 프롬프트 구조화는 실제 API 비교로 검증한다. 기본정보 보완 추출처럼 구조화가 timeout이나 품질 저하를 만들면 적용하지 않는다.
+- Q&A는 외부 API 기준으로 `POST /qa/stream` 하나만 유지한다. `stream`은 전송 방식이고, 답변 도메인 모델은 하나로 본다.
+- 단순한 보험 사실 질문은 planner를 거치지 않고 결정적 fast path를 우선한다. planner는 지시어 해소, 복합 질문 분리, 명백한 도메인 밖 질문, 인사처럼 대화 turn을 정리해야 할 때만 호출한다.
+- planner 입력에는 최근 12개 대화만 넣고, 주민등록번호 형태뿐 아니라 전화번호와 이메일도 외부 모델 호출 전에 마스킹한다.
+- planner가 실패해도 명백한 도메인 밖 질문은 보험 상담 답변으로 흘려보내지 않는다. 복합 질문에 외부 도메인이 섞이면 가능한 범위에서 보험 부분과 외부 도메인 부분을 나누고, 외부 도메인 부분은 정중하게 제한한다.
+- 후속 질문 추천은 사용자가 그대로 누를 수 있는 질문 원문만 사용한다. `~해 보세요`, `~확인해 주세요` 같은 행동 제안 문장은 추천 질문에 넣지 않고, 최대 3개만 반환한다.

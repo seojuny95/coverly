@@ -63,7 +63,7 @@ class ClaimChannelBlock(BaseModel):
 
 
 class PortfolioQuestionResponse(BaseModel):
-    status: Literal["answered", "refused", "no_data"]
+    status: Literal["answered", "refused", "no_data", "clarify"]
     answer: str
     sections: list[AnswerSection] = Field(default_factory=list)
     citations: list[AnswerCitation]
