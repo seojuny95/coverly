@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
@@ -93,6 +93,14 @@ export function useUploadOrchestration({
   const { setAnalysis } = useInsuranceData();
   const router = useRouter();
   const uploadMutation = useMutation({ mutationFn: uploadInsurance });
+
+  // This route is reached programmatically after a long-running upload, so it
+  // does not get Link's automatic prefetch. Prepare it while the user selects
+  // files to keep the completed loading screen continuous with the result.
+  useEffect(() => {
+    router.prefetch("/analysis");
+  }, [router]);
+
   const completeAnalysis =
     onAnalysisComplete ??
     ((analysis: InsuranceAnalysis) => {

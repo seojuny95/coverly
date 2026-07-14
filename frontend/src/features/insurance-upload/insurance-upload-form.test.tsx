@@ -28,8 +28,10 @@ function InsuranceDataProbe() {
 }
 
 const routerPush = vi.fn();
+const routerPrefetch = vi.fn();
+const router = { push: routerPush, prefetch: routerPrefetch };
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: routerPush }),
+  useRouter: () => router,
 }));
 
 const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
@@ -77,9 +79,18 @@ function renderForm({
 
 beforeEach(() => {
   routerPush.mockClear();
+  routerPrefetch.mockClear();
 });
 
 describe("InsuranceUploadForm", () => {
+  test("prefetches the programmatic analysis destination", async () => {
+    renderForm();
+
+    await waitFor(() => {
+      expect(routerPrefetch).toHaveBeenCalledWith("/analysis");
+    });
+  });
+
   test("disables upload until a file is selected", () => {
     renderForm();
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CoverlyMark } from "../../components/coverly-brand";
 
 const ANALYSIS_STEP_MESSAGES = [
   "증권에서 보장 내용을 찾고 있어요",
@@ -79,9 +80,14 @@ export function AnalysisProgress({
       className={`${
         surface === "modal"
           ? "flex w-full max-w-none flex-col items-center py-8 text-center"
-          : "fixed inset-0 z-50 flex items-center justify-center bg-white/90 px-6 py-10 text-center backdrop-blur-sm"
+          : "fixed inset-0 z-50 flex items-center justify-center bg-white px-6 py-10 text-center"
       }`}
     >
+      {surface === "page" ? (
+        <span className="absolute top-6 left-5 flex items-center gap-1.5 sm:left-6">
+          <CoverlyMark />
+        </span>
+      ) : null}
       <div className="flex w-full max-w-[760px] flex-col items-center">
         <div className="analysis-pixel-loader grid size-16 grid-cols-3 gap-1.5 rounded-2xl border border-zinc-200 bg-white p-3 shadow-[7px_7px_0_#e8edff]">
           {Array.from({ length: 9 }).map((_, index) => (

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 // InsuranceAnalysisPage's header logo now guards leaving via LeaveGuardLink,
 // which calls useRouter — mock it so it doesn't need a real App Router.
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
 }));
 
 import { renderWithProviders } from "../../test-utils/render-with-providers";

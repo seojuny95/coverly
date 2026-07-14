@@ -9,11 +9,10 @@ import { POLICY_SESSION_REFRESH_INTERVAL_MS } from "./use-policy-session-refresh
 import type { UploadInsurance } from "../insurance-upload/insurance-upload-form";
 
 // The upload modal renders InsuranceUploadForm, which calls useRouter even
-// when onAnalysisComplete is provided (the router is only used by its
-// default handler). Mock next/navigation so it doesn't need a real App
-// Router context in tests.
+// when onAnalysisComplete is provided (it also prefetches the destination).
+// Mock next/navigation so it doesn't need a real App Router context in tests.
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
 }));
 
 const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {

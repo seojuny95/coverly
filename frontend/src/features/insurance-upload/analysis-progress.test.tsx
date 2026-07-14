@@ -23,6 +23,19 @@ describe("AnalysisProgress", () => {
     );
   });
 
+  it("fully covers the previous page and keeps the analysis header mark", () => {
+    render(
+      <AnalysisProgress
+        progress={{ completed: 0, total: 1 }}
+        files={[{ name: "a.pdf", status: "reading" }]}
+        surface="page"
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveClass("bg-white");
+    expect(screen.getByText(/coverly/)).toBeInTheDocument();
+  });
+
   it("shows each file with its done/reading label", () => {
     render(
       <AnalysisProgress
