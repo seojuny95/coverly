@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     database_url: str = ""
     reference_data_database_enabled: bool = True
     rag_pg_table: str = "official_rag_chunks"
+    reference_schema: str = "reference"
+    premium_benchmark_table: str = "premium_benchmarks"
+    reference_source_table: str = "sources"
     rag_embedding_dim: int = 1536
     policy_rag_ttl_seconds: int = 15 * 60
     policy_rag_max_ttl_seconds: int = 2 * 60 * 60

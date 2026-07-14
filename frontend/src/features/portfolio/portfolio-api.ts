@@ -87,6 +87,19 @@ export type PortfolioAnalysisResult = {
       cycle: string | null;
     }>;
   };
+  premium_benchmark?: {
+    age_band_label: string;
+    min_age: number;
+    max_age: number;
+    average_monthly_premium: number;
+    source: {
+      label: string;
+      url: string;
+      published_at: string;
+      reliability: string;
+      caveat: string;
+    };
+  } | null;
   baseline_notice: string;
   classifications: ClassificationAnalysis[];
   sources: Array<{

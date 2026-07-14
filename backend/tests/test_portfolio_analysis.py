@@ -1,6 +1,6 @@
 from pytest import MonkeyPatch
 
-from app.schemas.analysis import AnalysisContextAnswer
+from app.schemas.analysis import AnalysisContextAnswer, PremiumBenchmark, PremiumBenchmarkSource
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.services.analysis import service as portfolio_analysis
@@ -612,6 +612,37 @@ def test_analysis_exposes_excluded_coverage_ledger_with_reasons() -> None:
     assert result.excluded_coverages[0].reason
 
 
+def test_analysis_does_not_turn_excluded_data_limits_into_gaps() -> None:
+    partial = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "테스트보험", "상품명": "상품-p1", "보험분류": "질병"},
+            "보장목록": [{"담보명": "특정질환보장", "가입금액": "별도 약정"}],
+        }
+    )
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "strengths": [],
+            "gaps": [
+                {
+                    "title": "지급 방식이 확인되지 않았어요",
+                    "detail": "증권 정보가 부족해 합계에서 제외했어요.",
+                    "evidence_ids": ["excluded:1"],
+                }
+            ],
+            "amount_review_items": [],
+            "next_questions": [],
+            "next_steps": ["확인되지 않은 보장이 다른 증권에 있는지 확인해 보세요."],
+        }
+
+    result = analyze_portfolio([partial], age=35, gender="여성", complete=complete)
+
+    assert result.generation == "llm"
+    assert result.excluded_coverage_count == 1
+    assert "지급 방식이 확인되지 않았어요" not in result.model_dump_json()
+
+
 def test_analysis_reports_monthly_premium_total() -> None:
     policy = PolicyInput.model_validate(
         {
@@ -630,6 +661,46 @@ def test_analysis_reports_monthly_premium_total() -> None:
 
     assert result.premium.monthly_total == 30000
     assert result.premium.monthly_policy_count == 1
+
+
+def test_analysis_attaches_premium_benchmark_from_reference_store(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {
+                "보험사": "테스트보험",
+                "상품명": "상품-p1",
+                "보험분류": "질병",
+                "보험료": {"금액": 30000, "납입주기": "월납"},
+            },
+            "보장목록": [{"담보명": "암진단비", "가입금액": "3,000만원", "지급유형": "정액"}],
+        }
+    )
+    benchmark = PremiumBenchmark(
+        age_band_label="30대",
+        min_age=30,
+        max_age=39,
+        average_monthly_premium=278395,
+        source=PremiumBenchmarkSource(
+            label="KB의 생각 · 시그널플래너 40만명 분석",
+            url="https://kbthink.com/main/asset-management/insurance/insurance-2-240828.html",
+            published_at="2025-06-16",
+            reliability="large_private_analysis",
+            caveat="평균은 적정 보험료 기준이 아니에요.",
+        ),
+    )
+
+    monkeypatch.setattr(
+        portfolio_analysis,
+        "premium_benchmark_for_age",
+        lambda age: benchmark if age == 35 else None,
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert result.premium_benchmark == benchmark
 
 
 def test_fallback_gaps_explain_why() -> None:

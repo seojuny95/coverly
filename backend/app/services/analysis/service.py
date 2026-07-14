@@ -33,6 +33,7 @@ from app.services.portfolio.summary import (
 )
 from app.services.rag.official.models import RetrievalHit
 from app.services.rag.official.retrieval import retrieve
+from app.services.reference.premium_benchmark import premium_benchmark_for_age
 
 _UNCLASSIFIED = "미분류"
 
@@ -110,6 +111,7 @@ def analyze_portfolio(
         notices=notices,
         limitations=limitations,
         premium=summarize_premiums(list(facts.policies)),
+        premium_benchmark=premium_benchmark_for_age(insured.age),
         generation=generation,
     )
 

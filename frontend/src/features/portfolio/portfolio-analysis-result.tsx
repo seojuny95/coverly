@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { formatWon } from "./money-format";
 import type {
   AnalysisEvidence,
@@ -20,12 +21,13 @@ export function PortfolioAnalysisResultView({
   const strengths =
     result.counselor?.strengths ??
     result.prepared_coverages.map((title) => ({ title }));
-  const gaps =
+  const rawGaps =
     result.counselor?.gaps ??
     result.coverage_gaps.map((item) => ({
       title: item.category,
       detail: item.reason,
     }));
+  const gaps = rawGaps.filter((item) => !isExcludedDataLimitReviewItem(item));
   const analyzedTitles = (result.sources ?? []).map(
     (source) => source.product_name || source.insurer || "이름 미확인",
   );
@@ -72,6 +74,8 @@ export function PortfolioAnalysisResultView({
       </section>
 
       <AnalysisSummary overview={overview} />
+
+      <PremiumPosition result={result} />
 
       {analyzedTitles.length ? (
         <section className="rounded-2xl border border-zinc-200 p-6">
@@ -163,6 +167,86 @@ function AnalysisSummary({ overview }: { overview: string }) {
   );
 }
 
+function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
+  const monthlyPremium = result.premium.monthly_total;
+  const benchmark = result.premium_benchmark;
+  if (
+    typeof monthlyPremium !== "number" ||
+    result.premium.monthly_policy_count < 1 ||
+    !benchmark
+  ) {
+    return null;
+  }
+
+  const maxAmount =
+    Math.max(monthlyPremium, benchmark.average_monthly_premium) * 1.35;
+  const userPosition = progressPosition(monthlyPremium, maxAmount);
+  const benchmarkPosition = progressPosition(
+    benchmark.average_monthly_premium,
+    maxAmount,
+  );
+  const difference = monthlyPremium - benchmark.average_monthly_premium;
+  const comparison =
+    Math.abs(difference) < 10_000
+      ? "평균과 거의 비슷해요"
+      : difference > 0
+        ? "평균보다 높게 내고 있어요"
+        : "평균보다 낮게 내고 있어요";
+  const style = {
+    "--premium-position": `${userPosition}%`,
+  } as CSSProperties;
+
+  return (
+    <section className="rounded-2xl border border-zinc-200 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-blue-700">내 보험료 위치</p>
+          <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+            {benchmark.age_band_label} 평균과 비교하면
+          </h2>
+        </div>
+        <p className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600">
+          {comparison}
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <Metric label="내 월 보험료" value={formatWon(monthlyPremium)} />
+        <Metric
+          label={`${benchmark.age_band_label} 평균`}
+          value={formatWon(benchmark.average_monthly_premium)}
+        />
+      </div>
+
+      <div className="mt-7">
+        <div className="relative h-12" style={style}>
+          <div className="absolute inset-x-0 top-5 h-2 rounded-full bg-zinc-100" />
+          <div className="premium-position-fill absolute top-5 left-0 h-2 rounded-full bg-blue-600" />
+          <div
+            className="absolute top-1 flex -translate-x-1/2 flex-col items-center gap-1"
+            style={{ left: `${benchmarkPosition}%` }}
+          >
+            <span className="text-xs font-medium text-zinc-500">평균</span>
+            <span className="h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-zinc-500" />
+          </div>
+          <div className="premium-position-user absolute top-3 flex -translate-x-1/2 flex-col items-center gap-1">
+            <span className="h-4 w-4 rounded-full border-2 border-white bg-blue-600 shadow-sm" />
+            <span className="text-xs font-semibold text-blue-700">나</span>
+          </div>
+        </div>
+        <div className="mt-1 flex justify-between text-xs text-zinc-400">
+          <span>낮음</span>
+          <span>높음</span>
+        </div>
+      </div>
+
+      <p className="mt-4 text-xs leading-5 text-zinc-500">
+        {benchmark.source.label} 기준이에요. {benchmark.source.caveat}
+      </p>
+    </section>
+  );
+}
+
 function ReviewCard({
   eyebrow,
   title,
@@ -249,6 +333,12 @@ function EvidenceDetails({
   );
 }
 
+function isExcludedDataLimitReviewItem(item: ReviewDisplayItem) {
+  if (item.evidence_ids?.some((id) => id.startsWith("excluded:"))) return true;
+  const text = `${item.title} ${item.detail ?? ""}`;
+  return text.includes("지급 방식") || text.includes("지급유형");
+}
+
 function plainEvidenceSummary(evidence: AnalysisEvidence) {
   const id = evidence.id ?? "";
   if (id.startsWith("official:")) {
@@ -285,4 +375,9 @@ function Metric({ label, value }: { label: string; value: string }) {
       <dd className="mt-2 font-semibold text-zinc-900">{value}</dd>
     </div>
   );
+}
+
+function progressPosition(amount: number, maxAmount: number) {
+  if (maxAmount <= 0) return 0;
+  return Math.min(96, Math.max(4, (amount / maxAmount) * 100));
 }

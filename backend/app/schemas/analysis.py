@@ -107,6 +107,22 @@ class PremiumOverview(BaseModel):
     items: list[PremiumPolicyItem]
 
 
+class PremiumBenchmarkSource(BaseModel):
+    label: str
+    url: str
+    published_at: str
+    reliability: str
+    caveat: str
+
+
+class PremiumBenchmark(BaseModel):
+    age_band_label: str
+    min_age: int
+    max_age: int
+    average_monthly_premium: int
+    source: PremiumBenchmarkSource
+
+
 class PortfolioAnalysisResponse(BaseModel):
     status: Literal["complete", "partial", "empty"]
     policy_count: int
@@ -131,4 +147,5 @@ class PortfolioAnalysisResponse(BaseModel):
     notices: list[str]
     limitations: list[str]
     premium: PremiumOverview
+    premium_benchmark: PremiumBenchmark | None = None
     generation: GenerationMode
