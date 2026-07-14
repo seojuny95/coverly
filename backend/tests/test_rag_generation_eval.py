@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -18,9 +19,9 @@ def test_generation_eval_fixture_uses_existing_fixed_context_chunks() -> None:
     chunk_ids = {chunk.id for chunk in load_official_chunks()}
     case_ids = [case.id for case in cases]
 
-    assert len(cases) == 12
+    assert len(cases) == 60
     assert len(case_ids) == len(set(case_ids))
-    assert {case.expected_status for case in cases} == {"answered", "no_evidence"}
+    assert {case.expected_status for case in cases} == {"answered", "no_evidence", "filtered"}
     assert all(chunk_id in chunk_ids for case in cases for chunk_id in case.hit_chunk_ids)
     assert all(
         citation_id in case.hit_chunk_ids
@@ -33,7 +34,9 @@ def test_generation_eval_dataset_has_stable_schema() -> None:
     raw_cases = json.loads(EVAL_FIXTURE.read_text(encoding="utf-8"))
     expected_keys = {
         "id",
-        "question",
+        "questions",
+        "profile",
+        "difficulty",
         "hit_chunk_ids",
         "expected_status",
         "must_include_groups",
@@ -43,7 +46,17 @@ def test_generation_eval_dataset_has_stable_schema() -> None:
     }
 
     assert raw_cases
+    assert len(raw_cases) == 30
+    assert all(len(raw_case["questions"]) == 2 for raw_case in raw_cases)
     assert all(set(raw_case) == expected_keys for raw_case in raw_cases)
+
+
+def test_generation_eval_dataset_contains_no_personal_identifiers() -> None:
+    serialized = EVAL_FIXTURE.read_text(encoding="utf-8")
+
+    assert re.search(r"\b\d{6}-[1-4]\d{6}\b", serialized) is None
+    assert re.search(r"\b01[016789]-?\d{3,4}-?\d{4}\b", serialized) is None
+    assert re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", serialized) is None
 
 
 def test_generation_eval_scores_contract_checks(

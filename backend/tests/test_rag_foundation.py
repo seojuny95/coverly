@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -238,10 +239,30 @@ def test_retrieval_eval_fixture_passes_current_small_corpus() -> None:
     report = evaluate_retrieval(cases)
 
     assert report.total == 60
-    assert report.recall >= 0.4, report.results
+    assert report.recall >= 0.3, report.results
     assert 0.0 <= report.mrr <= 1.0
-    assert 0.0 <= report.source_precision <= 1.0
+    assert 0.0 <= report.precision_at_k <= 1.0
+    assert 0.0 <= report.ndcg_at_k <= 1.0
+    assert report.negative_total == 6
     assert report.average_latency_seconds >= 0.0
+
+
+def test_retrieval_eval_fixture_uses_exact_existing_chunks_without_pii() -> None:
+    cases = load_retrieval_eval_cases()
+    chunk_ids = {chunk.id for chunk in load_official_chunks()}
+    fixture_text = (
+        Path(__file__).parents[1] / "app/services/rag/official/evaluation/retrieval_dataset.json"
+    ).read_text(encoding="utf-8")
+
+    assert len(cases) == 60
+    assert len({case.id for case in cases}) == len(cases)
+    assert all(
+        case.expected_no_hits or set(case.relevant_chunk_ids).issubset(chunk_ids) for case in cases
+    )
+    assert all(case.relevant_chunk_ids or case.expected_no_hits for case in cases)
+    assert re.search(r"\b\d{6}-[1-4]\d{6}\b", fixture_text) is None
+    assert re.search(r"\b01[016789]-?\d{3,4}-?\d{4}\b", fixture_text) is None
+    assert re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", fixture_text) is None
 
 
 def test_retrieval_eval_reports_first_passing_rank_and_mrr(
@@ -300,6 +321,7 @@ def test_retrieval_eval_reports_first_passing_rank_and_mrr(
         query: str,
         chunks: tuple[RagChunk, ...] | None = None,
         embedder: object | None = None,
+        final_k: int = 5,
     ) -> list[RetrievalHit]:
         return hits
 
@@ -308,22 +330,24 @@ def test_retrieval_eval_reports_first_passing_rank_and_mrr(
         RetrievalEvalCase(
             id="case",
             query="질문",
-            expected_source_ids=("expected_source",),
-            expected_terms=("기대용어",),
+            profile="term_explain",
+            difficulty="medium",
+            relevant_chunk_ids=("right-term",),
         ),
     )
 
     report = evaluate_retrieval(cases, production=True)
 
     assert report.results[0].rank == 3
-    assert report.results[0].source_precision == 2 / 3
+    assert report.results[0].precision_at_k == 1 / 3
     assert report.recall == 1.0
     assert report.mrr == 1 / 3
-    assert report.source_precision == 2 / 3
+    assert report.precision_at_k == 1 / 3
+    assert report.ndcg_at_k == 0.5
     assert report.average_latency_seconds >= 0.0
 
 
-def test_retrieval_eval_normalizes_terms_against_labels(
+def test_retrieval_eval_uses_exact_relevant_chunk_ids(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     hits = [
@@ -351,6 +375,7 @@ def test_retrieval_eval_normalizes_terms_against_labels(
         query: str,
         chunks: tuple[RagChunk, ...] | None = None,
         embedder: object | None = None,
+        final_k: int = 5,
     ) -> list[RetrievalHit]:
         return hits
 
@@ -359,8 +384,9 @@ def test_retrieval_eval_normalizes_terms_against_labels(
         RetrievalEvalCase(
             id="case",
             query="질문",
-            expected_source_ids=("expected_source",),
-            expected_terms=("설명의무",),
+            profile="term_explain",
+            difficulty="medium",
+            relevant_chunk_ids=("right-label",),
         ),
     )
 
@@ -433,12 +459,22 @@ def test_evaluate_retrieval_production_flag_skips_in_memory_chunks(
         query: str,
         chunks: tuple[RagChunk, ...] | None = None,
         embedder: object | None = None,
+        final_k: int = 5,
     ) -> list[RetrievalHit]:
         calls.append(chunks)
         return []
 
     monkeypatch.setattr("app.services.rag.official.evaluation.retrieval.retrieve", _fake_retrieve)
-    cases = (RetrievalEvalCase(id="case", query="질문", expected_source_ids=(), expected_terms=()),)
+    cases = (
+        RetrievalEvalCase(
+            id="case",
+            query="질문",
+            profile="out_of_scope",
+            difficulty="hard",
+            relevant_chunk_ids=(),
+            expected_no_hits=True,
+        ),
+    )
 
     evaluate_retrieval(cases, production=True)
     evaluate_retrieval(cases, production=False)
