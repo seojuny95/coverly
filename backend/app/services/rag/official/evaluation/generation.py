@@ -9,6 +9,7 @@ embedding-based grading, or another LLM as a judge.
 from __future__ import annotations
 
 import json
+import re
 from argparse import ArgumentParser
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -30,7 +31,14 @@ GenerationCheckName = Literal[
     "must_include",
     "must_not_include",
     "missing_context",
+    "numeric_grounding",
 ]
+
+GenerationProfile = Literal["term_explain", "claim_check", "consumer_protection", "out_of_scope"]
+GenerationDifficulty = Literal["easy", "medium", "hard"]
+
+_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9])\d+(?:[.,]\d+)?(?![A-Za-z0-9])")
+_BULLET_NUMBER_RE = re.compile(r"(?m)^\s*\d+[.)]\s*")
 
 
 @dataclass(frozen=True)
@@ -43,6 +51,8 @@ class GenerationEvalCase:
     must_not_include: tuple[str, ...]
     required_citation_ids: tuple[str, ...]
     expected_missing_context_terms: tuple[str, ...]
+    profile: GenerationProfile = "term_explain"
+    difficulty: GenerationDifficulty = "medium"
 
 
 @dataclass(frozen=True)
@@ -56,6 +66,7 @@ class GenerationEvalResult:
     must_include_covered: bool
     must_not_include_clean: bool
     missing_context_covered: bool
+    numeric_grounded: bool
     failed_checks: tuple[GenerationCheckName, ...]
     notes: tuple[str, ...]
     answer_status: RagAnswerStatus
@@ -98,10 +109,19 @@ class GenerationEvalReport:
     def missing_context_coverage(self) -> float:
         return _rate(result.missing_context_covered for result in self.results)
 
+    @property
+    def numeric_grounding_rate(self) -> float:
+        return _rate(result.numeric_grounded for result in self.results)
+
 
 def load_generation_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[GenerationEvalCase, ...]:
-    raw_cases = json.loads(path.read_text(encoding="utf-8"))
-    return tuple(_case_from_json(raw) for raw in raw_cases)
+    raw_scenarios = cast(list[dict[str, object]], json.loads(path.read_text(encoding="utf-8")))
+    cases: list[GenerationEvalCase] = []
+    for raw in raw_scenarios:
+        questions = _string_tuple(raw["questions"])
+        for index, question in enumerate(questions, start=1):
+            cases.append(_case_from_json(raw, question=question, index=index))
+    return tuple(cases)
 
 
 def evaluate_generation(
@@ -115,7 +135,11 @@ def evaluate_generation(
     active_cases = cases if cases is not None else load_generation_eval_cases()
     chunks_by_id = {chunk.id: chunk for chunk in load_official_chunks()}
     results = tuple(
-        _evaluate_case(case, _answer_case(case, chunks_by_id, complete=complete))
+        _evaluate_case(
+            case,
+            _answer_case(case, chunks_by_id, complete=complete),
+            chunks_by_id,
+        )
         for case in active_cases
     )
 
@@ -136,7 +160,8 @@ def render_report(report: GenerationEvalReport, *, show_passing: bool = False) -
             f"required_citations={report.required_citation_coverage:.3f} "
             f"must_include={report.must_include_coverage:.3f} "
             f"must_not_include={report.must_not_include_clean_rate:.3f} "
-            f"missing_context={report.missing_context_coverage:.3f}"
+            f"missing_context={report.missing_context_coverage:.3f} "
+            f"numeric_grounding={report.numeric_grounding_rate:.3f}"
         )
     ]
 
@@ -157,20 +182,22 @@ def render_report(report: GenerationEvalReport, *, show_passing: bool = False) -
     return "\n".join(lines)
 
 
-def _case_from_json(raw: dict[str, object]) -> GenerationEvalCase:
+def _case_from_json(raw: dict[str, object], *, question: str, index: int) -> GenerationEvalCase:
     expected_status = str(raw["expected_status"])
     if expected_status not in {"answered", "no_evidence", "filtered"}:
         raise ValueError(f"unknown expected_status: {expected_status}")
 
     return GenerationEvalCase(
-        id=str(raw["id"]),
-        question=str(raw["question"]),
+        id=f"{raw['id']}__q{index}",
+        question=question,
         hit_chunk_ids=_string_tuple(raw["hit_chunk_ids"]),
         expected_status=cast(RagAnswerStatus, expected_status),
         must_include_groups=_string_groups(raw["must_include_groups"]),
         must_not_include=_string_tuple(raw["must_not_include"]),
         required_citation_ids=_string_tuple(raw["required_citation_ids"]),
         expected_missing_context_terms=_string_tuple(raw["expected_missing_context_terms"]),
+        profile=_generation_profile(raw["profile"]),
+        difficulty=_generation_difficulty(raw["difficulty"]),
     )
 
 
@@ -180,6 +207,20 @@ def _string_tuple(value: object) -> tuple[str, ...]:
 
 def _string_groups(value: object) -> tuple[tuple[str, ...], ...]:
     return tuple(_string_tuple(group) for group in cast(list[object], value))
+
+
+def _generation_profile(value: object) -> GenerationProfile:
+    profile = str(value)
+    if profile not in {"term_explain", "claim_check", "consumer_protection", "out_of_scope"}:
+        raise ValueError(f"unknown generation profile: {profile}")
+    return cast(GenerationProfile, profile)
+
+
+def _generation_difficulty(value: object) -> GenerationDifficulty:
+    difficulty = str(value)
+    if difficulty not in {"easy", "medium", "hard"}:
+        raise ValueError(f"unknown generation difficulty: {difficulty}")
+    return cast(GenerationDifficulty, difficulty)
 
 
 def _answer_case(
@@ -196,7 +237,11 @@ def _hit_for_chunk(chunk: RagChunk) -> RetrievalHit:
     return RetrievalHit(chunk=chunk, score=1.0, keyword_score=1.0, vector_score=1.0)
 
 
-def _evaluate_case(case: GenerationEvalCase, answer: RagAnswer) -> GenerationEvalResult:
+def _evaluate_case(
+    case: GenerationEvalCase,
+    answer: RagAnswer,
+    chunks_by_id: dict[str, RagChunk],
+) -> GenerationEvalResult:
     hit_ids = set(case.hit_chunk_ids)
     citation_ids = tuple(citation.chunk_id for citation in answer.citations)
     answer_text = _normalize(answer.answer)
@@ -206,8 +251,9 @@ def _evaluate_case(case: GenerationEvalCase, answer: RagAnswer) -> GenerationEva
 
     status_matched = answer.status == case.expected_status
     citation_valid = all(citation_id in hit_ids for citation_id in citation_ids)
-    required_citation_covered = all(
-        citation_id in citation_ids for citation_id in case.required_citation_ids
+    required_citation_covered = not case.required_citation_ids or (
+        answer.status == "answered"
+        and all(citation_id in citation_ids for citation_id in case.required_citation_ids)
     )
     must_include_covered = all(
         any(_normalize(term) in answer_text for term in group) for group in case.must_include_groups
@@ -219,6 +265,7 @@ def _evaluate_case(case: GenerationEvalCase, answer: RagAnswer) -> GenerationEva
         _normalize_missing_context_term(term) in missing_context_terms
         for term in case.expected_missing_context_terms
     )
+    numeric_grounded = _numbers_are_grounded(case.question, answer, chunks_by_id)
 
     checks: tuple[tuple[GenerationCheckName, bool], ...] = (
         ("status", status_matched),
@@ -227,6 +274,7 @@ def _evaluate_case(case: GenerationEvalCase, answer: RagAnswer) -> GenerationEva
         ("must_include", must_include_covered),
         ("must_not_include", must_not_include_clean),
         ("missing_context", missing_context_covered),
+        ("numeric_grounding", numeric_grounded),
     )
     failed_checks = tuple(name for name, passed in checks if not passed)
 
@@ -240,6 +288,7 @@ def _evaluate_case(case: GenerationEvalCase, answer: RagAnswer) -> GenerationEva
         must_include_covered=must_include_covered,
         must_not_include_clean=must_not_include_clean,
         missing_context_covered=missing_context_covered,
+        numeric_grounded=numeric_grounded,
         failed_checks=failed_checks,
         notes=_notes(case, answer, failed_checks, citation_ids),
         answer_status=answer.status,
@@ -277,7 +326,39 @@ def _notes(
             normalize=_normalize_missing_context_term,
         )
         notes.append(f"missing expected missing_context terms: {', '.join(missing_context_terms)}")
+    if "numeric_grounding" in failed_checks:
+        notes.append("answer contains a number that is absent from the question and cited evidence")
     return tuple(notes)
+
+
+def _numbers_are_grounded(
+    question: str,
+    answer: RagAnswer,
+    chunks_by_id: dict[str, RagChunk],
+) -> bool:
+    answer_without_bullet_numbers = _BULLET_NUMBER_RE.sub("", answer.answer)
+    answer_numbers = set(_NUMBER_RE.findall(answer_without_bullet_numbers))
+    if not answer_numbers:
+        return True
+
+    grounded_text = "\n".join(
+        [
+            question,
+            *(
+                "\n".join(
+                    (
+                        citation.source_title,
+                        citation.citation_label,
+                        chunks_by_id[citation.chunk_id].text,
+                    )
+                )
+                for citation in answer.citations
+                if citation.chunk_id in chunks_by_id
+            ),
+        ]
+    )
+    grounded_numbers = set(_NUMBER_RE.findall(grounded_text))
+    return answer_numbers.issubset(grounded_numbers)
 
 
 def _missing_terms(

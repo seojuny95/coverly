@@ -147,11 +147,11 @@ def test_rag_answer_prompt_has_required_sections() -> None:
     assert "# 출력 규칙" in prompt
 
 
-def test_rag_answer_prompt_keeps_generation_eval_rules_visible() -> None:
+def test_rag_answer_prompt_keeps_general_grounding_rules_visible() -> None:
     prompt = load_prompt(_PROMPT_PATH)
 
-    assert "30일 초과 불가" in prompt
-    assert "치료 기록" in prompt
-    assert "위반 내용" in prompt
-    assert "보험금 지급사유" in prompt
+    assert "기간, 금액, 숫자, 예외" in prompt
+    assert "직접 관련되지 않으면" in prompt
+    assert "실제 치료·진단 기록" in prompt
+    assert "지급사유" in prompt
     assert "포괄 문구" in prompt

@@ -193,11 +193,10 @@ def _first_rank(
     *,
     visible_only: bool,
 ) -> int | None:
+    if case.expected_no_hits:
+        return None
     for rank, hit in enumerate(hits, start=1):
-        text = hit.chunk.text[:_VISIBLE_CONTEXT_CHARS] if visible_only else hit.chunk.text
-        if hit.chunk.source_id in case.expected_source_ids and all(
-            term in text for term in case.expected_terms
-        ):
+        if hit.chunk.id in case.relevant_chunk_ids:
             return rank
     return None
 
