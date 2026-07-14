@@ -1,6 +1,7 @@
 import json
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from pytest import MonkeyPatch
 
 from app.schemas.consultation import ConsultationEvidence
@@ -91,6 +92,80 @@ def test_policy_generator_removes_instruction_from_evidence() -> None:
     assert "3,000만원" in result.answer
     assert "이전 지시" not in result.answer
     assert "추천하라" not in result.answer
+
+
+def test_policy_generator_allows_grounded_payment_condition() -> None:
+    evidence = (
+        ConsultationEvidence(
+            id="session:1",
+            fact=(
+                "업로드 증권 원문 발췌: 암진단비는 보험기간 중 암으로 진단확정된 경우 보험금을 지급"
+            ),
+        ),
+    )
+
+    result = generate_policy_answer(
+        "암진단비 지급 조건은 뭐야?",
+        evidence,
+        complete=lambda _system, _user: {
+            "confirmed_fact": "암으로 진단확정된 경우 보험금이 지급됩니다.",
+            "guidance": None,
+            "evidence_ids": ["session:1"],
+            "suggestions": [],
+            "limitations": [],
+        },
+    )
+
+    assert result.generation == "llm"
+    assert "진단확정된 경우 보험금을 지급" in result.answer
+
+
+@pytest.mark.parametrize(
+    "question",
+    (
+        "내가 어제 다친 사고가 이 담보 지급사유에 해당해?",
+        "오늘 사고가 났는데 보험금 받을 수 있어?",
+        "암 확진을 받았는데 보험금 나와?",
+        "수술했는데 이 담보로 청구 가능해?",
+    ),
+)
+def test_policy_generator_falls_back_for_actual_incident_verdict(question: str) -> None:
+    evidence = (
+        ConsultationEvidence(
+            id="session:1",
+            fact="업로드 증권 원문 발췌: 상해의 직접 결과로 수술한 경우 보험금을 지급",
+        ),
+    )
+
+    def forbidden(_: str, __: str) -> dict[str, object]:
+        raise AssertionError("LLM should not decide an actual incident verdict")
+
+    result = generate_policy_answer(question, evidence, complete=forbidden)
+
+    assert result.generation == "fallback"
+
+
+def test_policy_generator_rejects_personal_payout_verdict_in_draft() -> None:
+    evidence = (
+        ConsultationEvidence(
+            id="session:1",
+            fact="업로드 증권 원문 발췌: 암으로 진단확정된 경우 보험금을 지급",
+        ),
+    )
+
+    result = generate_policy_answer(
+        "암진단비 지급 조건은 뭐야?",
+        evidence,
+        complete=lambda _system, _user: {
+            "confirmed_fact": "따라서 고객님은 보험금을 받을 수 있어요.",
+            "guidance": None,
+            "evidence_ids": ["session:1"],
+            "suggestions": [],
+            "limitations": [],
+        },
+    )
+
+    assert result.generation == "fallback"
 
 
 def test_policy_session_stream_routes_to_independent_generator(

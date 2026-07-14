@@ -12,10 +12,6 @@ from app.schemas.consultation import ConsultationEvidence
 from app.services.llm import JsonCompleter, dump_prompt_json, structured_completer
 
 _UNSAFE_POLICY_TEXT = (
-    "보험금이 지급",
-    "보험금을 지급",
-    "보상받을 수",
-    "보상 받을 수",
     "면책이 없",
     "면책되지 않",
     "공식 기준",
@@ -36,6 +32,59 @@ _UNSAFE_POLICY_TEXT = (
     "자녀가 있어",
     "소득이 높",
     "소득이 낮",
+)
+_PAYOUT_TERMS = ("보험금", "보상", "지급", "청구")
+_PAYOUT_VERDICT_TERMS = (
+    "받을 수 있어",
+    "받을 수 있습",
+    "지급돼",
+    "지급됩",
+    "지급 대상",
+    "보상 가능",
+    "청구 가능",
+    "해당해",
+)
+_PERSONAL_VERDICT_SUBJECTS = (
+    "고객님은",
+    "사용자는",
+    "당신은",
+    "이번 사고",
+    "이번 진단",
+    "이번 치료",
+    "해당 사고",
+    "해당 진단",
+    "해당 치료",
+    "따라서",
+)
+_CERTAINTY_TERMS = ("무조건", "반드시", "확실히", "틀림없이")
+_PERSONAL_CONTEXT_TERMS = ("내가", "제가", "저는", "나는", "저에게", "나한테")
+_TIME_CONTEXT_TERMS = ("오늘", "어제", "방금", "지난주", "지난달")
+_INCIDENT_TERMS = ("진단", "확진", "사고", "다친", "입원", "수술", "치료")
+_COMPLETED_INCIDENT_TERMS = (
+    "진단받았",
+    "진단 받았",
+    "진단을 받았",
+    "확진받았",
+    "확진 받았",
+    "확진을 받았",
+    "확진됐",
+    "사고가 났",
+    "사고 났",
+    "다쳤",
+    "입원했",
+    "수술했",
+    "치료받았",
+    "치료 받았",
+    "치료를 받았",
+)
+_CLAIM_VERDICT_TERMS = (
+    "받을 수",
+    "받을수",
+    "나와",
+    "지급",
+    "보상",
+    "청구 가능",
+    "해당",
 )
 
 
@@ -182,11 +231,16 @@ def _asks_personal_adequacy(question: str) -> bool:
 
 
 def _asks_actual_incident_verdict(question: str) -> bool:
-    return (
-        "내가" in question
-        and any(term in question for term in ("어제", "사고", "다친"))
-        and any(term in question for term in ("해당", "청구", "지급"))
+    asks_for_verdict = any(term in question for term in _CLAIM_VERDICT_TERMS)
+    if not asks_for_verdict:
+        return False
+
+    describes_completed_incident = any(term in question for term in _COMPLETED_INCIDENT_TERMS)
+    has_contextual_incident = any(term in question for term in _INCIDENT_TERMS) and (
+        any(term in question for term in _PERSONAL_CONTEXT_TERMS)
+        or any(term in question for term in _TIME_CONTEXT_TERMS)
     )
+    return describes_completed_incident or has_contextual_incident
 
 
 def _asks_complete_claim_documents(question: str) -> bool:
@@ -242,7 +296,19 @@ def _safe_unique_texts(
 
 def _is_safe_policy_text(text: str) -> bool:
     compact = " ".join(text.split())
-    return bool(compact) and not any(term in compact for term in _UNSAFE_POLICY_TEXT)
+    if not compact or any(term in compact for term in _UNSAFE_POLICY_TEXT):
+        return False
+    return not _has_personal_payout_verdict(compact)
+
+
+def _has_personal_payout_verdict(text: str) -> bool:
+    if not any(term in text for term in _PAYOUT_TERMS):
+        return False
+    if any(term in text for term in _CERTAINTY_TERMS):
+        return True
+    has_subject = any(term in text for term in _PERSONAL_VERDICT_SUBJECTS)
+    has_verdict = any(term in text for term in _PAYOUT_VERDICT_TERMS)
+    return has_subject and has_verdict
 
 
 def _mentions_uncited_specifics(
