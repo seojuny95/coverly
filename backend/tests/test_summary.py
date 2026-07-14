@@ -7,6 +7,7 @@ from app.services.policy.summary.service import (
     _LlmPolicySummaryExtraction,
     extract_local_policy_summary,
     extract_policy_summary,
+    get_insurer_aliases,
     get_insurer_candidates,
 )
 
@@ -119,6 +120,7 @@ def test_extract_policy_summary_reads_core_fields() -> None:
         계약자: 가나
         피보험자: 가나
         보험기간: 2026.01.01 ~ 2027.01.01
+        계약사항: 1년만기 / 1년납 / 월납
         보험료: 월 120,000원
         """,
         llm_extractor=None,
@@ -135,6 +137,7 @@ def test_extract_policy_summary_reads_core_fields() -> None:
             "종료일": "2027-01-01",
         },
         "만기일": "2027-01-01",
+        "납입기간": "1년납",
         "보험료": {
             "금액": 120000,
             "납입주기": "월납",
@@ -229,6 +232,7 @@ def test_extract_policy_summary_reads_collapsed_pdf_text() -> None:
     assert 0 <= demographics["나이"] <= 120
 
     assert result == {
+        "보험사": "DB손해보험",
         "상품명": "무배당 프로미라이프 참좋은운전자상해보험(TM)2404",
         "증권번호": "POLICY-TEST-MASKED-001",
         "계약자": "테스트고객A",
@@ -246,6 +250,141 @@ def test_extract_policy_summary_reads_collapsed_pdf_text() -> None:
         "보험분류": "배상·화재·기타",
         "상품태그": ["운전자"],
     }
+
+
+def test_extract_local_policy_summary_reads_insured_person_from_same_line_name_label() -> None:
+    result = extract_local_policy_summary(
+        """
+        보험증권
+        피보험자성명 홍길동 피보험자번호 950524-1******
+        """
+    )
+
+    assert result["피보험자"] == "홍길동"
+
+
+def test_insurer_aliases_cover_every_catalog_candidate() -> None:
+    aliases = get_insurer_aliases()
+
+    assert set(get_insurer_candidates()).issubset(aliases)
+    assert "삼성" in aliases["삼성화재"]
+    assert "DB" in aliases["DB손해보험"]
+    assert "현대해상" in aliases["현대해상화재보험"]
+
+
+def test_insurer_contact_evidence_matches_official_homepage_domain() -> None:
+    result = extract_local_policy_summary(
+        """
+        보험증권
+        상품명: 무배당 프로미라이프 참좋은운전자상해보험
+        홈페이지 www.idbins.com
+        """
+    )
+
+    assert result["보험사"] == "DB손해보험"
+
+
+def test_insurer_contact_evidence_matches_official_call_center() -> None:
+    result = extract_local_policy_summary(
+        """
+        보험증권
+        상품명: 무배당 프로미라이프 참좋은운전자상해보험
+        문의 1588-0100
+        """
+    )
+
+    assert result["보험사"] == "DB손해보험"
+
+
+def test_insurer_contact_evidence_maps_display_name_to_catalog_name() -> None:
+    result = extract_local_policy_summary(
+        """
+        보험증권
+        보험종목 Hicar 다이렉트개인용
+        문의 1588-5656
+        """
+    )
+
+    assert result["보험사"] == "현대해상화재보험"
+
+
+def test_catalog_alias_matches_long_brand_token_with_suffix_particle() -> None:
+    result = extract_local_policy_summary(
+        """
+        보험증권
+        현대해상의 자동차보험증권입니다.
+        보험종목 Hicar 다이렉트개인용
+        """
+    )
+
+    assert result["보험사"] == "현대해상화재보험"
+
+
+def test_short_ascii_insurer_alias_does_not_match_inside_unknown_domain_text() -> None:
+    result = extract_local_policy_summary(
+        """
+        보험증권
+        상품명: 무배당 프로미라이프 참좋은운전자상해보험
+        홈페이지 www.dbexample.com
+        """
+    )
+
+    assert "보험사" not in result
+
+
+def test_short_hangul_insurer_alias_does_not_match_inside_common_wording() -> None:
+    result = extract_local_policy_summary(
+        """
+        보험증권
+        상품명: 무배당 프로미라이프 참좋은운전자상해보험
+        확인이 안 되는 내용은 추측하지 않아요.
+        """
+    )
+
+    assert "보험사" not in result
+
+
+def test_missing_insurer_alone_does_not_trigger_llm_fill() -> None:
+    def forbidden_llm(_text: str) -> None:
+        raise AssertionError("보험사 단독 누락은 LLM summary fallback을 호출하지 않는다")
+
+    result = extract_policy_summary(
+        """
+        보험증권
+        상품명: 무배당 건강보험
+        증권번호: POLICY-TEST-001
+        계약자: 가나
+        피보험자: 가나
+        보험기간: 2026.01.01 ~ 2027.01.01
+        계약사항: 1년만기 / 1년납 / 월납
+        보험료: 월 120,000원
+        """,
+        llm_extractor=forbidden_llm,
+    )
+
+    assert "보험사" not in result
+    assert result["상품명"] == "무배당 건강보험"
+
+
+def test_missing_payment_period_alone_does_not_trigger_llm_fill() -> None:
+    def forbidden_llm(_text: str) -> None:
+        raise AssertionError("납입기간 단독 누락은 LLM summary fallback을 호출하지 않는다")
+
+    result = extract_policy_summary(
+        """
+        보험증권
+        상품명: 자동차보험
+        증권번호: POLICY-TEST-001
+        계약자: 가나
+        피보험자: 가나
+        보험기간: 2026.01.01 ~ 2027.01.01
+        보험료: 120,000원
+        """,
+        llm_extractor=forbidden_llm,
+    )
+
+    assert result["상품명"] == "자동차보험"
+    assert "납입기간" not in result
 
 
 def test_extract_policy_summary_fills_missing_display_fields_from_llm_without_overriding() -> None:
@@ -486,7 +625,7 @@ def test_llm_filled_insurer_present_in_text_is_set() -> None:
 
 def test_llm_filled_insurer_grounded_by_brand_token_alone() -> None:
     # Documents rarely print the catalog's full legal name ("DB손해보험") — they
-    # carry the brand ("DB", "디비손보"). Grounding the insurer on its brand
+    # carry the brand ("DB"). Grounding the insurer on its brand
     # token (legal name minus the generic industry suffix) keeps cite-or-refuse
     # while accepting the document's own naming.
     result = extract_policy_summary(

@@ -82,6 +82,7 @@ _POLICY_HOLDER_EXTRACTION_PATTERNS = [
     rf"계약자\s*({_PERSON_NAME_VALUE_PATTERN})\s*\([^)]*\)\s*보험기간",
 ]
 _INSURED_PERSON_EXTRACTION_PATTERNS = [
+    r"피보험자성명\s+([가-힣A-Za-z]+)\s+피보험자번호",
     r"피보험자\s+([가-힣A-Za-z]+)\s+주민등록번호",
     rf"피보험자\s*({_PERSON_NAME_VALUE_PATTERN})\s*\(",
 ]
@@ -240,8 +241,59 @@ def _first_pattern_match(patterns: list[str], text: str) -> re.Match[str] | None
     return next((match for pattern in patterns if (match := re.search(pattern, text))), None)
 
 
+def _normalize_insurer_alias(value: str) -> str:
+    return re.sub(r"[^0-9A-Za-z가-힣]", "", value).casefold()
+
+
+def match_insurer_from_text(text: str) -> str | None:
+    """Return the catalog insurer whose generated/data alias appears in text."""
+
+    contact_match = _match_insurer_by_contact_evidence(text)
+    if contact_match:
+        return contact_match
+
+    normalized_text = _normalize_insurer_alias(text)
+    if not normalized_text:
+        return None
+
+    for insurer, aliases in get_insurer_aliases().items():
+        if any(_insurer_alias_matches(alias, text, normalized_text) for alias in aliases):
+            return insurer
+
+    return None
+
+
+def _match_insurer_by_contact_evidence(text: str) -> str | None:
+    normalized_text = _normalize_contact_text(text)
+    digits = re.sub(r"\D", "", text)
+    for insurer, domains, phones in get_insurer_contact_evidence():
+        if domains and any(domain in normalized_text for domain in domains):
+            return insurer
+        if phones and any(phone in digits for phone in phones):
+            return insurer
+    return None
+
+
+def _normalize_contact_text(value: str) -> str:
+    return re.sub(r"\s+", "", value).casefold()
+
+
+def _insurer_alias_matches(alias: str, text: str, normalized_text: str) -> bool:
+    normalized_alias = _normalize_insurer_alias(alias)
+    if not normalized_alias:
+        return False
+    if len(normalized_alias) <= 2:
+        tokens = {token.casefold() for token in _BRAND_TOKEN_PATTERN.findall(text)}
+        return normalized_alias in tokens
+    return normalized_alias in normalized_text
+
+
 def _extract_insurer_name(text: str) -> str | None:
-    return _extract_labeled_value(text, _INSURER_LABELS)
+    labeled = _extract_labeled_value(text, _INSURER_LABELS)
+    if labeled:
+        return labeled
+
+    return match_insurer_from_text(text)
 
 
 _PRODUCT_NAME_TRAILING_LABELS = _POLICY_NUMBER_LABELS + [
@@ -606,6 +658,7 @@ def _extract_maturity_date(coverage_period: CoveragePeriod | None) -> str | None
 
 _MAX_INPUT_CHARS = 30_000
 _INSURER_CATALOG_PATH = SERVICE_DATA_DIR / "insurer_catalog.json"
+_CLAIM_CHANNELS_PATH = SERVICE_DATA_DIR / "claim_channels.json"
 _SUMMARY_STRING_FIELDS = (
     "보험사",
     "상품명",
@@ -674,6 +727,99 @@ def get_insurer_candidates() -> tuple[str, ...]:
         raise ValueError("insurer catalog must contain at least one insurer")
 
     return candidates
+
+
+@lru_cache
+def get_insurer_aliases() -> dict[str, tuple[str, ...]]:
+    """Generate catalog-derived insurer aliases used by local extraction."""
+
+    aliases: dict[str, set[str]] = {
+        insurer: set(_generated_insurer_aliases(insurer)) for insurer in get_insurer_candidates()
+    }
+
+    return {insurer: tuple(values) for insurer, values in aliases.items() if values}
+
+
+@lru_cache
+def get_insurer_contact_evidence() -> tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]:
+    """Return catalog insurers with official homepage domains and call-center digits."""
+
+    payload = json.loads(_CLAIM_CHANNELS_PATH.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        return ()
+
+    entries = payload.get("보험사")
+    if not isinstance(entries, list):
+        return ()
+
+    evidence: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        insurer_name = entry.get("보험사")
+        if not isinstance(insurer_name, str):
+            continue
+
+        insurer = _catalog_insurer_for_name(insurer_name)
+        if insurer is None:
+            continue
+
+        domains = tuple(
+            value
+            for key in ("홈페이지", "청구링크", "source")
+            if isinstance(entry.get(key), str)
+            for value in _domain_evidence(entry[key])
+        )
+        phone = entry.get("고객센터")
+        phones = (re.sub(r"\D", "", phone),) if isinstance(phone, str) else ()
+        evidence.append((insurer, domains, tuple(value for value in phones if value)))
+
+    return tuple(evidence)
+
+
+def _domain_evidence(url: str) -> tuple[str, ...]:
+    match = re.search(r"https?://([^/\s]+)", url.casefold())
+    if not match:
+        return ()
+    host = match.group(1).removeprefix("www.")
+    if "." not in host:
+        return ()
+    return (host,)
+
+
+def _catalog_insurer_for_name(value: str) -> str | None:
+    """Map a data-file display name to the canonical catalog insurer."""
+
+    if value in get_insurer_candidates():
+        return value
+
+    normalized_value = _normalize_insurer_alias(value)
+    if not normalized_value:
+        return None
+
+    for insurer, aliases in get_insurer_aliases().items():
+        normalized_aliases = {_normalize_insurer_alias(alias) for alias in aliases}
+        if normalized_value in normalized_aliases:
+            return insurer
+
+    return None
+
+
+def _generated_insurer_aliases(insurer: str) -> tuple[str, ...]:
+    """Generate generic aliases from catalog names, without insurer-specific code."""
+
+    generated = {insurer}
+    brand = insurer
+    for suffix in _INSURER_NAME_SUFFIXES:
+        if insurer.endswith(suffix) and len(insurer) > len(suffix):
+            generated.add(insurer[: -len(suffix)])
+
+    brand = min(generated, key=len)
+
+    if brand.endswith("손해") and len(brand) > len("손해"):
+        generated.add(f"{brand.removesuffix('손해')}손보")
+
+    return tuple(alias for alias in generated if len(alias.strip()) >= 2)
 
 
 def extract_policy_summary_with_llm(text: str) -> LlmPolicySummary | None:
@@ -821,7 +967,9 @@ _LLM_FILLABLE_FIELDS = [
     "보험료",
     "차량정보",
 ]
-_LLM_TRIGGER_FIELDS = [field for field in _LLM_FILLABLE_FIELDS if field != "차량정보"]
+_LLM_TRIGGER_FIELDS = [
+    field for field in _LLM_FILLABLE_FIELDS if field not in {"보험사", "납입기간", "차량정보"}
+]
 
 
 def extract_policy_summary(
@@ -857,7 +1005,7 @@ _GROUNDED_LLM_FIELDS = {"보험사", "증권번호", "계약자", "피보험자"
 
 # Generic industry suffixes of Korean insurer legal names, longest first. The
 # catalog lists full legal names ("DB손해보험") while documents usually print
-# only the brand ("DB", "디비손보"), so insurer grounding checks the brand —
+# only the brand ("DB" etc.), so insurer grounding checks the brand —
 # the legal name minus one of these suffixes — instead of the full name.
 _INSURER_NAME_SUFFIXES = (
     "화재해상보험",

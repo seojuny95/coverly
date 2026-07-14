@@ -68,3 +68,19 @@ def test_result_shape(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert set(result) == {"기본정보", "보장목록", "분석상태", "문자수", "문서세션ID"}
     assert result["문서세션ID"] == "session-1"
+
+
+def test_missing_insurer_stays_missing_without_external_fallback() -> None:
+    def fake_summarize(text: str) -> PolicySummary:
+        return {"보험분류": "미분류", "상품태그": []}
+
+    result = run_pipeline(
+        b"%PDF-x",
+        password="pw",
+        parse=_fake_parse("일반 증권"),
+        summarize=fake_summarize,
+        extract=lambda _doc: ([], "완료"),
+        index=lambda _doc: None,
+    )
+
+    assert "보험사" not in result["기본정보"]
