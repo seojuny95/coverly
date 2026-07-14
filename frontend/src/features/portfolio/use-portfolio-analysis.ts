@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
 import { isAnalyzableDocument } from "./analysis-eligibility";
 import {
+  type AnalysisContextAnswer,
   collectPolicyDemographicsCandidates,
   type PortfolioAnalysisResult,
   requestPortfolioAnalysis,
@@ -38,6 +39,7 @@ export function deriveDemographics(
 export function usePortfolioAnalysis(
   documents: AnalyzedInsurance[],
   demographics: Demographics | null,
+  personalContext: AnalysisContextAnswer[] = [],
 ) {
   const eligible = documents.filter(isAnalyzableDocument);
 
@@ -51,9 +53,15 @@ export function usePortfolioAnalysis(
       portfolioKey(documents),
       demographics?.age,
       demographics?.gender,
+      personalContext,
     ],
     queryFn: ({ signal }) =>
-      requestPortfolioAnalysis(documents, demographics!, signal),
+      requestPortfolioAnalysis(
+        documents,
+        demographics!,
+        personalContext,
+        signal,
+      ),
     enabled: eligible.length > 0 && demographics != null,
   });
 

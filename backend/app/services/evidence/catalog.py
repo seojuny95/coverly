@@ -8,6 +8,7 @@ from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import AnswerCitation
 from app.services.coverage_knowledge.taxonomy import classify_coverage
 from app.services.portfolio.summary import PortfolioFacts
+from app.services.rag.official.models import RetrievalHit
 from app.services.rag.policy import PolicyRetrievalHit
 
 _UNSUPPORTED_CONCLUSIONS = (
@@ -45,6 +46,11 @@ _SALES_PUSH_TERMS = (
     "꼭 가입",
     "가입하면 됩니다",
     "가입하는 것이 좋습니다",
+    "추가 가입",
+    "가입을 고려",
+    "가입을 검토",
+    "추가적인 보장",
+    "필요한 보장",
 )
 _DIRECT_ACTION_TERMS = (
     "가입하세요",
@@ -87,6 +93,9 @@ _PAYOUT_OR_OFFICIAL_CLAIMS = (
     "면책되지 않",
     "공식 기준",
 )
+_OFFICIAL_CLAIMS = ("공식 기준",)
+_PAYOUT_CLAIMS = tuple(term for term in _PAYOUT_OR_OFFICIAL_CLAIMS if term not in _OFFICIAL_CLAIMS)
+_OFFICIAL_ADEQUACY_TERMS = ("충분", "부족", "적정", "권장", "추천")
 _FABRICATED_PERSONAL_FACTS = (
     "가족력이 있어",
     "부양가족이 있어",
@@ -124,6 +133,43 @@ def with_session_evidence(
         by_id={item.id: item for item in items},
         coverage_ids_by_category=catalog.coverage_ids_by_category,
     )
+
+
+def with_official_evidence(
+    catalog: EvidenceCatalog, hits: tuple[RetrievalHit, ...]
+) -> EvidenceCatalog:
+    """Append official-source guidance as auxiliary citation evidence."""
+
+    if not hits:
+        return catalog
+    items = list(catalog.items)
+    for index, hit in enumerate(hits, start=1):
+        chunk = hit.chunk
+        label = f" ({chunk.citation_label})" if chunk.citation_label else ""
+        items.append(
+            ConsultationEvidence(
+                id=f"official:{index}",
+                fact=(
+                    f"{chunk.publisher} {chunk.source_title}{label}: "
+                    f"{_compact_evidence_text(chunk.text, 700)}"
+                ),
+                source_title=chunk.source_title,
+                publisher=chunk.publisher,
+                citation_label=chunk.citation_label,
+            )
+        )
+    return EvidenceCatalog(
+        items=tuple(items),
+        by_id={item.id: item for item in items},
+        coverage_ids_by_category=catalog.coverage_ids_by_category,
+    )
+
+
+def _compact_evidence_text(text: str, max_chars: int) -> str:
+    compact = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+    if len(compact) <= max_chars:
+        return compact
+    return compact[: max_chars - 1].rstrip() + "…"
 
 
 def build_evidence_catalog(
@@ -277,7 +323,7 @@ def is_safe_general_guidance(text: str) -> bool:
     return not any(term in cleaned for term in _UNSUPPORTED_GUIDANCE_TERMS)
 
 
-def is_safe_analysis_text(text: str) -> bool:
+def is_safe_analysis_text(text: str, *, allow_official_claims: bool = False) -> bool:
     """Allow grounded opinion — amounts, high/low, over/under judgments — while
     still blocking sales commands, payout/exclusion verdicts, official-standard
     claims, and fabricated personal facts. Used for the richer strength/gap and
@@ -287,7 +333,14 @@ def is_safe_analysis_text(text: str) -> bool:
     if not cleaned:
         return False
     compact = " ".join(cleaned.split())
-    if any(term in compact for term in _PAYOUT_OR_OFFICIAL_CLAIMS):
+    blocked_claims = _PAYOUT_CLAIMS if allow_official_claims else _PAYOUT_OR_OFFICIAL_CLAIMS
+    if any(term in compact for term in blocked_claims):
+        return False
+    if (
+        allow_official_claims
+        and "공식 기준" in compact
+        and any(term in compact for term in _OFFICIAL_ADEQUACY_TERMS)
+    ):
         return False
     if any(term in compact for term in _FABRICATED_PERSONAL_FACTS):
         return False

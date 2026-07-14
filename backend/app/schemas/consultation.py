@@ -31,6 +31,9 @@ class ConsultationEvidence(BaseModel):
 
     id: str
     fact: str
+    source_title: str | None = None
+    publisher: str | None = None
+    citation_label: str | None = None
     policy_id: str | None = None
     insurer: str | None = None
     product_name: str | None = None

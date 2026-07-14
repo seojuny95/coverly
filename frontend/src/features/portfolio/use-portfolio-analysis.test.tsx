@@ -81,4 +81,39 @@ describe("usePortfolioAnalysis", () => {
     expect(result.current.status).toBe("idle");
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it("requests a new analysis when personal context changes", async () => {
+    const spy = vi.spyOn(api, "requestPortfolioAnalysis").mockResolvedValue({
+      status: "complete",
+    } as unknown as api.PortfolioAnalysisResult);
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ context }) =>
+        usePortfolioAnalysis([covered], { age: 35, gender: "남성" }, context),
+      {
+        initialProps: { context: [] as api.AnalysisContextAnswer[] },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    await waitFor(() => expect(result.current.status).toBe("success"));
+
+    rerender({
+      context: [
+        {
+          question: "치료 중 필요한 생활비는 얼마인가요?",
+          answer: "매달 250만원 정도예요.",
+        },
+      ],
+    });
+
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+    expect(spy.mock.calls[1][2]).toEqual([
+      {
+        question: "치료 중 필요한 생활비는 얼마인가요?",
+        answer: "매달 250만원 정도예요.",
+      },
+    ]);
+  });
 });

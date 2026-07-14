@@ -27,4 +27,9 @@ describe("formatWon", () => {
     expect(formatWon(30_000)).toBe("30,000원");
     expect(formatWon(0)).toBe("0원");
   });
+
+  it("falls back when the amount is unavailable", () => {
+    expect(formatWon(null)).toBe("미확인");
+    expect(formatWon(undefined)).toBe("미확인");
+  });
 });

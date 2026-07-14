@@ -14,9 +14,15 @@ from app.schemas.consultation import (
 from app.schemas.portfolio import ExcludedCoverageItem, PolicyInput
 
 
+class AnalysisContextAnswer(BaseModel):
+    question: str = Field(min_length=1, max_length=200)
+    answer: str = Field(min_length=1, max_length=500)
+
+
 class PortfolioAnalysisRequest(BaseModel):
     policies: list[PolicyInput] = Field(default_factory=list)
     demographics: InsuredDemographics | None = None
+    personal_context: list[AnalysisContextAnswer] = Field(default_factory=list, max_length=6)
     # Temporary compatibility fields for the current client. New clients send demographics.
     age: int | None = Field(default=None, ge=0, le=120)
     gender: Gender | None = None
@@ -60,6 +66,9 @@ class CounselorInsight(BaseModel):
     evidence_ids: list[str]
 
 
+AnalysisContextKind = Literal["소득", "치료·회복 기간 생활비", "부양 책임", "가용 예산"]
+
+
 class AmountReviewItem(BaseModel):
     coverage_name: str
     current_amount: int
@@ -68,11 +77,9 @@ class AmountReviewItem(BaseModel):
     rationale: str
     suggested_range: str | None = None
     confidence: Literal["low"] = "low"
-    basis: Literal["general_guidance"] = "general_guidance"
-    requires_personal_context: Literal[True] = True
-    required_context: list[Literal["소득", "치료·회복 기간 생활비", "부양 책임", "가용 예산"]] = (
-        Field(min_length=1)
-    )
+    basis: Literal["general_guidance", "personal_context"] = "general_guidance"
+    requires_personal_context: bool = True
+    required_context: list[AnalysisContextKind]
     evidence_ids: list[str]
 
 

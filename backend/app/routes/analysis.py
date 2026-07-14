@@ -13,4 +13,5 @@ def create_portfolio_analysis(request: PortfolioAnalysisRequest) -> PortfolioAna
     return analyze_portfolio(
         request.policies,
         demographics=request.resolved_demographics(),
+        personal_context=tuple(request.personal_context),
     )

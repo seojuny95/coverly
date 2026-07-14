@@ -8,24 +8,28 @@ units, or action verbs). This is what turns "가입 사실 확인" into a reason
 from app.services.coverage_knowledge import taxonomy as coverage_taxonomy
 
 _PURPOSES: dict[str, str] = {
-    coverage_taxonomy.CANCER: "암을 진단받은 초기에 목돈이 드는 상황에 대응하는 성격이에요.",
-    coverage_taxonomy.CEREBRO: ("뇌혈관 질환을 진단받았을 때의 목돈 부담에 대응하는 성격이에요."),
-    coverage_taxonomy.HEART: "심장 질환을 진단받았을 때의 목돈 부담에 대응하는 성격이에요.",
+    coverage_taxonomy.CANCER: (
+        "암 진단 초기에 필요한 치료 준비금과 생활비 공백을 살펴볼 때 기준이 돼요."
+    ),
+    coverage_taxonomy.CEREBRO: (
+        "뇌혈관 질환 진단 후 치료와 회복 기간에 필요한 목돈을 점검할 때 중요해요."
+    ),
+    coverage_taxonomy.HEART: "심장 질환 진단 후 치료비와 회복 기간의 지출 부담을 볼 때 참고돼요.",
     coverage_taxonomy.INJURY_DISABILITY: (
-        "사고로 장해가 남아 소득이 줄어드는 상황에 대응하는 성격이에요."
+        "사고 후 장해가 남아 소득이 줄거나 돌봄 비용이 생길 때를 살펴보는 항목이에요."
     ),
     coverage_taxonomy.DISEASE_DISABILITY: (
-        "질병으로 장해가 남아 소득이 줄어드는 상황에 대응하는 성격이에요."
+        "질병 후 장해로 일상생활이나 소득 흐름이 달라질 때 필요한 보장을 점검하게 해줘요."
     ),
-    coverage_taxonomy.HOSPITAL: "입원해 있는 동안 병원비와 생활비 부담을 메우는 성격이에요.",
-    coverage_taxonomy.SURGERY: "수술을 받을 때 드는 비용 부담을 덜어 주는 성격이에요.",
+    coverage_taxonomy.HOSPITAL: "입원 기간의 병원비와 생활비 부담을 함께 살펴보는 항목이에요.",
+    coverage_taxonomy.SURGERY: "수술 시 발생하는 비용 부담을 점검하는 항목이에요.",
     coverage_taxonomy.DEATH: (
-        "가장의 부재로 남은 가족의 생계가 흔들리는 상황에 대응하는 성격이에요."
+        "남은 가족의 생활비와 고정 지출을 이어갈 수 있는지 볼 때 핵심이 되는 항목이에요."
     ),
     coverage_taxonomy.INDEMNITY: (
-        "실제 지출한 치료비를 돌려받아 병원비 부담을 덜어 주는 성격이에요."
+        "실제 치료비 부담을 약관상 조건, 한도, 자기부담금과 함께 확인해야 하는 보장이에요."
     ),
-    coverage_taxonomy.CARE: "혼자 일상생활이 어려워 간병이 필요한 상황에 대응하는 성격이에요.",
+    coverage_taxonomy.CARE: "혼자 일상생활이 어려워 간병비가 생길 때 부담을 점검하는 항목이에요.",
 }
 
 

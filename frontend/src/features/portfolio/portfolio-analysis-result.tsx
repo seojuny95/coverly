@@ -1,5 +1,16 @@
+"use client";
+
 import { formatWon } from "./money-format";
-import type { PortfolioAnalysisResult } from "./portfolio-api";
+import type {
+  AnalysisEvidence,
+  PortfolioAnalysisResult,
+} from "./portfolio-api";
+
+type ReviewDisplayItem = {
+  title: string;
+  detail?: string;
+  evidence_ids?: string[];
+};
 
 export function PortfolioAnalysisResultView({
   result,
@@ -25,6 +36,13 @@ export function PortfolioAnalysisResultView({
     ...result.notices,
     result.baseline_notice,
   ].filter(Boolean);
+  const evidenceById = new Map<string, AnalysisEvidence>();
+  for (const evidence of result.evidence ?? []) {
+    if (evidence.id) evidenceById.set(evidence.id, evidence);
+  }
+  const overview =
+    result.counselor?.overview ??
+    `${result.life_stage} 기준으로 보험 ${result.policy_count}건에서 확인 가능한 보장을 정리했어요.`;
 
   return (
     <div className="space-y-5">
@@ -54,6 +72,8 @@ export function PortfolioAnalysisResultView({
           />
         </dl>
       </section>
+
+      <AnalysisSummary overview={overview} />
 
       {analyzedTitles.length ? (
         <section className="rounded-2xl border border-zinc-200 p-6">
@@ -86,46 +106,33 @@ export function PortfolioAnalysisResultView({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <ReviewCard
-          eyebrow="현재 강점"
-          title="잘 가입돼 있는 부분"
+          eyebrow="확인된 보장"
+          title="증권에서 확인된 부분"
           items={strengths}
-          empty="현재 데이터에서 뚜렷한 강점을 확인하지 못했어요."
+          evidenceById={evidenceById}
+          empty="현재 데이터에서 설명할 수 있는 보장을 확인하지 못했어요."
+          reasonLabel="왜 의미가 있나요?"
         />
         <ReviewCard
-          eyebrow="현재 부족한 점"
-          title="과하거나 부족한 부분"
+          eyebrow="추가 확인"
+          title="다른 자료도 확인할 부분"
           items={gaps}
-          empty="지금 데이터에서 과하거나 부족한 점을 찾지 못했어요."
+          evidenceById={evidenceById}
+          empty="현재 자료에서 추가로 확인할 항목을 찾지 못했어요."
           tone="warning"
+          reasonLabel="왜 확인하나요?"
         />
       </div>
 
-      <section className="rounded-2xl border border-zinc-200 p-6">
-        <p className="text-xs font-semibold text-blue-700">총평</p>
-        <p className="mt-3 text-sm leading-7 text-zinc-700">
-          {result.counselor?.overview ??
-            `${result.life_stage} 기준으로 보험 ${result.policy_count}건에서 확인 가능한 보장을 정리했어요.`}
-        </p>
-      </section>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <ReviewCard
-          eyebrow="다음 질문"
-          title="함께 생각해볼 질문"
-          items={(result.counselor?.next_questions ?? []).map((title) => ({
-            title,
-          }))}
-          empty="보험금이 필요한 상황과 월 납입 여력을 먼저 정리해보세요."
-        />
-        <ReviewCard
-          eyebrow="다음 단계"
-          title="이어서 확인하면 좋아요"
-          items={(result.counselor?.next_steps ?? []).map((title) => ({
-            title,
-          }))}
-          empty="원본 약관과 최신 계약 상태도 함께 확인해보세요."
-        />
-      </div>
+      <ReviewCard
+        eyebrow="다음 단계"
+        title="이어서 확인하면 좋아요"
+        items={(result.counselor?.next_steps ?? []).map((title) => ({
+          title,
+        }))}
+        evidenceById={evidenceById}
+        empty="원본 약관과 최신 계약 상태도 함께 확인해보세요."
+      />
 
       <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
         <h2 className="text-sm font-semibold">확인 범위와 한계</h2>
@@ -144,18 +151,36 @@ export function PortfolioAnalysisResultView({
   );
 }
 
+function AnalysisSummary({ overview }: { overview: string }) {
+  return (
+    <section className="border-y border-zinc-200 py-6">
+      <p className="text-xs font-semibold text-blue-700">총평</p>
+      <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+        보험을 한데 모아 보면
+      </h2>
+      <p className="mt-3 max-w-4xl text-sm leading-7 text-zinc-700">
+        {overview}
+      </p>
+    </section>
+  );
+}
+
 function ReviewCard({
   eyebrow,
   title,
   items,
+  evidenceById,
   empty,
   tone = "default",
+  reasonLabel,
 }: {
   eyebrow: string;
   title: string;
-  items: Array<{ title: string; detail?: string }>;
+  items: ReviewDisplayItem[];
+  evidenceById: Map<string, AnalysisEvidence>;
   empty: string;
   tone?: "default" | "warning";
+  reasonLabel?: string;
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 p-6">
@@ -174,8 +199,19 @@ function ReviewCard({
             >
               <p className="font-medium text-zinc-800">{item.title}</p>
               {item.detail ? (
-                <p className="mt-1 leading-6 text-zinc-500">{item.detail}</p>
+                <p className="mt-2 leading-6 text-zinc-500">
+                  {reasonLabel ? (
+                    <strong className="font-semibold text-zinc-700">
+                      {reasonLabel}{" "}
+                    </strong>
+                  ) : null}
+                  {item.detail}
+                </p>
               ) : null}
+              <EvidenceDetails
+                evidenceIds={item.evidence_ids}
+                evidenceById={evidenceById}
+              />
             </li>
           ))}
         </ul>
@@ -184,6 +220,64 @@ function ReviewCard({
       )}
     </section>
   );
+}
+
+function EvidenceDetails({
+  evidenceIds = [],
+  evidenceById,
+}: {
+  evidenceIds?: string[];
+  evidenceById: Map<string, AnalysisEvidence>;
+}) {
+  const evidence = evidenceIds.flatMap((id) => {
+    const item = evidenceById.get(id);
+    return item ? [item] : [];
+  });
+  if (!evidence.length) return null;
+
+  return (
+    <details className="mt-3 border-t border-zinc-200 pt-3">
+      <summary className="cursor-pointer text-xs font-medium text-blue-700">
+        근거 보기
+      </summary>
+      <ul className="mt-2 space-y-2 text-xs leading-5 text-zinc-500">
+        {evidence.map((item, index) => (
+          <li key={`${item.id ?? "evidence"}-${index}`}>
+            {plainEvidenceSummary(item)}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function plainEvidenceSummary(evidence: AnalysisEvidence) {
+  const id = evidence.id ?? "";
+  if (id.startsWith("official:")) {
+    const publisher = evidence.publisher || "공식기관";
+    const source = evidence.source_title || "공식자료";
+    const citation = evidence.citation_label
+      ? ` ${evidence.citation_label}`
+      : "";
+    return `${publisher}의 ${source}${citation}를 참고했어요.`;
+  }
+
+  if (id.startsWith("gap:")) {
+    const coverage = evidence.coverage_name || "이 항목";
+    return `올린 비자동차 보험 전체에서 ${coverage} 담보를 찾지 못했어요.`;
+  }
+
+  if (id.startsWith("excluded:")) {
+    const coverage = evidence.coverage_name || "이 담보";
+    return `${coverage}은 금액이나 지급 방식을 확인하기 어려워 따로 살펴봤어요.`;
+  }
+
+  const source = evidence.product_name || evidence.insurer || "올린 증권";
+  const coverage = evidence.coverage_name || "해당 담보";
+  if (evidence.amount !== undefined) {
+    return `${source}에서 ${coverage} 가입금액 ${formatWon(evidence.amount)}을 확인했어요.`;
+  }
+  return `${source}에서 ${coverage} 가입 사실을 확인했어요.`;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
