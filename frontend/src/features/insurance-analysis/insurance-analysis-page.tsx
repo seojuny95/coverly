@@ -95,6 +95,8 @@ type InsuranceAnalysisPageProps = {
   uploadInsurance?: UploadInsurance;
 };
 
+type AnalysisTab = "insurance" | "analysis" | "chat";
+
 export function InsuranceAnalysisPage({
   uploadInsurance,
 }: InsuranceAnalysisPageProps = {}) {
@@ -109,20 +111,28 @@ export function InsuranceAnalysisPage({
   } = useInsuranceData();
   useBeforeUnloadGuard(hasData);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"insurance" | "analysis">(
-    "insurance",
-  );
+  const [activeTab, setActiveTab] = useState<AnalysisTab>("insurance");
   const insuranceTabRef = useRef<HTMLButtonElement>(null);
   const analysisTabRef = useRef<HTMLButtonElement>(null);
+  const chatTabRef = useRef<HTMLButtonElement>(null);
 
-  // Arrow-key navigation between the two tabs (WAI-ARIA tabs pattern,
+  // Arrow-key navigation between the tabs (WAI-ARIA tabs pattern,
   // automatic activation): moves focus and switches the panel in one step.
   const handleTabListKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    const next = activeTab === "insurance" ? "analysis" : "insurance";
+    const tabs: AnalysisTab[] = ["insurance", "analysis", "chat"];
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    const nextIndex =
+      (tabs.indexOf(activeTab) + direction + tabs.length) % tabs.length;
+    const next = tabs[nextIndex];
     setActiveTab(next);
-    (next === "insurance" ? insuranceTabRef : analysisTabRef).current?.focus();
+    const tabRefs = {
+      insurance: insuranceTabRef,
+      analysis: analysisTabRef,
+      chat: chatTabRef,
+    };
+    tabRefs[next].current?.focus();
   };
   const [expandedInsuranceIds, setExpandedInsuranceIds] = useState<Set<string>>(
     () => new Set(),
@@ -205,7 +215,7 @@ export function InsuranceAnalysisPage({
   }
 
   return (
-    <main className="min-h-screen bg-white px-5 py-6 text-zinc-950 sm:px-6">
+    <main className="flex min-h-dvh flex-col bg-white px-5 py-6 text-zinc-950 sm:px-6">
       <header className="mx-auto flex w-full max-w-6xl items-center gap-4">
         <LeaveGuardLink
           href="/"
@@ -218,7 +228,7 @@ export function InsuranceAnalysisPage({
         </LeaveGuardLink>
       </header>
 
-      <section className="mx-auto mt-10 w-full max-w-6xl">
+      <section className="mx-auto mt-10 flex min-h-0 w-full max-w-6xl flex-1 flex-col">
         <nav
           role="tablist"
           aria-label="보험 정보 보기"
@@ -249,6 +259,15 @@ export function InsuranceAnalysisPage({
             }
           >
             보험 분석
+          </TabButton>
+          <TabButton
+            ref={chatTabRef}
+            id="chat-tab"
+            controls="chat-tabpanel"
+            active={activeTab === "chat"}
+            onClick={() => setActiveTab("chat")}
+          >
+            AI 보험 상담
           </TabButton>
         </nav>
         {sessionExpired ? <PolicySessionExpiredNotice /> : null}
@@ -403,7 +422,7 @@ export function InsuranceAnalysisPage({
               })}
             </div>
           </div>
-        ) : (
+        ) : activeTab === "analysis" ? (
           <div
             id="analysis-tabpanel"
             role="tabpanel"
@@ -431,13 +450,28 @@ export function InsuranceAnalysisPage({
               insuredName={insuredName}
             />
           </div>
+        ) : (
+          <div>
+            <div className="mb-7">
+              <PixelEyebrow>근거 기반 Q&A</PixelEyebrow>
+              <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
+                내 보험을 AI 상담사와 함께 살펴봐요
+              </h1>
+              <p className="mt-3 text-sm leading-6 text-zinc-500">
+                올린 보험증권에서 확인한 내용을 근거로 답하고, 확인하기 어려운
+                내용은 한계도 함께 알려드려요.
+              </p>
+            </div>
+          </div>
         )}
-      </section>
 
-      <InsuranceChatbot
-        documents={insuranceDocuments}
-        sessionExpired={sessionExpired}
-      />
+        <InsuranceChatbot
+          documents={insuranceDocuments}
+          sessionExpired={sessionExpired}
+          mode={activeTab === "chat" ? "full" : "floating"}
+          onExpand={() => setActiveTab("chat")}
+        />
+      </section>
 
       {isUploadModalOpen ? (
         <UploadInsuranceModal

@@ -168,4 +168,21 @@ describe("InsuranceChatbot", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("opens the full 상담 tab from the floating chat", async () => {
+    const onExpand = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <InsuranceChatbot documents={docs} onExpand={onExpand} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "AI 보험 상담 탭에서 크게 보기" }),
+    );
+
+    expect(onExpand).toHaveBeenCalledOnce();
+  });
 });

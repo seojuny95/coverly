@@ -217,7 +217,7 @@ describe("portfolio features", () => {
     expect(screen.queryByText(/합산하지 않은 담보/)).not.toBeInTheDocument();
   });
 
-  test("starts analysis on first tab entry and keeps chat messages across tabs", async () => {
+  test("keeps chat messages between the floating chat and 상담 tab", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
@@ -358,6 +358,20 @@ describe("portfolio features", () => {
       String(input).endsWith("/qa/stream"),
     );
     expect(qaCall?.[1]?.body).toContain('"history":[]');
+
+    await user.click(
+      screen.getByRole("button", { name: "AI 보험 상담 탭에서 크게 보기" }),
+    );
+    expect(screen.getByRole("tab", { name: "AI 보험 상담" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.queryByRole("button", { name: "AI 보험 상담 탭에서 크게 보기" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("암 진단비는 1,000만원이에요."),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "내 보험" }));
     expect(
