@@ -61,6 +61,7 @@ app/
     │   └── generation.py      # 상담사 관점 LLM 생성 + fallback 검증
     ├── qa/
     │   ├── service.py         # POST /qa/stream use case
+    │   ├── planning.py        # 맥락 지시어·복합 질문·도메인 범위 planner
     │   ├── generation.py      # Q&A LLM 생성/streaming
     │   └── claim_channels.py  # 청구 채널 결정적 안내
     └── rag/                   # 공식 약관/제도 RAG + 업로드 세션 RAG

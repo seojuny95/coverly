@@ -1,5 +1,6 @@
 """Plan only Q&A turns that need context, splitting, or scope checks."""
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -50,6 +51,22 @@ _OUT_OF_SCOPE_TERMS = (
     "코드 짜",
     "코딩",
 )
+_INSURANCE_FRAGMENT_TERMS = (
+    "보험",
+    "증권",
+    "담보",
+    "보장",
+    "가입금액",
+    "청구",
+    "보험금",
+    "실손",
+    "실비",
+    "진단비",
+)
+_EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_PHONE_PATTERN = re.compile(r"(?<!\d)(?:01[016789]|02|0[3-6][1-5])[-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)")
+_MASKED_EMAIL = "[이메일]"
+_MASKED_PHONE = "[전화번호]"
 
 
 class PlannedQuestion(BaseModel):
@@ -91,7 +108,7 @@ def plan_questions(
             message.model_dump(mode="json") for message in history[-_MAX_HISTORY_MESSAGES:]
         ],
     }
-    user = mask_demographic_identifiers(dump_prompt_json(payload))
+    user = _mask_planner_prompt(dump_prompt_json(payload))
     try:
         raw = (complete or structured_completer(QuestionPlan))(_system_prompt(), user)
         return QuestionPlan.model_validate(raw)
@@ -100,17 +117,54 @@ def plan_questions(
 
 
 def _fallback_scope_plan(question: str) -> QuestionPlan | None:
+    if any(term in question for term in _OUT_OF_SCOPE_TERMS):
+        return _fallback_out_of_scope_plan(question)
     if any(term in question for term in _REFERENCE_TERMS + _MULTI_QUESTION_TERMS):
         return None
     if any(term in question for term in _GREETING_TERMS):
         scope: Literal["out_of_scope", "greeting"] = "greeting"
-    elif any(term in question for term in _OUT_OF_SCOPE_TERMS):
-        scope = "out_of_scope"
     else:
         return None
     return QuestionPlan(
         questions=[PlannedQuestion(original=question, resolved=question, scope=scope)]
     )
+
+
+def _fallback_out_of_scope_plan(question: str) -> QuestionPlan:
+    out_of_scope_start = min(
+        index for term in _OUT_OF_SCOPE_TERMS if (index := question.find(term)) >= 0
+    )
+    prefix = _clean_fallback_fragment(question[:out_of_scope_start])
+    suffix = _clean_fallback_fragment(question[out_of_scope_start:])
+
+    questions: list[PlannedQuestion] = []
+    if _looks_like_insurance_fragment(prefix):
+        questions.append(PlannedQuestion(original=prefix, resolved=prefix, scope="insurance"))
+    questions.append(
+        PlannedQuestion(
+            original=suffix or question,
+            resolved=suffix or question,
+            scope="out_of_scope",
+        )
+    )
+    return QuestionPlan(questions=questions)
+
+
+def _clean_fallback_fragment(fragment: str) -> str:
+    cleaned = fragment.strip(" ,.?")
+    cleaned = cleaned.removesuffix("그리고").removesuffix("또").strip(" ,")
+    cleaned = cleaned.removesuffix("하고").removesuffix("고").strip(" ,")
+    return cleaned
+
+
+def _looks_like_insurance_fragment(fragment: str) -> bool:
+    return any(term in fragment for term in _INSURANCE_FRAGMENT_TERMS)
+
+
+def _mask_planner_prompt(text: str) -> str:
+    masked = mask_demographic_identifiers(text)
+    masked = _EMAIL_PATTERN.sub(_MASKED_EMAIL, masked)
+    return _PHONE_PATTERN.sub(_MASKED_PHONE, masked)
 
 
 def _system_prompt() -> str:

@@ -24,6 +24,54 @@ def test_planner_failure_still_limits_obvious_out_of_scope_question() -> None:
     assert plan.questions[0].scope == "out_of_scope"
 
 
+def test_planner_failure_still_limits_mixed_out_of_scope_question() -> None:
+    plan = plan_questions(
+        "암진단비 알려주고 오늘 날씨도 알려줘",
+        [],
+        complete=lambda _system, _user: (_ for _ in ()).throw(RuntimeError("offline")),
+    )
+
+    assert plan is not None
+    assert [question.scope for question in plan.questions] == ["insurance", "out_of_scope"]
+    assert "암진단비" in plan.questions[0].original
+    assert "날씨" in plan.questions[1].original
+
+
+def test_planner_masks_phone_and_email_in_history() -> None:
+    captured: dict[str, object] = {}
+
+    def complete(_: str, user: str) -> dict[str, object]:
+        captured.update(json.loads(user))
+        return {
+            "questions": [
+                {
+                    "original": "그건 얼마야?",
+                    "resolved": "암진단비 가입금액은 얼마야?",
+                    "scope": "insurance",
+                }
+            ],
+            "clarification": None,
+        }
+
+    plan = plan_questions(
+        "그건 얼마야?",
+        [
+            ConversationMessage(
+                role="user",
+                content="제 전화번호는 010-1234-5678이고 메일은 test@example.com이야.",
+            )
+        ],
+        complete=complete,
+    )
+
+    assert plan is not None
+    serialized = json.dumps(captured, ensure_ascii=False)
+    assert "010-1234-5678" not in serialized
+    assert "test@example.com" not in serialized
+    assert "[전화번호]" in serialized
+    assert "[이메일]" in serialized
+
+
 def test_planner_receives_history_and_splits_mixed_question() -> None:
     captured: dict[str, object] = {}
 

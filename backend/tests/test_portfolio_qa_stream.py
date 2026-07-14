@@ -92,6 +92,11 @@ def test_stream_deterministic_amount_answer_is_single_delta() -> None:
     text = "".join(str(e["text"]) for e in events if e["type"] == "delta")
     assert "30,000,000원" in text
     assert events[-1]["type"] == "end"
+    suggestions = events[-1]["suggestions"]
+    assert isinstance(suggestions, list)
+    assert suggestions
+    assert all(suggestion.endswith("?") for suggestion in suggestions)
+    assert not any("해 주세요" in suggestion for suggestion in suggestions)
 
 
 def test_stream_claim_howto_carries_clickable_channels_in_end() -> None:
@@ -385,6 +390,10 @@ def test_stream_answers_insurance_part_and_limits_out_of_scope_part() -> None:
     assert "30,000,000원" in text
     assert "보험과 관련 없는 정보는 답변하기 어려워요" in text
     assert events[-1]["status"] == "answered"
+    suggestions = events[-1]["suggestions"]
+    assert isinstance(suggestions, list)
+    assert suggestions
+    assert all(suggestion.endswith("?") for suggestion in suggestions)
 
 
 def test_stream_clarifies_ambiguous_reference() -> None:

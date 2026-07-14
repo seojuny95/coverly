@@ -76,6 +76,7 @@ _OFFICIAL_CLAIM_CHECK_TERMS = (
     "받을수",
     "면책",
 )
+_MAX_SUGGESTIONS = 3
 
 OfficialAnswerer = Callable[[str], RagAnswer]
 
@@ -147,7 +148,7 @@ def _no_uploaded_policies_response() -> PortfolioQuestionResponse:
         answer="살펴볼 보험 정보가 아직 없어요.",
         citations=[],
         limitations=["보험증권을 먼저 업로드해 주세요."],
-        suggestions=["보험증권을 업로드한 뒤 다시 질문해 주세요."],
+        suggestions=["업로드한 증권에서 어떤 보장을 확인할 수 있어?"],
     )
 
 
@@ -238,7 +239,7 @@ def _stream_context(
         life_stage_check=context.life_stage_check,
         catalog=context.catalog,
         limitations=limitations,
-        suggestions=["다른 담보나 보장 공백도 이어서 물어보세요."],
+        suggestions=_contextual_suggestions(context),
         fallback=fallback,
         claim_targets=_claim_targets(context.policies, _medical_indemnity_names(context.facts)),
         stream=stream,
@@ -290,7 +291,7 @@ def _answer_question_plan(
 ) -> PortfolioQuestionResponse:
     if question_plan.clarification is not None:
         return PortfolioQuestionResponse(
-            status="refused",
+            status="clarify",
             answer=question_plan.clarification,
             citations=[],
             limitations=[],
@@ -300,6 +301,7 @@ def _answer_question_plan(
     answers: list[str] = []
     citations: list[AnswerCitation] = []
     limitations: list[str] = []
+    suggestions: list[str] = []
     answered = False
     generation: GenerationMode = "fallback"
     claim_channels = None
@@ -321,6 +323,7 @@ def _answer_question_plan(
             generation = "llm" if response.generation == "llm" else generation
             citations.extend(response.citations)
             limitations.extend(response.limitations)
+            suggestions.extend(response.suggestions)
             claim_channels = claim_channels or response.claim_channels
         if len(question_plan.questions) == 1:
             answers.append(answer)
@@ -332,7 +335,7 @@ def _answer_question_plan(
         answer="\n\n".join(answers),
         citations=_unique_citations(citations),
         limitations=list(dict.fromkeys(limitations)),
-        suggestions=[],
+        suggestions=_question_suggestions(*suggestions, *_contextual_suggestions(context)),
         generation=generation,
         demographics=context.insured,
         claim_channels=claim_channels,
@@ -349,6 +352,52 @@ def _unique_citations(citations: list[AnswerCitation]) -> list[AnswerCitation]:
         seen.add(key)
         unique.append(citation)
     return unique
+
+
+def _contextual_suggestions(context: _QaContext) -> list[str]:
+    totals = context.facts.coverage_summary.totals
+    if totals:
+        coverage_name = totals[0].display_name
+        candidates = [
+            f"{coverage_name} 가입금액은 얼마야?",
+            f"{coverage_name} 지급 조건은 뭐야?",
+            "가입한 보험은 몇 개야?",
+        ]
+    else:
+        candidates = [
+            "가입한 보험은 몇 개야?",
+            "분석 상태는 어때?",
+            "실손 청구는 어디서 해?",
+        ]
+    if context.facts.coverage_summary.indemnity_coverages:
+        candidates.append("실손 청구는 어디서 해?")
+    return _question_suggestions(*candidates)
+
+
+def _fact_suggestions(facts: PortfolioFacts) -> list[str]:
+    totals = facts.coverage_summary.totals
+    if not totals:
+        return _question_suggestions("가입한 보험은 몇 개야?", "분석 상태는 어때?")
+    coverage_name = totals[0].display_name
+    return _question_suggestions(
+        f"{coverage_name} 가입금액은 얼마야?",
+        f"{coverage_name} 지급 조건은 뭐야?",
+        "가입한 보험은 몇 개야?",
+    )
+
+
+def _question_suggestions(*candidates: str) -> list[str]:
+    suggestions: list[str] = []
+    for candidate in candidates:
+        cleaned = " ".join(candidate.split())
+        if not cleaned or cleaned in suggestions:
+            continue
+        if not cleaned.endswith("?"):
+            continue
+        suggestions.append(cleaned)
+        if len(suggestions) == _MAX_SUGGESTIONS:
+            break
+    return suggestions
 
 
 def _resolve_precomputed_answer(
@@ -555,8 +604,11 @@ def _official_citation(citation: RagCitation) -> AnswerCitation:
 
 def _official_suggestions(result: RagAnswer) -> list[str]:
     if result.mode == "claim_check":
-        return ["가입한 상품의 실제 약관과 보험사 심사 기준을 함께 확인해 주세요."]
-    return ["업로드한 증권의 담보명이나 보장내용과 함께 다시 물어보세요."]
+        return _question_suggestions("내 증권 기준으로도 보상 조건을 확인할 수 있어?")
+    return _question_suggestions(
+        "이 약관 내용이 내 증권에도 들어 있어?",
+        "내 담보의 지급 조건은 뭐야?",
+    )
 
 
 def _medical_indemnity_names(facts: PortfolioFacts) -> set[str]:
@@ -612,7 +664,7 @@ def _answer_amount(
                 ),
                 citations=[],
                 limitations=_standard_limitations(facts),
-                suggestions=["확인할 담보명 하나와 함께 가입금액을 질문해 주세요."],
+                suggestions=_question_suggestions("담보별 가입금액은 얼마야?"),
             )
         selected_totals = matches
 
@@ -622,7 +674,7 @@ def _answer_amount(
             answer="올린 증권에서 질문한 담보의 확인 가능한 가입금액을 찾지 못했습니다.",
             citations=[],
             limitations=_standard_limitations(facts),
-            suggestions=["담보명을 증권에 적힌 표현으로 다시 질문해 보세요."],
+            suggestions=_fact_suggestions(facts),
         )
 
     total_amount = sum(item.total_amount for item in selected_totals)
@@ -685,7 +737,7 @@ def _fact_response(
             if evidence_id in catalog.by_id
         ],
         limitations=_standard_limitations(facts),
-        suggestions=["다른 담보나 보장 공백도 이어서 물어보세요."],
+        suggestions=_fact_suggestions(facts),
     )
 
 
@@ -766,7 +818,7 @@ def _answer_claim_channels(
             "청구 방법만 안내했어요. "
             "보상 가능 여부와 지급액은 약관·보험사 안내를 확인해야 정확합니다."
         ],
-        suggestions=["가입한 담보와 금액처럼 증권에서 확인 가능한 내용도 물어보세요."],
+        suggestions=_fact_suggestions(facts),
         claim_channels=block,
     )
 

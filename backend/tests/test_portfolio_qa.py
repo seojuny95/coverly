@@ -398,6 +398,26 @@ def test_qa_returns_no_data_without_uploaded_policies() -> None:
     assert result.citations == []
 
 
+def test_qa_returns_clarify_status_for_ambiguous_planned_reference() -> None:
+    result = answer_portfolio_question(
+        "그건 얼마야?",
+        _policies(),
+        plan=lambda _system, _user: {
+            "questions": [
+                {
+                    "original": "그건 얼마야?",
+                    "resolved": "대상을 확인해야 하는 가입금액 질문",
+                    "scope": "insurance",
+                }
+            ],
+            "clarification": "어떤 담보의 가입금액을 말씀하시는지 알려주세요.",
+        },
+    )
+
+    assert result.status == "clarify"
+    assert result.answer == "어떤 담보의 가입금액을 말씀하시는지 알려주세요."
+
+
 def test_qa_passes_recent_history_and_demographics_to_llm() -> None:
     captured: dict[str, object] = {}
 

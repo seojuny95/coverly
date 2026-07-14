@@ -36,6 +36,7 @@ from app.services.policy.demographics import mask_demographic_identifiers
 from app.services.qa.claim_channels import claim_channel_block
 
 _MAX_HISTORY_MESSAGES = 12
+_MAX_SUGGESTIONS = 3
 
 # One event of the /qa/stream Server-Sent-Events protocol: meta → delta* → end.
 QaStreamEvent = dict[str, object]
@@ -90,7 +91,7 @@ class _LlmQaDraft(BaseModel):
     confirmed_fact: str = Field(min_length=1, max_length=700)
     guidance: str | None = Field(default=None, max_length=700)
     evidence_ids: list[str] = Field(min_length=1, max_length=8)
-    suggestions: list[str] = Field(default_factory=list, max_length=4)
+    suggestions: list[str] = Field(default_factory=list, max_length=_MAX_SUGGESTIONS)
     limitations: list[str] = Field(default_factory=list, max_length=4)
 
 
@@ -124,10 +125,7 @@ def generate_consultation_answer(
     if guidance and not is_safe_analysis_text(guidance):
         guidance = ""
 
-    suggestions = filter_safe_unique_texts(
-        draft.suggestions,
-        is_safe=is_safe_analysis_text,
-    )
+    suggestions = _safe_question_suggestions(draft.suggestions)
     limitations = filter_safe_unique_texts(
         draft.limitations,
         is_safe=is_safe_analysis_text,
@@ -177,12 +175,29 @@ def _system_prompt() -> str:
 - 금액대를 언급해도 됩니다. 단 공식 기준이 아닌 일반 참고임을 밝히세요.
   (예: "정답은 아니지만 월 3만원 정도를 기준으로 보는 분들도 있어요")
 
+[suggestions]
+- 사용자가 그대로 누르거나 다시 물어볼 수 있는 질문 원문만 최대 3개 쓰세요.
+- 모두 물음표로 끝내세요.
+- "~해 보세요", "~확인해 주세요" 같은 행동 제안 문장은 쓰지 마세요.
+
 [절대 하지 말 것 — 이걸 어기면 답변이 폐기됩니다]
 - "지금 가입하세요 / 해지하세요 / 증액하세요" 같은 직접적인 가입·해지·증감 지시.
 - 보상 가능 여부, 면책, 보험금 지급을 단정하는 말. 이는 약관 확인이 필요하니 판단하지 마세요.
 - "공식 기준" 같은 표현으로 근거를 과장하는 말.
 - 제공받지 않은 개인 사실(가족력·소득·부양가족 유무 등)을 지어내는 말.
 - 이전 assistant 답변을 새로운 증거로 취급하는 것."""
+
+
+def _safe_question_suggestions(items: list[str]) -> list[str]:
+    accepted: list[str] = []
+    for item in filter_safe_unique_texts(items, is_safe=is_safe_analysis_text):
+        cleaned = " ".join(item.split())
+        if not cleaned.endswith("?"):
+            continue
+        accepted.append(cleaned)
+        if len(accepted) == _MAX_SUGGESTIONS:
+            break
+    return accepted
 
 
 def _grounding_context(
