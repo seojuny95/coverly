@@ -41,6 +41,11 @@ def _forbidden_completer(_system: str, _user: str) -> dict[str, object]:
             "교통사고처리지원금 자동차부상치료비 벌금",
             "배상·화재·기타",
         ),
+        (
+            "무배당 프로미라이프 나에게 맞춘 생활종합보험2404_TM",
+            "가족화재벌금 12대가전제품고장수리비용 소재지",
+            "배상·화재·기타",
+        ),
     ],
 )
 def test_classify_policy_deterministic_match_never_calls_llm(
@@ -60,6 +65,23 @@ def test_classify_policy_matches_driver_accident_product_without_llm() -> None:
 
     assert result["보험분류"] == "배상·화재·기타"
     assert "운전자" in result["상품태그"]
+
+
+def test_classify_policy_requires_context_for_broad_lifestyle_package() -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_completer(system: str, user: str) -> dict[str, object]:
+        calls.append((system, user))
+        return {"보험분류": "미분류"}
+
+    result = classify_policy(
+        text="연금개시 연금수령",
+        product_name="무배당 나에게 맞춘 생활종합보험",
+        complete=fake_completer,
+    )
+
+    assert result == {"보험분류": "미분류", "상품태그": []}
+    assert len(calls) == 1
 
 
 def test_classify_policy_falls_back_to_llm_when_no_official_term_matches() -> None:

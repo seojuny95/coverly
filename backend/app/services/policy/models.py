@@ -26,7 +26,7 @@ class ParsedDocument:
 class Coverage(TypedDict):
     """One coverage (담보) row for the /policies/parse response.
 
-    보장내용 is the policy's own wording (authoritative); 해설 is an LLM-generated
+    보장내용 is the policy's own wording (authoritative); 해설 is a generated
     general explanation, filled only when 보장내용 is absent.
     """
 

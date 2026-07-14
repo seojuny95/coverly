@@ -15,6 +15,7 @@ from app.services.policy.coverage.service import (
     build_coverage_source,
     extract_coverages,
     normalize_coverages,
+    normalize_table_coverages,
 )
 from app.services.policy.models import Coverage, ParsedDocument, Table
 from app.services.policy.parsing import parse_document
@@ -112,6 +113,73 @@ def test_normalize_requests_and_keeps_the_verbatim_coverage_name() -> None:
 
     assert "증권 표기 그대로" in captured["system"]
     assert result[0]["담보명"] == "암진단비(감액없음)"
+
+
+def test_normalize_table_coverages_handles_clear_markdown_without_llm() -> None:
+    result = normalize_table_coverages(SOURCE)
+
+    assert result == [
+        {
+            "담보명": "암진단비(감액없음)",
+            "가입금액": "30,000,000원",
+            "보장내용": "암 진단 확정 시 최초 1회 지급",
+            "해설": None,
+        },
+        {
+            "담보명": "교통사고처리지원금",
+            "가입금액": "50,000,000원",
+            "보장내용": None,
+            "해설": None,
+        },
+    ]
+
+
+def test_normalize_table_coverages_finds_header_after_title_row() -> None:
+    source = (
+        "|  | 담보정보 |  |  |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 가입담보 | 보장상세(지급조건) | 보험가입금액 | 보험기간/납입기간 |\n"
+        "| 가족화재벌금(실손) | 벌금형 확정시 실제 납부한 벌금액 보상 | 2,000 만원 | 20년 |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "가족화재벌금(실손)",
+            "가입금액": "2,000 만원",
+            "보장내용": "벌금형 확정시 실제 납부한 벌금액 보상",
+            "해설": None,
+        }
+    ]
+
+
+def test_normalize_table_coverages_handles_content_column_as_name_with_wrapped_detail() -> None:
+    source = (
+        "| 구분 | 보장내용 | 납입/보험기간 | 가입금액 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 기본 | 일반상해후유장해(80%이상) | 20년납 100세만기 | 1,000만원 |\n"
+        "|  | 보험기간 중 상해로 후유장해 상태가 된 경우 금액 지급 |  |  |\n"
+        "| 선택 | 질병후유장해(3~100%)(감액없음) | 20년납 80세만기 | 3,000만원 |\n"
+        "|  | 보험기간 중 질병으로 후유장해 상태가 된 경우 금액 지급 |  |  |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "일반상해후유장해(80%이상)",
+            "가입금액": "1,000만원",
+            "보장내용": "보험기간 중 상해로 후유장해 상태가 된 경우 금액 지급",
+            "해설": None,
+        },
+        {
+            "담보명": "질병후유장해(3~100%)(감액없음)",
+            "가입금액": "3,000만원",
+            "보장내용": "보험기간 중 질병으로 후유장해 상태가 된 경우 금액 지급",
+            "해설": None,
+        },
+    ]
 
 
 def test_normalize_drops_policy_wording_absent_from_source() -> None:
@@ -456,6 +524,16 @@ def test_generates_explanation_for_coverage_missing_policy_wording() -> None:
 
     assert status == STATUS_OK
     assert coverages[0]["해설"] == "교통사고처리지원금 설명이에요."
+
+
+def test_default_extract_generates_missing_explanations_without_external_calls() -> None:
+    coverages, status = extract_coverages(
+        _doc(tables=(COVERAGE_TABLE,)),
+        normalize=lambda _s: [_coverage("교통사고처리지원금", None)],
+    )
+
+    assert status == STATUS_OK
+    assert coverages[0]["해설"]
 
 
 def test_policy_wording_is_not_overwritten_by_generated_explanation() -> None:

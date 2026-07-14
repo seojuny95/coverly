@@ -1,20 +1,21 @@
-"""Official-source assisted explanations for coverages whose 보장내용 is absent.
+"""Explanations for coverages whose 보장내용 is absent.
 
-One batched structured-output call explains every cache-missed name; results
-are cached in-process by 담보명 because a general explanation is independent of
-any particular policy. Official RAG excerpts are passed as context so the LLM
-uses standard-clause terms and limitations before falling back to broad
-coverage-name meaning.
+The upload path uses `explain_coverages_fast`: deterministic, local, and
+dependency-free. The slower `explain_coverages` remains available for call sites
+that explicitly want official-source assisted LLM explanations.
 
 Never raises: on LLM failure the caller gets cache hits plus ok=False so the
 upload degrades to 분석상태=부분 instead of breaking.
 """
 
+import re
 from collections.abc import Callable
 from functools import lru_cache
 
 from pydantic import BaseModel, ValidationError
 
+from app.services.coverage_knowledge.purpose import coverage_purpose
+from app.services.coverage_knowledge.taxonomy import classify_coverage
 from app.services.llm import (
     JsonCompleter,
     compact_prompt_text,
@@ -62,6 +63,70 @@ class _ExplanationBatch(BaseModel):
 
 _CACHE: dict[str, str] = {}
 CoverageContextRetriever = Callable[[str], list[RetrievalHit]]
+
+
+def explain_coverages_fast(names: list[str]) -> tuple[dict[str, str], bool]:
+    """Local 담보명-based explanations for the upload path.
+
+    These are general display helpers, not policy-condition summaries. The
+    policy's own 보장내용 always stays authoritative when present; this only
+    fills a user-friendly explanation when the PDF table has name + amount but
+    no wording.
+    """
+    explanations: dict[str, str] = {}
+    for name in dict.fromkeys(item.strip() for item in names if item.strip()):
+        explanations[name] = _local_explanation(name)
+    return explanations, True
+
+
+def _local_explanation(name: str) -> str:
+    normalized = re.sub(r"\s+", "", name)
+
+    category = classify_coverage(normalized)
+    if category:
+        purpose = coverage_purpose(category)
+        if purpose:
+            return purpose
+
+    for keyword, explanation in _LOCAL_EXPLANATION_RULES:
+        if keyword in normalized:
+            return explanation
+
+    return (
+        "담보명만으로는 세부 조건을 단정하기 어려워요. "
+        "가입금액과 약관의 지급 조건을 함께 확인하는 항목이에요."
+    )
+
+
+_LOCAL_EXPLANATION_RULES: tuple[tuple[str, str], ...] = (
+    (
+        "대인배상",
+        "자동차 사고로 다른 사람이 다치거나 사망한 상황을 살펴볼 때 기준이 되는 항목이에요.",
+    ),
+    (
+        "대물배상",
+        "자동차 사고로 다른 사람의 차량이나 재산에 손해가 생긴 상황을 살펴보는 항목이에요.",
+    ),
+    (
+        "자동차상해",
+        "자동차 사고로 운전자나 탑승자가 다친 상황에서 치료와 회복 부담을 점검하는 항목이에요.",
+    ),
+    (
+        "무보험차상해",
+        "보험 가입이 충분하지 않은 차량과의 사고처럼 보상 경로가 복잡할 때 보는 항목이에요.",
+    ),
+    ("자기차량손해", "내 차량에 생긴 손해와 수리 부담을 확인할 때 보는 항목이에요."),
+    (
+        "긴급출동",
+        "차량 고장이나 운행 중 긴급 상황에서 받을 수 있는 지원 범위를 확인하는 항목이에요.",
+    ),
+    ("벌금", "사고나 법적 책임으로 벌금 부담이 생길 수 있는 상황을 살펴보는 항목이에요."),
+    ("배상", "다른 사람에게 손해를 끼쳐 책임이 생길 수 있는 상황을 확인하는 항목이에요."),
+    ("화재", "화재로 재산 손해나 비용 부담이 생기는 상황을 살펴보는 항목이에요."),
+    ("고장수리", "가전이나 생활 기기 고장으로 수리비가 생길 때 확인하는 항목이에요."),
+    ("치료비", "치료 과정에서 생기는 비용 부담을 점검하는 항목이에요."),
+    ("진단비", "질병이나 사고가 진단된 뒤 필요한 목돈과 생활비 공백을 살펴보는 항목이에요."),
+)
 
 
 @lru_cache

@@ -31,7 +31,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.services.grounding import normalize_amount, wording_grounded
 from app.services.llm import JsonCompleter, structured_completer
-from app.services.policy.coverage.explanation import explain_coverages
+from app.services.policy.coverage.explanation import explain_coverages_fast
 from app.services.policy.demographics import mask_demographic_identifiers
 from app.services.policy.models import Coverage, ParsedDocument
 from app.services.table_text import serialize_table
@@ -50,8 +50,10 @@ _MAX_SOURCE_CHARS = 30_000
 
 # Header vocabulary observed across sample policies, kept intentionally wider
 # than the samples so unseen insurers still match tier 1.
-_NAME_HEADERS = ("보장명", "담보명", "담보종목", "보장상세", "특약명")
+_NAME_HEADERS = ("가입담보", "보장명", "담보명", "담보종목", "보장상세", "보장내용", "특약명")
+_NAME_COLUMN_HEADERS = ("가입담보", "보장명", "담보명", "담보종목", "특약명")
 _AMOUNT_HEADERS = ("가입금액", "보험가입금액", "보장금액", "보험금액", "한도")
+_DETAIL_HEADERS = ("보장상세", "지급조건", "보장내용")
 
 # One prompt for every policy type. The 담보/부가 split and the verbatim-amount
 # rules are structural (driven by the table's shape), so an unfriendly non-auto
@@ -172,6 +174,123 @@ def _amount_column_index(header: list[str]) -> int | None:
     if len(header) >= 2 and not header[1]:
         return 1
     return None
+
+
+def _header_column_index(header: list[str], candidates: tuple[str, ...]) -> int | None:
+    for index, cell in enumerate(header):
+        if any(candidate in cell for candidate in candidates):
+            return index
+    return None
+
+
+def _name_column_index(header: list[str]) -> int | None:
+    """Column containing coverage names.
+
+    Most tables have an explicit name header (가입담보/담보명/담보종목). Some
+    policies use a compact table shaped as 구분 | 보장내용 | 기간 | 가입금액, where
+    the first row in 보장내용 is the coverage name and following wrapped rows are
+    details. Treat 보장내용 as the name column only when no stronger name header
+    exists.
+    """
+    explicit = _header_column_index(header, _NAME_COLUMN_HEADERS)
+    if explicit is not None:
+        return explicit
+    return _header_column_index(header, ("보장내용",))
+
+
+def _continuation_detail(
+    rows: list[list[str]], start_index: int, name_column: int, amount_column: int
+) -> str | None:
+    """Detail text in wrapped rows following a coverage row."""
+    details: list[str] = []
+    for cells in rows[start_index + 1 :]:
+        if len(cells) <= max(name_column, amount_column):
+            continue
+
+        has_previous_marker = any(cell.strip() for cell in cells[:name_column])
+        has_amount = bool(cells[amount_column].strip())
+        if has_previous_marker or has_amount:
+            break
+
+        detail = cells[name_column].strip()
+        if detail:
+            details.append(detail)
+
+    return "\n".join(details) or None
+
+
+def _is_continuation_row(cells: list[str], name_column: int, amount_column: int) -> bool:
+    if len(cells) <= max(name_column, amount_column):
+        return False
+    if cells[amount_column].strip():
+        return False
+    return name_column > 0 and not any(cell.strip() for cell in cells[:name_column])
+
+
+def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
+    if not rows:
+        return []
+
+    header_index: int | None = None
+    for index, candidate in enumerate(rows):
+        if (
+            _name_column_index(candidate) is not None
+            and _amount_column_index(candidate) is not None
+        ):
+            header_index = index
+            break
+
+    if header_index is None:
+        return []
+
+    header = rows[header_index]
+    name_column = _name_column_index(header)
+    amount_column = _amount_column_index(header)
+    if name_column is None or amount_column is None:
+        return []
+
+    detail_column = _header_column_index(header, _DETAIL_HEADERS)
+    if detail_column == name_column:
+        detail_column = None
+
+    coverages: list[Coverage] = []
+    for index, cells in enumerate(rows[header_index + 1 :], start=header_index + 1):
+        if len(cells) <= max(name_column, amount_column):
+            continue
+        if _is_continuation_row(cells, name_column, amount_column):
+            continue
+
+        name = cells[name_column].strip()
+        raw_amount = cells[amount_column].strip()
+        if not name:
+            continue
+
+        row_type: Literal["담보", "부가"] = "담보" if raw_amount else "부가"
+        detail = (
+            cells[detail_column].strip()
+            if detail_column is not None and len(cells) > detail_column
+            else None
+        )
+        if detail is None:
+            detail = _continuation_detail(rows, index, name_column, amount_column)
+        parsed = _CoverageRow(
+            담보명=name,
+            가입금액=raw_amount,
+            보장내용=detail or None,
+            유형=row_type,
+        )
+        coverages.append(_coverage_from_row(parsed, "\n".join("|".join(row) for row in rows)))
+
+    return coverages
+
+
+def normalize_table_coverages(source: str) -> list[Coverage]:
+    """Extract straightforward markdown coverage tables without an LLM call."""
+
+    coverages: list[Coverage] = []
+    for rows in _markdown_tables(source):
+        coverages.extend(_table_rows_to_coverages(rows))
+    return coverages
 
 
 def _amount_from_source_row(name: str, source: str) -> str | None:
@@ -302,6 +421,11 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
     if not source.strip():
         return []
 
+    if complete is None:
+        local_coverages = normalize_table_coverages(source)
+        if local_coverages:
+            return local_coverages
+
     completer = complete or _default_completer()
     model_source = mask_demographic_identifiers(source)
     rows = completer(_SYSTEM, model_source).get("보장목록", [])
@@ -332,7 +456,7 @@ def extract_coverages(
     doc: ParsedDocument,
     *,
     normalize: Normalizer = normalize_coverages,
-    explain: Explainer = explain_coverages,
+    explain: Explainer = explain_coverages_fast,
 ) -> tuple[list[Coverage], str]:
     """Extract the coverage list from a parsed policy document, best-effort."""
     try:

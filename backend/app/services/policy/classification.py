@@ -112,6 +112,10 @@ _CATEGORIES = [
 _TAG_TERMS: dict[str, list[str]] = {
     tag: _normalize_terms(terms) for tag, terms in _RAW_RULES["tag_terms"].items()
 }
+_DAMAGE_GENERAL_PRODUCT_TERMS = _normalize_terms(["생활종합보험", "종합손해보험"])
+_DAMAGE_GENERAL_CONTEXT_TERMS = _normalize_terms(
+    ["화재", "배상", "벌금", "고장수리", "소재지", "주택", "아파트", "가재", "재물"]
+)
 
 
 def _contains_any(text: str, terms: list[str]) -> bool:
@@ -161,6 +165,18 @@ def _match_deterministic(product_name: str | None) -> _Category | None:
     return None
 
 
+def _match_contextual(search_space: str, product_name: str | None) -> _Category | None:
+    """Classify broad non-life package products only with product + context evidence."""
+
+    product_space = _normalize_text(product_name or "")
+    if not _contains_any(product_space, _DAMAGE_GENERAL_PRODUCT_TERMS):
+        return None
+    if not _contains_any(search_space, _DAMAGE_GENERAL_CONTEXT_TERMS):
+        return None
+
+    return next(category for category in _CATEGORIES if category.classification == "배상·화재·기타")
+
+
 @lru_cache
 def _default_completer() -> JsonCompleter:
     return structured_completer(_ClassificationResult)
@@ -192,6 +208,10 @@ def classify_policy(
     search_space = _search_space(text, product_name)
 
     category = _match_deterministic(product_name)
+    if category is not None:
+        return _enrich_tags(category.classification, search_space, seed_tags=category.tags)
+
+    category = _match_contextual(search_space, product_name)
     if category is not None:
         return _enrich_tags(category.classification, search_space, seed_tags=category.tags)
 
