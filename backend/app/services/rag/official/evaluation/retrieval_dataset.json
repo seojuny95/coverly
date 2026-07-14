@@ -211,5 +211,53 @@
     "difficulty": "hard",
     "relevant_chunk_ids": [],
     "expected_no_hits": true
+  },
+  {
+    "id": "negative_news",
+    "questions": ["오늘 주요 경제 뉴스를 요약해줘", "방금 발표된 보험업계 최신 뉴스를 알려줘"],
+    "profile": "out_of_scope",
+    "difficulty": "hard",
+    "relevant_chunk_ids": [],
+    "expected_no_hits": true
+  },
+  {
+    "id": "negative_stock_price",
+    "questions": ["지금 보험회사 주가가 얼마인지 알려줘", "오늘 코스피와 보험주 시세를 비교해줘"],
+    "profile": "out_of_scope",
+    "difficulty": "hard",
+    "relevant_chunk_ids": [],
+    "expected_no_hits": true
+  },
+  {
+    "id": "negative_hospital_booking",
+    "questions": ["근처 병원 진료 예약을 잡아줘", "오늘 오후에 갈 수 있는 정형외과 예약 가능 시간을 찾아줘"],
+    "profile": "out_of_scope",
+    "difficulty": "hard",
+    "relevant_chunk_ids": [],
+    "expected_no_hits": true
+  },
+  {
+    "id": "negative_app_account",
+    "questions": ["앱 계정 비밀번호를 재설정하는 방법을 알려줘", "로그인이 안 될 때 인증번호를 다시 받는 절차가 궁금해"],
+    "profile": "out_of_scope",
+    "difficulty": "hard",
+    "relevant_chunk_ids": [],
+    "expected_no_hits": true
+  },
+  {
+    "id": "negative_personal_coverage_amount",
+    "questions": ["내가 가입한 암 진단비 보장금액이 얼마인지 알려줘", "내 실손보험의 자기부담금이 정확히 얼마인지 확인해줘"],
+    "profile": "out_of_scope",
+    "difficulty": "hard",
+    "relevant_chunk_ids": [],
+    "expected_no_hits": true
+  },
+  {
+    "id": "negative_realtime_information",
+    "questions": ["지금 가장 가까운 약국이 열려 있는지 알려줘", "현재 교통 상황을 보고 병원까지 걸리는 시간을 계산해줘"],
+    "profile": "out_of_scope",
+    "difficulty": "hard",
+    "relevant_chunk_ids": [],
+    "expected_no_hits": true
   }
 ]

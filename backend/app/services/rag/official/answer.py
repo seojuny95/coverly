@@ -23,6 +23,7 @@ from app.services.llm import (
     structured_completer,
 )
 from app.services.prompt_loader import load_prompt
+from app.services.rag.official.answerability import judge_query_scope
 from app.services.rag.official.models import RagChunk, RetrievalHit
 from app.services.rag.official.retrieval import retrieve
 
@@ -80,6 +81,7 @@ def answer_official_question(
     question: str,
     *,
     complete: JsonCompleter | None = None,
+    scope_complete: JsonCompleter | None = None,
     hits: list[RetrievalHit] | None = None,
     final_k: int = 5,
 ) -> RagAnswer:
@@ -89,9 +91,20 @@ def answer_official_question(
     """
 
     normalized = question.strip()
+    if not normalized:
+        return _no_evidence()
+
+    if hits is None:
+        try:
+            scope = judge_query_scope(normalized, complete=scope_complete)
+        except Exception:
+            return _no_evidence(missing_context=("질문 범위 판정 실패",))
+        if scope.label == "out_of_scope":
+            return _out_of_scope(scope.reason)
+
     selected_hits = hits if hits is not None else retrieve(normalized, final_k=final_k)
 
-    if not normalized or not selected_hits:
+    if not selected_hits:
         return _no_evidence()
 
     completer = complete or structured_completer(_RagDraft)
@@ -120,13 +133,25 @@ def answer_official_question(
     )
 
 
-def _no_evidence() -> RagAnswer:
+def _no_evidence(*, missing_context: tuple[str, ...] = ()) -> RagAnswer:
     return RagAnswer(
         status="no_evidence",
         mode="general",
         answer="공식 자료에서 답변 근거를 찾지 못했습니다.",
         citations=(),
         limitations=("근거가 확인되지 않으면 답변하지 않습니다.",),
+        missing_context=missing_context,
+    )
+
+
+def _out_of_scope(reason: str) -> RagAnswer:
+    return RagAnswer(
+        status="no_evidence",
+        mode="general",
+        answer="공식 보험자료로 답변할 수 있는 범위 밖 질문입니다.",
+        citations=(),
+        limitations=("공식자료 RAG 범위 밖 질문은 검색하지 않고 답변하지 않습니다.",),
+        missing_context=(reason,),
     )
 
 
