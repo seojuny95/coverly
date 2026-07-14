@@ -1,5 +1,17 @@
+from pathlib import Path
+
+from app.services.prompt_loader import load_prompt
 from app.services.rag.official.answer import answer_official_question
 from app.services.rag.official.models import RagChunk, RetrievalHit
+
+_PROMPT_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "app"
+    / "services"
+    / "rag"
+    / "official"
+    / "rag_answer_prompt.md"
+)
 
 
 def _hit(chunk: RagChunk) -> RetrievalHit:
@@ -86,6 +98,21 @@ def test_answer_official_question_keeps_missing_context() -> None:
     assert result.missing_context == ("가입 상품 약관", "진단일")
 
 
+def test_answer_official_question_replaces_generic_missing_context() -> None:
+    result = answer_official_question(
+        "내 실손보험에서 도수치료가 보장돼?",
+        hits=[_hit(_chunk())],
+        complete=lambda _system, _user: {
+            "answer": "제공된 공식자료만으로는 도수치료 보장 여부를 확인할 수 없어요.",
+            "citation_ids": ["chunk-1"],
+            "missing_context": ["개별 판단에 추가로 필요한 정보"],
+        },
+    )
+
+    assert result.status == "answered"
+    assert result.missing_context == ()
+
+
 def test_answer_official_question_allows_grounded_payment_language() -> None:
     result = answer_official_question(
         "암 진단비 받을 수 있어?",
@@ -108,3 +135,23 @@ def test_answer_official_question_no_evidence_without_hits() -> None:
 
     assert result.status == "no_evidence"
     assert result.citations == ()
+
+
+def test_rag_answer_prompt_has_required_sections() -> None:
+    prompt = load_prompt(_PROMPT_PATH)
+
+    assert "# 역할" in prompt
+    assert "# 작업 순서" in prompt
+    assert "# 하지 말아야 할 것" in prompt
+    assert "# 부족한 정보" in prompt
+    assert "# 출력 규칙" in prompt
+
+
+def test_rag_answer_prompt_keeps_generation_eval_rules_visible() -> None:
+    prompt = load_prompt(_PROMPT_PATH)
+
+    assert "30일 초과 불가" in prompt
+    assert "치료 기록" in prompt
+    assert "위반 내용" in prompt
+    assert "보험금 지급사유" in prompt
+    assert "포괄 문구" in prompt

@@ -11,6 +11,7 @@ The answer flow stays intentionally small:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -21,6 +22,7 @@ from app.services.llm import (
     dump_prompt_json,
     structured_completer,
 )
+from app.services.prompt_loader import load_prompt
 from app.services.rag.official.models import RagChunk, RetrievalHit
 from app.services.rag.official.retrieval import retrieve
 
@@ -33,6 +35,15 @@ RagAnswerMode = Literal["term_explain", "claim_check", "general"]
 RagAnswerStatus = Literal["answered", "no_evidence", "filtered"]
 
 _MAX_CONTEXT_CHARS = 900
+_PROMPT_PATH = Path(__file__).with_name("rag_answer_prompt.md")
+_GENERIC_MISSING_CONTEXT = (
+    "개별 판단에 추가로 필요한 정보",
+    "개별 판단에 필요한 정보",
+    "추가 정보",
+    "구체적인 정보",
+    "자세한 정보",
+    "질문에 필요한 구체 확인 항목",
+)
 
 
 @dataclass(frozen=True)
@@ -105,7 +116,7 @@ def answer_official_question(
             _citation_by_id(citation_id, selected_hits) for citation_id in citation_ids
         ),
         limitations=("공식자료 발췌문에 근거한 일반 설명입니다.",),
-        missing_context=tuple(item.strip() for item in draft.missing_context if item.strip()),
+        missing_context=_missing_context(draft.missing_context),
     )
 
 
@@ -135,15 +146,7 @@ def _filtered(
 
 
 def _system_prompt() -> str:
-    return (
-        "당신은 사용자가 이미 가진 보험을 이해하도록 돕는 상담사입니다. "
-        "제공된 공식자료 발췌문만 근거로 답하세요. "
-        "근거에 없는 보험사, 상품명, 금액, 지급 조건을 만들지 마세요. "
-        "특정 상품 가입·해지·증액을 권하지 마세요. "
-        "어려운 약관 용어는 쉬운 한국어로 설명하세요. "
-        "citation_ids에는 실제로 사용한 발췌문 id만 넣으세요. "
-        "공식자료만으로 부족한 내용은 missing_context에 적으세요."
-    )
+    return load_prompt(_PROMPT_PATH)
 
 
 def _user_prompt(question: str, hits: list[RetrievalHit]) -> str:
@@ -162,7 +165,7 @@ def _user_prompt(question: str, hits: list[RetrievalHit]) -> str:
         "output": {
             "answer": "사용자에게 보여줄 답변",
             "citation_ids": ["사용한 excerpt id"],
-            "missing_context": ["개별 판단에 추가로 필요한 정보"],
+            "missing_context": ["질문에 필요한 구체 확인 항목"],
         },
     }
     return dump_prompt_json(payload)
@@ -175,6 +178,21 @@ def _valid_citation_ids(ids: list[str], hits: list[RetrievalHit]) -> list[str]:
         if citation_id in available and citation_id not in valid:
             valid.append(citation_id)
     return valid
+
+
+def _missing_context(items: list[str]) -> tuple[str, ...]:
+    cleaned = [_normalize_missing_context(item) for item in items]
+    concrete = [item for item in cleaned if item and not _is_generic_missing_context(item)]
+
+    return tuple(dict.fromkeys(concrete))
+
+
+def _normalize_missing_context(item: str) -> str:
+    return " ".join(item.strip().split())
+
+
+def _is_generic_missing_context(item: str) -> bool:
+    return any(generic in item for generic in _GENERIC_MISSING_CONTEXT)
 
 
 def _citation_by_id(chunk_id: str, hits: list[RetrievalHit]) -> RagCitation:
