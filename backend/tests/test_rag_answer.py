@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from app.services.prompt_loader import load_prompt
 from app.services.rag.official.answer import answer_official_question
 from app.services.rag.official.models import RagChunk, RetrievalHit
@@ -135,6 +137,71 @@ def test_answer_official_question_no_evidence_without_hits() -> None:
 
     assert result.status == "no_evidence"
     assert result.citations == ()
+
+
+def test_answer_official_question_rejects_out_of_scope_before_retrieval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_retrieve(*_args: object, **_kwargs: object) -> list[RetrievalHit]:
+        raise AssertionError("out-of-scope question should not reach retrieval")
+
+    monkeypatch.setattr("app.services.rag.official.answer.retrieve", fail_retrieve)
+
+    result = answer_official_question(
+        "오늘 보험회사 주가 알려줘",
+        scope_complete=lambda _system, _user: {
+            "label": "out_of_scope",
+            "reason": "실시간 주가 정보는 공식 보험자료 범위 밖입니다.",
+        },
+    )
+
+    assert result.status == "no_evidence"
+    assert result.citations == ()
+    assert "범위 밖" in result.answer
+    assert result.missing_context == ("실시간 주가 정보는 공식 보험자료 범위 밖입니다.",)
+
+
+def test_answer_official_question_returns_no_evidence_when_scope_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_retrieve(*_args: object, **_kwargs: object) -> list[RetrievalHit]:
+        raise AssertionError("scope failure should not reach retrieval")
+
+    def fail_scope(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise RuntimeError("scope unavailable")
+
+    monkeypatch.setattr("app.services.rag.official.answer.retrieve", fail_retrieve)
+
+    result = answer_official_question("청약 철회 기간은?", scope_complete=fail_scope)
+
+    assert result.status == "no_evidence"
+    assert result.citations == ()
+    assert result.missing_context == ("질문 범위 판정 실패",)
+
+
+def test_answer_official_question_retrieves_when_scope_is_in_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_retrieve(*_args: object, **_kwargs: object) -> list[RetrievalHit]:
+        return [_hit(_chunk())]
+
+    monkeypatch.setattr("app.services.rag.official.answer.retrieve", fake_retrieve)
+
+    result = answer_official_question(
+        "계약 전 알릴 의무가 뭐야?",
+        scope_complete=lambda _system, _user: {
+            "label": "in_scope",
+            "reason": "공식 약관의 일반 의무를 묻는 질문입니다.",
+        },
+        complete=lambda _system, _user: {
+            "answer": "계약 전 알릴 의무는 중요한 사항을 알려야 한다는 뜻입니다.",
+            "citation_ids": ["chunk-1"],
+            "missing_context": [],
+        },
+    )
+
+    assert result.status == "answered"
+    assert result.citations[0].chunk_id == "chunk-1"
 
 
 def test_rag_answer_prompt_has_required_sections() -> None:

@@ -238,12 +238,12 @@ def test_retrieval_eval_fixture_passes_current_small_corpus() -> None:
     cases = load_retrieval_eval_cases()
     report = evaluate_retrieval(cases)
 
-    assert report.total == 60
+    assert report.total == 72
     assert report.recall >= 0.3, report.results
     assert 0.0 <= report.mrr <= 1.0
     assert 0.0 <= report.precision_at_k <= 1.0
     assert 0.0 <= report.ndcg_at_k <= 1.0
-    assert report.negative_total == 6
+    assert report.negative_total == 18
     assert report.average_latency_seconds >= 0.0
 
 
@@ -254,7 +254,7 @@ def test_retrieval_eval_fixture_uses_exact_existing_chunks_without_pii() -> None
         Path(__file__).parents[1] / "app/services/rag/official/evaluation/retrieval_dataset.json"
     ).read_text(encoding="utf-8")
 
-    assert len(cases) == 60
+    assert len(cases) == 72
     assert len({case.id for case in cases}) == len(cases)
     assert all(
         case.expected_no_hits or set(case.relevant_chunk_ids).issubset(chunk_ids) for case in cases
