@@ -59,9 +59,9 @@ def test_analysis_route_verifies_policy_demographics_instead_of_client_source() 
     }
 
 
-def test_qa_route_contract() -> None:
+def test_qa_stream_route_contract() -> None:
     response = _client().post(
-        "/qa",
+        "/qa/stream",
         json={
             "question": "보험 목록 알려줘",
             "policies": [],
@@ -71,11 +71,13 @@ def test_qa_route_contract() -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["status"] == "no_data"
-    assert "suggestions" in response.json()
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"type": "meta"' in response.text
+    assert '"type": "end"' in response.text
+    assert '"status": "no_data"' in response.text
 
 
-def test_qa_route_validates_blank_question() -> None:
-    response = _client().post("/qa", json={"question": "", "policies": []})
+def test_qa_stream_route_validates_blank_question() -> None:
+    response = _client().post("/qa/stream", json={"question": "", "policies": []})
 
     assert response.status_code == 422
