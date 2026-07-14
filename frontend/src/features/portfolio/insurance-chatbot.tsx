@@ -270,7 +270,7 @@ export function InsuranceChatbot({
         role="tabpanel"
         aria-labelledby="chat-tab"
         tabIndex={0}
-        className="flex min-h-[28rem] flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-[8px_8px_0_#eef2ff]"
+        className="mb-4 flex min-h-[28rem] flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-[8px_8px_0_#eef2ff] sm:mb-6"
       >
         {chat}
       </div>
