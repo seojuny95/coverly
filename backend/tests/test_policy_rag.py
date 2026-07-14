@@ -546,8 +546,11 @@ def test_local_policy_eval_dataset_has_product_scale_cases() -> None:
     cases = raw["cases"]
     case_ids = [case["id"] for case in cases]
 
-    assert len(cases) >= 50
+    assert len(cases) >= 120
     assert len(case_ids) == len(set(case_ids))
+    assert sum(case_id.startswith("paraphrase-") for case_id in case_ids) >= 12
+    assert sum(case_id.startswith("noisy-") for case_id in case_ids) >= 8
+    assert sum(len(case["session_ids"]) > 1 for case in cases) >= 14
 
 
 def test_local_policy_eval_dataset_does_not_contain_sample_pii() -> None:

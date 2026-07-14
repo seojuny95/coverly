@@ -1235,6 +1235,483 @@
           "4,000만원"
         ]
       ]
+    },
+    {
+      "id": "paraphrase-db-policy-period",
+      "query": "이 운전자 보장 계약이 끝나는 날짜를 찾아줘",
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
+      "expected_session_id": "sample-db-driver-policy",
+      "expected_term_groups": [
+        [
+          "보험기간 2024년 07월 26일 ~ 2044년 07월 26일"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-db-payment-term",
+      "query": "몇 년 동안 매달 내는 계약인지 알려줘",
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
+      "expected_session_id": "sample-db-driver-policy",
+      "expected_term_groups": [
+        [
+          "계약사항 20년만기 / 20년납 / 월납"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-db-car-treatment",
+      "query": "교통사고로 1급부터 7급 사이 부상을 입으면 잡혀 있는 금액이 얼마야?",
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
+      "expected_session_id": "sample-db-driver-policy",
+      "expected_term_groups": [
+        [
+          "자동차부상치료비",
+          "100 만원"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-nh-policy-period",
+      "query": "아이 보험 보장이 종료되는 날이 언제인지 봐줘",
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
+      "expected_session_id": "sample-nh-child-policy",
+      "expected_term_groups": [
+        [
+          "2095년04월29일"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-nh-cancer-diagnosis",
+      "query": "갑상선암 같은 유사암을 뺀 일반암 진단 보장액을 확인해줘",
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
+      "expected_session_id": "sample-nh-child-policy",
+      "expected_term_groups": [
+        [
+          "암진단비",
+          "유사암제외",
+          "2,000"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-hyundai-driver-scope",
+      "query": "이 차를 누가 운전할 때 보험 적용 대상으로 설정돼 있어?",
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
+      "expected_session_id": "sample-hyundai-car-policy",
+      "expected_term_groups": [
+        [
+          "운전자범위",
+          "기명피보험자 1인한정"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-hyundai-vehicle-value",
+      "query": "사고 때 기준이 되는 가입 차량의 평가 금액을 알려줘",
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
+      "expected_session_id": "sample-hyundai-car-policy",
+      "expected_term_groups": [
+        [
+          "차량가액",
+          "2,423만원"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-hyundai-emergency-service",
+      "query": "차가 멈췄을 때 긴급 견인은 최대 몇 km까지 가능해?",
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
+      "expected_session_id": "sample-hyundai-car-policy",
+      "expected_term_groups": [
+        [
+          "긴급출동특약",
+          "견인 100km한도"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-heungkuk-cerebrovascular",
+      "query": "뇌혈관 질환으로 진단받았을 때 잡힌 보장액을 찾아줘",
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "뇌혈관질환진단비",
+          "2,000만원"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-heungkuk-ischemic-heart",
+      "query": "허혈성 심장질환 진단 시 받을 수 있게 적힌 금액은?",
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "허혈성심질환진단비",
+          "2,000만원"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-heungkuk-injury-surgery",
+      "query": "다쳐서 수술하는 경우의 정액 보장이 얼마로 되어 있어?",
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "상해수술비",
+          "50만원"
+        ]
+      ]
+    },
+    {
+      "id": "paraphrase-heungkuk-disease-surgery",
+      "query": "질병 때문에 수술하면 지급하도록 가입한 금액을 보여줘",
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "질병수술비",
+          "50만원"
+        ]
+      ]
+    },
+    {
+      "id": "noisy-db-injury-grade",
+      "query": "상해급수몇급?",
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
+      "expected_session_id": "sample-db-driver-policy",
+      "expected_term_groups": [
+        [
+          "상해급수 1급"
+        ]
+      ]
+    },
+    {
+      "id": "noisy-db-legal-support",
+      "query": "교통사고처리지원금한도얼마",
+      "session_ids": [
+        "sample-db-driver-policy"
+      ],
+      "expected_session_id": "sample-db-driver-policy",
+      "expected_term_groups": [
+        [
+          "자가용운전자교통사고 처리지원금",
+          "20,000 만원"
+        ]
+      ]
+    },
+    {
+      "id": "noisy-nh-premium",
+      "query": "농협애기보험 월보험료?",
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
+      "expected_session_id": "sample-nh-child-policy",
+      "expected_term_groups": [
+        [
+          "42,615원"
+        ]
+      ]
+    },
+    {
+      "id": "noisy-nh-similar-cancer",
+      "query": "유사암에갑상선암포함?",
+      "session_ids": [
+        "sample-nh-child-policy"
+      ],
+      "expected_session_id": "sample-nh-child-policy",
+      "expected_term_groups": [
+        [
+          "유사암진단비",
+          "갑상선암"
+        ]
+      ]
+    },
+    {
+      "id": "noisy-hyundai-policy-period",
+      "query": "자동차보험 언제까지임",
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
+      "expected_session_id": "sample-hyundai-car-policy",
+      "expected_term_groups": [
+        [
+          "2027-06-27"
+        ]
+      ]
+    },
+    {
+      "id": "noisy-hyundai-property-liability",
+      "query": "대물한도10억맞나",
+      "session_ids": [
+        "sample-hyundai-car-policy"
+      ],
+      "expected_session_id": "sample-hyundai-car-policy",
+      "expected_term_groups": [
+        [
+          "대물배상",
+          "1사고당 10억원"
+        ]
+      ]
+    },
+    {
+      "id": "noisy-heungkuk-premium",
+      "query": "자녀보험1회보험료?",
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "1회 보험료 79,032원"
+        ]
+      ]
+    },
+    {
+      "id": "noisy-heungkuk-similar-cancer",
+      "query": "유사암진단비얼마",
+      "session_ids": [
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "유사암진단비",
+          "1,000만원"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-db-payment-hard-negative",
+      "query": "여러 증권 중 20년 만기, 20년 납, 월납인 운전자 계약의 납입 조건을 찾아줘",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-db-driver-policy",
+      "expected_term_groups": [
+        [
+          "계약사항 20년만기 / 20년납 / 월납"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-db-treatment-hard-negative",
+      "query": "자동차 자체 보험 말고 운전자 보장에서 1~7급 부상치료비를 찾아줘",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-db-driver-policy",
+      "expected_term_groups": [
+        [
+          "자동차부상치료비",
+          "100 만원"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-db-legal-support-hard-negative",
+      "query": "올린 증권 중 자가용 운전자의 사고 처리지원금 2억원 한도가 적힌 근거는?",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-db-driver-policy",
+      "expected_term_groups": [
+        [
+          "자가용운전자교통사고 처리지원금",
+          "20,000 만원"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-nh-period-hard-negative",
+      "query": "두 자녀보험 중 2095년 4월에 끝나는 계약의 종료일은?",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-nh-child-policy",
+      "expected_term_groups": [
+        [
+          "2095년04월29일"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-nh-premium-hard-negative",
+      "query": "여러 계약 중 매달 4만원대인 어린이보험의 정확한 보험료를 찾아줘",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-nh-child-policy",
+      "expected_term_groups": [
+        [
+          "42,615원"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-nh-cancer-hard-negative",
+      "query": "두 자녀보험 중 일반암 진단비가 2천인 쪽의 근거를 보여줘",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-nh-child-policy",
+      "expected_term_groups": [
+        [
+          "암진단비",
+          "유사암제외",
+          "2,000"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-hyundai-vehicle-value-hard-negative",
+      "query": "운전자보험 말고 차량을 대상으로 한 계약에서 차값이 얼마로 잡혀 있어?",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-hyundai-car-policy",
+      "expected_term_groups": [
+        [
+          "차량가액",
+          "2,423만원"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-hyundai-driver-scope-hard-negative",
+      "query": "자동차보험에서 운전자를 계약자 한 명으로 제한한 내용을 찾아줘",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-hyundai-car-policy",
+      "expected_term_groups": [
+        [
+          "운전자범위",
+          "기명피보험자 1인한정"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-hyundai-emergency-hard-negative",
+      "query": "업로드한 계약들 중 차량 긴급견인 100km가 적힌 특약을 찾아줘",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-hyundai-car-policy",
+      "expected_term_groups": [
+        [
+          "긴급출동특약",
+          "견인 100km한도"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-heungkuk-cancer-hard-negative",
+      "query": "두 자녀보험 가운데 유사암 제외 암진단비가 4천만원인 계약은?",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "암진단비",
+          "유사암제외",
+          "4,000만원"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-heungkuk-cerebrovascular-hard-negative",
+      "query": "자녀보험 중 뇌혈관질환 진단비 2천만원 근거를 찾아줘",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "뇌혈관질환진단비",
+          "2,000만원"
+        ]
+      ]
+    },
+    {
+      "id": "cross-session-heungkuk-heart-hard-negative",
+      "query": "여러 증권에서 허혈성 심장질환 진단비 2천만원 항목을 골라줘",
+      "session_ids": [
+        "sample-db-driver-policy",
+        "sample-nh-child-policy",
+        "sample-hyundai-car-policy",
+        "sample-heungkuk-child-policy"
+      ],
+      "expected_session_id": "sample-heungkuk-child-policy",
+      "expected_term_groups": [
+        [
+          "허혈성심질환진단비",
+          "2,000만원"
+        ]
+      ]
     }
   ]
 }
