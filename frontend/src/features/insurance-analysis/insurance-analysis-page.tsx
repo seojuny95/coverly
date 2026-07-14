@@ -215,7 +215,7 @@ export function InsuranceAnalysisPage({
   }
 
   return (
-    <main className="min-h-screen bg-white px-5 py-6 text-zinc-950 sm:px-6">
+    <main className="flex min-h-dvh flex-col bg-white px-5 py-6 text-zinc-950 sm:px-6">
       <header className="mx-auto flex w-full max-w-6xl items-center gap-4">
         <LeaveGuardLink
           href="/"
@@ -228,7 +228,7 @@ export function InsuranceAnalysisPage({
         </LeaveGuardLink>
       </header>
 
-      <section className="mx-auto mt-10 w-full max-w-6xl">
+      <section className="mx-auto mt-10 flex min-h-0 w-full max-w-6xl flex-1 flex-col">
         <nav
           role="tablist"
           aria-label="보험 정보 보기"
