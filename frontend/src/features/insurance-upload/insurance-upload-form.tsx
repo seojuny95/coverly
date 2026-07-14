@@ -51,6 +51,7 @@ export function InsuranceUploadForm({
     inputRef,
     selectFiles,
     removeSelectedFile,
+    updateSelectedFilePassword,
     handleSubmit,
     handleNameSelectionSubmit,
   } = useUploadOrchestration({
@@ -79,6 +80,13 @@ export function InsuranceUploadForm({
       ? `${selectedFiles.length}개 · ${(selectedBytes / 1024 / 1024).toFixed(2)} MB`
       : "파일당 최대 10MB";
   const isModal = surface === "modal";
+  const passwordRetryFiles = selectedUploadFiles.filter((selectedFile) =>
+    isPasswordRetryFile(selectedFile.errorCode),
+  );
+  const hasPasswordRetryFiles = passwordRetryFiles.length > 0;
+  const hasMissingPasswords = passwordRetryFiles.some(
+    (selectedFile) => !(selectedFile.password ?? "").trim(),
+  );
   const submitLabel = isModal ? "분석에 추가하기" : "내 보험 분석하기";
   const dropzoneTitle = fixedSelectedName
     ? `${fixedSelectedName}(피보험자)의 보험증권 PDF만 올릴 수 있어요`
@@ -196,11 +204,16 @@ export function InsuranceUploadForm({
               files={selectedUploadFiles}
               surface={surface}
               onRemove={removeSelectedFile}
+              onPasswordChange={updateSelectedFilePassword}
               disableRemove={isAnalyzing}
             />
             <button
               type="submit"
-              disabled={selectedUploadFiles.length === 0 || isAnalyzing}
+              disabled={
+                selectedUploadFiles.length === 0 ||
+                isAnalyzing ||
+                (hasPasswordRetryFiles && hasMissingPasswords)
+              }
               className={`${primaryButtonClassName} self-stretch ${isModal ? "" : "sm:self-end"}`}
             >
               {isAnalyzing ? "보험 정리 중이에요" : submitLabel}
@@ -229,6 +242,13 @@ export function InsuranceUploadForm({
         </div>
       </section>
     </form>
+  );
+}
+
+function isPasswordRetryFile(errorCode?: string) {
+  return (
+    errorCode === "PDF_PASSWORD_REQUIRED" ||
+    errorCode === "PDF_PASSWORD_INCORRECT"
   );
 }
 

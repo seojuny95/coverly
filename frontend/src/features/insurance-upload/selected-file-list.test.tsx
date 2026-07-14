@@ -21,6 +21,7 @@ describe("SelectedFileList", () => {
         files={[]}
         surface="page"
         onRemove={vi.fn()}
+        onPasswordChange={vi.fn()}
         disableRemove={false}
       />,
     );
@@ -37,6 +38,7 @@ describe("SelectedFileList", () => {
         ]}
         surface="page"
         onRemove={onRemove}
+        onPasswordChange={vi.fn()}
         disableRemove={false}
       />,
     );
@@ -63,11 +65,43 @@ describe("SelectedFileList", () => {
         ]}
         surface="page"
         onRemove={vi.fn()}
+        onPasswordChange={vi.fn()}
         disableRemove={false}
       />,
     );
     expect(screen.getByText("PDF 형식 아님")).toBeInTheDocument();
     expect(screen.queryByText("읽을 수 없는 PDF")).not.toBeInTheDocument();
+  });
+
+  it("shows a password field for encrypted PDFs", () => {
+    const onPasswordChange = vi.fn();
+    render(
+      <SelectedFileList
+        files={[
+          file({
+            id: "1",
+            name: "locked.pdf",
+            status: "failed",
+            errorCode: "PDF_PASSWORD_REQUIRED",
+            errorMessage: "PDF 비밀번호를 입력해주세요.",
+          }),
+        ]}
+        surface="page"
+        onRemove={vi.fn()}
+        onPasswordChange={onPasswordChange}
+        disableRemove={false}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("PDF 비밀번호"), {
+      target: { value: "900101" },
+    });
+
+    expect(screen.getByText("비밀번호 필요")).toBeInTheDocument();
+    expect(
+      screen.getByText(/보험사 로그인 비밀번호와 다를 수 있어요\./),
+    ).toBeInTheDocument();
+    expect(onPasswordChange).toHaveBeenCalledWith("1", "900101");
   });
 
   it("disables remove buttons when disableRemove is set", () => {
@@ -76,6 +110,7 @@ describe("SelectedFileList", () => {
         files={[file({ id: "1", name: "a.pdf" })]}
         surface="page"
         onRemove={vi.fn()}
+        onPasswordChange={vi.fn()}
         disableRemove
       />,
     );

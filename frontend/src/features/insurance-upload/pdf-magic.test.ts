@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { fileHasPdfMagic, hasPdfMagicBytes } from "./pdf-magic";
+import {
+  fileHasPdfMagic,
+  fileLooksEncryptedPdf,
+  hasPdfMagicBytes,
+} from "./pdf-magic";
 
 const encode = (text: string) => new TextEncoder().encode(text);
 
@@ -33,5 +37,35 @@ describe("fileHasPdfMagic", () => {
       type: "application/pdf",
     });
     expect(await fileHasPdfMagic(file)).toBe(false);
+  });
+});
+
+describe("fileLooksEncryptedPdf", () => {
+  it("is true when the PDF trailer references /Encrypt", async () => {
+    const file = new File(
+      [
+        encode(
+          "%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\ntrailer\n<< /Encrypt 5 0 R >>",
+        ),
+      ],
+      "locked.pdf",
+      {
+        type: "application/pdf",
+      },
+    );
+
+    expect(await fileLooksEncryptedPdf(file)).toBe(true);
+  });
+
+  it("is false for a normal PDF without an encryption marker", async () => {
+    const file = new File(
+      [encode("%PDF-1.7\ntrailer\n<< /Size 5 >>")],
+      "open.pdf",
+      {
+        type: "application/pdf",
+      },
+    );
+
+    expect(await fileLooksEncryptedPdf(file)).toBe(false);
   });
 });

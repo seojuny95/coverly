@@ -45,6 +45,13 @@ const secondInsuranceFile = new File(
     type: "application/pdf",
   },
 );
+const encryptedInsuranceFile = new File(
+  ["%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\ntrailer\n<< /Encrypt 5 0 R >>"],
+  "locked-insurance.pdf",
+  {
+    type: "application/pdf",
+  },
+);
 
 function renderForm({
   uploadInsurance = vi.fn(),
@@ -198,6 +205,26 @@ describe("InsuranceUploadForm", () => {
     ).toBeDisabled();
   });
 
+  test("detects an encrypted PDF before the first upload attempt", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi.fn<UploadInsurance>();
+    renderForm({ uploadInsurance });
+
+    await user.upload(
+      screen.getByLabelText("PDF 파일 선택"),
+      encryptedInsuranceFile,
+    );
+
+    expect(screen.getByText("비밀번호 필요")).toBeInTheDocument();
+    expect(
+      screen.getByText("잠긴 PDF예요. 비밀번호를 먼저 입력해주세요."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeDisabled();
+    expect(uploadInsurance).not.toHaveBeenCalled();
+  });
+
   test("uploads selected files and navigates to the analysis page", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi
@@ -248,11 +275,11 @@ describe("InsuranceUploadForm", () => {
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(uploadInsurance).toHaveBeenCalledWith(
-      insuranceFile,
+      { file: insuranceFile },
       expect.anything(),
     );
     expect(uploadInsurance).toHaveBeenCalledWith(
-      secondInsuranceFile,
+      { file: secondInsuranceFile },
       expect.anything(),
     );
     expect(onAnalysisComplete).toHaveBeenCalledWith(
@@ -497,6 +524,70 @@ describe("InsuranceUploadForm", () => {
       );
     });
     expect(navigateToAnalysis).toHaveBeenCalledOnce();
+  });
+
+  test("asks for a password only for encrypted PDFs and retries with it", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
+      .mockRejectedValueOnce(
+        new UploadInsuranceError({
+          code: "PDF_PASSWORD_REQUIRED",
+          status: 422,
+          userMessage: "PDF 비밀번호를 입력해주세요.",
+        }),
+      )
+      .mockResolvedValueOnce({
+        status: "accepted",
+        문자수: 20,
+        기본정보: {
+          보험사: "삼성화재",
+          상품명: "건강보험",
+          피보험자: "테스트고객",
+          보험분류: "상해·질병·실손",
+          상품태그: ["질병"],
+        },
+      });
+    const onAnalysisComplete = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(await screen.findByText("비밀번호 필요")).toBeInTheDocument();
+    expect(screen.getByLabelText("PDF 비밀번호")).toBeInTheDocument();
+    expect(
+      screen.getByText(/입력한 비밀번호는 저장하지 않아요\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "비밀번호가 필요한 PDF가 있어요. 표시된 파일에 비밀번호를 입력한 뒤 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeDisabled();
+
+    await user.type(screen.getByLabelText("PDF 비밀번호"), "900101");
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    await waitFor(() => {
+      expect(uploadInsurance).toHaveBeenLastCalledWith(
+        {
+          file: insuranceFile,
+          password: "900101",
+        },
+        expect.anything(),
+      );
+    });
+    await waitFor(() => {
+      expect(onAnalysisComplete).toHaveBeenCalledWith(
+        expect.objectContaining({ selectedName: "테스트고객" }),
+      );
+    });
   });
 
   test("keeps network errors as a global upload error", async () => {

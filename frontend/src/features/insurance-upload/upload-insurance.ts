@@ -96,11 +96,18 @@ export class UploadInsuranceError extends Error {
   }
 }
 
-export async function uploadInsurance(
-  file: File,
-): Promise<InsuranceUploadResult> {
+export async function uploadInsurance({
+  file,
+  password,
+}: {
+  file: File;
+  password?: string;
+}): Promise<InsuranceUploadResult> {
   const formData = new FormData();
   formData.append("file", file);
+  if (password) {
+    formData.append("password", password);
+  }
 
   let response: Response;
   try {
