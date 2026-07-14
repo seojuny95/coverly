@@ -123,6 +123,16 @@ class PremiumBenchmark(BaseModel):
     source: PremiumBenchmarkSource
 
 
+PriorityCheckKind = Literal["premium", "duplicate", "coverage_gap", "contract"]
+
+
+class PriorityCheck(BaseModel):
+    kind: PriorityCheckKind
+    title: str
+    detail: str
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
 class PortfolioAnalysisResponse(BaseModel):
     status: Literal["complete", "partial", "empty"]
     policy_count: int
@@ -148,4 +158,5 @@ class PortfolioAnalysisResponse(BaseModel):
     limitations: list[str]
     premium: PremiumOverview
     premium_benchmark: PremiumBenchmark | None = None
+    priority_checks: list[PriorityCheck] = Field(default_factory=list, max_length=3)
     generation: GenerationMode

@@ -67,6 +67,48 @@ describe("PortfolioAnalysisResultView", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows priority checks when the analysis response provides them", () => {
+    render(
+      <PortfolioAnalysisResultView
+        result={{
+          ...base,
+          priority_checks: [
+            {
+              kind: "premium",
+              title: "월 보험료가 같은 나이대 평균보다 낮아요",
+              detail:
+                "낮다고 부족하다는 뜻은 아니지만 큰 보장은 함께 확인해야 해요.",
+              evidence_ids: [],
+            },
+            {
+              kind: "coverage_gap",
+              title: "간병 보장이 다른 증권에 있는지 확인하세요",
+              detail: "현재 올린 보험에서는 찾지 못했어요.",
+              evidence_ids: ["gap:1"],
+            },
+          ],
+          evidence: [
+            {
+              id: "gap:1",
+              coverage_name: "간병",
+              fact: "업로드된 비자동차 보험 전체에서 간병 담보를 확인하지 못함",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("우선 확인 3가지")).toBeInTheDocument();
+    expect(screen.getByText("지금 화면에서 먼저 볼 부분")).toBeInTheDocument();
+    expect(
+      screen.getByText("월 보험료가 같은 나이대 평균보다 낮아요"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("간병 보장이 다른 증권에 있는지 확인하세요"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("근거 보기")).toBeInTheDocument();
+  });
+
   it("uses the full KB benchmark bands through age 70+", () => {
     render(
       <PortfolioAnalysisResultView

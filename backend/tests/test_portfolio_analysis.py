@@ -701,6 +701,35 @@ def test_analysis_attaches_premium_benchmark_from_reference_store(
     result = analyze_portfolio([policy], age=35, gender="여성")
 
     assert result.premium_benchmark == benchmark
+    assert result.priority_checks
+    assert result.priority_checks[0].kind == "premium"
+    assert "평균보다" in result.priority_checks[0].title
+
+
+def test_analysis_prioritizes_duplicate_and_gap_checks() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "테스트보험A", "상품명": "실손1", "보험분류": "실손"},
+                "보장목록": [{"담보명": "실손의료비", "가입금액": "1억원", "지급유형": "실손"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "p2",
+                "기본정보": {"보험사": "테스트보험B", "상품명": "실손2", "보험분류": "실손"},
+                "보장목록": [{"담보명": "실손의료비", "가입금액": "1억원", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+    result = analyze_portfolio(policies, age=35, gender="여성")
+
+    assert len(result.priority_checks) <= 3
+    assert result.priority_checks[0].kind == "duplicate"
+    assert result.priority_checks[0].evidence_ids
+    assert any(check.kind == "coverage_gap" for check in result.priority_checks)
 
 
 def test_fallback_gaps_explain_why() -> None:

@@ -100,6 +100,12 @@ export type PortfolioAnalysisResult = {
       caveat: string;
     };
   } | null;
+  priority_checks?: Array<{
+    kind: "premium" | "duplicate" | "coverage_gap" | "contract";
+    title: string;
+    detail: string;
+    evidence_ids: string[];
+  }>;
   baseline_notice: string;
   classifications: ClassificationAnalysis[];
   sources: Array<{

@@ -43,6 +43,7 @@ export function PortfolioAnalysisResultView({
   const overview =
     result.counselor?.overview ??
     `${result.life_stage} 기준으로 보험 ${result.policy_count}건에서 확인 가능한 보장을 정리했어요.`;
+  const priorityChecks = result.priority_checks ?? [];
 
   return (
     <div className="space-y-5">
@@ -76,6 +77,10 @@ export function PortfolioAnalysisResultView({
       <AnalysisSummary overview={overview} />
 
       <PremiumPosition result={result} />
+
+      {priorityChecks.length ? (
+        <PriorityChecks items={priorityChecks} evidenceById={evidenceById} />
+      ) : null}
 
       {analyzedTitles.length ? (
         <section className="rounded-2xl border border-zinc-200 p-6">
@@ -243,6 +248,45 @@ function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
       <p className="mt-4 text-xs leading-5 text-zinc-500">
         {benchmark.source.label} 기준이에요. {benchmark.source.caveat}
       </p>
+    </section>
+  );
+}
+
+function PriorityChecks({
+  items,
+  evidenceById,
+}: {
+  items: ReviewDisplayItem[];
+  evidenceById: Map<string, AnalysisEvidence>;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 p-6">
+      <p className="text-xs font-semibold text-blue-700">우선 확인 3가지</p>
+      <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+        지금 화면에서 먼저 볼 부분
+      </h2>
+      <ol className="mt-4 space-y-3">
+        {items.slice(0, 3).map((item, index) => (
+          <li
+            key={`${item.title}-${index}`}
+            className="flex gap-3 rounded-xl bg-zinc-50 px-4 py-3 text-sm"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+              {index + 1}
+            </span>
+            <div>
+              <p className="font-medium text-zinc-800">{item.title}</p>
+              {item.detail ? (
+                <p className="mt-2 leading-6 text-zinc-500">{item.detail}</p>
+              ) : null}
+              <EvidenceDetails
+                evidenceIds={item.evidence_ids}
+                evidenceById={evidenceById}
+              />
+            </div>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

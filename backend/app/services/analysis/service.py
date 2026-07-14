@@ -12,6 +12,9 @@ from app.schemas.analysis import (
     CounselorInsight,
     CoverageGap,
     PortfolioAnalysisResponse,
+    PremiumBenchmark,
+    PremiumOverview,
+    PriorityCheck,
 )
 from app.schemas.consultation import Gender, GenerationMode, InsuredDemographics
 from app.schemas.portfolio import PolicyInput
@@ -77,6 +80,8 @@ def analyze_portfolio(
     excluded_count = len(summary.excluded_coverages)
     notices = _analysis_notices(facts, insured)
     limitations = _analysis_limitations(generation)
+    premium = summarize_premiums(list(facts.policies))
+    premium_benchmark = premium_benchmark_for_age(insured.age)
 
     return PortfolioAnalysisResponse(
         status=_analysis_status(facts),
@@ -110,8 +115,15 @@ def analyze_portfolio(
         evidence=list(catalog.items),
         notices=notices,
         limitations=limitations,
-        premium=summarize_premiums(list(facts.policies)),
-        premium_benchmark=premium_benchmark_for_age(insured.age),
+        premium=premium,
+        premium_benchmark=premium_benchmark,
+        priority_checks=_priority_checks(
+            facts,
+            life_stage_check,
+            catalog,
+            premium,
+            premium_benchmark,
+        ),
         generation=generation,
     )
 
@@ -216,6 +228,104 @@ def _life_stage_check(demographics: InsuredDemographics, facts: PortfolioFacts) 
     if facts.coverage_summary.indemnity_coverages:
         coverage_names.append("실손의료")
     return check_life_stage(demographics.age, coverage_names)
+
+
+def _priority_checks(
+    facts: PortfolioFacts,
+    life_stage_check: LifeStageCheck,
+    catalog: EvidenceCatalog,
+    premium: PremiumOverview,
+    premium_benchmark: PremiumBenchmark | None,
+) -> list[PriorityCheck]:
+    checks: list[PriorityCheck] = []
+
+    duplicate_count = count_duplicate_indemnity_coverages(facts.coverage_summary)
+    if duplicate_count > 0:
+        evidence_ids = [item.id for item in catalog.items if item.id.startswith("indemnity:")][:3]
+        checks.append(
+            PriorityCheck(
+                kind="duplicate",
+                title="실손·비례보상 중복 가능성을 먼저 확인하세요",
+                detail=(
+                    f"중복 수령이 어려운 성격의 보장이 {duplicate_count}건 있어요. "
+                    "같은 병원비를 여러 보험에서 모두 받는 구조가 아닐 수 있어 "
+                    "약관 조건을 먼저 보는 게 좋아요."
+                ),
+                evidence_ids=evidence_ids,
+            )
+        )
+
+    premium_check = _premium_priority_check(premium, premium_benchmark)
+    if premium_check is not None:
+        checks.append(premium_check)
+
+    for category in life_stage_check.missing:
+        if len(checks) >= 3:
+            break
+        evidence_ids = [
+            item.id
+            for item in catalog.items
+            if item.id.startswith("gap:") and item.coverage_name == category
+        ][:1]
+        checks.append(
+            PriorityCheck(
+                kind="coverage_gap",
+                title=f"{category} 보장이 다른 증권에 있는지 확인하세요",
+                detail=(
+                    "현재 올린 비자동차 보험 전체에서는 이 성격의 담보를 찾지 못했어요. "
+                    "없다고 단정하기보다 아직 올리지 않은 증권에 있는지 먼저 확인해야 해요."
+                ),
+                evidence_ids=list(evidence_ids[:1]),
+            )
+        )
+
+    if facts.policies and len(checks) < 3:
+        checks.append(
+            PriorityCheck(
+                kind="contract",
+                title="원본 약관의 지급 조건을 함께 확인하세요",
+                detail=(
+                    "가입 사실이 보여도 실제 지급은 지급사유, 면책, 감액 조건에 따라 "
+                    "달라질 수 있어요. "
+                    "큰 진단비나 치료비 담보부터 약관 원문을 같이 보는 게 좋아요."
+                ),
+            )
+        )
+
+    return checks[:3]
+
+
+def _premium_priority_check(
+    premium: PremiumOverview,
+    benchmark: PremiumBenchmark | None,
+) -> PriorityCheck | None:
+    if premium.monthly_policy_count < 1 or benchmark is None:
+        return None
+
+    difference = premium.monthly_total - benchmark.average_monthly_premium
+    if abs(difference) < 10_000:
+        title = "월 보험료가 같은 나이대 평균과 비슷해요"
+        detail = (
+            f"{benchmark.age_band_label} 평균과 큰 차이는 없어요. "
+            "다만 평균은 적정 기준이 아니라 비교용 참고값이므로, "
+            "보험료보다 보장 구성과 중복 여부를 같이 봐야 해요."
+        )
+    elif difference > 0:
+        title = "월 보험료가 같은 나이대 평균보다 높아요"
+        detail = (
+            f"{benchmark.age_band_label} 평균보다 {difference:,}원 높게 확인돼요. "
+            "비싸다고 바로 나쁜 것은 아니지만, "
+            "중복 보장이나 유지 필요성이 낮은 담보가 있는지 먼저 보는 게 좋아요."
+        )
+    else:
+        title = "월 보험료가 같은 나이대 평균보다 낮아요"
+        detail = (
+            f"{benchmark.age_band_label} 평균보다 {abs(difference):,}원 낮게 확인돼요. "
+            "낮다고 부족하다는 뜻은 아니지만, "
+            "큰 진단비·치료비 보장이 실제로 있는지는 함께 확인해야 해요."
+        )
+
+    return PriorityCheck(kind="premium", title=title, detail=detail)
 
 
 def _profile_label(demographics: InsuredDemographics) -> str:
