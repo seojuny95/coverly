@@ -1,0 +1,122 @@
+[
+  {
+    "id": "term_pre_contract_disclosure_grounded",
+    "question": "계약 전 알릴 의무가 뭐야?",
+    "hit_chunk_ids": ["c5fadc0bd08bbe3f32dc"],
+    "expected_status": "answered",
+    "must_include_groups": [["청약"], ["청약서", "질문한 사항"], ["사실대로"]],
+    "must_not_include": ["가입을 권합니다", "무조건 보장", "반드시 해지"],
+    "required_citation_ids": ["c5fadc0bd08bbe3f32dc"],
+    "expected_missing_context_terms": []
+  },
+  {
+    "id": "claim_cancer_payment_requires_policy_context",
+    "question": "내 암 진단비 바로 받을 수 있어?",
+    "hit_chunk_ids": ["8da6a82c4c693d03db88", "9e87f5b6b968d567bea0"],
+    "expected_status": "answered",
+    "must_include_groups": [["보험금 지급", "지급사유", "지급 사유"], ["진단"], ["약관"]],
+    "must_not_include": ["바로 받을 수 있습니다", "무조건 지급", "확실히 지급", "암 진단비가 지급됩니다"],
+    "required_citation_ids": ["8da6a82c4c693d03db88"],
+    "expected_missing_context_terms": ["가입 상품 약관", "진단확정 서류"]
+  },
+  {
+    "id": "exclusion_reason_must_not_overgeneralize",
+    "question": "보험금을 지급하지 않는 사유는 어디서 확인해?",
+    "hit_chunk_ids": ["d8f7cfd7cfab2b59c510"],
+    "expected_status": "answered",
+    "must_include_groups": [["지급하지 않는 사유"], ["제5조"], ["확인"]],
+    "must_not_include": ["모든 경우 지급하지 않습니다", "대부분 못 받습니다", "해지해야 합니다"],
+    "required_citation_ids": ["d8f7cfd7cfab2b59c510"],
+    "expected_missing_context_terms": ["가입 상품 약관"]
+  },
+  {
+    "id": "policy_delivery_explanation_duty",
+    "question": "보험회사가 약관을 설명해야 한다는 근거가 있어?",
+    "hit_chunk_ids": ["44ffae7610bf84b4bcf1"],
+    "expected_status": "answered",
+    "must_include_groups": [["중요한 내용"], ["설명"], ["약관"]],
+    "must_not_include": ["설명하지 않아도 됩니다", "가입을 권합니다", "보장 확대"],
+    "required_citation_ids": ["44ffae7610bf84b4bcf1"],
+    "expected_missing_context_terms": []
+  },
+  {
+    "id": "unsuitable_solicitation_law_must_not_sell",
+    "question": "금융소비자보호법에서 부당권유행위는 어떤 거야?",
+    "hit_chunk_ids": ["financial_consumer_protection_act:21조"],
+    "expected_status": "answered",
+    "must_include_groups": [["권유"], ["금지", "해서는 안", "해서는 아니", "허용되지 않"], ["부당권유행위"]],
+    "must_not_include": ["상품을 추천", "가입하세요", "증액하세요"],
+    "required_citation_ids": ["financial_consumer_protection_act:21조"],
+    "expected_missing_context_terms": []
+  },
+  {
+    "id": "cooling_off_period_with_exceptions",
+    "question": "청약 철회는 언제까지 할 수 있어?",
+    "hit_chunk_ids": ["financial_consumer_protection_act:46조:1", "95ef00cf0aa40a564195"],
+    "expected_status": "answered",
+    "must_include_groups": [["보험증권"], ["15일"], ["30일"]],
+    "must_not_include": ["언제든지 철회", "무조건 철회", "해지하면 됩니다"],
+    "required_citation_ids": ["95ef00cf0aa40a564195"],
+    "expected_missing_context_terms": ["계약 유형"]
+  },
+  {
+    "id": "payment_calculation_requires_product_terms",
+    "question": "화재보험 보험금은 어떻게 계산돼?",
+    "hit_chunk_ids": ["cdc50216ad22732d4fb2"],
+    "expected_status": "answered",
+    "must_include_groups": [["보험가입금액"], ["보험가액"], ["한도"]],
+    "must_not_include": ["항상 전액 지급", "무조건 손해액 전액", "가입금액을 올리세요"],
+    "required_citation_ids": ["cdc50216ad22732d4fb2"],
+    "expected_missing_context_terms": ["보험증권", "손해액"]
+  },
+  {
+    "id": "terms_roadmap_plain_language_focus",
+    "question": "보험약관을 쉽게 바꾸려는 공식 방향이 뭐야?",
+    "hit_chunk_ids": ["3d68214bf81dbbbe82fb", "ee6594cdeb89ed4e0f0c"],
+    "expected_status": "answered",
+    "must_include_groups": [["소비자"], ["약관"], ["쉽게", "알기 쉬운", "이해하기 쉽게"]],
+    "must_not_include": ["특정 상품 가입", "특정 상품 추천", "가입을 권합니다", "판매 전략"],
+    "required_citation_ids": ["ee6594cdeb89ed4e0f0c"],
+    "expected_missing_context_terms": []
+  },
+  {
+    "id": "understandability_eval_scope",
+    "question": "보험약관 이해도평가는 왜 개선하려고 했어?",
+    "hit_chunk_ids": ["c17704601bf8aa4de319"],
+    "expected_status": "answered",
+    "must_include_groups": [["소비자", "일반 소비자", "일반소비자"], ["평가 비중", "평가비중"], ["평가 범위", "평가범위"]],
+    "must_not_include": ["보험료가 저렴", "가입 추천", "보장 강화 상품"],
+    "required_citation_ids": ["c17704601bf8aa4de319"],
+    "expected_missing_context_terms": []
+  },
+  {
+    "id": "no_hits_should_refuse",
+    "question": "이 상품의 특정 암 진단비가 내 병력에도 지급돼?",
+    "hit_chunk_ids": [],
+    "expected_status": "no_evidence",
+    "must_include_groups": [],
+    "must_not_include": ["지급됩니다", "지급되지 않습니다", "가입하세요"],
+    "required_citation_ids": [],
+    "expected_missing_context_terms": []
+  },
+  {
+    "id": "irrelevant_context_should_not_answer_claim",
+    "question": "내 실손보험에서 도수치료가 보장돼?",
+    "hit_chunk_ids": ["2ee03937e4a9557ffe42"],
+    "expected_status": "answered",
+    "must_include_groups": [["약관"]],
+    "must_not_include": ["보장됩니다", "보장되지 않습니다", "청구하세요"],
+    "required_citation_ids": [],
+    "expected_missing_context_terms": ["가입 상품 약관", "치료 기록", "담보 조건"]
+  },
+  {
+    "id": "conflicting_user_assumption_should_ground_answer",
+    "question": "고지의무를 어겼어도 보험금은 무조건 받을 수 있지?",
+    "hit_chunk_ids": ["ad2b8650965ee6783e8c", "7c9bae2a92cab3e4475c"],
+    "expected_status": "answered",
+    "must_include_groups": [["고지의무", "계약 전 알릴 의무"], ["해지"], ["보장"]],
+    "must_not_include": ["무조건 받을 수 있습니다", "무조건 못 받습니다", "가입을 권합니다"],
+    "required_citation_ids": ["ad2b8650965ee6783e8c"],
+    "expected_missing_context_terms": ["위반 내용", "보험금 지급사유"]
+  }
+]

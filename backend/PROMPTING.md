@@ -72,7 +72,11 @@ Coverly의 LLM 프롬프트는 사용자의 보험 정보를 근거 기반으로
 
 ## 파일로 분리할 때의 규칙
 
-프롬프트 파일을 만들 때는 `backend/app/services/prompts/` 아래에 둔다. 예시는 다음과 같다.
+프롬프트 파일을 만들 때는 기본적으로 `backend/app/services/prompts/` 아래에 둔다.
+다만 RAG처럼 prompt가 특정 pipeline, evaluation dataset, 후처리 contract와 강하게 결합된 경우에는 사용하는 코드 가까이에 둔다.
+예를 들어 공식자료 RAG 응답 prompt는 `backend/app/services/rag/official/rag_answer_prompt.md`에 둔다.
+
+기본 위치 예시는 다음과 같다.
 
 ```text
 backend/app/services/prompts/
