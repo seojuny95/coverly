@@ -3,12 +3,25 @@ import io
 from pypdf import PdfWriter
 
 from app.services.policy.models import ParsedDocument
-from app.services.policy.parsing import parse_document
+from app.services.policy.parsing import (
+    PdfPasswordIncorrectError,
+    PdfPasswordRequiredError,
+    parse_document,
+)
 
 
 def _blank_pdf() -> bytes:
     writer = PdfWriter()
     writer.add_blank_page(width=200, height=200)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def _encrypted_blank_pdf(password: str) -> bytes:
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.encrypt(password)
     buffer = io.BytesIO()
     writer.write(buffer)
     return buffer.getvalue()
@@ -35,3 +48,26 @@ def test_parse_document_does_not_raise_on_corrupt_bytes() -> None:
     result = parse_document(b"%PDF-broken")
     assert result.text == ""
     assert result.tables == ()
+
+
+def test_parse_document_requires_password_for_encrypted_pdf() -> None:
+    try:
+        parse_document(_encrypted_blank_pdf("secret"))
+    except PdfPasswordRequiredError:
+        pass
+    else:
+        raise AssertionError("expected PdfPasswordRequiredError")
+
+
+def test_parse_document_rejects_wrong_password_for_encrypted_pdf() -> None:
+    try:
+        parse_document(_encrypted_blank_pdf("secret"), password="wrong")
+    except PdfPasswordIncorrectError:
+        pass
+    else:
+        raise AssertionError("expected PdfPasswordIncorrectError")
+
+
+def test_parse_document_accepts_correct_password_for_encrypted_pdf() -> None:
+    result = parse_document(_encrypted_blank_pdf("secret"), password="secret")
+    assert isinstance(result, ParsedDocument)

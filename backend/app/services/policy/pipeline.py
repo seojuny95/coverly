@@ -34,12 +34,16 @@ class EmptyTextError(Exception):
 def run_pipeline(
     pdf_bytes: bytes,
     *,
+    password: str | None = None,
     parse: Callable[[bytes], ParsedDocument] = parse_document,
     summarize: Callable[[str], PolicySummary] = extract_policy_summary,
     extract: Callable[[ParsedDocument], tuple[list[Coverage], str]] = extract_coverages,
     index: Callable[[ParsedDocument], str | None] = index_policy_document,
 ) -> PipelineResult:
-    doc = parse(pdf_bytes)
+    if parse is parse_document:
+        doc = parse_document(pdf_bytes, password=password)
+    else:
+        doc = parse(pdf_bytes)
     if not doc.text:
         raise EmptyTextError
     summary = summarize(doc.text)

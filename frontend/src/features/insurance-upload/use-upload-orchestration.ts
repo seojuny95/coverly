@@ -14,7 +14,7 @@ import {
   findDuplicatePolicyDocuments,
 } from "../insurance-analysis/policy-identity";
 import { UploadInsuranceError } from "./upload-insurance";
-import { fileHasPdfMagic } from "./pdf-magic";
+import { fileHasPdfMagic, fileLooksEncryptedPdf } from "./pdf-magic";
 import type { SelectedUploadFile, UploadInsurance } from "./upload-types";
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -38,6 +38,14 @@ function isFileSpecificUploadError(err: unknown) {
   if (err.code === "UPLOAD_NETWORK_ERROR") return false;
   if (err.status && err.status >= 500) return false;
   return true;
+}
+
+function isPasswordUploadError(code: string) {
+  return code === "PDF_PASSWORD_REQUIRED" || code === "PDF_PASSWORD_INCORRECT";
+}
+
+function isPreflightPasswordError(code?: string) {
+  return code === "PDF_PASSWORD_REQUIRED";
 }
 
 async function createFileFingerprint(file: File) {
@@ -126,16 +134,49 @@ export function useUploadOrchestration({
       return;
     }
 
-    setSelectedUploadFiles(
-      incomingFiles.map((file, index) => ({
-        id: `${Date.now()}-${index}-${file.name}-${file.size}`,
-        file,
-        status: "idle",
-      })),
-    );
+    const selectedFiles = incomingFiles.map((file, index) => ({
+      id: `${Date.now()}-${index}-${file.name}-${file.size}`,
+      file,
+      status: "idle" as const,
+    }));
+    setSelectedUploadFiles(selectedFiles);
     setPendingAnalysis(null);
     setSelectedName("");
     setError(null);
+
+    void Promise.all(
+      selectedFiles.map(async (selectedFile) => ({
+        id: selectedFile.id,
+        isEncrypted: await fileLooksEncryptedPdf(selectedFile.file),
+      })),
+    ).then((inspectedFiles) => {
+      const encryptedIds = new Set(
+        inspectedFiles
+          .filter((inspectedFile) => inspectedFile.isEncrypted)
+          .map((inspectedFile) => inspectedFile.id),
+      );
+      if (encryptedIds.size === 0) {
+        return;
+      }
+
+      setSelectedUploadFiles((current) =>
+        current.map((selectedFile) => {
+          if (!encryptedIds.has(selectedFile.id)) {
+            return selectedFile;
+          }
+
+          if (isPreflightPasswordError(selectedFile.errorCode)) {
+            return selectedFile;
+          }
+
+          return {
+            ...selectedFile,
+            errorCode: "PDF_PASSWORD_REQUIRED",
+            errorMessage: "잠긴 PDF예요. 비밀번호를 먼저 입력해주세요.",
+          };
+        }),
+      );
+    });
   };
 
   const removeSelectedFile = (fileId: string) => {
@@ -147,6 +188,16 @@ export function useUploadOrchestration({
     setPendingAnalysis(null);
     setSelectedName("");
     setError(null);
+  };
+
+  const updateSelectedFilePassword = (fileId: string, password: string) => {
+    setSelectedUploadFiles((current) =>
+      current.map((selectedFile) =>
+        selectedFile.id === fileId
+          ? { ...selectedFile, password }
+          : selectedFile,
+      ),
+    );
   };
 
   // Mark the given selected files as failed with a shared code + message and
@@ -262,7 +313,10 @@ export function useUploadOrchestration({
       const uploadResults = await Promise.all(
         selectedUploadFiles.map(async (selectedFile, index) => {
           try {
-            const result = await uploadMutation.mutateAsync(selectedFile.file);
+            const uploadInput = selectedFile.password
+              ? { file: selectedFile.file, password: selectedFile.password }
+              : { file: selectedFile.file };
+            const result = await uploadMutation.mutateAsync(uploadInput);
             setAnalysisProgress((current) => ({
               ...current,
               completed: current.completed + 1,
@@ -307,6 +361,7 @@ export function useUploadOrchestration({
             return {
               status: "rejected" as const,
               fileName: selectedFile.file.name,
+              code: uploadError.code,
               message: uploadError.userMessage,
             };
           }
@@ -317,8 +372,20 @@ export function useUploadOrchestration({
         (result) => result.status === "rejected",
       );
       if (failedUploads.length > 0) {
+        const hasPasswordErrors = failedUploads.some(
+          (result) =>
+            result.status === "rejected" && isPasswordUploadError(result.code),
+        );
+        const onlyPasswordErrors = failedUploads.every(
+          (result) =>
+            result.status === "rejected" && isPasswordUploadError(result.code),
+        );
         setError(
-          "텍스트를 추출할 수 없는 PDF가 있어요. 표시된 파일을 제거한 뒤 다시 시도해주세요.",
+          onlyPasswordErrors
+            ? "비밀번호가 필요한 PDF가 있어요. 표시된 파일에 비밀번호를 입력한 뒤 다시 시도해주세요."
+            : hasPasswordErrors
+              ? "일부 PDF는 비밀번호가 필요해요. 읽을 수 없는 PDF는 제거한 뒤 다시 시도해주세요."
+              : "텍스트를 추출할 수 없는 PDF가 있어요. 표시된 파일을 제거한 뒤 다시 시도해주세요.",
         );
         return;
       }
@@ -462,6 +529,7 @@ export function useUploadOrchestration({
     inputRef,
     selectFiles,
     removeSelectedFile,
+    updateSelectedFilePassword,
     handleSubmit,
     handleNameSelectionSubmit,
   };

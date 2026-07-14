@@ -536,7 +536,7 @@ describe("InsuranceAnalysisPage", () => {
     await user.click(screen.getByRole("button", { name: "분석에 추가하기" }));
 
     expect(uploadInsurance).toHaveBeenCalledWith(
-      insuranceFile,
+      { file: insuranceFile },
       expect.anything(),
     );
     expect(

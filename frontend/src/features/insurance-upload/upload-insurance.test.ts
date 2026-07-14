@@ -40,7 +40,7 @@ describe("uploadInsurance", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await uploadInsurance(insuranceFile);
+    const result = await uploadInsurance({ file: insuranceFile });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/policies/parse",
@@ -51,6 +51,21 @@ describe("uploadInsurance", () => {
     );
     expect(result.기본정보?.보험사).toBe("삼성화재");
     expect(result.기본정보?.보험분류).toBe("상해·질병·실손");
+  });
+
+  test("includes the PDF password when one is provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "accepted", 문자수: 32 }), {
+        status: 200,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await uploadInsurance({ file: insuranceFile, password: "900101" });
+
+    const body = fetchMock.mock.calls[0]?.[1]?.body;
+    expect(body).toBeInstanceOf(FormData);
+    expect((body as FormData).get("password")).toBe("900101");
   });
 
   test("throws a typed user-facing error when the parse endpoint rejects the file", async () => {
@@ -72,7 +87,9 @@ describe("uploadInsurance", () => {
       ),
     );
 
-    await expect(uploadInsurance(insuranceFile)).rejects.toMatchObject({
+    await expect(
+      uploadInsurance({ file: insuranceFile }),
+    ).rejects.toMatchObject({
       code: "POLICY_PARSE_FAILED",
       requestId: "req_123",
       status: 422,
@@ -94,7 +111,9 @@ describe("uploadInsurance", () => {
       ),
     );
 
-    await expect(uploadInsurance(insuranceFile)).rejects.toMatchObject({
+    await expect(
+      uploadInsurance({ file: insuranceFile }),
+    ).rejects.toMatchObject({
       code: "UPLOAD_FAILED",
       status: 500,
       userMessage:
@@ -119,7 +138,9 @@ describe("uploadInsurance", () => {
       ),
     );
 
-    await expect(uploadInsurance(insuranceFile)).rejects.toMatchObject({
+    await expect(
+      uploadInsurance({ file: insuranceFile }),
+    ).rejects.toMatchObject({
       code: "PDF_PARSE_CRASHED",
       requestId: "req_500",
       status: 500,
@@ -138,7 +159,7 @@ describe("uploadInsurance", () => {
         ),
     );
 
-    const error = await uploadInsurance(insuranceFile).catch(
+    const error = await uploadInsurance({ file: insuranceFile }).catch(
       (err: unknown) => err,
     );
 
@@ -156,7 +177,9 @@ describe("uploadInsurance", () => {
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
     );
 
-    await expect(uploadInsurance(insuranceFile)).rejects.toMatchObject({
+    await expect(
+      uploadInsurance({ file: insuranceFile }),
+    ).rejects.toMatchObject({
       code: "UPLOAD_NETWORK_ERROR",
       userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
     });

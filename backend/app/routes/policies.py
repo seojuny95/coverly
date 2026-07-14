@@ -2,10 +2,14 @@
 
 import asyncio
 
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, Form, UploadFile
 from pydantic import BaseModel
 
 from app.errors import ApiError
+from app.services.policy.parsing import (
+    PdfPasswordIncorrectError,
+    PdfPasswordRequiredError,
+)
 from app.services.policy.pipeline import EmptyTextError, run_pipeline
 from app.services.rag.policy import delete_policy_session, refresh_policy_session
 from app.services.rag.policy.session_tokens import InvalidPolicySessionToken
@@ -45,10 +49,26 @@ async def _read_pdf(file: UploadFile) -> bytes:
 
 
 @router.post("/parse")
-async def parse_policy(file: UploadFile) -> dict[str, object]:
+async def parse_policy(
+    file: UploadFile,
+    password: str | None = Form(default=None),
+) -> dict[str, object]:
     data = await _read_pdf(file)
+    pdf_password = password if password else None
     try:
-        result = await asyncio.to_thread(run_pipeline, data)
+        result = await asyncio.to_thread(run_pipeline, data, password=pdf_password)
+    except PdfPasswordRequiredError:
+        raise ApiError(
+            status_code=422,
+            code="PDF_PASSWORD_REQUIRED",
+            message="PDF 비밀번호를 입력해주세요.",
+        ) from None
+    except PdfPasswordIncorrectError:
+        raise ApiError(
+            status_code=422,
+            code="PDF_PASSWORD_INCORRECT",
+            message="PDF 비밀번호가 맞지 않아요. 다시 입력해주세요.",
+        ) from None
     except EmptyTextError:
         raise ApiError(
             status_code=422,

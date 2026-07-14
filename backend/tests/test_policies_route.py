@@ -4,6 +4,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.policy.parsing import (
+    PdfPasswordIncorrectError,
+    PdfPasswordRequiredError,
+)
 from app.services.policy.pipeline import EmptyTextError, PipelineResult
 from app.services.rag.policy.session_tokens import sign_policy_session_id
 
@@ -88,7 +92,11 @@ def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) ->
         "분석상태": "완료",
         "문자수": 42,
     }
-    monkeypatch.setattr(policies, "run_pipeline", lambda _data: result)
+
+    def _run(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        return result
+
+    monkeypatch.setattr(policies, "run_pipeline", _run)
 
     client = TestClient(app)
     response = client.post(
@@ -99,6 +107,77 @@ def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) ->
     assert response.status_code == 200
     payload = response.json()
     assert payload == {"status": "accepted", **result}
+
+
+def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.routes import policies
+
+    seen: dict[str, str | None] = {}
+    result: PipelineResult = {
+        "기본정보": {"보험사": "삼성화재"},
+        "보장목록": [],
+        "분석상태": "완료",
+        "문자수": 42,
+    }
+
+    def _run(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        seen["password"] = password
+        return result
+
+    monkeypatch.setattr(policies, "run_pipeline", _run)
+
+    client = TestClient(app)
+    response = client.post(
+        "/policies/parse",
+        files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+        data={"password": "900101"},
+    )
+
+    assert response.status_code == 200
+    assert seen["password"] == "900101"
+
+
+def test_parse_maps_missing_pdf_password_to_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.routes import policies
+
+    def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        raise PdfPasswordRequiredError
+
+    monkeypatch.setattr(policies, "run_pipeline", _raise)
+
+    client = TestClient(app)
+    response = client.post(
+        "/policies/parse",
+        files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "PDF_PASSWORD_REQUIRED"
+    assert response.json()["error"]["message"] == "PDF 비밀번호를 입력해주세요."
+
+
+def test_parse_maps_wrong_pdf_password_to_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.routes import policies
+
+    def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        raise PdfPasswordIncorrectError
+
+    monkeypatch.setattr(policies, "run_pipeline", _raise)
+
+    client = TestClient(app)
+    response = client.post(
+        "/policies/parse",
+        files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+        data={"password": "wrong"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "PDF_PASSWORD_INCORRECT"
+    assert response.json()["error"]["message"] == "PDF 비밀번호가 맞지 않아요. 다시 입력해주세요."
 
 
 def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -112,7 +191,11 @@ def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.Monk
         "분석상태": "완료",
         "문자수": 10,
     }
-    monkeypatch.setattr(policies, "run_pipeline", lambda _data: result)
+
+    def _run(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        return result
+
+    monkeypatch.setattr(policies, "run_pipeline", _run)
 
     client = TestClient(app)
     response = client.post(
@@ -130,7 +213,7 @@ def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.Monk
 def test_parse_maps_empty_text_error_to_422(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.routes import policies
 
-    def _raise(_data: bytes) -> PipelineResult:
+    def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
         raise EmptyTextError
 
     monkeypatch.setattr(policies, "run_pipeline", _raise)
