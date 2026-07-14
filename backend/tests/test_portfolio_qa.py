@@ -587,6 +587,60 @@ def test_qa_does_not_call_llm_for_deterministic_amount_questions() -> None:
     assert "30,000,000원" in amount.answer
 
 
+def test_qa_fast_amount_path_skips_planner_llm_and_policy_rag(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    from app.services.qa import service as portfolio_qa
+
+    policy = _policies()[0]
+    policy.문서세션ID = "session-1"
+
+    def forbidden_json(_: str, __: str) -> dict[str, object]:
+        raise AssertionError("LLM should not be called for deterministic amount questions")
+
+    def forbidden_retrieval(_ids: list[str], _query: str) -> list[PolicyRetrievalHit]:
+        raise AssertionError("policy RAG should not run for deterministic amount questions")
+
+    monkeypatch.setattr(portfolio_qa, "retrieve_policy_context", forbidden_retrieval)
+
+    result = portfolio_qa.answer_portfolio_question(
+        "암진단비 가입금액은 얼마야?",
+        [policy],
+        complete=forbidden_json,
+        plan=forbidden_json,
+    )
+
+    assert result.status == "answered"
+    assert "30,000,000원" in result.answer
+
+
+def test_qa_scope_only_plan_skips_portfolio_context(monkeypatch: MonkeyPatch) -> None:
+    from app.services.qa import service as portfolio_qa
+
+    def forbidden_context(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("scope-only plans should not build portfolio context")
+
+    monkeypatch.setattr(portfolio_qa, "_build_qa_context", forbidden_context)
+
+    result = portfolio_qa.answer_portfolio_question(
+        "오늘 날씨 알려줘",
+        _policies(),
+        plan=lambda _system, _user: {
+            "questions": [
+                {
+                    "original": "오늘 날씨 알려줘",
+                    "resolved": "오늘 날씨 알려줘",
+                    "scope": "out_of_scope",
+                }
+            ],
+            "clarification": None,
+        },
+    )
+
+    assert result.status == "refused"
+    assert "보험과 관련 없는 정보" in result.answer
+
+
 def test_qa_adds_session_policy_text_to_llm_context(monkeypatch: MonkeyPatch) -> None:
     from app.services.qa import service as portfolio_qa
 

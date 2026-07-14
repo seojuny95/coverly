@@ -105,10 +105,20 @@ def answer_portfolio_question(
 ) -> PortfolioQuestionResponse:
     """Answer with cited facts, or refuse conclusions that require policy terms."""
 
-    context = _build_qa_context(question, policies, demographics, history)
-    question_plan = plan_questions(context.question, context.history, complete=plan)
+    normalized_question = question.strip()
+    conversation_history = history or []
+    question_plan = plan_questions(normalized_question, conversation_history, complete=plan)
     if question_plan is not None:
+        if question_plan.clarification is not None:
+            return _clarification_response(question_plan.clarification)
+        if _is_scope_only_plan(question_plan):
+            return _answer_scope_only_plan(question_plan)
+        context = _build_qa_context(
+            normalized_question, policies, demographics, conversation_history
+        )
         return _answer_question_plan(context, question_plan, complete, official_answer)
+
+    context = _build_qa_context(normalized_question, policies, demographics, conversation_history)
     return _answer_context(context, complete, official_answer)
 
 
@@ -182,17 +192,28 @@ def stream_portfolio_answer(
 ) -> Iterator[QaStreamEvent]:
     """Stream the answer: deterministic routes emit at once, the LLM route streams."""
 
-    context = _build_qa_context(question, policies, demographics, history)
-    question_plan = plan_questions(context.question, context.history, complete=plan)
+    normalized_question = question.strip()
+    conversation_history = history or []
+    question_plan = plan_questions(normalized_question, conversation_history, complete=plan)
     if question_plan is not None:
         if question_plan.clarification is not None:
             yield from _stream_clarification(question_plan.clarification)
             return
+        if _is_scope_only_plan(question_plan):
+            yield from _stream_response(_answer_scope_only_plan(question_plan))
+            return
+        context = _build_qa_context(
+            normalized_question, policies, demographics, conversation_history
+        )
         if len(question_plan.questions) != 1 or question_plan.questions[0].scope != "insurance":
             response = _answer_question_plan(context, question_plan, None, official_answer)
             yield from _stream_response(response)
             return
         context = _context_with_question(context, question_plan.questions[0].resolved)
+    else:
+        context = _build_qa_context(
+            normalized_question, policies, demographics, conversation_history
+        )
 
     yield from _stream_context(context, stream, official_answer)
 
@@ -283,6 +304,44 @@ def _context_with_question(context: _QaContext, question: str) -> _QaContext:
     )
 
 
+def _clarification_response(question: str) -> PortfolioQuestionResponse:
+    return PortfolioQuestionResponse(
+        status="clarify",
+        answer=question,
+        citations=[],
+        limitations=[],
+        suggestions=[],
+    )
+
+
+def _is_scope_only_plan(question_plan: QuestionPlan) -> bool:
+    return all(planned.scope != "insurance" for planned in question_plan.questions)
+
+
+def _answer_scope_only_plan(question_plan: QuestionPlan) -> PortfolioQuestionResponse:
+    answers: list[str] = []
+    answered = False
+    for planned in question_plan.questions:
+        if planned.scope == "greeting":
+            answer = "안녕하세요. 가입한 보험과 보장에 관해 궁금한 내용을 물어봐 주세요."
+            answered = True
+        else:
+            answer = "보험과 관련 없는 정보는 답변하기 어려워요."
+
+        if len(question_plan.questions) == 1:
+            answers.append(answer)
+        else:
+            answers.append(f"{planned.original}\n{answer}")
+
+    return PortfolioQuestionResponse(
+        status="answered" if answered else "refused",
+        answer="\n\n".join(answers),
+        citations=[],
+        limitations=[],
+        suggestions=[],
+    )
+
+
 def _answer_question_plan(
     context: _QaContext,
     question_plan: QuestionPlan,
@@ -290,13 +349,7 @@ def _answer_question_plan(
     official_answer: OfficialAnswerer | None,
 ) -> PortfolioQuestionResponse:
     if question_plan.clarification is not None:
-        return PortfolioQuestionResponse(
-            status="clarify",
-            answer=question_plan.clarification,
-            citations=[],
-            limitations=[],
-            suggestions=[],
-        )
+        return _clarification_response(question_plan.clarification)
 
     answers: list[str] = []
     citations: list[AnswerCitation] = []
