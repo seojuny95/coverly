@@ -333,3 +333,79 @@ def test_stream_falls_back_when_streamer_errors_before_any_token() -> None:
     assert events[-1]["type"] == "end"
     text = "".join(str(e["text"]) for e in events if e["type"] == "delta")
     assert text
+
+
+def test_stream_resolves_contextual_question_before_fast_answer() -> None:
+    events = list(
+        stream_portfolio_answer(
+            "그건 얼마야?",
+            _policies(),
+            history=[ConversationMessage(role="assistant", content="암진단비를 확인했어요.")],
+            plan=lambda _system, _user: {
+                "questions": [
+                    {
+                        "original": "그건 얼마야?",
+                        "resolved": "암진단비 가입금액은 얼마야?",
+                        "scope": "insurance",
+                    }
+                ],
+                "clarification": None,
+            },
+        )
+    )
+
+    text = "".join(str(event.get("text", "")) for event in events)
+    assert "30,000,000원" in text
+
+
+def test_stream_answers_insurance_part_and_limits_out_of_scope_part() -> None:
+    events = list(
+        stream_portfolio_answer(
+            "암진단비 알려주고 오늘 날씨도 알려줘",
+            _policies(),
+            plan=lambda _system, _user: {
+                "questions": [
+                    {
+                        "original": "암진단비 알려주고",
+                        "resolved": "암진단비 가입금액은 얼마야?",
+                        "scope": "insurance",
+                    },
+                    {
+                        "original": "오늘 날씨도 알려줘",
+                        "resolved": "오늘 날씨는 어때?",
+                        "scope": "out_of_scope",
+                    },
+                ],
+                "clarification": None,
+            },
+        )
+    )
+
+    text = "".join(str(event.get("text", "")) for event in events)
+    assert "30,000,000원" in text
+    assert "보험과 관련 없는 정보는 답변하기 어려워요" in text
+    assert events[-1]["status"] == "answered"
+
+
+def test_stream_clarifies_ambiguous_reference() -> None:
+    events = list(
+        stream_portfolio_answer(
+            "그건 얼마야?",
+            _policies(),
+            plan=lambda _system, _user: {
+                "questions": [
+                    {
+                        "original": "그건 얼마야?",
+                        "resolved": "대상을 확인해야 하는 가입금액 질문",
+                        "scope": "insurance",
+                    }
+                ],
+                "clarification": "어떤 담보의 가입금액을 말씀하시는지 알려주세요.",
+            },
+        )
+    )
+
+    assert [event["type"] for event in events] == ["meta", "delta", "end"]
+    assert events[0]["status"] == "clarify"
+    assert events[1]["text"] == "어떤 담보의 가입금액을 말씀하시는지 알려주세요."
+    assert events[-1]["status"] == "clarify"

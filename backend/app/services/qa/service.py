@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from app.schemas.consultation import (
     AnswerSection,
+    GenerationMode,
     InsuredDemographics,
 )
 from app.schemas.portfolio import PolicyInput
@@ -37,6 +38,7 @@ from app.services.qa.generation import (
     generate_consultation_answer,
     stream_consultation_answer,
 )
+from app.services.qa.planning import QuestionPlan, plan_questions
 from app.services.rag.official.answer import RagAnswer, RagCitation, answer_official_question
 from app.services.rag.policy import (
     PolicyGenerationResult,
@@ -98,10 +100,22 @@ def answer_portfolio_question(
     history: list[ConversationMessage] | None = None,
     complete: JsonCompleter | None = None,
     official_answer: OfficialAnswerer | None = None,
+    plan: JsonCompleter | None = None,
 ) -> PortfolioQuestionResponse:
     """Answer with cited facts, or refuse conclusions that require policy terms."""
 
     context = _build_qa_context(question, policies, demographics, history)
+    question_plan = plan_questions(context.question, context.history, complete=plan)
+    if question_plan is not None:
+        return _answer_question_plan(context, question_plan, complete, official_answer)
+    return _answer_context(context, complete, official_answer)
+
+
+def _answer_context(
+    context: _QaContext,
+    complete: JsonCompleter | None,
+    official_answer: OfficialAnswerer | None,
+) -> PortfolioQuestionResponse:
     response = _resolve_precomputed_answer(
         context,
         try_official=complete is None or official_answer is not None,
@@ -163,10 +177,44 @@ def stream_portfolio_answer(
     history: list[ConversationMessage] | None = None,
     stream: TextStreamer | None = None,
     official_answer: OfficialAnswerer | None = None,
+    plan: JsonCompleter | None = None,
 ) -> Iterator[QaStreamEvent]:
     """Stream the answer: deterministic routes emit at once, the LLM route streams."""
 
     context = _build_qa_context(question, policies, demographics, history)
+    question_plan = plan_questions(context.question, context.history, complete=plan)
+    if question_plan is not None:
+        if question_plan.clarification is not None:
+            yield from _stream_clarification(question_plan.clarification)
+            return
+        if len(question_plan.questions) != 1 or question_plan.questions[0].scope != "insurance":
+            response = _answer_question_plan(context, question_plan, None, official_answer)
+            yield from _stream_response(response)
+            return
+        context = _context_with_question(context, question_plan.questions[0].resolved)
+
+    yield from _stream_context(context, stream, official_answer)
+
+
+def _stream_clarification(question: str) -> Iterator[QaStreamEvent]:
+    yield {"type": "meta", "status": "clarify", "generation": "fallback"}
+    yield {"type": "delta", "text": question}
+    yield {
+        "type": "end",
+        "status": "clarify",
+        "generation": "fallback",
+        "citations": [],
+        "limitations": [],
+        "suggestions": [],
+        "claim_channels": None,
+    }
+
+
+def _stream_context(
+    context: _QaContext,
+    stream: TextStreamer | None,
+    official_answer: OfficialAnswerer | None,
+) -> Iterator[QaStreamEvent]:
     response = _resolve_precomputed_answer(
         context,
         try_official=stream is None or official_answer is not None,
@@ -219,6 +267,88 @@ def _build_qa_context(
         life_stage_check=life_stage_check,
         catalog=catalog,
     )
+
+
+def _context_with_question(context: _QaContext, question: str) -> _QaContext:
+    return _QaContext(
+        question=question.strip(),
+        policies=context.policies,
+        history=context.history,
+        insured=context.insured,
+        facts=context.facts,
+        auto_policies=context.auto_policies,
+        life_stage_check=context.life_stage_check,
+        catalog=context.catalog,
+    )
+
+
+def _answer_question_plan(
+    context: _QaContext,
+    question_plan: QuestionPlan,
+    complete: JsonCompleter | None,
+    official_answer: OfficialAnswerer | None,
+) -> PortfolioQuestionResponse:
+    if question_plan.clarification is not None:
+        return PortfolioQuestionResponse(
+            status="refused",
+            answer=question_plan.clarification,
+            citations=[],
+            limitations=[],
+            suggestions=[],
+        )
+
+    answers: list[str] = []
+    citations: list[AnswerCitation] = []
+    limitations: list[str] = []
+    answered = False
+    generation: GenerationMode = "fallback"
+    claim_channels = None
+
+    for planned in question_plan.questions:
+        if planned.scope == "out_of_scope":
+            answer = "보험과 관련 없는 정보는 답변하기 어려워요."
+        elif planned.scope == "greeting":
+            answer = "안녕하세요. 가입한 보험과 보장에 관해 궁금한 내용을 물어봐 주세요."
+            answered = True
+        else:
+            response = _answer_context(
+                _context_with_question(context, planned.resolved),
+                complete,
+                official_answer,
+            )
+            answer = response.answer
+            answered = answered or response.status == "answered"
+            generation = "llm" if response.generation == "llm" else generation
+            citations.extend(response.citations)
+            limitations.extend(response.limitations)
+            claim_channels = claim_channels or response.claim_channels
+        if len(question_plan.questions) == 1:
+            answers.append(answer)
+        else:
+            answers.append(f"{planned.original}\n{answer}")
+
+    return PortfolioQuestionResponse(
+        status="answered" if answered else "refused",
+        answer="\n\n".join(answers),
+        citations=_unique_citations(citations),
+        limitations=list(dict.fromkeys(limitations)),
+        suggestions=[],
+        generation=generation,
+        demographics=context.insured,
+        claim_channels=claim_channels,
+    )
+
+
+def _unique_citations(citations: list[AnswerCitation]) -> list[AnswerCitation]:
+    unique: list[AnswerCitation] = []
+    seen: set[str] = set()
+    for citation in citations:
+        key = citation.model_dump_json()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(citation)
+    return unique
 
 
 def _resolve_precomputed_answer(
