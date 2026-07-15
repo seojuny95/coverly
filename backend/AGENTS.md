@@ -78,6 +78,9 @@ FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별
 - **참조 데이터 소유권이 맞는가**: Supabase 소유 데이터(`REFERENCE_DATA.md`)를 코드 상수·bundled JSON·silent fallback으로 복제하지 않는다. 코드 소유 규칙과 DB 소유 사실을 섞지 않는다.
 - **하드코딩이 정당한가**: 보험사/상품 전용 분기, 출처 없는 기준금액, 임의 score/weight/threshold가 들어오면 거절한다. 필요한 운영 데이터는 DB나 명시된 참조 데이터로 옮긴다.
 - **LLM 경계가 안전한가**: 프롬프트, grounding, cite-or-refuse, fallback 정책이 [PROMPTING.md](PROMPTING.md)와 루트 원칙을 따른다. 근거 없는 총평이나 보장 단정은 허용하지 않는다.
+- **개인정보가 새지 않는가**: 원본 PDF 텍스트, 피보험자 정보, 주민등록번호, 연락처, 주소, 계좌, 병력, 계약번호를 로그·예외 메시지·metric label·테스트 fixture에 남기지 않는다. 저장·로그·파일 기록 직전에는 마스킹을 적용한다.
+- **시크릿과 권한 경계가 안전한가**: `DATABASE_URL`, OpenAI key, Supabase service role key 같은 시크릿은 환경변수/secret store에서만 읽고 응답·로그·프론트 타입으로 전달하지 않는다. DB 접근은 필요한 schema/table로 제한하고, migration은 RLS·grant·security definer 영향을 함께 검토한다.
+- **외부 입력 방어가 충분한가**: 업로드 파일, PDF 파싱 결과, LLM 출력, RAG 검색 결과, Supabase payload는 모두 신뢰하지 않는 입력으로 보고 schema validation과 크기·형식 제한을 둔다. LLM 출력은 바로 실행하거나 DB 쿼리로 사용하지 않는다.
 - **실패 정책이 명확한가**: DB, RAG, LLM, 외부 API 실패가 조용히 성공처럼 보이지 않아야 한다. 전체 분석을 실패시켜야 하는 참조 데이터 오류와 확인 불가로 degrade할 수 있는 검색 오류를 구분한다.
 - **타입과 테스트가 회귀를 막는가**: Pydantic schema, mypy, pytest fixture가 실제 응답 계약을 반영하는지 본다. LLM/API/DB는 유닛 테스트에서 stub 가능해야 한다.
 - **성능·비용이 예측 가능한가**: 불필요한 LLM 호출, 반복 DB 조회, 대용량 PDF/RAG 처리의 중복 작업이 없는지 확인한다. 캐시는 소유권과 무효화 기준이 명확해야 한다.

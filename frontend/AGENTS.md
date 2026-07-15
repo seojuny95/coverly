@@ -51,9 +51,11 @@ src/
 - **Next.js/React 관용 방식인가**: 기본은 Server Components이고, 상호작용·브라우저 API·client state가 필요한 파일에만 `"use client"`를 둔다. 불필요한 client boundary를 만들지 않는다.
 - **react-query 사용이 일관적인가**: 서버 조회는 `useQuery`, 생성·전송은 `useMutation`을 사용한다. 임의 fetch state, 중복 캐시, 영속 저장으로 민감정보를 남기지 않는다.
 - **API 계약이 타입으로 드러나는가**: backend 응답 shape 변경은 `*-api.ts` 타입, fixture, 화면 테스트에 함께 반영한다. `any`나 optional 남발로 계약 깨짐을 숨기지 않는다.
+- **민감정보를 저장하지 않는가**: 보험증권 원문, 분석 결과, 피보험자 정보, 계약번호, 상담 내용은 localStorage/sessionStorage/IndexedDB/persisted query cache에 저장하지 않는다. 인메모리 상태를 기본으로 하고, 로그·analytics·error reporting에도 원문 데이터를 보내지 않는다.
+- **클라이언트 노출 경계가 안전한가**: 브라우저 번들에는 `NEXT_PUBLIC_*`로 공개해도 되는 값만 들어가야 한다. API key, service role key, DB URL, 내부 endpoint는 프론트 코드·테스트 fixture·환경 예시에 넣지 않는다.
 - **UX 카피 원칙을 지키는가**: 공포·판매 압박·가입 권유 카피를 넣지 않는다. 사용자 대상 문구는 [UX_COPY.md](UX_COPY.md)를 따른다.
 - **하드코딩이 정당한가**: 출처, 기준금액, 보험 판단, 보험사별 분기를 UI 코드에 박지 않는다. 표시용 label·정적 설명은 가능하지만 서버 데이터와 충돌하면 서버를 우선한다.
-- **접근성과 안전한 링크를 지키는가**: 버튼/링크의 의미, heading 구조, keyboard interaction, `safeHref` 같은 URL 방어를 확인한다.
+- **접근성과 안전한 링크를 지키는가**: 버튼/링크의 의미, heading 구조, keyboard interaction, `safeHref` 같은 URL 방어를 확인한다. 서버가 준 URL·markdown·HTML은 신뢰하지 말고 허용된 프로토콜/렌더링 경로만 사용한다.
 - **렌더링 비용이 과하지 않은가**: 큰 리스트·계산·애니메이션이 불필요하게 매 렌더마다 반복되지 않는지 본다. 다만 성능 최적화 hook은 실제 병목과 팀 패턴이 있을 때만 추가한다.
 - **테스트가 사용자 관점인가**: Testing Library 테스트는 구현 세부보다 사용자가 보는 문구, 상태 전환, 링크, 오류 표시를 검증한다.
 
