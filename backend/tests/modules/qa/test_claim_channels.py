@@ -12,7 +12,7 @@ def test_channels_for_matches_insurer_by_containment() -> None:
     assert result.medical_indemnity is None
 
 
-def test_channels_for_prepends_indemnity_service_when_holding_indemnity() -> None:
+def test_channels_for_adds_service_when_holding_medical_indemnity() -> None:
     result = channels_for(["삼성화재"], has_medical_indemnity=True)
 
     assert result.medical_indemnity is not None

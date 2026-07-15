@@ -26,13 +26,13 @@ const BANKSALAD_DIAGNOSIS_SOURCE = {
   reliability: "private_guidance" as const,
   caveat: "구성 예시는 상품과 개인 상황에 따라 달라질 수 있어요.",
 };
-const INDEMNITY_SOURCE = {
+const MEDICAL_INDEMNITY_SOURCE = {
   label: "실손24 · 서비스 안내",
   url: "https://www.silson24.or.kr",
   published_at: "2025-01-01",
   reliability: "official" as const,
   caveat:
-    "실손 청구 가능 범위는 의료기관과 보험회사 시스템에 따라 달라질 수 있어요.",
+    "실손의료비 청구 가능 범위는 의료기관과 보험회사 시스템에 따라 달라질 수 있어요.",
 };
 
 const PREVIEW_SUMMARY: PortfolioSummary = {
@@ -51,7 +51,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
     {
       policy_id: "health-2",
       insurer: "메리츠화재",
-      product_name: "실손보험",
+      product_name: "실손의료보험",
       coverage_name: "질병실손의료비",
       normalized_name: "질병실손의료비",
       coverage_domain: "medical_expense",
@@ -162,8 +162,8 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         reference_min_amount: null,
         reference_max_amount: null,
         reference_basis:
-          "실손은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인",
-        reference_sources: [INDEMNITY_SOURCE],
+          "실손의료보험은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인",
+        reference_sources: [MEDICAL_INDEMNITY_SOURCE],
         coverage_count: 2,
         detail:
           "실손의료보험이 여러 계약에서 확인돼요. 중복 가입 여부를 확인해보세요.",
@@ -333,7 +333,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
     medical_indemnity: {
       name: "실손24",
       description:
-        "병원이 진료비 서류를 보험사로 자동 전송해, 서류 없이 실손보험금을 청구하는 공식 서비스예요.",
+        "병원이 진료비 서류를 보험사로 자동 전송해, 서류 없이 실손의료보험금을 청구하는 공식 서비스예요.",
       call_center: "1811-3000",
       links: [
         {
@@ -358,7 +358,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
       {
         policy_id: "health-2",
         insurer: "메리츠화재",
-        product_name: "실손보험",
+        product_name: "실손의료보험",
         monthly_amount: 31_000,
         cycle: "월납",
       },

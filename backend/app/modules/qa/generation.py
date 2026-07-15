@@ -25,6 +25,7 @@ from app.modules.evidence.catalog import (
 )
 from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.qa.claim_channels import claim_channel_block
+from app.modules.qa.context import ClaimTarget
 from app.modules.qa.contracts import (
     AnswerSection,
     InsuredDemographics,
@@ -66,7 +67,7 @@ def _is_claim_related(question: str, answer: str) -> bool:
 
 
 def _claim_channels_for_answer(
-    question: str, answer: str, claim_targets: list[tuple[str, str, bool]]
+    question: str, answer: str, claim_targets: list[ClaimTarget]
 ) -> dict[str, object] | None:
     """Channels for the insurers whose coverage the answer actually names.
 
@@ -76,12 +77,24 @@ def _claim_channels_for_answer(
     """
 
     haystack = f"{question}\n{answer}"
+    matched_targets = [
+        target
+        for target in claim_targets
+        if query_contains_canonical_name(haystack, target.normalized_name)
+    ]
+    context_matched_targets = [
+        target
+        for target in matched_targets
+        if any(query_contains_canonical_name(haystack, term) for term in target.policy_terms)
+    ]
+    if context_matched_targets:
+        matched_targets = context_matched_targets
+
     insurers: list[str] = []
     has_medical_indemnity = False
-    for normalized_name, insurer, is_medical_indemnity in claim_targets:
-        if query_contains_canonical_name(haystack, normalized_name):
-            insurers.append(insurer)
-            has_medical_indemnity = has_medical_indemnity or is_medical_indemnity
+    for target in matched_targets:
+        insurers.append(target.insurer)
+        has_medical_indemnity = has_medical_indemnity or target.is_medical_indemnity
     insurers = list(dict.fromkeys(insurers))
     if not insurers:
         return None
@@ -456,7 +469,7 @@ def stream_consultation_answer(
     limitations: list[str],
     suggestions: list[str],
     fallback: PortfolioQuestionResponse,
-    claim_targets: list[tuple[str, str, bool]] | None = None,
+    claim_targets: list[ClaimTarget] | None = None,
     stream: TextStreamer | None = None,
 ) -> Iterator[QaStreamEvent]:
     """Stream the LLM's own grounded prose; fall back if it never produces text."""

@@ -717,10 +717,17 @@ def _answer_claim_channels(
     auto_related = any(term in question for term in _AUTO_CLAIM_TERMS)
     relevant = policies if auto_related else [p for p in policies if not is_auto_policy(p)]
     insurers = [policy.기본정보.보험사 for policy in relevant if policy.기본정보.보험사]
+    include_medical_indemnity = _claim_question_targets_medical_indemnity(
+        question,
+        facts.coverage_summary.actual_loss_coverages,
+    )
     block = claim_channel_block(
         insurers,
-        has_medical_indemnity=any(
-            item.is_medical_indemnity for item in facts.coverage_summary.actual_loss_coverages
+        has_medical_indemnity=(
+            include_medical_indemnity
+            and any(
+                item.is_medical_indemnity for item in facts.coverage_summary.actual_loss_coverages
+            )
         ),
     )
     lead_in = (
@@ -741,6 +748,22 @@ def _answer_claim_channels(
         suggestions=_fact_suggestions(facts),
         claim_channels=block,
     )
+
+
+def _claim_question_targets_medical_indemnity(
+    question: str,
+    actual_loss_coverages: list[ActualLossCoverageItem],
+) -> bool:
+    named_coverages = [
+        item
+        for item in actual_loss_coverages
+        if query_contains_canonical_name(question, _base_coverage_name(item.coverage_name))
+    ]
+    if named_coverages:
+        return any(item.is_medical_indemnity for item in named_coverages)
+    if any(term in question for term in _EXPLICIT_ACTUAL_LOSS_LOOKUP_TERMS):
+        return False
+    return any(term in question for term in _MEDICAL_INDEMNITY_LOOKUP_TERMS) or "실손" in question
 
 
 def _fact_suggestions(facts: PortfolioFacts) -> list[str]:

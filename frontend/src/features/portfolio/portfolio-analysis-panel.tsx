@@ -78,9 +78,7 @@ const RECOMMENDED_INSURANCE_COPY = {
     title: "실손의료보험",
     description:
       "입원·통원처럼 자주 생기는 의료비 중 실제로 쓴 돈을 약관 한도 안에서 돌려받는 보험이에요.",
-    rangeLabel: "실손형 보장 함께 점검",
-    rangeNote:
-      "실손 보장은 가입금액 합계보다 가입 여부, 세대, 자기부담금, 중복 여부가 더 중요해요.",
+    rangeLabel: "확인 기준",
   },
 } as const;
 
@@ -236,7 +234,9 @@ function PortfolioOverview({
           items={items}
           deathBenefitContext={deathBenefitContext}
           onDeathBenefitContextChange={onDeathBenefitContextChange}
-          actualLossCoverages={summary?.actual_loss_coverages ?? []}
+        />
+        <ActualLossCoverageReview
+          coverages={summary?.actual_loss_coverages ?? []}
         />
       </section>
     );
@@ -313,7 +313,9 @@ function PortfolioOverview({
         items={items}
         deathBenefitContext={deathBenefitContext}
         onDeathBenefitContextChange={onDeathBenefitContextChange}
-        actualLossCoverages={summary?.actual_loss_coverages ?? []}
+      />
+      <ActualLossCoverageReview
+        coverages={summary?.actual_loss_coverages ?? []}
       />
     </section>
   );
@@ -323,20 +325,16 @@ function RecommendedInsuranceCards({
   items,
   deathBenefitContext,
   onDeathBenefitContextChange,
-  actualLossCoverages,
 }: {
   items: EssentialCoverageItem[];
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
-  actualLossCoverages: PortfolioSummary["actual_loss_coverages"];
 }) {
   const death = items.find((item) => item.kind === "death");
   const diagnosisItems = items.filter((item) => DIAGNOSIS_KINDS.has(item.kind));
   const medicalIndemnity = items.find(
     (item) => item.kind === "medical_indemnity",
   );
-  const duplicateActualLossNames =
-    duplicateActualLossCoverageNames(actualLossCoverages);
   const diagnosisConfirmedCount = diagnosisItems.filter(
     (item) => item.status !== "not_found",
   ).length;
@@ -363,10 +361,7 @@ function RecommendedInsuranceCards({
           confirmedCount={diagnosisConfirmedCount}
         />
 
-        <RecommendedMedicalIndemnityCard
-          item={medicalIndemnity}
-          duplicateActualLossNames={duplicateActualLossNames}
-        />
+        <RecommendedMedicalIndemnityCard item={medicalIndemnity} />
       </div>
     </article>
   );
@@ -384,6 +379,43 @@ function duplicateActualLossCoverageNames(
     }
   }
   return [...namesByNormalizedName.values()];
+}
+
+function ActualLossCoverageReview({
+  coverages,
+}: {
+  coverages: PortfolioSummary["actual_loss_coverages"];
+}) {
+  const duplicateNames = duplicateActualLossCoverageNames(coverages);
+
+  return (
+    <article className="analysis-overview-reveal analysis-overview-delay-2 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
+      <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
+        실손형 지급 방식
+      </p>
+      <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
+        실손형 보장 중복 점검
+      </h3>
+      <p className="mt-3 text-sm leading-6 text-zinc-700">
+        실제 발생한 손해를 보상하는 담보는 같은 손해를 여러 계약에서 보장하는지
+        따로 확인해요. 실손의료보험 가입 여부 점검과는 다른 항목이에요.
+      </p>
+      {duplicateNames.length > 0 ? (
+        <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+          여러 계약에서 확인된 실손형 담보: {duplicateNames.join(" · ")}. 실제
+          중복 보상 제한은 각 약관에서 확인해요.
+        </p>
+      ) : coverages.length > 0 ? (
+        <p className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-600">
+          같은 실손형 담보가 여러 계약에서 확인되지는 않았어요.
+        </p>
+      ) : (
+        <p className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-600">
+          현재 자료에서는 실손형 담보를 확인하지 못했어요.
+        </p>
+      )}
+    </article>
+  );
 }
 
 function RecommendedSingleCoverageCard({
@@ -576,10 +608,8 @@ function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
 
 function RecommendedMedicalIndemnityCard({
   item,
-  duplicateActualLossNames,
 }: {
   item: EssentialCoverageItem | undefined;
-  duplicateActualLossNames: string[];
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
@@ -609,24 +639,17 @@ function RecommendedMedicalIndemnityCard({
         </p>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3">
-        <p className="text-xs font-semibold text-zinc-500">
-          {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.rangeLabel}
-        </p>
-        <p className="mt-1 text-sm leading-6 text-zinc-700">
-          {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.rangeNote}
-        </p>
-        {duplicateActualLossNames.length > 0 ? (
-          <p className="mt-2 text-xs leading-5 text-amber-700">
-            여러 계약에서 확인된 실손형 담보:{" "}
-            {duplicateActualLossNames.join(" · ")}
+      {item?.reference_basis ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3">
+          <p className="text-xs font-semibold text-zinc-500">
+            {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.rangeLabel}
           </p>
-        ) : (
-          <p className="mt-2 text-xs leading-5 text-zinc-500">
-            같은 실손형 담보가 여러 계약에서 확인되지는 않았어요.
+          <p className="mt-1 text-sm leading-6 text-zinc-700">
+            {item.reference_basis}
           </p>
-        )}
-      </div>
+          <ReferenceSourceList sources={item.reference_sources} />
+        </div>
+      ) : null}
 
       {item?.matched_coverage_names.length ? (
         <p className="mt-4 text-xs leading-5 text-blue-700">

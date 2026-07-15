@@ -79,7 +79,7 @@ def _match(insurer: str, entries: list[dict[str, Any]]) -> dict[str, Any] | None
 
 
 def _medical_indemnity_service(directory: dict[str, Any]) -> MedicalIndemnityService:
-    block = directory["실손"]
+    block = directory["실손의료보험"]
     links = tuple(
         ChannelLink(label=channel["이름"], url=channel["링크"])
         for channel in block.get("채널", [])

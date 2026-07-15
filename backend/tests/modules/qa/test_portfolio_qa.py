@@ -316,6 +316,14 @@ def test_qa_claim_howto_includes_auto_insurer_for_car_question() -> None:
     assert result.claim_channels is not None
     names = [insurer.name for insurer in result.claim_channels.insurers]
     assert "현대해상" in names
+    assert result.claim_channels.medical_indemnity is None
+
+
+def test_qa_non_medical_claim_does_not_include_medical_indemnity_service() -> None:
+    result = answer_portfolio_question("암진단비 청구 서류 알려줘", _policies())
+
+    assert result.claim_channels is not None
+    assert result.claim_channels.medical_indemnity is None
 
 
 def test_qa_claim_howto_detects_medical_indemnity_payment_type_variant() -> None:

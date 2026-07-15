@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from app.modules.coverage.indemnity import classify_indemnity
 from app.modules.coverage.matching import canonicalize_coverage_name
 from app.modules.coverage.taxonomy import LifeStageCheck, check_life_stage
 from app.modules.evidence.catalog import EvidenceCatalog, build_evidence_catalog
@@ -24,6 +25,14 @@ class QaContext:
     auto_policies: tuple[PolicyInput, ...]
     life_stage_check: LifeStageCheck
     catalog: EvidenceCatalog
+
+
+@dataclass(frozen=True)
+class ClaimTarget:
+    normalized_name: str
+    insurer: str
+    is_medical_indemnity: bool
+    policy_terms: tuple[str, ...]
 
 
 def build_qa_context(
@@ -63,7 +72,7 @@ def context_with_question(context: QaContext, question: str) -> QaContext:
     )
 
 
-def claim_targets(context: QaContext) -> list[tuple[str, str, bool]]:
+def claim_targets(context: QaContext) -> list[ClaimTarget]:
     """Map held coverages to their policy insurers for claim-channel routing.
 
     Base-name normalization drops qualifiers such as ``(유사암제외)`` so a
@@ -71,21 +80,36 @@ def claim_targets(context: QaContext) -> list[tuple[str, str, bool]]:
     policy rather than to an insurer-less multi-policy total.
     """
 
-    medical_indemnity_names = {
-        base_normalized_coverage_name(item.coverage_name)
-        for item in context.facts.coverage_summary.actual_loss_coverages
-        if item.is_medical_indemnity
-    }
-    targets: list[tuple[str, str, bool]] = []
+    targets: list[ClaimTarget] = []
     for policy in context.policies:
         insurer = policy.기본정보.보험사
         if not insurer:
             continue
+        policy_terms = tuple(
+            dict.fromkeys(
+                normalized
+                for value in (
+                    insurer,
+                    policy.기본정보.상품명,
+                    *policy.기본정보.상품태그,
+                )
+                if value and (normalized := base_normalized_coverage_name(value))
+            )
+        )
         for coverage in policy.보장목록:
             normalized = base_normalized_coverage_name(coverage.담보명)
             if normalized:
-                # Only personal medical-indemnity coverage routes to 실손24.
-                targets.append((normalized, insurer, normalized in medical_indemnity_names))
+                classification = classify_indemnity(coverage, policy=policy)
+                targets.append(
+                    ClaimTarget(
+                        normalized_name=normalized,
+                        insurer=insurer,
+                        is_medical_indemnity=(
+                            classification.medical_indemnity_status == "confirmed"
+                        ),
+                        policy_terms=policy_terms,
+                    )
+                )
     return targets
 
 

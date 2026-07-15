@@ -534,7 +534,7 @@ def test_legacy_specific_damage_classification_is_excluded_from_totals() -> None
     assert result.damage_coverages[0].insurance_type == "여행자보험"
 
 
-def test_indemnity_is_listed_and_flagged_only_across_insurers() -> None:
+def test_medical_indemnity_is_listed_and_flagged_across_contracts() -> None:
     policies = [
         _policy("p1", "건강보험", "보험사A", [{"담보명": "실손 의료비", "가입금액": "5천만원"}]),
         _policy("p2", "건강보험", "보험사B", [{"담보명": "실손-의료비", "가입금액": "5천만원"}]),
@@ -637,7 +637,7 @@ def test_death_benefit_guide_changes_with_user_context() -> None:
     assert death.detail == "사망 담보가 확인돼요."
 
 
-def test_essential_check_flags_narrow_diagnoses_and_multiple_indemnity_contracts() -> None:
+def test_essential_check_flags_narrow_diagnoses_and_multiple_medical_contracts() -> None:
     policies = [
         _policy(
             "p1",
@@ -671,7 +671,7 @@ def test_essential_check_flags_narrow_diagnoses_and_multiple_indemnity_contracts
     assert items["medical_indemnity"].status == "needs_review"
 
 
-def test_essential_indemnity_check_excludes_auto_policy_rows() -> None:
+def test_essential_medical_indemnity_check_excludes_auto_policy_rows() -> None:
     policy = _policy(
         "auto",
         "자동차보험",
@@ -687,7 +687,7 @@ def test_essential_indemnity_check_excludes_auto_policy_rows() -> None:
     assert items["medical_indemnity"].matched_coverage_names == []
 
 
-def test_essential_indemnity_check_excludes_auto_fine_actual_loss_terms() -> None:
+def test_essential_medical_indemnity_check_excludes_auto_fine_actual_loss_terms() -> None:
     policy = _policy(
         "driver",
         "손해보험",
@@ -710,7 +710,7 @@ def test_essential_indemnity_check_excludes_auto_fine_actual_loss_terms() -> Non
     assert items["medical_indemnity"].matched_coverage_names == []
 
 
-def test_essential_indemnity_check_excludes_property_and_driver_actual_loss_terms() -> None:
+def test_essential_medical_check_excludes_property_and_driver_actual_loss_terms() -> None:
     policy = _policy(
         "damage",
         "손해보험",
@@ -1267,6 +1267,27 @@ def test_travel_medical_actual_loss_does_not_count_as_personal_medical_indemnity
         "손해보험",
         "삼성화재",
         [{"담보명": "해외의료비(실손)", "지급유형": "실손"}],
+        tags=["여행자보험"],
+    )
+
+    summary = summarize_portfolio_coverages([policy])
+    medical_item = next(
+        item for item in summary.essential_coverage_check.items if item.kind == "medical_indemnity"
+    )
+
+    assert summary.actual_loss_coverages[0].coverage_domain == "travel_medical_expense"
+    assert summary.actual_loss_coverages[0].is_medical_indemnity is False
+    assert medical_item.status == "not_found"
+    assert summary.claim_channels is not None
+    assert summary.claim_channels.medical_indemnity is None
+
+
+def test_domestic_travel_medical_actual_loss_is_not_personal_medical_indemnity() -> None:
+    policy = _policy(
+        "travel",
+        "손해보험",
+        "삼성화재",
+        [{"담보명": "국내질병입원의료비", "지급유형": "실손"}],
         tags=["여행자보험"],
     )
 

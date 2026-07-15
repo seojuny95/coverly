@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -28,13 +28,13 @@ const banksaladDiagnosisSource = {
   reliability: "private_guidance" as const,
   caveat: "구성 예시는 상품과 개인 상황에 따라 달라질 수 있어요.",
 };
-const indemnitySource = {
+const medicalIndemnitySource = {
   label: "실손24 · 서비스 안내",
   url: "https://www.silson24.or.kr",
   published_at: "2025-01-01",
   reliability: "official" as const,
   caveat:
-    "실손 청구 가능 범위는 의료기관과 보험회사 시스템에 따라 달라질 수 있어요.",
+    "실손의료비 청구 가능 범위는 의료기관과 보험회사 시스템에 따라 달라질 수 있어요.",
 };
 
 const summary: PortfolioSummary = {
@@ -125,8 +125,8 @@ const summary: PortfolioSummary = {
         reference_min_amount: null,
         reference_max_amount: null,
         reference_basis:
-          "실손은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인",
-        reference_sources: [indemnitySource],
+          "실손의료보험은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인",
+        reference_sources: [medicalIndemnitySource],
         coverage_count: 2,
         detail: "실손의료보험 가입 사실이 확인돼요.",
         matched_coverage_names: ["질병실손의료비", "상해실손의료비"],
@@ -231,7 +231,7 @@ const summary: PortfolioSummary = {
     medical_indemnity: {
       name: "실손24",
       description:
-        "병원이 진료비 서류를 보험사로 자동 전송해, 서류 없이 실손보험금을 청구하는 공식 서비스예요.",
+        "병원이 진료비 서류를 보험사로 자동 전송해, 서류 없이 실손의료보험금을 청구하는 공식 서비스예요.",
       call_center: "1811-3000",
       links: [
         {
@@ -408,7 +408,7 @@ test("shows an explicit retry state when the LLM overview is missing", async () 
   expect(onRetry).toHaveBeenCalledOnce();
 });
 
-test("shows a multiple-indemnity review directly in the coverage map", () => {
+test("shows a multiple-medical-indemnity review directly in the coverage map", () => {
   const reviewSummary: PortfolioSummary = {
     ...summary,
     essential_coverage_check: {
@@ -460,9 +460,23 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
 
   render(<PortfolioAnalysisPanel {...baseProps()} summary={reviewSummary} />);
 
+  const actualLossReview = screen
+    .getByRole("heading", { name: "실손형 보장 중복 점검" })
+    .closest("article");
+  const medicalIndemnityCard = screen
+    .getByRole("heading", { name: "실손의료보험" })
+    .closest("section");
+
+  expect(actualLossReview).not.toBeNull();
+  expect(medicalIndemnityCard).not.toBeNull();
   expect(
-    screen.getByText(/여러 계약에서 확인된 실손형 담보: 자동차사고벌금/),
+    within(actualLossReview!).getByText(
+      /여러 계약에서 확인된 실손형 담보: 자동차사고벌금/,
+    ),
   ).toBeInTheDocument();
+  expect(
+    within(medicalIndemnityCard!).queryByText(/자동차사고벌금/),
+  ).not.toBeInTheDocument();
 });
 
 test("shows the loading state while the deterministic summary runs", () => {

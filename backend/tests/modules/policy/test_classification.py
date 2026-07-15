@@ -65,6 +65,17 @@ def test_classify_policy_matches_driver_accident_product_without_llm() -> None:
     assert "운전자보험" in result["상품태그"]
 
 
+def test_classify_policy_uses_explicit_medical_indemnity_tag() -> None:
+    result = classify_policy(
+        text="실손의료비 급여 비급여 자기부담금 보상",
+        product_name="메리츠 실비보험",
+        complete=_forbidden_completer,
+    )
+
+    assert result["보험분류"] == "제3보험"
+    assert result["상품태그"] == ["실손의료보험"]
+
+
 def test_classify_policy_requires_context_for_broad_lifestyle_package() -> None:
     calls: list[tuple[str, str]] = []
 

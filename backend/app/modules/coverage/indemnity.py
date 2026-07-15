@@ -90,6 +90,7 @@ _MEDICAL_TERMS = (
     "질병실손",
 )
 _TRAVEL_MEDICAL_TERMS = ("해외의료비", "해외실손의료비", "국외의료비")
+_TRAVEL_POLICY_TERMS = ("여행자보험", "여행보험", "해외여행")
 _LEGAL_TERMS = ("벌금", "변호사", "교통사고처리지원금", "형사합의", "방어비용")
 _PROPERTY_TERMS = (
     "화재",
@@ -208,6 +209,8 @@ def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
 
 
 def _coverage_domain(text: str, policy: PolicyInput | None) -> CoverageDomain:
+    if _is_travel_policy_context(policy) and _contains_any(text, _MEDICAL_TERMS):
+        return "travel_medical_expense"
     for domain, terms in _domain_priorities(policy):
         if _contains_any(text, terms):
             return domain
@@ -263,6 +266,21 @@ def is_damage_policy_context(policy: PolicyInput | None) -> bool:
     category = policy.기본정보.보험분류 or ""
     tags = policy.기본정보.상품태그
     return category in _DAMAGE_CLASSIFICATIONS or any(tag in _DAMAGE_TAG_TERMS for tag in tags)
+
+
+def _is_travel_policy_context(policy: PolicyInput | None) -> bool:
+    if policy is None:
+        return False
+    identity = _normalize(
+        " ".join(
+            [
+                policy.기본정보.보험분류 or "",
+                policy.기본정보.상품명 or "",
+                *policy.기본정보.상품태그,
+            ]
+        )
+    )
+    return _contains_any(identity, _TRAVEL_POLICY_TERMS)
 
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
