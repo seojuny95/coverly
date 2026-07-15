@@ -222,6 +222,10 @@ def _coverage_identity(value: str) -> str:
     return _normalized_header_name(value)
 
 
+def _has_previous_column_value(cells: list[str], name_column: int) -> bool:
+    return any(cell.strip() for cell in cells[:name_column])
+
+
 def _looks_like_standalone_coverage_name(value: str) -> bool:
     """True when a wrapped-looking row is more likely a separate coverage name."""
     stripped = value.strip()
@@ -305,7 +309,7 @@ def _continuation_detail(
         if len(cells) <= max(name_column, amount_column):
             continue
 
-        has_previous_marker = any(cell.strip() for cell in cells[:name_column])
+        has_previous_marker = _has_previous_column_value(cells, name_column)
         has_amount = bool(cells[amount_column].strip())
         if has_previous_marker or has_amount:
             break
@@ -328,9 +332,10 @@ def _continuation_amount(
         if len(cells) <= max(name_column, amount_column):
             continue
 
-        has_previous_marker = any(cell.strip() for cell in cells[:name_column])
         name_text = cells[name_column].strip()
-        if has_previous_marker or _looks_like_standalone_coverage_name(name_text):
+        if _has_previous_column_value(cells, name_column) or _looks_like_standalone_coverage_name(
+            name_text
+        ):
             break
 
         amount = cells[amount_column].strip()
@@ -351,7 +356,7 @@ def _is_continuation_row(cells: list[str], name_column: int, amount_column: int)
         return False
     if _looks_like_standalone_coverage_name(cells[name_column]):
         return False
-    return name_column > 0 and not any(cell.strip() for cell in cells[:name_column])
+    return name_column > 0 and not _has_previous_column_value(cells, name_column)
 
 
 def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
@@ -462,24 +467,20 @@ def _amount_from_source_row(name: str, source: str) -> str | None:
         return None
 
     for rows in _markdown_tables(source):
-        amount_column = _amount_column_index(rows[0])
-        if amount_column is None:
+        header = rows[0]
+        name_column = _name_column_index(header)
+        amount_column = _amount_column_index(header)
+        if name_column is None or amount_column is None:
             continue
 
         for index, cells in enumerate(rows):
-            if len(cells) <= amount_column or re.sub(r"\s", "", cells[0]) != target:
+            if len(cells) <= max(name_column, amount_column):
+                continue
+            if re.sub(r"\s", "", cells[name_column]) != target:
                 continue
             if cells[amount_column]:
                 return cells[amount_column]
-            # pdfplumber sometimes wraps the value onto a continuation row
-            # (empty name cell, value in the amount cell) — look one row ahead.
-            next_row = rows[index + 1] if index + 1 < len(rows) else None
-            is_continuation = (
-                next_row is not None and len(next_row) > amount_column and not next_row[0]
-            )
-            if is_continuation and next_row is not None and next_row[amount_column]:
-                return next_row[amount_column]
-            return None
+            return _continuation_amount(rows, index, name_column, amount_column) or None
 
     return None
 
