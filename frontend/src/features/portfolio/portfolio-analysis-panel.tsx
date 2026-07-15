@@ -7,6 +7,8 @@ import type {
   ClaimChannelBlock,
   EssentialCoverageItem,
   PortfolioSummary,
+  ReferenceSource,
+  SourceReliability,
   SpecialPolicyAnalysis,
 } from "./portfolio-api";
 import { safeHref } from "./safe-href";
@@ -483,12 +485,15 @@ function CoverageAmountMeter({
   const currentAmount = item?.confirmed_amount ?? null;
   const minAmount = item?.reference_min_amount ?? null;
   const maxAmount = item?.reference_max_amount ?? null;
+  const basis = item?.reference_basis ?? fallbackNote;
+  const sources = item?.reference_sources ?? [];
 
   if (minAmount == null || maxAmount == null) {
     return (
       <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3">
         <p className="text-xs font-semibold text-zinc-500">{rangeLabel}</p>
-        <p className="mt-1 text-sm leading-6 text-zinc-700">{fallbackNote}</p>
+        <p className="mt-1 text-sm leading-6 text-zinc-700">{basis}</p>
+        <ReferenceSourceList sources={sources} />
       </div>
     );
   }
@@ -556,9 +561,67 @@ function CoverageAmountMeter({
         </div>
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-zinc-500">{fallbackNote}</p>
+      <p className="mt-3 text-xs leading-5 text-zinc-500">{basis}</p>
+      <ReferenceSourceList sources={sources} />
     </div>
   );
+}
+
+function ReferenceSourceList({
+  sources,
+  className = "",
+}: {
+  sources: ReferenceSource[];
+  className?: string;
+}) {
+  if (sources.length === 0) return null;
+
+  return (
+    <div className={`mt-3 flex flex-wrap gap-1.5 ${className}`}>
+      {sources.map((source) => {
+        const href = safeHref(source.url);
+        const label = sourceTypeLabel(source.reliability);
+        const className =
+          "rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-medium text-zinc-600";
+
+        return href ? (
+          <a
+            key={`${source.label}-${source.url}`}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className={className}
+            title={source.caveat}
+          >
+            {label}: {source.label}
+          </a>
+        ) : (
+          <span
+            key={`${source.label}-${source.url}`}
+            className={className}
+            title={source.caveat}
+          >
+            {label}: {source.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function sourceTypeLabel(reliability: SourceReliability) {
+  switch (reliability) {
+    case "official":
+      return "공식 출처";
+    case "public_research":
+      return "공공 연구 출처";
+    case "industry":
+      return "협회·공시 출처";
+    case "large_private_analysis":
+      return "민간 분석 출처";
+    case "private_guidance":
+      return "아티클·블로그 출처";
+  }
 }
 
 function indemnityHeadline(item: EssentialCoverageItem | undefined) {
@@ -686,6 +749,10 @@ function PremiumSummaryBar({
     maxAmount,
   );
   const userPosition = progressPosition(premium.monthly_total, maxAmount);
+  const sourceLabels = [
+    sourceTypeLabel(benchmark.income_source.reliability),
+    sourceTypeLabel(benchmark.guide_source.reliability),
+  ];
   const style = {
     "--premium-position": `${userPosition}%`,
   } as CSSProperties;
@@ -745,8 +812,12 @@ function PremiumSummaryBar({
       <p className="mt-3 text-xs leading-5 text-zinc-300">
         월 소득의 {Math.round(benchmark.suggested_min_ratio * 100)}%~
         {Math.round(benchmark.suggested_max_ratio * 100)} 권장 구간과
-        비교했어요. 민간 가이드 기준이에요.
+        비교했어요. {sourceLabels.join(" + ")} 기준이에요.
       </p>
+      <ReferenceSourceList
+        sources={[benchmark.income_source, benchmark.guide_source]}
+        className="[&_a]:border-white/10 [&_a]:bg-white/10 [&_a]:text-zinc-200 [&_span]:border-white/10 [&_span]:bg-white/10 [&_span]:text-zinc-200"
+      />
     </div>
   );
 }

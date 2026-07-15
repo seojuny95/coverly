@@ -4,13 +4,8 @@ import re
 from functools import lru_cache
 
 from app.core.grounding import wording_grounded
-from app.modules.reference_data import (
-    REFERENCE_DATA_DIR,
-    load_database_reference_data,
-    load_reference_data,
-)
+from app.modules.reference_data import load_database_reference_data
 
-_INSURER_CATALOG_PATH = REFERENCE_DATA_DIR / "insurer_catalog.json"
 _INSURER_NAME_SUFFIXES = (
     "화재해상보험",
     "해상화재보험",
@@ -27,9 +22,7 @@ _BRAND_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9]+|[가-힣]+")
 
 @lru_cache
 def get_insurer_candidates() -> tuple[str, ...]:
-    return load_reference_data(
-        "insurer_catalog", _INSURER_CATALOG_PATH, _validate_insurer_candidates
-    )
+    return load_database_reference_data("insurer_catalog", _validate_insurer_candidates)
 
 
 def _validate_insurer_candidates(payload: object) -> tuple[str, ...]:

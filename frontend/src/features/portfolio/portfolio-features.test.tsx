@@ -257,6 +257,17 @@ describe("portfolio features", () => {
                 confirmed_amount: 10_000_000,
                 reference_min_amount: 30_000_000,
                 reference_max_amount: 50_000_000,
+                reference_basis: "3대 진단비 점검용 범위",
+                reference_sources: [
+                  {
+                    label: "시그널플래너 · 3대 진단비 설명",
+                    url: "https://blog.signalplanner.co.kr/5344/",
+                    published_at: "2022-01-01",
+                    reliability: "private_guidance",
+                    caveat:
+                      "진단비 금액은 개인 상황과 상품 조건에 따라 달라질 수 있어요.",
+                  },
+                ],
                 coverage_count: 1,
                 detail:
                   "일반암 진단비는 확인되지만 가입금액이 참고금액보다 낮아요.",
@@ -337,6 +348,17 @@ describe("portfolio features", () => {
                 confirmed_amount: 30_000_000,
                 reference_min_amount: 30_000_000,
                 reference_max_amount: 50_000_000,
+                reference_basis: "3대 진단비 점검용 범위",
+                reference_sources: [
+                  {
+                    label: "시그널플래너 · 3대 진단비 설명",
+                    url: "https://blog.signalplanner.co.kr/5344/",
+                    published_at: "2022-01-01",
+                    reliability: "private_guidance",
+                    caveat:
+                      "진단비 금액은 개인 상황과 상품 조건에 따라 달라질 수 있어요.",
+                  },
+                ],
                 coverage_count: 1,
                 detail: "일반암 진단비가 참고금액 이상으로 확인돼요.",
                 matched_coverage_names: ["암진단비"],
