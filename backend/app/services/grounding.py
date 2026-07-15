@@ -56,6 +56,10 @@ def normalize_amount(value: str, source: str) -> str:
     cleaned = value.strip()
     if not cleaned:
         return AMOUNT_UNVERIFIED
+    if "\n" in cleaned:
+        lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+        if lines and all(_is_grounded(line, source) for line in lines):
+            return cleaned
     if not _is_grounded(cleaned, source):
         return AMOUNT_UNVERIFIED
     # Bare number under a 만원 header → make the unit explicit (3,000 → 3,000만원),

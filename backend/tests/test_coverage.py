@@ -182,6 +182,206 @@ def test_normalize_table_coverages_handles_content_column_as_name_with_wrapped_d
     ]
 
 
+def test_normalize_table_coverages_does_not_merge_next_coverage_name_into_detail() -> None:
+    source = (
+        "| 구분 | 보장내용 | 납입/보험기간 | 가입금액 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 기본 | 자기차량손해 | 1년 | 차량가입금액 2,423만원\\n자기부담금 "
+        "피보험자동차에 생긴 손해액의20%(최소 20만원,최대 50만원) |\n"
+        "|  | 긴급출동특약 |  |  |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "자기차량손해",
+            "가입금액": (
+                "차량가입금액 2,423만원\\n자기부담금 "
+                "피보험자동차에 생긴 손해액의20%(최소 20만원,최대 50만원)"
+            ),
+            "보장내용": None,
+            "해설": None,
+        },
+        {
+            "담보명": "긴급출동특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+    ]
+
+
+def test_normalize_table_coverages_keeps_wrapped_amount_with_its_coverage() -> None:
+    source = (
+        "| 담보종목 | 보험가입금액 |\n"
+        "| --- | --- |\n"
+        "| 긴급출동특약 |  |\n"
+        "|  | 하이카서비스 총 6회 |\n"
+        "|  | 견인 100km한도 |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "긴급출동특약",
+            "가입금액": "하이카서비스 총 6회\n견인 100km한도",
+            "보장내용": None,
+            "해설": None,
+        }
+    ]
+
+
+def test_normalize_table_coverages_collects_sidecar_riders_but_skips_rates() -> None:
+    source = (
+        "| 담보종목 | 보험가입금액 | 보험료 할인특약 | 보장확대 및 기타 특약 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 대인배상Ⅰ | 자배법에서 정한 금액 | 마일리지특약 | 다른자동차운전담보특약 |\n"
+        "|  |  | 잠금장치해제불가요율 | 친환경차배터리신품가액보상특약 |\n"
+        "| 자기차량손해 | 차량가입금액 2,423만원 | 특별요율 |  |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "대인배상Ⅰ",
+            "가입금액": "자배법에서 정한 금액",
+            "보장내용": None,
+            "해설": None,
+        },
+        {
+            "담보명": "마일리지특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+        {
+            "담보명": "다른자동차운전담보특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+        {
+            "담보명": "친환경차배터리신품가액보상특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+        {
+            "담보명": "자기차량손해",
+            "가입금액": "차량가입금액 2,423만원",
+            "보장내용": None,
+            "해설": None,
+        },
+    ]
+
+
+def test_normalize_table_coverages_keeps_name_only_rider_tables() -> None:
+    source = (
+        "| 담보종목 | 보험가입금액 |\n"
+        "| --- | --- |\n"
+        "| 대인배상Ⅰ | 자배법에서 정한 금액 |\n\n"
+        "| 특약명 |\n"
+        "| --- |\n"
+        "| 특별요율 |\n"
+        "| 마일리지특약 |\n"
+        "| 블랙박스특약 |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "대인배상Ⅰ",
+            "가입금액": "자배법에서 정한 금액",
+            "보장내용": None,
+            "해설": None,
+        },
+        {
+            "담보명": "마일리지특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+        {
+            "담보명": "블랙박스특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+    ]
+
+
+def test_normalize_coverages_drops_section_headers_from_model_rows() -> None:
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": "특별요율", "보장내용": None, "가입금액": "", "유형": "부가"},
+                {"담보명": "마일리지특약", "보장내용": None, "가입금액": "", "유형": "부가"},
+            ]
+        }
+
+    result = normalize_coverages("특별요율 마일리지특약", complete=fake_complete)
+
+    assert [coverage["담보명"] for coverage in result] == ["마일리지특약"]
+
+
+def test_normalize_coverages_drops_notice_sentences_from_model_rows() -> None:
+    notice = (
+        "상해담보가입시, 보험기간 중에 피보험자가 직업이나 직무를 변경하거나 "
+        "이륜자동차를 계속적으로 사용하게 된 경우에는 지체없이 회사에 알려야 하며 "
+        "그렇지 않은 경우 보험금 지급이 거절되거나 감액될 수 있습니다."
+    )
+
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": notice, "보장내용": None, "가입금액": "", "유형": "담보"},
+                {"담보명": "마일리지특약", "보장내용": None, "가입금액": "", "유형": "부가"},
+            ]
+        }
+
+    result = normalize_coverages(notice, complete=fake_complete)
+
+    assert [coverage["담보명"] for coverage in result] == ["마일리지특약"]
+
+
+def test_normalize_table_coverages_drops_notice_sentences() -> None:
+    source = (
+        "| 보장내용 |\n"
+        "| --- |\n"
+        "| 청약서 주요내용 작성시 사실 그대로를 알리지 않았거나, "
+        "자필서명을 본인이 직접서명(날인)하지 않은경우는 보상되지 않을 수 있습니다. |\n"
+        "| 마일리지특약 |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert [coverage["담보명"] for coverage in result] == ["마일리지특약"]
+
+
+def test_build_coverage_source_includes_name_only_tables_with_strict_tables() -> None:
+    strict_table: Table = (
+        ("담보종목", "보험가입금액"),
+        ("대인배상Ⅰ", "자배법에서 정한 금액"),
+    )
+    rider_table: Table = (("특약명",), ("마일리지특약",), ("블랙박스특약",))
+
+    source = build_coverage_source(_doc(tables=(strict_table, rider_table)))
+
+    assert "대인배상Ⅰ" in source
+    assert "마일리지특약" in source
+    assert "블랙박스특약" in source
+
+
 def test_normalize_drops_policy_wording_absent_from_source() -> None:
     # The LLM returned 보장내용 that does not appear in the source — a paraphrase or
     # hallucination. It must not be shown as authoritative 증권 원문; drop it to None
@@ -302,7 +502,8 @@ def test_normalize_skips_invalid_rows() -> None:
     result = normalize_coverages(SOURCE, complete=fake_complete)
 
     assert [coverage["담보명"] for coverage in result] == ["정상담보"]
-    assert result[0]["가입금액"] == "확인필요"  # empty cell -> nothing to show
+    assert result[0]["가입금액"] == ""
+    assert result[0]["유형"] == "부가"  # name-only rows are auxiliary, not core coverages
 
 
 def test_normalize_drops_wording_that_merely_repeats_the_amount() -> None:
@@ -424,7 +625,29 @@ def test_normalize_keeps_rider_amount_empty_not_unverified() -> None:
     result = normalize_coverages("대인배상Ⅰ 안전운전할인특약", complete=fake_complete)
 
     assert result[0]["가입금액"] == ""  # rider: empty stays empty
-    assert result[1]["가입금액"] == "확인필요"  # core: empty is a verification gap
+    assert result[1]["가입금액"] == ""
+    assert result[1]["유형"] == "부가"  # name-only beats the model's core/rider label
+
+
+def test_normalize_treats_name_only_rows_as_riders_regardless_of_model_label() -> None:
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": "마일리지특약", "보장내용": None, "가입금액": "", "유형": "담보"}
+            ]
+        }
+
+    result = normalize_coverages("마일리지특약", complete=fake_complete)
+
+    assert result == [
+        {
+            "담보명": "마일리지특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        }
+    ]
 
 
 def test_normalize_returns_no_coverages_for_blank_source() -> None:

@@ -7,7 +7,7 @@ def serialize_table(rows: Sequence[Sequence[str | None]]) -> str:
     """Render a table as markdown while preserving row-column associations."""
     clean = [[_join_cell_lines(cell or "") for cell in row] for row in rows]
     clean = [row for row in clean if any(row)]
-    if len(clean) < 2 or len(clean[0]) < 2:
+    if len(clean) < 2 or len(clean[0]) < 1:
         return ""
 
     width = len(clean[0])
