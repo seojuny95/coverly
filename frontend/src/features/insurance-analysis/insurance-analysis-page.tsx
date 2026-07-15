@@ -67,6 +67,17 @@ const InsuranceChatbot = dynamic(
 
 const CLASSIFICATION_ORDER = ["생명보험", "제3보험", "손해보험", "미분류"];
 
+const CLASSIFICATION_HELP: Record<string, string> = {
+  생명보험:
+    "사망이나 노후처럼 사람의 생명과 긴 기간의 생활을 준비하는 보험이에요. 종신보험, 정기보험, 연금보험이 여기에 가까워요.",
+  제3보험:
+    "질병, 상해, 간병처럼 사람의 몸과 건강에 생기는 일을 보장하는 보험이에요. 암보험, 상해보험, 간병보험이 대표적이에요.",
+  손해보험:
+    "갑작스러운 사고로 생긴 재산 손해나 책임을 보상하는 보험이에요. 자동차보험, 운전자보험, 화재보험이 여기에 들어가요.",
+  미분류:
+    "증권에서 보험 종류를 확실히 판단할 단서가 부족한 경우예요. 상품명이나 보장 내용을 다시 확인해 주세요.",
+};
+
 const LIFE_CLASSIFICATIONS = new Set(["생명보험", "생명·연금"]);
 const THIRD_CLASSIFICATIONS = new Set(["제3보험", "상해·질병·실손"]);
 const DAMAGE_CLASSIFICATIONS = new Set([
@@ -325,10 +336,27 @@ export function InsuranceAnalysisPage({
               {CLASSIFICATION_ORDER.map((classification) => (
                 <div
                   key={classification}
-                  className="rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
+                  className="group relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
                 >
-                  <dt className="text-xs font-medium text-zinc-500">
-                    {classification}
+                  <dt className="flex items-start justify-between gap-3 text-xs font-medium text-zinc-500">
+                    <span>{classification}</span>
+                    <span className="relative inline-flex">
+                      <button
+                        type="button"
+                        aria-label={`${classification} 설명 보기`}
+                        aria-describedby={`classification-help-${classification}`}
+                        className="flex size-5 items-center justify-center rounded-full border border-zinc-200 text-[11px] font-semibold text-zinc-400 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                      >
+                        ?
+                      </button>
+                      <span
+                        id={`classification-help-${classification}`}
+                        role="tooltip"
+                        className="pointer-events-none absolute top-7 right-0 z-10 hidden w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg group-focus-within:block group-hover:block"
+                      >
+                        {CLASSIFICATION_HELP[classification]}
+                      </span>
+                    </span>
                   </dt>
                   <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
                     {groupedInsuranceDocuments[classification]?.length ?? 0}

@@ -111,6 +111,12 @@ describe("InsuranceAnalysisPage", () => {
       within(healthCard as HTMLElement).getByText("1"),
     ).toBeInTheDocument();
     expect(screen.getByText("자동차보험")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "생명보험 설명 보기" }),
+    ).toHaveAttribute("aria-describedby", "classification-help-생명보험");
+    expect(
+      screen.getByText(/사망이나 노후처럼 사람의 생명/),
+    ).toBeInTheDocument();
   });
 
   test("normalizes legacy classification values into current sections", async () => {
