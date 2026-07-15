@@ -64,7 +64,12 @@ def context_with_question(context: QaContext, question: str) -> QaContext:
 
 
 def claim_targets(context: QaContext) -> list[tuple[str, str, bool]]:
-    """Map each held coverage to the insurer used for claim-channel routing."""
+    """Map held coverages to their policy insurers for claim-channel routing.
+
+    Base-name normalization drops qualifiers such as ``(유사암제외)`` so a
+    conversational mention can still resolve to the insurer on the original
+    policy rather than to an insurer-less multi-policy total.
+    """
 
     medical_indemnity_names = {
         base_normalized_coverage_name(item.coverage_name)
@@ -78,6 +83,8 @@ def claim_targets(context: QaContext) -> list[tuple[str, str, bool]]:
         for coverage in policy.보장목록:
             normalized = base_normalized_coverage_name(coverage.담보명)
             if normalized:
+                # Use the shared medical-indemnity result so only eligible
+                # coverages route to the dedicated indemnity claim channel.
                 targets.append((normalized, insurer, normalized in medical_indemnity_names))
     return targets
 

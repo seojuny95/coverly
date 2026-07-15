@@ -19,7 +19,7 @@ def test_local_frontend_can_preflight_policy_upload() -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
-def test_worktree_frontend_can_preflight_policy_upload() -> None:
+def test_unconfigured_frontend_origin_cannot_preflight_policy_upload() -> None:
     client = TestClient(app)
 
     response = client.options(
@@ -31,5 +31,5 @@ def test_worktree_frontend_can_preflight_policy_upload() -> None:
         },
     )
 
-    assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == "http://localhost:3001"
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers

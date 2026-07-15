@@ -49,6 +49,8 @@ _LLM_FILLABLE_FIELDS = [
 _LLM_TRIGGER_FIELDS = [
     field for field in _LLM_FILLABLE_FIELDS if field not in {"보험사", "납입기간", "차량정보"}
 ]
+# Identity fields must be traceable to source text. Dates, amounts, and periods
+# are structured or derived values, so they are intentionally excluded.
 _GROUNDED_LLM_FIELDS = {"보험사", "증권번호", "계약자", "피보험자", "상품명"}
 
 
@@ -84,6 +86,8 @@ def _merge_missing_llm_fields(
             continue
         value = llm_summary[key]  # type: ignore[literal-required]
 
+        # Cite-or-refuse prevents an allowed but hallucinated identity from being
+        # presented as policy data. Insurers use document-visible brand tokens.
         if key in _GROUNDED_LLM_FIELDS:
             if not isinstance(value, str):
                 continue
@@ -95,6 +99,8 @@ def _merge_missing_llm_fields(
             if not grounded:
                 continue
 
+        # Vehicle data is structured, so ground its source-visible plate number.
+        # Lookup-style model/year data may remain when the document has no plate.
         if key == "차량정보":
             if not isinstance(value, dict):
                 continue

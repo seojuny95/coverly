@@ -219,6 +219,8 @@ def _policy_session_catalog(
     try:
         hits = retrieve_policy(session_ids, question)
     except Exception:
+        # Session RAG is optional. Retrieval outages must fall through to the
+        # portfolio-fact or consultation path instead of failing the whole answer.
         return None
     if not hits:
         return None
@@ -260,6 +262,8 @@ def _answer_with_official_rag(
     try:
         result = answerer(question)
     except Exception:
+        # Official RAG is a shortcut, not a requirement. A pgvector or OpenAI
+        # outage falls through to the remaining grounded answer strategies.
         return None
     if result.status != "answered":
         return None
