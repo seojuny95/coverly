@@ -42,6 +42,25 @@ def test_non_medical_actual_loss_reimbursement_is_excluded() -> None:
     assert result.medical_indemnity_status == "excluded"
 
 
+def test_non_medical_actual_loss_terms_are_excluded_even_with_health_category() -> None:
+    cases = (
+        ("벌금(실손)", "legal_cost"),
+        ("대물배상(실손)", "liability"),
+        ("휴대품손해(실손)", "property_damage"),
+        ("화재손해(실손)", "property_damage"),
+    )
+
+    for coverage_name, expected_domain in cases:
+        result = classify_indemnity(
+            _coverage(담보명=coverage_name, 지급유형="실손"),
+            policy=_policy(category="건강보험"),
+        )
+
+        assert result.payment_basis == "indemnity"
+        assert result.coverage_domain == expected_domain
+        assert result.medical_indemnity_status == "excluded"
+
+
 def test_travel_medical_expense_can_still_be_medical_indemnity() -> None:
     result = classify_indemnity(
         _coverage(담보명="해외의료비(실손)", 지급유형="실손"),

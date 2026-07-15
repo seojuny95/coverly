@@ -168,7 +168,7 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right align-top">
-        <CoverageBasis tone="indemnity">실손보상</CoverageBasis>
+        <CoverageBasis tone="indemnity">실손의료</CoverageBasis>
       </td>
     </tr>
   );
