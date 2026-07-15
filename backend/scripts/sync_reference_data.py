@@ -5,7 +5,7 @@ from pathlib import Path
 
 import psycopg
 
-from app.settings import get_settings
+from app.core.config import get_settings
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BACKEND_DIR / "app" / "services" / "data"

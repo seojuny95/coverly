@@ -18,66 +18,55 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run p
 
 ## Project Structure
 
-`app/services/`는 런타임 파이프라인과 의존 방향이 드러나도록 나눈다. 핵심 라우트(`parse`, `summary`, `qa`)는 하위 사실 계층(`policy`, `portfolio`, `evidence`, `coverage_knowledge`, `rag`)을 사용하지만, 하위 계층은 라우트나 상위 use case를 import하지 않는다. 새 코드는 아래 패키지 경로를 직접 import한다.
+백엔드는 `app/core`, `app/modules`, `app/rag`, `app/integrations`로 나눈다. `app`는 런타임 코드만 담고, `backend/evals`는 평가 전용이다. `app`는 `backend/evals`를 import하지 않는다.
 
 ```text
 app/
-├── main.py                # FastAPI app (핵심 3개 흐름과 보조 라우터 등록)
-├── errors.py              # ApiError, request-id 미들웨어
-├── routes/
-│   ├── policies.py        # POST /policies/parse — 증권 1건 파싱
-│   ├── portfolio.py       # POST /portfolio/summary — 보장금 합계
-│   └── qa.py              # POST /qa/stream — 근거 기반 Q&A 스트리밍
-└── services/
-    ├── llm.py             # OpenAI 경계: structured/text/stream completion
-    ├── grounding.py       # 금액·문구 anti-hallucination (공유)
-    ├── paths.py           # services/data 공통 경로
-    ├── data/              # insurer_catalog.json, classification_rules.json 등
-    ├── policy/            # 증권 1건 처리
-    │   ├── models.py      # ParsedDocument, Coverage, PolicySummary 등 타입
-    │   ├── parsing.py     # pdfplumber 1회 파싱 → ParsedDocument
-    │   ├── classification.py  # 보험종류 분류 (규칙 + LLM fallback)
-    │   ├── demographics.py    # 피보험자 나이·성별·생애단계 추출
-    │   ├── pipeline.py        # parse → summary/classification → coverage
-    │   ├── summary/service.py # 기본정보 (regex 로컬 + LLM 보완)
-    │   └── coverage/
-    │       ├── service.py     # 담보 추출 (표 선택 → LLM 정규화 → grounding)
-    │       └── explanation.py # 보장내용 없는 담보의 약관/RAG 기반 해설
-    ├── coverage_knowledge/
-    │   ├── taxonomy.py        # 담보 대분류·생애단계 체크
-    │   ├── matching.py        # 담보명 정규화·교차 매칭
-    │   ├── rules.py           # coverage_matching_rules.json 로딩/검증
-    │   ├── purpose.py         # 담보 목적 설명
-    │   └── disclosure_links.py
-    ├── portfolio/             # 여러 증권의 결정적 사실 집계
-    │   ├── summary.py         # 보장금 합계·실손/중복·손해보험 별도 집계
-    │   ├── premium.py         # 보험료 집계
-    │   └── demographics.py    # 포트폴리오 단위 인구정보 판정
-    ├── evidence/
-    │   └── catalog.py         # 분석/Q&A 공용 근거 카탈로그·안전 필터
-    ├── analysis/
-    │   └── summary_overview.py # 포트폴리오 총평 LLM 생성·검증
-    ├── qa/
-    │   ├── service.py         # POST /qa/stream use case
-    │   ├── planning.py        # 맥락 지시어·복합 질문·도메인 범위 planner
-    │   ├── generation.py      # Q&A LLM 생성/streaming
-    │   └── claim_channels.py  # 청구 채널 결정적 안내
-    ├── reference/
-    │   └── premium_benchmark.py # 출처가 있는 보험료 부담 가이드 조회
-    └── rag/                   # 공식 약관/제도 RAG + 업로드 세션 RAG
+├── main.py                  # FastAPI 앱 조립
+├── core/                    # config, lifespan, errors, middleware, 공유 pure helper
+├── modules/
+│   ├── policy/              # 증권 파싱·분류·요약·담보 해설
+│   ├── portfolio/           # 다건 증권 집계와 총평 입력 준비
+│   ├── analysis/            # 포트폴리오 총평 생성
+│   ├── qa/                  # 근거 기반 Q&A
+│   ├── coverage/            # 담보 분류·매칭·설명
+│   ├── evidence/            # 분석/Q&A 공용 근거 카탈로그
+│   └── reference_data/      # DB-backed reference data access
+├── rag/                     # 공유 런타임 RAG subsystem
+│   ├── official/            # 공식 약관·제도 RAG
+│   └── policy/              # 업로드 세션 RAG
+└── integrations/
+    ├── openai/              # OpenAI client boundary
+    └── postgres/            # pgvector / Postgres 구현
+
+backend/evals/
+└── rag/
+    ├── official/            # official retrieval/generation eval runners + datasets
+    └── policy/              # policy retrieval/generation eval runners + datasets
+
+tests/
+├── core/                    # 앱 조립, 미들웨어, 공용 규칙 테스트
+├── modules/                 # policy, portfolio, qa 등 기능별 테스트
+├── rag/                     # official / policy 런타임 RAG 테스트
+├── evals/                   # 평가 runner와 metric 테스트
+└── integrations/            # Postgres 등 외부 연동 구현 테스트
 ```
 
-의존 방향은 `routes -> policy/portfolio/qa`, `portfolio route -> analysis/summary_overview`, `qa -> portfolio/evidence/coverage_knowledge/rag/llm`, `portfolio -> policy models/coverage_knowledge`, `policy -> llm/grounding/rag` 순서다. 분석 총평과 Q&A는 서버에서만 생성하고, 공통 판단은 `portfolio`, `evidence`, `coverage_knowledge`로 내려서 공유한다.
+FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별 엔드포인트 묶음에만 쓰고, `Depends`는 실제로 필요한 경우에만 라우터/핸들러에서 국소적으로 사용한다. 전역 의존성 주입은 기본 패턴이 아니며, 앱 수명 주기 연결은 `lifespan`으로 처리한다. `lifespan`은 공용 캐시 워밍, 초기화, 종료 정리에 사용하고 `create_app()`에서 연결한다.
 
-참조 데이터 로딩·RAG 테이블·migration 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다.
+의존 방향은 대체로 `modules -> core/integrations/rag`, `rag -> integrations/core`, `integrations -> 외부 시스템`이다. `analysis`와 `qa`는 서버 응답을 생성하는 계층이고, `coverage`, `evidence`, `reference_data`는 여러 기능이 공유하는 순수/조회 로직을 담는다. `app`는 평가 코드를 참조하지 않는다.
+
+참조 데이터와 RAG 테이블 경계, Supabase migration을 포함한 DB 원본 정의는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다.
 
 전역 원칙(내 편·판매원 아님, grounding)은 [../AGENTS.md](../AGENTS.md)에 있고, 아래는 백엔드에서 그걸 강제하는 규칙이다.
 
-- **특정 보험사·상품 전용 로직 금지.** 코드에 보험사/상품 이름이 등장하면 안 된다. 회사별 차이는 일반 로직(형태 검증, 레이아웃 무관 패턴) + 데이터 파일(`services/data/*.json`)로만 흡수한다. `test_no_insurer_specific_identifiers_in_module`이 이를 강제한다.
+- **특정 보험사·상품 전용 로직 금지.** 코드에 보험사/상품 이름이 등장하면 안 된다. 회사별 차이는 일반 로직 + 참조 데이터만으로 흡수한다.
 - **규칙에 매직넘버 금지.** 분류·판정 규칙은 "용어 존재 여부" 같은 이진 판단만 쓴다. 점수·가중치·임계값이 필요해지는 순간, 그건 규칙이 아니라 LLM fallback으로 보낸다.
 - **판매·권유를 생성하지 않는다.** 분석·상담·Q&A 생성(LLM 포함)은 상품 가입 권유나 금액 상향 압박을 출력하지 않는다. 금액 검토는 "적정하다/부족하다"는 단정 대신 "확인해볼 질문"으로 제시한다. (루트 "내 편, 판매원 아님" 원칙의 강제)
 - **근거 수준을 응답 구조로 드러낸다.** 확정 판단 대신 확인된 사실 / 일반 가이드 / 확인 불가를 구분한다(예: Q&A 섹션의 `basis`, 금액 검토의 `confidence`). 근거 없이 단정하는 필드를 새로 만들지 않는다. (루트 grounding 원칙의 강제)
 - **LLM 프롬프트는 별도 기준을 따른다.** 프롬프트 작성, 코드 내 유지/파일 분리 기준, 평가 방식은 [PROMPTING.md](PROMPTING.md)를 먼저 확인한다.
+
+- **평가와 런타임을 분리한다.** `backend/evals`는 품질 측정 전용이고, `tests/`는 correctness를 검증한다. `app`는 `evals`를 import하지 않는다.
 
 ## Coding Style & Naming Conventions
 
@@ -88,12 +77,13 @@ app/
   - 들여쓰기가 3단을 넘으면 함수를 쪼갠다.
   - 이름은 하는 일을 그대로 드러낸다.
 - 타입은 **mypy strict**를 통과해야 한다.
-- 라우트는 얇게 유지하고, 외부 I/O와 도메인 로직은 `services/` 아래로 분리한다.
+- 라우트는 얇게 유지하고, 외부 I/O와 도메인 로직은 해당 `modules/`, `rag/`, `integrations/` 아래로 분리한다.
 - 마크다운은 한국어, 코드 코멘트·docstring은 영어. 한국어 필드명(담보명 등)은 의도된 데이터 값이다.
 
 ## 테스트 정책
 
 - 테스트는 **pytest**, 파일명은 `test_<module>.py`.
+- 테스트 폴더는 런타임 책임 구조를 따라 `core`, `modules`, `rag`, `integrations`로 나누고, 평가 코드 테스트는 `tests/evals`에 둔다.
 - 변경 후 `ruff check`, `ruff format --check`, `mypy`, `pytest`를 모두 통과시킨다.
 - **mock 문서는 정확한 추출값을 단언**하고, 실제 샘플(`test_local_*`, gitignored PDF)은 골든 필드 + 불변식(grounding·degrade·응답 shape)을 검증한다.
 - **LLM 비용 관리**: 반복(iteration) 중에는 비-LLM 테스트만 돌리고, LLM 의존 테스트(`test_local_*`)는 작업 마무리에 1회만 실행한다.
