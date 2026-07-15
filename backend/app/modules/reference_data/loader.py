@@ -29,7 +29,7 @@ def _database_url() -> str:
 @lru_cache(maxsize=1)
 def _database_reference_data() -> dict[str, object]:
     with psycopg.connect(_database_url(), connect_timeout=3) as connection:
-        rows = connection.execute("SELECT key, payload FROM coverly.reference_data").fetchall()
+        rows = connection.execute("SELECT key, payload FROM reference.reference_data").fetchall()
 
     return {str(key): payload for key, payload in rows}
 
