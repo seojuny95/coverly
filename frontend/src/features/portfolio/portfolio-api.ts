@@ -54,41 +54,12 @@ export type PortfolioSummary = {
     }>;
   }>;
   excluded_auto_policy_count: number;
-};
-
-export type ClassificationAnalysis = {
-  classification: string;
-  policy_count: number;
-  confirmed_total_count: number;
-  confirmed_total_amount: number;
-  indemnity_coverage_count: number;
-  excluded_coverage_count: number;
-};
-
-export type PortfolioAnalysisResult = {
-  status: "complete" | "partial" | "empty";
-  policy_count: number;
-  classification_count: number;
-  confirmed_total_count: number;
-  indemnity_coverage_count: number;
-  indemnity_duplicate_count: number;
-  excluded_coverage_count: number;
-  excluded_auto_policy_count: number;
-  age: number | null;
-  gender: string;
-  life_stage: string;
-  prepared_coverages: string[];
-  coverage_gaps: Array<{ category: string; reason: string }>;
-  excluded_coverages: Array<{
-    policy_id?: string;
-    insurer?: string;
-    product_name?: string;
-    coverage_name: string;
-    major_category?: string;
-    original_amount?: string;
-    reason: string;
-  }>;
-  premium: {
+  essential_coverage_check?: {
+    items: EssentialCoverageItem[];
+  };
+  special_policy_analyses?: SpecialPolicyAnalysis[];
+  claim_channels?: ClaimChannelBlock | null;
+  premium?: {
     monthly_total: number | null;
     monthly_policy_count: number;
     unconfirmed_policy_count: number;
@@ -99,7 +70,7 @@ export type PortfolioAnalysisResult = {
       monthly_amount: number | null;
       cycle: string | null;
     }>;
-  };
+  } | null;
   premium_benchmark?: {
     age_band_label: string;
     min_age: number;
@@ -124,133 +95,43 @@ export type PortfolioAnalysisResult = {
       caveat: string;
     };
   } | null;
-  priority_checks?: Array<{
-    kind: "premium" | "duplicate" | "coverage_gap" | "contract";
+  overview?: {
+    generation: "llm";
     title: string;
-    detail: string;
-    evidence_ids: string[];
-  }>;
-  age_coverage_recommendation?: {
-    age_band_label: string;
-    title: string;
-    detail: string;
-    confirmed_count: number;
-    recommended_count: number;
-    optional_count: number;
-    items: Array<{
-      category: string;
-      status: "confirmed" | "missing" | "optional_missing";
+    paragraphs: string[];
+    takeaways: Array<{
+      label: string;
       title: string;
       detail: string;
-      evidence_ids: string[];
     }>;
-    source: {
-      label: string;
-      url: string;
-      published_at: string;
-      reliability: string;
-      caveat: string;
-    };
   } | null;
-  coverage_amount_status?: {
-    title: string;
-    detail: string;
-    confirmed_total_amount: number;
-    confirmed_category_count: number;
-    unconfirmed_coverage_count: number;
-    items: Array<{
-      category: string;
-      amount: number;
-      coverage_count: number;
-      title: string;
-      detail: string;
-      evidence_ids: string[];
-    }>;
-  };
-  claim_condition_checks?: Array<{
-    kind: "fixed" | "indemnity" | "contract";
-    title: string;
-    detail: string;
-    evidence_ids: string[];
-  }>;
-  policy_change_checks?: Array<{
-    title: string;
-    summary: string;
-    user_impact: string;
-    effective_from: string | null;
-    applies_to: string;
-    source: {
-      label: string;
-      url: string;
-      published_at: string;
-      reliability: string;
-      caveat: string;
-    };
-  }>;
-  baseline_notice: string;
-  classifications: ClassificationAnalysis[];
-  sources: Array<{
-    policy_id?: string;
-    insurer?: string;
-    product_name?: string;
-  }>;
-  notices: string[];
-  evidence?: AnalysisEvidence[];
-  limitations?: string[];
-  demographics?: {
-    age: number | null;
-    gender: string;
-    source: "policy" | "user" | "unknown";
-  };
-  counselor?: {
-    overview: string;
-    strengths: ReviewItem[];
-    gaps: ReviewItem[];
-    amount_review_items: AmountReviewItem[];
-    next_questions: string[];
-    next_steps: string[];
-  };
-  generation?: "llm" | "fallback";
 };
 
-export type AnalysisEvidence = {
-  id?: string;
-  label?: string;
-  detail?: string;
-  fact?: string;
-  source_title?: string;
-  publisher?: string;
-  citation_label?: string;
-  policy_id?: string;
-  insurer?: string;
-  product_name?: string;
-  coverage_name?: string;
-  amount?: number;
-};
-
-export type ReviewItem = {
-  title: string;
+export type EssentialCoverageItem = {
+  kind: "death" | "cancer" | "cerebrovascular" | "ischemic_heart" | "indemnity";
+  label: string;
+  status: "well_prepared" | "needs_review" | "not_found";
+  confirmed_amount: number | null;
+  reference_min_amount: number | null;
+  reference_max_amount: number | null;
+  coverage_count: number;
   detail: string;
-  evidence_ids: string[];
+  matched_coverage_names: string[];
 };
 
-export type AmountReviewItem = {
-  coverage_name: string;
-  current_amount: number | null;
-  title: string;
-  guidance: string;
-  rationale: string;
-  suggested_range: string | null;
-  confidence: "high" | "medium" | "low";
-  basis?: "confirmed_fact" | "general_guidance" | "personal_context";
-  requires_personal_context?: boolean;
-  required_context?: string[];
-  evidence_ids: string[];
-};
-
-export type AnalysisContextAnswer = {
-  question: string;
-  answer: string;
+export type SpecialPolicyAnalysis = {
+  kind: "auto" | "driver" | "travel" | "fire";
+  label: string;
+  policy_count: number;
+  product_names: string[];
+  confirmed_coverage_names: string[];
+  overview: string;
+  coverage_checks: Array<{
+    label: string;
+    status: "confirmed" | "not_found";
+    detail: string;
+    matched_coverage_names: string[];
+  }>;
 };
 
 export type ClaimChannelLink = { label: string; url: string };
@@ -324,31 +205,6 @@ export function requestPortfolioSummary(
   return post<PortfolioSummary>(
     "/portfolio/summary",
     { policies: toPolicies(insuranceDocuments) },
-    signal,
-  );
-}
-
-export function requestPortfolioAnalysis(
-  insuranceDocuments: AnalyzedInsurance[],
-  demographics: {
-    age: number;
-    gender: string;
-    source?: "policy" | "user" | "unknown";
-  },
-  personalContext: AnalysisContextAnswer[] = [],
-  signal?: AbortSignal,
-) {
-  return post<PortfolioAnalysisResult>(
-    "/portfolio/analysis",
-    {
-      policies: toPolicies(insuranceDocuments),
-      demographics: {
-        age: demographics.age,
-        gender: demographics.gender,
-        source: demographics.source ?? "user",
-      },
-      personal_context: personalContext,
-    },
     signal,
   );
 }
@@ -444,11 +300,8 @@ export type PolicyDemographicsCandidate = {
   lifeStage?: string;
 };
 
-// Shared scan over life/third-insurance policies for usable (age, gender) info. Callers
-// apply their own policy on top: getPolicyDemographics here takes the first
-// match (best-effort, for Q&A context); deriveDemographics in
-// use-portfolio-analysis.ts requires a single unambiguous match across all
-// documents (for the counselor-view demographics that must not silently guess).
+// Shared scan over non-damage policies for usable (age, gender) info. Q&A takes
+// the first match as best-effort context; portfolio summary stays deterministic.
 export function collectPolicyDemographicsCandidates(
   insuranceDocuments: AnalyzedInsurance[],
 ): PolicyDemographicsCandidate[] {

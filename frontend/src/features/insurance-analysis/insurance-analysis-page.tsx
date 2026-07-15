@@ -26,7 +26,6 @@ import insurerLogos from "./insurer-logos.json";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
-  getInsuredPersonName,
   useInsuranceData,
 } from "./insurance-analysis-store";
 import { LeaveGuardLink } from "./leave-guard-link";
@@ -46,15 +45,7 @@ import {
 import { InsuranceCoverageList } from "./insurance-coverage-list";
 import { CoverageTotalTable } from "../portfolio/coverage-total-table";
 import { PortfolioAnalysisPanel } from "../portfolio/portfolio-analysis-panel";
-import {
-  emptyReasonFor,
-  isAnalyzableDocument,
-} from "../portfolio/analysis-eligibility";
-import {
-  type Demographics,
-  deriveDemographics,
-  usePortfolioAnalysis,
-} from "../portfolio/use-portfolio-analysis";
+import { emptyReasonFor } from "../portfolio/analysis-eligibility";
 import { usePortfolioSummary } from "../portfolio/use-portfolio-summary";
 import { formatWon } from "../portfolio/money-format";
 
@@ -174,8 +165,6 @@ export function InsuranceAnalysisPage({
   const [expandedInsuranceIds, setExpandedInsuranceIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [manualDemographics, setManualDemographics] =
-    useState<Demographics | null>(null);
 
   useEffect(() => {
     if (!openClassificationHelp) return;
@@ -220,21 +209,6 @@ export function InsuranceAnalysisPage({
   );
   const classificationTypeCount = CLASSIFICATION_ORDER.length;
   const portfolioSummary = usePortfolioSummary(insuranceDocuments);
-
-  const demographics =
-    deriveDemographics(insuranceDocuments) ?? manualDemographics;
-  const eligible = insuranceDocuments.filter(isAnalyzableDocument);
-  const analysisView = usePortfolioAnalysis(insuranceDocuments, demographics);
-
-  // Name stays client-side only (never sent back to the server) to honor PII
-  // masking. Use it only when it is unambiguous across the analyzed policies.
-  const insuredNames = new Set(
-    eligible
-      .map((doc) => getInsuredPersonName(doc))
-      .filter((name): name is string => Boolean(name)),
-  );
-  const insuredName =
-    insuredNames.size === 1 ? [...insuredNames][0] : undefined;
 
   const toggleInsurance = (policyId: string) => {
     setExpandedInsuranceIds((current) => {
@@ -316,7 +290,7 @@ export function InsuranceAnalysisPage({
             active={activeTab === "analysis"}
             onClick={() => setActiveTab("analysis")}
             badge={
-              analysisView.status === "loading" ? (
+              portfolioSummary.state.status === "loading" ? (
                 <span className="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">
                   분석 중…
                 </span>
@@ -536,22 +510,23 @@ export function InsuranceAnalysisPage({
             <div className="mb-7">
               <PixelEyebrow>내 보험 분석</PixelEyebrow>
               <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
-                내 보험을 당신 편에서 살펴봐요
+                가입한 보험을 한눈에 확인해요
               </h1>
               <p className="mt-3 text-sm leading-6 text-zinc-500">
-                확인한 강점과 보장 공백, 이어서 생각해볼 질문을 근거와 함께
-                정리해요.
+                전체 보험에서 사망·3대 진단비·실손을 확인하고, 보험 종류별
+                보장도 함께 정리해요.
               </p>
             </div>
             <PortfolioAnalysisPanel
-              status={analysisView.status}
-              result={analysisView.result}
-              eligibleCount={eligible.length}
+              status={portfolioSummary.state.status}
+              summary={
+                portfolioSummary.state.status === "success"
+                  ? portfolioSummary.state.summary
+                  : undefined
+              }
+              eligibleCount={insuranceDocuments.length}
               emptyReason={emptyReasonFor(insuranceDocuments)}
-              needsDemographics={eligible.length > 0 && !demographics}
-              onManualDemographics={setManualDemographics}
-              onRetry={analysisView.refetch}
-              insuredName={insuredName}
+              onRetry={portfolioSummary.retry}
             />
           </div>
         ) : (

@@ -6,22 +6,33 @@ from dataclasses import dataclass
 from enum import Enum
 
 from app.schemas.portfolio import (
+    ClaimChannelBlock,
     CoverageInput,
     CoverageSourceItem,
     CoverageTotalItem,
     DamageCoverageGroup,
     DamageCoverageItem,
     DamagePolicyCoverageGroup,
+    EssentialCoverageCheck,
     ExcludedCoverageItem,
     IndemnityItem,
     PolicyInput,
     PortfolioCoverageSummary,
+    PremiumBenchmark,
+    PremiumOverview,
 )
 from app.services.coverage_knowledge.indemnity import classify_indemnity
 from app.services.coverage_knowledge.matching import (
     canonicalize_coverage_name,
     choose_display_name,
 )
+from app.services.portfolio.essential_coverage import (
+    build_essential_coverage_check,
+    build_special_policy_analyses,
+)
+from app.services.portfolio.premium import summarize_premiums
+from app.services.qa.claim_channels import claim_channel_block
+from app.services.reference.premium_benchmark import premium_benchmark_for_age
 
 _DAMAGE_CLASSIFICATION = "손해보험"
 _LEGACY_DAMAGE_CLASSIFICATIONS = frozenset(
@@ -276,12 +287,24 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
             item.reason,
         )
     )
-    return PortfolioCoverageSummary(
+    essential_coverage_check = build_essential_coverage_check(policies)
+    summary = PortfolioCoverageSummary(
         totals=totals,
         indemnity_coverages=indemnity,
         excluded_coverages=excluded,
         damage_coverages=_build_damage_groups(damage_rows),
         excluded_auto_policy_count=auto_count,
+    )
+    return summary.model_copy(
+        update={
+            "essential_coverage_check": essential_coverage_check,
+            "special_policy_analyses": build_special_policy_analyses(policies),
+            "claim_channels": _claim_channels(policies, essential_coverage_check),
+            "premium": PremiumOverview.model_validate(
+                summarize_premiums(policies).model_dump(mode="python")
+            ),
+            "premium_benchmark": _premium_benchmark(policies),
+        }
     )
 
 
@@ -305,6 +328,38 @@ def build_portfolio_facts(policies: list[PolicyInput]) -> PortfolioFacts:
         policies=tuple(policy for policy in policies if not is_damage_policy(policy)),
         coverage_summary=summarize_portfolio_coverages(policies),
     )
+
+
+def _claim_channels(
+    policies: list[PolicyInput],
+    essential_coverage_check: EssentialCoverageCheck,
+) -> ClaimChannelBlock | None:
+    insurers = [policy.기본정보.보험사 for policy in policies if policy.기본정보.보험사]
+    has_indemnity = any(
+        item.kind == "indemnity" and item.status != "not_found"
+        for item in essential_coverage_check.items
+    )
+    if not insurers and not has_indemnity:
+        return None
+
+    channels = claim_channel_block(insurers, has_indemnity=has_indemnity)
+    if not channels.insurers and channels.indemnity is None:
+        return None
+    return ClaimChannelBlock.model_validate(channels.model_dump(mode="python"))
+
+
+def _single_policy_age(policies: list[PolicyInput]) -> int | None:
+    ages = {info.나이 for policy in policies if (info := policy.기본정보.피보험자정보) is not None}
+    if len(ages) != 1:
+        return None
+    return next(iter(ages))
+
+
+def _premium_benchmark(policies: list[PolicyInput]) -> PremiumBenchmark | None:
+    benchmark = premium_benchmark_for_age(_single_policy_age(policies))
+    if benchmark is None:
+        return None
+    return PremiumBenchmark.model_validate(benchmark.model_dump(mode="python"))
 
 
 def _excluded(policy: PolicyInput, coverage: CoverageInput, reason: str) -> ExcludedCoverageItem:

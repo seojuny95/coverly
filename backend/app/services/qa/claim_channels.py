@@ -53,7 +53,12 @@ class ClaimChannelSet:
 
 @lru_cache(maxsize=1)
 def _directory() -> dict[str, Any]:
-    return load_reference_data("claim_channels", _DATA, _validate_directory)
+    return load_reference_data(
+        "claim_channels",
+        _DATA,
+        _validate_directory,
+        owner="database",
+    )
 
 
 def _validate_directory(value: object) -> dict[str, Any]:

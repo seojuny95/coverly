@@ -215,74 +215,6 @@ describe("portfolio features", () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
-      if (path.endsWith("/portfolio/analysis")) {
-        return new Response(
-          JSON.stringify({
-            status: "complete",
-            policy_count: 1,
-            classification_count: 1,
-            confirmed_total_count: 1,
-            indemnity_coverage_count: 0,
-            indemnity_duplicate_count: 1,
-            excluded_coverages: [
-              {
-                coverage_name: "알 수 없는 담보",
-                reason: "담보명을 분류하지 못해 합계에는 더하지 않았어요.",
-              },
-            ],
-            premium: {
-              monthly_total: 80000,
-              monthly_policy_count: 2,
-              unconfirmed_policy_count: 0,
-              items: [],
-            },
-            excluded_coverage_count: 0,
-            excluded_auto_policy_count: 0,
-            age: 35,
-            gender: "여성",
-            life_stage: "성인",
-            prepared_coverages: ["암 진단"],
-            coverage_gaps: [{ category: "뇌혈관 진단", reason: "확인 필요" }],
-            baseline_notice: "참고 정보예요.",
-            classifications: [
-              {
-                classification: "제3보험",
-                policy_count: 1,
-                confirmed_total_count: 1,
-                confirmed_total_amount: 10_000_000,
-                indemnity_coverage_count: 0,
-                excluded_coverage_count: 0,
-              },
-            ],
-            counselor: {
-              overview: "상담 전에 확인한 요약이에요.",
-              strengths: [
-                {
-                  title: "암 진단 보장",
-                  detail: "증권에서 암 진단비를 확인했어요.",
-                  evidence_ids: ["e1"],
-                },
-              ],
-              gaps: [],
-              amount_review_items: [
-                {
-                  coverage_name: "암 진단비",
-                  current_amount: 10_000_000,
-                  title: "암 진단비 금액",
-                  guidance: "생활비와 함께 확인해보세요.",
-                  rationale: "현재 금액만으로 적정성을 판단하지 않아요.",
-                  suggested_range: null,
-                  confidence: "medium",
-                  evidence_ids: ["e1"],
-                },
-              ],
-              next_questions: [],
-              next_steps: [],
-            },
-            notices: [],
-          }),
-        );
-      }
       if (path.endsWith("/qa/stream")) {
         const events = [
           { type: "meta", status: "answered", generation: "llm" },
@@ -310,6 +242,28 @@ describe("portfolio features", () => {
           indemnity_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
+          overview: {
+            generation: "llm",
+            title: "현재 보장을 한눈에 확인해보세요",
+            paragraphs: ["확인된 보장 정보를 바탕으로 정리했어요."],
+            takeaways: [],
+          },
+          essential_coverage_check: {
+            items: [
+              {
+                kind: "cancer",
+                label: "암 진단비",
+                status: "needs_review",
+                confirmed_amount: 10_000_000,
+                reference_min_amount: 30_000_000,
+                reference_max_amount: 50_000_000,
+                coverage_count: 1,
+                detail:
+                  "일반암 진단비는 확인되지만 가입금액이 참고금액보다 낮아요.",
+                matched_coverage_names: ["암 진단비"],
+              },
+            ],
+          },
         }),
       );
     });
@@ -319,13 +273,10 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
-    await screen.findByText("Coverly AI가 당신 편에서 살펴봤어요");
-    expect(fetchMock).toHaveBeenCalledWith(
+    await screen.findByText("권장보험");
+    expect(fetchMock).not.toHaveBeenCalledWith(
       expect.stringContaining("/portfolio/analysis"),
-      expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining('"source":"policy"'),
-      }),
+      expect.anything(),
     );
 
     await user.click(
@@ -335,15 +286,6 @@ describe("portfolio features", () => {
     await user.click(screen.getByRole("button", { name: "질문하기" }));
     expect(
       await screen.findByText("암 진단비는 1,000만원이에요."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("중복되면 안 되는 요약")).not.toBeInTheDocument();
-    expect(
-      screen.getByText("증권에서 암 진단비를 확인했어요."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("매달 내는 보험료")).toBeInTheDocument();
-    expect(screen.getAllByText("80,000원").length).toBeGreaterThanOrEqual(1);
-    expect(
-      screen.getByText(/중복 수령이 안 되는데 겹쳐 가입된 보장 1건/),
     ).toBeInTheDocument();
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
@@ -373,96 +315,68 @@ describe("portfolio features", () => {
     ).toBeInTheDocument();
   });
 
-  test("shows the analysis badge while pending and runs analysis once across tab switches", async () => {
+  test("shows the summary badge while pending and reuses it across tab switches", async () => {
     const user = userEvent.setup();
-    let resolveAnalysis: ((value: Response) => void) | undefined;
-    const analysisPromise = new Promise<Response>((resolve) => {
-      resolveAnalysis = resolve;
+    let resolveSummary: ((value: Response) => void) | undefined;
+    const summaryPromise = new Promise<Response>((resolve) => {
+      resolveSummary = resolve;
     });
-    const analysisResponse = () =>
+    const summaryResponse = () =>
       new Response(
         JSON.stringify({
-          status: "complete",
-          policy_count: 1,
-          classification_count: 1,
-          confirmed_total_count: 1,
-          indemnity_coverage_count: 0,
-          indemnity_duplicate_count: 0,
-          excluded_coverage_count: 0,
-          excluded_auto_policy_count: 0,
-          age: 35,
-          gender: "여성",
-          life_stage: "성인",
-          prepared_coverages: [],
-          coverage_gaps: [],
+          totals: [],
+          indemnity_coverages: [],
           excluded_coverages: [],
-          premium: {
-            monthly_total: 0,
-            monthly_policy_count: 0,
-            unconfirmed_policy_count: 0,
-            items: [],
+          excluded_auto_policy_count: 0,
+          essential_coverage_check: {
+            items: [
+              {
+                kind: "cancer",
+                label: "암 진단비",
+                status: "well_prepared",
+                confirmed_amount: 30_000_000,
+                reference_min_amount: 30_000_000,
+                reference_max_amount: 50_000_000,
+                coverage_count: 1,
+                detail: "일반암 진단비가 참고금액 이상으로 확인돼요.",
+                matched_coverage_names: ["암진단비"],
+              },
+            ],
           },
-          baseline_notice: "참고 정보예요.",
-          classifications: [],
-          counselor: {
-            overview: "상담 전에 확인한 요약이에요.",
-            strengths: [],
-            gaps: [],
-            amount_review_items: [],
-            next_questions: [],
-            next_steps: [],
-          },
-          notices: [],
         }),
       );
 
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      if (String(input).endsWith("/portfolio/analysis")) return analysisPromise;
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({
-            totals: [],
-            indemnity_coverages: [],
-            excluded_coverages: [],
-            excluded_auto_policy_count: 0,
-          }),
-        ),
-      );
-    });
+    const fetchMock = vi.fn(() => summaryPromise);
     vi.stubGlobal("fetch", fetchMock);
     renderWithProviders(<InsuranceAnalysisPage />, {
       initialAnalysis: fixture(),
     });
 
-    // Analysis starts on 내 보험 entry; the 보험 분석 tab shows a pending badge.
     expect(await screen.findByText("분석 중…")).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining("/portfolio/analysis"),
+        expect.stringContaining("/portfolio/summary"),
         expect.anything(),
       ),
     );
 
-    resolveAnalysis?.(analysisResponse());
+    resolveSummary?.(summaryResponse());
     await waitFor(() =>
       expect(screen.queryByText("분석 중…")).not.toBeInTheDocument(),
     );
 
-    // Switching service tabs back and forth reuses the cached result.
     await user.click(screen.getByRole("tab", { name: "보험 분석" }));
-    expect(
-      await screen.findByText("상담 전에 확인한 요약이에요."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("권장보험")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "내 보험" }));
     await user.click(screen.getByRole("tab", { name: "보험 분석" }));
 
-    const analysisCalls = (
+    const summaryCalls = (
       fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit]>
-    ).filter(([input]) => String(input).endsWith("/portfolio/analysis"));
-    expect(analysisCalls).toHaveLength(1);
+    ).filter(([input]) => String(input).endsWith("/portfolio/summary"));
+    expect(summaryCalls).toHaveLength(1);
   });
 
-  test("asks for demographics only when policy demographics are missing", async () => {
+  test("does not ask for demographics when policy demographics are missing", async () => {
     const analysis = fixture();
     delete analysis.insuranceDocuments[0].result.기본정보!.피보험자정보;
     vi.stubGlobal(
@@ -484,8 +398,9 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: "보험 분석" }));
-    expect(screen.getByLabelText("나이")).toBeInTheDocument();
-    expect(screen.getByLabelText("성별")).toBeInTheDocument();
+    await screen.findByText("권장보험");
+    expect(screen.queryByLabelText("나이")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("성별")).not.toBeInTheDocument();
   });
 
   test("sends damage policies so the backend can list them separately", async () => {
@@ -500,42 +415,14 @@ describe("portfolio features", () => {
         보장목록: [],
       },
     });
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).endsWith("/portfolio/analysis")) {
-        return new Response(
-          JSON.stringify({
-            status: "complete",
-            policy_count: 1,
-            classification_count: 1,
-            confirmed_total_count: 0,
-            indemnity_coverage_count: 0,
-            indemnity_duplicate_count: 0,
-            excluded_coverages: [],
-            premium: {
-              monthly_total: 0,
-              monthly_policy_count: 0,
-              unconfirmed_policy_count: 0,
-              items: [],
-            },
-            excluded_coverage_count: 0,
-            excluded_auto_policy_count: 0,
-            age: 35,
-            gender: "여성",
-            life_stage: "성인",
-            prepared_coverages: [],
-            coverage_gaps: [],
-            baseline_notice: "참고 정보예요.",
-            classifications: [],
-            notices: [],
-          }),
-        );
-      }
+    const fetchMock = vi.fn(async () => {
       return new Response(
         JSON.stringify({
           totals: [],
           indemnity_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 1,
+          essential_coverage_check: { items: [] },
         }),
       );
     });
@@ -546,13 +433,13 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
-    await screen.findByText("Coverly AI가 당신 편에서 살펴봤어요");
+    await screen.findByText("권장보험");
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
     >;
-    const analysisCall = fetchCalls.find(([input]) =>
-      String(input).endsWith("/portfolio/analysis"),
+    const summaryCall = fetchCalls.find(([input]) =>
+      String(input).endsWith("/portfolio/summary"),
     );
-    expect(analysisCall?.[1]?.body).toContain("auto-1");
+    expect(summaryCall?.[1]?.body).toContain("auto-1");
   });
 });
