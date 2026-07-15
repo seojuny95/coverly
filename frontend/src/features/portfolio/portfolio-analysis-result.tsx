@@ -75,10 +75,6 @@ export function PortfolioAnalysisResultView({
         </dl>
       </section>
 
-      <AnalysisSummary overview={overview} />
-
-      <PremiumPosition result={result} />
-
       {analyzedTitles.length ? (
         <section className="rounded-2xl border border-zinc-200 p-6">
           <h2 className="text-sm font-semibold">이번 분석에 사용한 보험</h2>
@@ -94,6 +90,10 @@ export function PortfolioAnalysisResultView({
           </ul>
         </section>
       ) : null}
+
+      <AnalysisSummary overview={overview} />
+
+      <PremiumPosition result={result} />
 
       {result.indemnity_duplicate_count > 0 ? (
         <section className="rounded-2xl border border-blue-100 bg-blue-50/40 px-5 py-4">
