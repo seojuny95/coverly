@@ -50,6 +50,16 @@ _LEGACY_DAMAGE_CLASSIFICATIONS = frozenset(
     }
 )
 _AUTO_TAG_TERMS = ("자동차", "자동차보험")
+_AUTO_COVERAGE_TERMS = (
+    "대인배상",
+    "대물배상",
+    "자기차량손해",
+    "자기신체사고",
+    "자동차상해",
+    "무보험자동차",
+    "무보험차상해",
+    "무보험차에의한상해",
+)
 _INDEMNITY_NAME_TERMS = ("실손", "실비")
 _INDEMNITY_CATEGORIES = frozenset({"실손", "실손형", "실비", "실비형"})
 _NEGATED_INDEMNITY_PATTERNS = (
@@ -394,6 +404,9 @@ def _damage_insurance_type(policy: PolicyInput) -> str:
         if insurance_type in tags:
             return insurance_type
 
+    if _has_auto_insurance_coverages(policy):
+        return "자동차보험"
+
     product_name = policy.기본정보.상품명 or ""
     normalized_product = normalize_coverage_name(product_name)
     for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:
@@ -401,6 +414,16 @@ def _damage_insurance_type(policy: PolicyInput) -> str:
             return insurance_type
 
     return "손해보험"
+
+
+def _has_auto_insurance_coverages(policy: PolicyInput) -> bool:
+    """Infer auto insurance from auto-policy-specific coverage names only."""
+
+    normalized_terms = tuple(normalize_coverage_name(term) for term in _AUTO_COVERAGE_TERMS)
+    return any(
+        any(term in normalize_coverage_name(coverage.담보명) for term in normalized_terms)
+        for coverage in policy.보장목록
+    )
 
 
 def _damage_policy_group(policy: PolicyInput) -> DamagePolicyCoverageGroup:

@@ -44,6 +44,17 @@ _SPECIAL_POLICY_LABELS: dict[SpecialPolicyKind, str] = {
     "fire": "화재보험",
 }
 
+_AUTO_POLICY_COVERAGE_TERMS = (
+    "대인배상",
+    "대물배상",
+    "자기차량손해",
+    "자기신체사고",
+    "자동차상해",
+    "무보험자동차",
+    "무보험차상해",
+    "무보험차에의한상해",
+)
+
 _SPECIAL_COVERAGE_RULES: dict[SpecialPolicyKind, tuple[tuple[str, tuple[str, ...], str], ...]] = {
     "auto": (
         (
@@ -341,7 +352,12 @@ def _special_policy_kinds(policy: PolicyInput) -> tuple[SpecialPolicyKind, ...]:
     coverage_names = [_normalize(coverage.담보명) for coverage in policy.보장목록]
 
     kinds: list[SpecialPolicyKind] = []
-    if "자동차" in category or "자동차보험" in product or "자동차" in tags:
+    if (
+        "자동차" in category
+        or "자동차보험" in product
+        or "자동차" in tags
+        or _has_auto_policy_coverages(category, tags, coverage_names)
+    ):
         kinds.append("auto")
     if "운전자" in identity:
         kinds.append("driver")
@@ -350,6 +366,24 @@ def _special_policy_kinds(policy: PolicyInput) -> tuple[SpecialPolicyKind, ...]:
     if _is_fire_policy(category, product, tags, coverage_names):
         kinds.append("fire")
     return tuple(dict.fromkeys(kinds))
+
+
+def _has_auto_policy_coverages(
+    category: str,
+    tags: tuple[str, ...],
+    coverage_names: list[str],
+) -> bool:
+    """Infer auto insurance from auto-policy-specific coverage names only.
+
+    Driver policies often contain words like "자동차사고" in fine/legal-cost
+    coverages, so this intentionally uses mandatory/typical auto insurance
+    coverage names instead of the broad word "자동차".
+    """
+
+    if not _is_damage_policy_identity(category, tags):
+        return False
+    terms = tuple(_normalize(term) for term in _AUTO_POLICY_COVERAGE_TERMS)
+    return any(any(term in name for term in terms) for name in coverage_names)
 
 
 def _is_fire_policy(

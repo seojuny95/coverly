@@ -345,6 +345,23 @@ def test_damage_policies_are_listed_separately() -> None:
     assert result.excluded_auto_policy_count == 1
 
 
+def test_damage_policy_with_auto_coverages_is_listed_as_auto_without_tags() -> None:
+    policy = _policy(
+        "car",
+        "손해보험",
+        "보험사A",
+        [
+            {"담보명": "대인배상Ⅰ", "가입금액": "무한", "지급유형": "실손"},
+            {"담보명": "대물배상", "가입금액": "3억원", "지급유형": "실손"},
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.damage_coverages[0].insurance_type == "자동차보험"
+    assert result.excluded_auto_policy_count == 1
+
+
 def test_driver_policy_is_not_mistaken_for_auto_policy() -> None:
     policy = _policy(
         "driver",
@@ -640,6 +657,26 @@ def test_special_policy_analysis_does_not_treat_insurer_name_as_fire_policy() ->
     result = summarize_portfolio_coverages([policy])
 
     assert all(item.kind != "fire" for item in result.special_policy_analyses)
+
+
+def test_special_policy_analysis_infers_auto_from_auto_specific_coverages() -> None:
+    policy = _policy(
+        "damage",
+        "손해보험",
+        "보험사A",
+        [
+            {"담보명": "대인배상Ⅰ", "가입금액": "무한", "지급유형": "실손"},
+            {"담보명": "자기차량손해", "가입금액": "차량가액", "지급유형": "실손"},
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    analyses = {item.kind: item for item in result.special_policy_analyses}
+
+    assert "auto" in analyses
+    checks = {item.label: item for item in analyses["auto"].coverage_checks}
+    assert checks["상대방의 신체 피해"].matched_coverage_names == ["대인배상Ⅰ"]
+    assert checks["내 차량 손해"].matched_coverage_names == ["자기차량손해"]
 
 
 def test_special_policy_analysis_can_show_driver_and_fire_for_one_damage_policy() -> None:
