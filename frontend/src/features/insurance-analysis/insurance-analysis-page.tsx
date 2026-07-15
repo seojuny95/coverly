@@ -336,11 +336,11 @@ export function InsuranceAnalysisPage({
               {CLASSIFICATION_ORDER.map((classification) => (
                 <div
                   key={classification}
-                  className="group relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
+                  className="relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
                 >
                   <dt className="flex items-start justify-between gap-3 text-xs font-medium text-zinc-500">
                     <span>{classification}</span>
-                    <span className="relative inline-flex">
+                    <span className="group/help relative inline-flex">
                       <button
                         type="button"
                         aria-label={`${classification} 설명 보기`}
@@ -352,7 +352,7 @@ export function InsuranceAnalysisPage({
                       <span
                         id={`classification-help-${classification}`}
                         role="tooltip"
-                        className="pointer-events-none absolute right-0 bottom-7 z-10 hidden w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg group-focus-within:block group-hover:block"
+                        className="pointer-events-none absolute right-0 bottom-7 z-10 hidden w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg group-focus-within/help:block group-hover/help:block"
                       >
                         {CLASSIFICATION_HELP[classification]}
                       </span>
