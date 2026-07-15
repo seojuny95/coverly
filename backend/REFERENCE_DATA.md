@@ -28,6 +28,17 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 
 상태 표는 마이그레이션 적용 이력이 아니라 현재 사용 계약을 기록한다. migration은 이미 적용된 이력이므로 삭제하거나 재작성하지 않는다. 잘못된 정의나 중복은 새 migration으로 정리하고, 전환 기간에는 읽기 경로와 영향 범위를 명시한다.
 
+## 새 환경 초기 데이터
+
+`coverly.reference_data` migration은 테이블 구조만 생성한다. 새 로컬·스테이징 환경에는 migration 적용 후 아래 명령으로 누락된 초기 데이터를 한 번 넣는다.
+
+```bash
+cd backend
+DATABASE_URL=<database-url> uv run python -m scripts.seed_reference_data
+```
+
+시드 스크립트는 `claim_channels`, `disclosure_links`가 DB에 없을 때만 bundled JSON을 넣으며, 이미 존재하는 운영 값을 덮어쓰지 않는다. 초기화 이후 운영 데이터 변경은 승인된 DB 작업이나 새 migration으로 기록한다.
+
 ## 운영 규칙
 
 - 참조 사실에는 출처와 기준일을 저장하고 응답 근거에 연결한다.
