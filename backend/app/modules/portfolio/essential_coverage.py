@@ -4,17 +4,23 @@ import re
 from collections.abc import Callable
 
 from app.modules.coverage.indemnity import classify_indemnity
+from app.modules.portfolio.death_benefit_guides import (
+    DeathBenefitContext,
+    death_benefit_guide,
+)
 from app.modules.portfolio.essential_guides import (
     EssentialCoverageGuide,
     essential_coverage_guides,
 )
 from app.modules.portfolio.schemas import (
     CoverageInput,
+    DeathBenefitGuideInput,
     EssentialCoverageCheck,
     EssentialCoverageItem,
     EssentialCoverageKind,
     EssentialCoverageStatus,
     PolicyInput,
+    ReferenceSource,
     SpecialCoverageCheck,
     SpecialPolicyAnalysis,
     SpecialPolicyKind,
@@ -32,7 +38,6 @@ _UNITS = {
 _CANCER_TERMS = ("암", "악성신생물")
 _CEREBROVASCULAR_TERMS = ("뇌혈관질환",)
 _HEART_TERMS = ("심장질환", "심질환", "허혈성심")
-
 _SPECIAL_POLICY_LABELS: dict[SpecialPolicyKind, str] = {
     "auto": "자동차보험",
     "driver": "운전자보험",
@@ -132,10 +137,12 @@ _SPECIAL_COVERAGE_RULES: dict[SpecialPolicyKind, tuple[tuple[str, tuple[str, ...
 
 def build_essential_coverage_check(
     policies: list[PolicyInput],
+    death_benefit_context: DeathBenefitGuideInput | None = None,
 ) -> EssentialCoverageCheck:
     """Check uploaded policies without excluding any insurance category."""
 
     guides = essential_coverage_guides()
+    death_guide = death_benefit_guide(_death_benefit_context(death_benefit_context))
     return EssentialCoverageCheck(
         items=[
             _fixed_coverage_item(
@@ -144,7 +151,14 @@ def build_essential_coverage_check(
                 kind="death",
                 label="사망 보장",
                 matches=lambda name: "사망" in name,
-                confirmed_detail="업로드한 전체 보험에서 사망 보장이 확인돼요.",
+                confirmed_detail="사망 담보가 확인돼요.",
+                reference_min_amount=death_guide.min_amount,
+                reference_max_amount=death_guide.max_amount,
+                reference_basis=death_guide.reason,
+                reference_sources=list(death_guide.sources),
+                reference_amount_label=death_guide.amount_label,
+                guidance_situation=death_guide.situation,
+                guidance_reason=death_guide.reason,
             ),
             _fixed_coverage_item(
                 policies,
@@ -276,6 +290,13 @@ def _fixed_coverage_item(
     label: str,
     matches: Callable[[str], bool],
     confirmed_detail: str,
+    reference_min_amount: int | None = None,
+    reference_max_amount: int | None = None,
+    reference_basis: str | None = None,
+    reference_sources: list[ReferenceSource] | None = None,
+    reference_amount_label: str | None = None,
+    guidance_situation: str | None = None,
+    guidance_reason: str | None = None,
 ) -> EssentialCoverageItem:
     matched = [
         coverage
@@ -298,13 +319,32 @@ def _fixed_coverage_item(
         label=label,
         status=status,
         confirmed_amount=amount,
-        reference_min_amount=guide.reference_min_amount,
-        reference_max_amount=guide.reference_max_amount,
-        reference_basis=guide.basis,
-        reference_sources=list(guide.sources),
+        reference_min_amount=(
+            guide.reference_min_amount if reference_min_amount is None else reference_min_amount
+        ),
+        reference_max_amount=(
+            guide.reference_max_amount if reference_max_amount is None else reference_max_amount
+        ),
+        reference_basis=guide.basis if reference_basis is None else reference_basis,
+        reference_sources=list(guide.sources) if reference_sources is None else reference_sources,
+        reference_amount_label=reference_amount_label,
+        guidance_situation=guidance_situation,
+        guidance_reason=guidance_reason,
         coverage_count=len(matched),
         detail=detail,
         matched_coverage_names=sorted({coverage.담보명 for coverage in matched}),
+    )
+
+
+def _death_benefit_context(
+    context: DeathBenefitGuideInput | None,
+) -> DeathBenefitContext:
+    if context is None:
+        return DeathBenefitContext()
+    return DeathBenefitContext(
+        has_dependent_family=context.has_dependent_family,
+        has_minor_children=context.has_minor_children,
+        has_major_debt=context.has_major_debt,
     )
 
 

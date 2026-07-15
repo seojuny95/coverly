@@ -69,8 +69,15 @@ class PolicyInput(BaseModel):
     문서세션ID: str | None = None
 
 
+class DeathBenefitGuideInput(BaseModel):
+    has_dependent_family: bool = False
+    has_minor_children: bool = False
+    has_major_debt: bool = False
+
+
 class PortfolioSummaryRequest(BaseModel):
     policies: list[PolicyInput] = Field(default_factory=list)
+    death_benefit_context: DeathBenefitGuideInput = Field(default_factory=DeathBenefitGuideInput)
 
 
 class CoverageSourceItem(BaseModel):
@@ -166,6 +173,9 @@ class EssentialCoverageItem(BaseModel):
     reference_max_amount: int | None = None
     reference_basis: str | None = None
     reference_sources: list[ReferenceSource] = Field(default_factory=list)
+    reference_amount_label: str | None = None
+    guidance_situation: str | None = None
+    guidance_reason: str | None = None
     coverage_count: int
     detail: str
     matched_coverage_names: list[str] = Field(default_factory=list)

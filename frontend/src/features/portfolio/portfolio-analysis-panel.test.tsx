@@ -6,12 +6,12 @@ import { PortfolioAnalysisPanel } from "./portfolio-analysis-panel";
 import type { PortfolioSummary } from "./portfolio-api";
 
 const noop = () => {};
-const officialFuneralSource = {
-  label: "한국소비자원 · 평균 장례비용 조사",
-  url: "https://www.kca.go.kr",
-  published_at: "2004-09-22",
-  reliability: "official" as const,
-  caveat: "장례비용은 시기, 지역, 장례 방식에 따라 달라질 수 있어요.",
+const deathBenefitSource = {
+  label: "매일경제 · 가장의 적정 사망보험금은 연소득 3~5배",
+  url: "https://www.mk.co.kr/news/economy/9495174",
+  published_at: "2020-08-28",
+  reliability: "private_guidance" as const,
+  caveat: "민간 재무설계 관점의 일반 가이드예요.",
 };
 const diagnosisSource = {
   label: "시그널플래너 · 3대 진단비 설명",
@@ -53,12 +53,17 @@ const summary: PortfolioSummary = {
         label: "사망 보장",
         status: "well_prepared",
         confirmed_amount: 100_000_000,
-        reference_min_amount: 10_000_000,
-        reference_max_amount: 20_000_000,
-        reference_basis: "장례비와 초기 정리 비용을 먼저 보는 점검용 범위",
-        reference_sources: [officialFuneralSource],
+        reference_min_amount: 0,
+        reference_max_amount: 50_000_000,
+        reference_basis:
+          "사망보험금은 남은 가족의 생활비 공백을 메우는 목적이 크기 때문에, 부양가족이나 큰 부채가 없다면 큰 금액의 필요성은 낮아요. 장례비, 정리비, 부모 지원 정도만 고려하면 돼요.",
+        reference_sources: [deathBenefitSource],
+        reference_amount_label: "0원~5천만 원",
+        guidance_situation: "부양가족이나 큰 부채가 없는 경우",
+        guidance_reason:
+          "사망보험금은 남은 가족의 생활비 공백을 메우는 목적이 크기 때문에, 부양가족이나 큰 부채가 없다면 큰 금액의 필요성은 낮아요. 장례비, 정리비, 부모 지원 정도만 고려하면 돼요.",
         coverage_count: 1,
-        detail: "업로드한 전체 보험에서 사망 보장이 확인돼요.",
+        detail: "사망 담보가 확인돼요.",
         matched_coverage_names: ["질병사망"],
       },
       {
@@ -267,6 +272,12 @@ function baseProps() {
   return {
     status: "success" as const,
     summary,
+    deathBenefitContext: {
+      has_dependent_family: false,
+      has_minor_children: false,
+      has_major_debt: false,
+    },
+    onDeathBenefitContextChange: vi.fn(),
     eligibleCount: 1,
     emptyReason: "no-coverage" as const,
     onRetry: noop,
@@ -306,11 +317,17 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.getByText("사망보험")).toBeInTheDocument();
   expect(screen.getByText("3대 진단보험")).toBeInTheDocument();
   expect(screen.getByText("실손의료보험")).toBeInTheDocument();
-  expect(screen.getByText("기본 장례비 기준")).toBeInTheDocument();
+  expect(
+    screen.getByText("부양가족이나 큰 부채가 없는 경우"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("0원~5천만 원")).toBeInTheDocument();
+  expect(
+    screen.queryByText("업로드한 전체 보험에서 사망 보장이 확인돼요."),
+  ).not.toBeInTheDocument();
   expect(screen.getAllByText("민간 가이드 기준").length).toBeGreaterThan(0);
   expect(screen.getAllByText(/공식 출처:/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/아티클·블로그 출처:/).length).toBeGreaterThan(0);
-  expect(screen.getByText(/장례비와 초기 정리 비용/)).toBeInTheDocument();
+  expect(screen.getByText(/생활비 공백/)).toBeInTheDocument();
   expect(screen.queryByText("가입이 보이는 항목")).not.toBeInTheDocument();
   expect(screen.queryByText("자료에서 찾지 못한 항목")).not.toBeInTheDocument();
   expect(screen.queryByText("함께 분석한 보험")).not.toBeInTheDocument();

@@ -48,6 +48,7 @@ import { PortfolioAnalysisPanel } from "../portfolio/portfolio-analysis-panel";
 import { emptyReasonFor } from "../portfolio/analysis-eligibility";
 import { usePortfolioSummary } from "../portfolio/use-portfolio-summary";
 import { formatWon } from "../portfolio/money-format";
+import type { DeathBenefitGuideInput } from "../portfolio/portfolio-api";
 
 // Lazy-load the chatbot (and its react-markdown dependency) so they stay out of
 // the initial /analysis bundle — it only mounts after the user opens it.
@@ -143,6 +144,12 @@ export function InsuranceAnalysisPage({
   const [openClassificationHelp, setOpenClassificationHelp] = useState<
     string | null
   >(null);
+  const [deathBenefitContext, setDeathBenefitContext] =
+    useState<DeathBenefitGuideInput>({
+      has_dependent_family: false,
+      has_minor_children: false,
+      has_major_debt: false,
+    });
 
   // Arrow-key navigation between the tabs (WAI-ARIA tabs pattern,
   // automatic activation): moves focus and switches the panel in one step.
@@ -208,7 +215,10 @@ export function InsuranceAnalysisPage({
     [insuranceDocuments],
   );
   const classificationTypeCount = CLASSIFICATION_ORDER.length;
-  const portfolioSummary = usePortfolioSummary(insuranceDocuments);
+  const portfolioSummary = usePortfolioSummary(
+    insuranceDocuments,
+    deathBenefitContext,
+  );
 
   const toggleInsurance = (policyId: string) => {
     setExpandedInsuranceIds((current) => {
@@ -524,6 +534,8 @@ export function InsuranceAnalysisPage({
                   ? portfolioSummary.state.summary
                   : undefined
               }
+              deathBenefitContext={deathBenefitContext}
+              onDeathBenefitContextChange={setDeathBenefitContext}
               eligibleCount={insuranceDocuments.length}
               emptyReason={emptyReasonFor(insuranceDocuments)}
               onRetry={portfolioSummary.retry}

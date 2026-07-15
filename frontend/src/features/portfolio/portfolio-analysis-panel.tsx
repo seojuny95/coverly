@@ -5,6 +5,7 @@ import type { EmptyReason } from "./analysis-eligibility";
 import { formatKoreanWon, formatWon } from "./money-format";
 import type {
   ClaimChannelBlock,
+  DeathBenefitGuideInput,
   EssentialCoverageItem,
   PortfolioSummary,
   ReferenceSource,
@@ -61,7 +62,7 @@ const RECOMMENDED_INSURANCE_COPY = {
     title: "사망보험",
     description:
       "유가족 생활비가 기본이고 남은 대출 상환·장례비·상속세 재원으로도 쓸 수 있어 먼저 확인해요.",
-    rangeLabel: "기본 장례비 기준",
+    rangeLabel: "안내금액",
     rangeNote:
       "1인 가구 기준으로는 장례비 1,000만~2,000만원 정도부터 보고, 부양가족이 있으면 생활비까지 따로 봐야 해요.",
   },
@@ -86,12 +87,16 @@ const RECOMMENDED_INSURANCE_COPY = {
 export function PortfolioAnalysisPanel({
   status,
   summary,
+  deathBenefitContext,
+  onDeathBenefitContextChange,
   eligibleCount,
   emptyReason,
   onRetry,
 }: {
   status: "loading" | "success" | "error";
   summary?: PortfolioSummary;
+  deathBenefitContext: DeathBenefitGuideInput;
+  onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
   eligibleCount: number;
   emptyReason: EmptyReason;
   onRetry: () => void;
@@ -127,6 +132,8 @@ export function PortfolioAnalysisPanel({
       <PortfolioOverview
         summary={summary}
         items={items}
+        deathBenefitContext={deathBenefitContext}
+        onDeathBenefitContextChange={onDeathBenefitContextChange}
         policyCount={eligibleCount}
         specialAnalyses={specialAnalyses}
         onRetry={onRetry}
@@ -144,12 +151,16 @@ export function PortfolioAnalysisPanel({
 function PortfolioOverview({
   summary,
   items,
+  deathBenefitContext,
+  onDeathBenefitContextChange,
   policyCount,
   specialAnalyses,
   onRetry,
 }: {
   summary?: PortfolioSummary;
   items: EssentialCoverageItem[];
+  deathBenefitContext: DeathBenefitGuideInput;
+  onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
   policyCount: number;
   specialAnalyses: SpecialPolicyAnalysis[];
   onRetry: () => void;
@@ -192,7 +203,11 @@ function PortfolioOverview({
           </button>
         </div>
 
-        <RecommendedInsuranceCards items={items} />
+        <RecommendedInsuranceCards
+          items={items}
+          deathBenefitContext={deathBenefitContext}
+          onDeathBenefitContextChange={onDeathBenefitContextChange}
+        />
       </section>
     );
   }
@@ -264,15 +279,23 @@ function PortfolioOverview({
         </div>
       </div>
 
-      <RecommendedInsuranceCards items={items} />
+      <RecommendedInsuranceCards
+        items={items}
+        deathBenefitContext={deathBenefitContext}
+        onDeathBenefitContextChange={onDeathBenefitContextChange}
+      />
     </section>
   );
 }
 
 function RecommendedInsuranceCards({
   items,
+  deathBenefitContext,
+  onDeathBenefitContextChange,
 }: {
   items: EssentialCoverageItem[];
+  deathBenefitContext: DeathBenefitGuideInput;
+  onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
 }) {
   const death = items.find((item) => item.kind === "death");
   const diagnosisItems = items.filter((item) => DIAGNOSIS_KINDS.has(item.kind));
@@ -294,6 +317,8 @@ function RecommendedInsuranceCards({
           eyebrow="사망 대비"
           item={death}
           copy={RECOMMENDED_INSURANCE_COPY.death}
+          deathBenefitContext={deathBenefitContext}
+          onDeathBenefitContextChange={onDeathBenefitContextChange}
         />
 
         <RecommendedDiagnosisCard
@@ -311,11 +336,22 @@ function RecommendedSingleCoverageCard({
   eyebrow,
   item,
   copy,
+  deathBenefitContext,
+  onDeathBenefitContextChange,
 }: {
   eyebrow: string;
   item: EssentialCoverageItem | undefined;
   copy: typeof RECOMMENDED_INSURANCE_COPY.death;
+  deathBenefitContext: DeathBenefitGuideInput;
+  onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
 }) {
+  const updateDeathBenefitContext = (
+    key: keyof DeathBenefitGuideInput,
+    checked: boolean,
+  ) => {
+    onDeathBenefitContextChange({ ...deathBenefitContext, [key]: checked });
+  };
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -332,11 +368,45 @@ function RecommendedSingleCoverageCard({
 
       <p className="mt-4 text-sm leading-6 text-zinc-700">{copy.description}</p>
 
+      <div className="mt-4 space-y-2 rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
+        <p className="text-xs font-semibold text-zinc-500">나의 상황</p>
+        <DeathBenefitCheckbox
+          checked={deathBenefitContext.has_dependent_family}
+          label="내 소득에 의존하는 가족이 있어요"
+          onChange={(checked) =>
+            updateDeathBenefitContext("has_dependent_family", checked)
+          }
+        />
+        <DeathBenefitCheckbox
+          checked={deathBenefitContext.has_minor_children}
+          label="미성년 자녀가 있어요"
+          onChange={(checked) =>
+            updateDeathBenefitContext("has_minor_children", checked)
+          }
+        />
+        <DeathBenefitCheckbox
+          checked={deathBenefitContext.has_major_debt}
+          label="주택담보대출·전세대출 등 큰 부채가 있어요"
+          onChange={(checked) =>
+            updateDeathBenefitContext("has_major_debt", checked)
+          }
+        />
+      </div>
+
+      {item?.guidance_situation ? (
+        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
+          <p className="text-xs font-semibold text-zinc-500">상황</p>
+          <p className="mt-1 text-sm font-semibold text-zinc-950">
+            {item.guidance_situation}
+          </p>
+        </div>
+      ) : null}
+
       <div className="mt-5">
         <CoverageAmountMeter
           item={item}
           rangeLabel={copy.rangeLabel}
-          fallbackNote={copy.rangeNote}
+          fallbackNote={item?.guidance_reason ?? copy.rangeNote}
         />
       </div>
 
@@ -350,6 +420,28 @@ function RecommendedSingleCoverageCard({
         </p>
       ) : null}
     </section>
+  );
+}
+
+function DeathBenefitCheckbox({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-2 text-sm leading-5 text-zinc-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        className="mt-0.5 size-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+      />
+      <span>{label}</span>
+    </label>
   );
 }
 
@@ -491,6 +583,7 @@ function CoverageAmountMeter({
   const maxAmount = item?.reference_max_amount ?? null;
   const basis = item?.reference_basis ?? fallbackNote;
   const sources = item?.reference_sources ?? [];
+  const amountLabel = item?.reference_amount_label ?? null;
 
   if (minAmount == null || maxAmount == null) {
     return (
@@ -523,8 +616,12 @@ function CoverageAmountMeter({
         <div className="text-right text-xs leading-5 text-zinc-500">
           <p>{rangeLabel}</p>
           <p className="font-medium text-zinc-700">
-            {formatKoreanWon(minAmount)}
-            {minAmount !== maxAmount ? ` ~ ${formatKoreanWon(maxAmount)}` : ""}
+            {amountLabel ??
+              `${formatKoreanWon(minAmount)}${
+                minAmount !== maxAmount
+                  ? ` ~ ${formatKoreanWon(maxAmount)}`
+                  : ""
+              }`}
           </p>
         </div>
       </div>

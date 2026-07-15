@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
 import {
+  type DeathBenefitGuideInput,
   type PortfolioSummary,
   requestPortfolioSummary,
 } from "./portfolio-api";
@@ -13,14 +14,27 @@ type SummaryState =
   | { status: "success"; summary: PortfolioSummary }
   | { status: "error" };
 
-function portfolioSummaryQueryKey(documents: AnalyzedInsurance[]) {
-  return ["portfolio-summary", portfolioKey(documents)] as const;
+function portfolioSummaryQueryKey(
+  documents: AnalyzedInsurance[],
+  deathBenefitContext: DeathBenefitGuideInput,
+) {
+  return [
+    "portfolio-summary",
+    portfolioKey(documents),
+    deathBenefitContext.has_dependent_family,
+    deathBenefitContext.has_minor_children,
+    deathBenefitContext.has_major_debt,
+  ] as const;
 }
 
-export function usePortfolioSummary(documents: AnalyzedInsurance[]) {
+export function usePortfolioSummary(
+  documents: AnalyzedInsurance[],
+  deathBenefitContext: DeathBenefitGuideInput,
+) {
   const query = useQuery({
-    queryKey: portfolioSummaryQueryKey(documents),
-    queryFn: ({ signal }) => requestPortfolioSummary(documents, signal),
+    queryKey: portfolioSummaryQueryKey(documents, deathBenefitContext),
+    queryFn: ({ signal }) =>
+      requestPortfolioSummary(documents, deathBenefitContext, signal),
     enabled: documents.length > 0,
   });
 

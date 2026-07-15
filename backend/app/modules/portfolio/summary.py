@@ -23,6 +23,7 @@ from app.modules.portfolio.schemas import (
     DamageCoverageGroup,
     DamageCoverageItem,
     DamagePolicyCoverageGroup,
+    DeathBenefitGuideInput,
     EssentialCoverageCheck,
     ExcludedCoverageItem,
     IndemnityItem,
@@ -236,7 +237,10 @@ def _parse_amount(coverage: CoverageInput) -> int | None:
     return int(amount)
 
 
-def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCoverageSummary:
+def summarize_portfolio_coverages(
+    policies: list[PolicyInput],
+    death_benefit_context: DeathBenefitGuideInput | None = None,
+) -> PortfolioCoverageSummary:
     """Aggregate only amounts whose fixed-benefit meaning and value are safe."""
 
     grouped_sources: dict[str, list[CoverageSourceItem]] = defaultdict(list)
@@ -297,7 +301,7 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
             item.reason,
         )
     )
-    essential_coverage_check = build_essential_coverage_check(policies)
+    essential_coverage_check = build_essential_coverage_check(policies, death_benefit_context)
     summary = PortfolioCoverageSummary(
         totals=totals,
         indemnity_coverages=indemnity,

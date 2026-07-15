@@ -6,6 +6,7 @@ from app.modules.analysis.summary_overview import (
     generate_summary_overview,
 )
 from app.modules.portfolio.schemas import (
+    DeathBenefitGuideInput,
     EssentialCoverageCheck,
     EssentialCoverageItem,
     EssentialCoverageKind,
@@ -593,12 +594,38 @@ def test_essential_coverage_check_scans_every_policy_for_core_coverages() -> Non
         "indemnity": "well_prepared",
     }
     assert items["death"].matched_coverage_names == ["교통상해사망"]
-    assert items["death"].reference_basis == "장례비와 초기 정리 비용을 먼저 보는 점검용 범위"
-    assert items["death"].reference_sources[0].reliability == "official"
+    assert "생활비 공백" in (items["death"].reference_basis or "")
+    assert items["death"].reference_sources[0].reliability == "private_guidance"
     assert items["cancer"].confirmed_amount == 35_000_000
     assert items["cancer"].reference_sources[0].reliability == "private_guidance"
     assert items["indemnity"].reference_sources[0].label == "실손24 · 서비스 안내"
     assert items["cancer"].matched_coverage_names == ["유사암진단비", "일반암진단비"]
+
+
+def test_death_benefit_guide_changes_with_user_context() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [{"담보명": "질병사망", "가입금액": "1억원", "지급유형": "정액"}],
+    )
+
+    result = summarize_portfolio_coverages(
+        [policy],
+        DeathBenefitGuideInput(
+            has_dependent_family=True,
+            has_minor_children=True,
+            has_major_debt=True,
+        ),
+    )
+    death = next(item for item in result.essential_coverage_check.items if item.kind == "death")
+
+    assert death.reference_min_amount == 300_000_000
+    assert death.reference_max_amount == 500_000_000
+    assert death.reference_amount_label == "3억~5억 원"
+    assert death.guidance_situation == "가족 생활비, 자녀 양육비, 대출 부담을 모두 책임지는 경우"
+    assert "대출 상환 부담" in (death.guidance_reason or "")
+    assert death.detail == "사망 담보가 확인돼요."
 
 
 def test_essential_check_flags_narrow_diagnoses_and_multiple_indemnity_contracts() -> None:

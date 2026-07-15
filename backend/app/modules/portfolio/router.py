@@ -1,6 +1,5 @@
 """HTTP boundary for deterministic portfolio calculations."""
 
-from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -11,7 +10,6 @@ from app.modules.analysis.summary_overview import (
     attach_summary_overview,
 )
 from app.modules.portfolio.schemas import (
-    PolicyInput,
     PortfolioCoverageSummary,
     PortfolioSummaryRequest,
 )
@@ -20,16 +18,18 @@ from app.modules.reference_data.loader import ReferenceDataUnavailableError
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
-PortfolioSummaryService = Callable[[list[PolicyInput]], PortfolioCoverageSummary]
 
-
-def build_portfolio_summary(policies: list[PolicyInput]) -> PortfolioCoverageSummary:
-    summary = summarize_portfolio_coverages(policies)
-    return attach_summary_overview(summary)
+class PortfolioSummaryService:
+    def __call__(self, request: PortfolioSummaryRequest) -> PortfolioCoverageSummary:
+        summary = summarize_portfolio_coverages(
+            request.policies,
+            request.death_benefit_context,
+        )
+        return attach_summary_overview(summary)
 
 
 def get_portfolio_summary_service() -> PortfolioSummaryService:
-    return build_portfolio_summary
+    return PortfolioSummaryService()
 
 
 PortfolioSummaryServiceDep = Annotated[
@@ -44,7 +44,7 @@ def coverage_summary(
     summarize: PortfolioSummaryServiceDep,
 ) -> PortfolioCoverageSummary:
     try:
-        return summarize(request.policies)
+        return summarize(request)
     except ReferenceDataUnavailableError as exc:
         raise ApiError(
             status_code=503,

@@ -9,6 +9,11 @@ import * as api from "./portfolio-api";
 const docs: AnalyzedInsurance[] = [
   { id: "1", fileName: "1.pdf", result: { status: "accepted", 문자수: 1 } },
 ];
+const deathBenefitContext: api.DeathBenefitGuideInput = {
+  has_dependent_family: false,
+  has_minor_children: false,
+  has_major_debt: false,
+};
 
 describe("usePortfolioSummary", () => {
   beforeEach(() => vi.restoreAllMocks());
@@ -18,11 +23,14 @@ describe("usePortfolioSummary", () => {
       classifications: [],
     } as unknown as api.PortfolioSummary);
     const client = makeTestQueryClient();
-    const { result } = renderHook(() => usePortfolioSummary(docs), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
-    });
+    const { result } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
     await waitFor(() => expect(result.current.state.status).toBe("success"));
   });
 });

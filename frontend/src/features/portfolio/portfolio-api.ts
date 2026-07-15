@@ -110,6 +110,12 @@ export type ReferenceSource = {
   caveat: string;
 };
 
+export type DeathBenefitGuideInput = {
+  has_dependent_family: boolean;
+  has_minor_children: boolean;
+  has_major_debt: boolean;
+};
+
 export type EssentialCoverageItem = {
   kind: "death" | "cancer" | "cerebrovascular" | "ischemic_heart" | "indemnity";
   label: string;
@@ -119,6 +125,9 @@ export type EssentialCoverageItem = {
   reference_max_amount: number | null;
   reference_basis: string | null;
   reference_sources: ReferenceSource[];
+  reference_amount_label?: string | null;
+  guidance_situation?: string | null;
+  guidance_reason?: string | null;
   coverage_count: number;
   detail: string;
   matched_coverage_names: string[];
@@ -205,11 +214,15 @@ function toPolicies(insuranceDocuments: AnalyzedInsurance[]) {
 
 export function requestPortfolioSummary(
   insuranceDocuments: AnalyzedInsurance[],
+  deathBenefitContext: DeathBenefitGuideInput,
   signal?: AbortSignal,
 ) {
   return post<PortfolioSummary>(
     "/portfolio/summary",
-    { policies: toPolicies(insuranceDocuments) },
+    {
+      policies: toPolicies(insuranceDocuments),
+      death_benefit_context: deathBenefitContext,
+    },
     signal,
   );
 }
