@@ -90,6 +90,8 @@ def test_stream_deterministic_amount_answer_is_single_delta() -> None:
 
     assert events[0]["type"] == "meta"
     text = "".join(str(e["text"]) for e in events if e["type"] == "delta")
+    assert "**증권에서 확인된 사실**" in text
+    assert "**30,000,000원**" in text
     assert "30,000,000원" in text
     assert events[-1]["type"] == "end"
     suggestions = events[-1]["suggestions"]
@@ -388,7 +390,7 @@ def test_stream_answers_insurance_part_and_limits_out_of_scope_part() -> None:
 
     text = "".join(str(event.get("text", "")) for event in events)
     assert "30,000,000원" in text
-    assert "보험과 관련 없는 정보는 답변하기 어려워요" in text
+    assert "**보험과 관련 없는 정보**는 답변하기 어려워요" in text
     assert events[-1]["status"] == "answered"
     suggestions = events[-1]["suggestions"]
     assert isinstance(suggestions, list)

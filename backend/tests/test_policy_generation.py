@@ -42,6 +42,8 @@ def test_policy_generator_uses_only_selected_evidence() -> None:
 
     assert result.generation == "llm"
     assert result.evidence_ids == ("session:1",)
+    assert "**증권에서 확인된 사실**" in result.answer
+    assert "- 업로드 증권 원문 발췌: 보험기간은 2045년까지" in result.answer
     assert "2045년" in result.answer
     assert "84,000원" not in result.answer
 
@@ -62,6 +64,7 @@ def test_policy_generator_falls_back_for_invalid_evidence_id() -> None:
     )
 
     assert result.generation == "fallback"
+    assert "**현재 제공된 증권 근거만으로는 이 질문에 답하기 어려워요.**" in result.answer
     assert result.evidence_ids == ()
 
 

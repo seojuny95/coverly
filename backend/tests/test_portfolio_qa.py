@@ -250,7 +250,9 @@ def test_qa_answers_holdings_with_policy_citation() -> None:
     result = answer_portfolio_question("가입한 보험 목록 알려줘", _policies())
 
     assert result.status == "answered"
+    assert "**증권에서 확인된 사실**" in result.answer
     assert "1건" in result.answer
+    assert "- 테스트보험 건강보험(질병)" in result.answer
     assert "건강보험" in result.answer
     assert result.citations[0].policy_id == "p1"
 
@@ -340,6 +342,8 @@ def test_qa_uses_confirmed_summary_for_amount_answer() -> None:
     result = answer_portfolio_question("전체 가입금액 합계가 얼마야?", _policies())
 
     assert result.status == "answered"
+    assert "**증권에서 확인된 사실**" in result.answer
+    assert "**30,000,000원**" in result.answer
     assert "30,000,000원" in result.answer
     assert "실손형 담보는 가입금액 합계에 포함하지 않았습니다." in result.limitations
     assert result.citations[0].coverage_name == "암진단비"
@@ -417,7 +421,8 @@ def test_qa_returns_clarify_status_for_ambiguous_planned_reference() -> None:
     )
 
     assert result.status == "clarify"
-    assert result.answer == "어떤 담보의 가입금액을 말씀하시는지 알려주세요."
+    assert "**확인이 필요해요**" in result.answer
+    assert "어떤 담보의 가입금액을 말씀하시는지 알려주세요." in result.answer
 
 
 def test_qa_passes_recent_history_and_demographics_to_llm() -> None:
@@ -689,8 +694,10 @@ def test_qa_answers_multiple_insurance_questions_in_parallel(
         "실손의료비 가입 여부는 어때?",
     }
     assert result.answer.split("\n\n") == [
-        "암진단비\n암진단비 가입금액은 얼마야? 답변",
-        "실손의료비\n실손의료비 가입 여부는 어때? 답변",
+        "**암진단비**",
+        "암진단비 가입금액은 얼마야? 답변",
+        "**실손의료비**",
+        "실손의료비 가입 여부는 어때? 답변",
     ]
 
 

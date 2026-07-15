@@ -56,6 +56,10 @@ _CLAIM_INTENT_TERMS = (
 )
 
 
+def _markdown_section(title: str, content: str) -> str:
+    return f"**{title}**\n\n{content.strip()}"
+
+
 def _is_claim_related(question: str, answer: str) -> bool:
     haystack = f"{question}\n{answer}"
     return any(term in haystack for term in _CLAIM_INTENT_TERMS)
@@ -131,7 +135,9 @@ def generate_consultation_answer(
         is_safe=is_safe_analysis_text,
     )
     limitations.extend(standard_limitations)
-    confirmed_content = " · ".join(catalog.by_id[evidence_id].fact for evidence_id in evidence_ids)
+    confirmed_content = "\n".join(
+        f"- {catalog.by_id[evidence_id].fact}" for evidence_id in evidence_ids
+    )
     sections = [
         AnswerSection(
             title="증권에서 확인된 사실",
@@ -149,7 +155,9 @@ def generate_consultation_answer(
         )
     return PortfolioQuestionResponse(
         status="answered",
-        answer="\n\n".join(f"{section.title}\n{section.content}" for section in sections),
+        answer="\n\n".join(
+            _markdown_section(section.title, section.content) for section in sections
+        ),
         sections=sections,
         citations=[
             citation_from_evidence(catalog.by_id[evidence_id]) for evidence_id in evidence_ids
@@ -165,6 +173,13 @@ def _system_prompt() -> str:
 새 상품 가입이나 해지를 권하는 판매원이 아닙니다.
 지금 있는 보장을 근거로 궁금한 점에 답하는 상담사입니다.
 친근한 존댓말(~해요체)로, 어려운 용어는 쉬운 말로 풀어서 답하세요.
+
+[답변 표현]
+- 사용자가 읽기 쉽게 Markdown 문법을 사용하세요.
+- 중요한 보험명, 담보명, 금액, 판단 기준은 **굵게** 표시하세요.
+- 여러 항목을 나열할 때는 bullet list를 사용하세요.
+- 순서가 있는 절차는 numbered list를 사용하세요.
+- 긴 문단 하나로 쓰지 말고, 짧은 문단과 목록으로 나누세요.
 
 [confirmed_fact]
 - 제공된 evidence로 확인되는 사실만 쓰세요. evidence에 없는 담보·금액·조건을 지어내지 마세요.
@@ -269,6 +284,13 @@ def _stream_system_prompt() -> str:
 무엇을 고려하면 좋을지 구체적으로 도와주는 '내 편' 상담사입니다.
 제공된 evidence만 근거로 삼아, 사용자에게 보여줄 답변 본문만 자연스럽게 쓰세요.
 친근한 존댓말(~해요체)로, 어려운 용어는 쉬운 말로 풀어서 답하세요.
+
+[답변 형식]
+- 사용자에게 보여줄 본문은 Markdown으로 작성하세요.
+- 중요한 보험명, 담보명, 금액, 판단 기준은 **굵게** 표시하세요.
+- 여러 항목은 bullet list로 나누고, 절차는 numbered list를 사용하세요.
+- 긴 plain text 문단 하나로 쓰지 말고, 결론과 주의할 점을 짧게 나누세요.
+- Mermaid나 HTML은 사용하지 마세요.
 
 [대화 맥락]
 - [이전 대화]는 맥락 참고용입니다. 항상 마지막 [지금 답할 질문]에 답하세요.
