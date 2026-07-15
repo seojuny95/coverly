@@ -309,6 +309,21 @@ def test_driver_policy_is_not_mistaken_for_auto_policy() -> None:
     assert result.excluded_auto_policy_count == 0
 
 
+def test_legacy_specific_damage_classification_is_excluded_from_totals() -> None:
+    policy = _policy(
+        "travel",
+        "여행자보험",
+        "보험사A",
+        [{"담보명": "휴대품손해", "가입금액": "100만원", "지급유형": "실손"}],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.indemnity_coverages == []
+    assert result.damage_coverages[0].insurance_type == "여행자보험"
+
+
 def test_indemnity_is_listed_and_flagged_only_across_insurers() -> None:
     policies = [
         _policy("p1", "건강보험", "보험사A", [{"담보명": "실손 의료비", "가입금액": "5천만원"}]),

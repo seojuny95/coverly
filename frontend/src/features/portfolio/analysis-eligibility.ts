@@ -16,6 +16,11 @@ export function isDamageInsurance(result: InsuranceUploadResult): boolean {
     classification === "자동차보험" ||
     classification === "운전자보험" ||
     classification === "운전자상해보험" ||
+    classification === "여행자보험" ||
+    classification === "화재보험" ||
+    classification === "주택화재보험" ||
+    classification === "배상책임보험" ||
+    classification === "보증보험" ||
     classification === "배상·화재·기타"
   );
 }

@@ -29,8 +29,11 @@ _LEGACY_DAMAGE_CLASSIFICATIONS = frozenset(
         "자동차보험",
         "운전자보험",
         "운전자상해보험",
+        "여행자보험",
         "화재보험",
         "주택화재보험",
+        "배상책임보험",
+        "보증보험",
         "배상·화재·기타",
     }
 )
@@ -311,8 +314,14 @@ def _damage_insurance_type(policy: PolicyInput) -> str:
         return "자동차보험"
     if category in {"운전자보험", "운전자상해보험"}:
         return "운전자보험"
+    if category == "여행자보험":
+        return "여행자보험"
     if category in {"화재보험", "주택화재보험"}:
         return "화재보험"
+    if category == "배상책임보험":
+        return "배상책임보험"
+    if category == "보증보험":
+        return "보증보험"
 
     tags = policy.기본정보.상품태그
     for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:

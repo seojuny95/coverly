@@ -133,16 +133,16 @@ describe("InsuranceAnalysisPage", () => {
           },
         },
         {
-          id: "legacy-auto",
-          fileName: "legacy-auto.pdf",
+          id: "legacy-fire",
+          fileName: "legacy-fire.pdf",
           result: {
             status: "accepted",
             문자수: 80,
             기본정보: {
               보험사: "현대해상",
-              상품명: "레거시 자동차보험",
-              보험분류: "자동차",
-              상품태그: ["자동차보험"],
+              상품명: "레거시 화재보험",
+              보험분류: "화재보험",
+              상품태그: ["화재보험"],
             },
           },
         },
@@ -152,7 +152,7 @@ describe("InsuranceAnalysisPage", () => {
     renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
 
     expect(await screen.findByText("레거시 건강보험")).toBeInTheDocument();
-    expect(screen.getByText("레거시 자동차보험")).toBeInTheDocument();
+    expect(screen.getByText("레거시 화재보험")).toBeInTheDocument();
 
     const thirdCard = screen.getAllByText("제3보험")[0].closest("div");
     const damageCard = screen.getAllByText("손해보험")[0].closest("div");

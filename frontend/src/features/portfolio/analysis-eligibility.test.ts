@@ -4,6 +4,7 @@ import type { InsuranceUploadResult } from "../insurance-upload/upload-insurance
 import {
   emptyReasonFor,
   hasAnalyzableCoverage,
+  isDamageInsurance,
   isAnalyzableDocument,
   isAutoInsurance,
 } from "./analysis-eligibility";
@@ -63,6 +64,21 @@ describe("analysis-eligibility", () => {
         }),
       ),
     ).toBe(false);
+  });
+
+  it("detects legacy specific damage insurance classifications", () => {
+    for (const classification of [
+      "여행자보험",
+      "화재보험",
+      "배상책임보험",
+      "보증보험",
+    ]) {
+      expect(
+        isDamageInsurance(
+          makeResult({ 기본정보: { 보험분류: classification } }),
+        ),
+      ).toBe(true);
+    }
   });
 
   it("is analyzable only when not damage insurance and has coverage", () => {
