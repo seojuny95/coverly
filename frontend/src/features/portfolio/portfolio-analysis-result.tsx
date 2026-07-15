@@ -165,14 +165,23 @@ export function PortfolioAnalysisResultView({
 
 function AnalysisSummary({ overview }: { overview: string }) {
   return (
-    <section className="border-y border-zinc-200 py-6">
-      <p className="text-xs font-semibold text-blue-700">총평</p>
-      <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
-        보험을 한데 모아 보면
-      </h2>
-      <p className="mt-3 max-w-4xl text-sm leading-7 text-zinc-700">
-        {overview}
-      </p>
+    <section className="rounded-2xl border border-zinc-200 bg-white p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-blue-700">총평</p>
+          <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-zinc-950">
+            보험을 한데 모아 보면
+          </h2>
+        </div>
+        <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+          전체 보험 기준
+        </span>
+      </div>
+      <div className="mt-5 border-l-2 border-blue-600 pl-4">
+        <p className="max-w-4xl text-base leading-8 whitespace-pre-line text-zinc-800">
+          {overview}
+        </p>
+      </div>
     </section>
   );
 }
