@@ -14,7 +14,6 @@ from app.modules.portfolio.schemas import (
     PremiumBenchmark,
     PremiumBenchmarkSource,
     PremiumOverview,
-    ReferenceSource,
 )
 from app.modules.portfolio.summary import (
     build_portfolio_facts,
@@ -48,13 +47,6 @@ def _summary_for_premium_guidance(
     monthly_total: int,
     missing_kinds: set[EssentialCoverageKind],
 ) -> PortfolioCoverageSummary:
-    coverage_source = ReferenceSource(
-        label="테스트 출처",
-        url="https://example.com",
-        published_at="2025-01-01",
-        reliability="official",
-        caveat="테스트용 출처예요.",
-    )
     benchmark_source = PremiumBenchmarkSource(
         label="테스트 출처",
         url="https://example.com",
@@ -77,8 +69,6 @@ def _summary_for_premium_guidance(
             confirmed_amount=None if kind in missing_kinds else 10_000_000,
             reference_min_amount=None if kind == "indemnity" else 10_000_000,
             reference_max_amount=None if kind == "indemnity" else 20_000_000,
-            reference_basis="테스트 기준",
-            reference_sources=[coverage_source],
             coverage_count=0 if kind in missing_kinds else 1,
             detail="테스트 상세",
             matched_coverage_names=[] if kind in missing_kinds else [label],
