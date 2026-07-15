@@ -777,28 +777,28 @@ function premiumSummaryComparison(
     return {
       tone: "low" as const,
       label: allCoreCoverageVisible
-        ? "보험료는 낮고 핵심 보장은 보여요"
-        : "보험료는 낮지만 권장보험 점검이 필요해요",
+        ? "현재 보험료는 좋아보여요"
+        : "권장보험을 점검해보세요",
       title: allCoreCoverageVisible
-        ? "월 보험료는 낮고 핵심 보장은 보여요"
-        : "월 보험료는 낮지만 권장보험 점검이 필요해요",
+        ? "현재 보험료는 좋아보여요"
+        : "권장보험을 점검해보세요",
     };
   }
   if (premium.monthly_total > benchmark.suggested_max_premium) {
     return {
       tone: "high" as const,
-      label: "보험료가 권장 범위보다 높아요",
-      title: "가입한 보험과 보장내용을 다시 확인해보세요",
+      label: "현재 보험료는 높아보여요",
+      title: "현재 보험료는 높아보여요",
     };
   }
   return {
     tone: "in_range" as const,
     label: allCoreCoverageVisible
-      ? "보험료와 핵심 보장이 균형 있게 보여요"
-      : "보험료는 권장 범위지만 권장보험 점검이 필요해요",
+      ? "현재 보험료는 좋아보여요"
+      : "권장보험을 점검해보세요",
     title: allCoreCoverageVisible
-      ? "월 보험료와 핵심 보장이 균형 있게 보여요"
-      : "월 보험료는 권장 범위지만 권장보험 점검이 필요해요",
+      ? "현재 보험료는 좋아보여요"
+      : "권장보험을 점검해보세요",
   };
 }
 
