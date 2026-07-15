@@ -10,7 +10,7 @@
 | 서버 코드 | PDF 파싱, 분류, 담보 매칭, grounding·안전 필터, 집계, 실패·degrade 정책 | 입력을 구조화하고 판단 절차를 결정한다. 데이터 갱신을 코드 배포로 대체하지 않는다. |
 | 프론트엔드 | 서버 응답의 표시와 사용자 상호작용 | 보험 사실이나 LLM 총평을 임의로 만들어내지 않는다. |
 
-`classification_rules`와 `coverage_matching_rules`는 서버 동작을 결정하는 규칙이므로 코드 배포와 함께 버전 관리한다. `claim_channels`와 `disclosure_links`는 운영 중 갱신이 필요할 수 있어 DB 후보로 관리하되, production에서는 오래된 bundled JSON으로 조용히 대체하지 않는다. DB 조회 실패·스키마 불일치·기준일 만료는 관측 가능한 오류 또는 확인 불가 응답으로 처리해야 한다. 공식 RAG 인덱싱에 쓰는 데이터 적재/갱신 잡은 현재 RAG 인덱싱 경로에서 계속 호출 가능하지만, 별도 `jobs/` 디렉터리가 있다고 문서화하지 않는다.
+`classification_rules`와 `coverage_matching_rules`는 서버 동작을 결정하는 규칙이므로 코드 배포와 함께 버전 관리한다. `claim_channels`와 `disclosure_links`는 Supabase `coverly.reference_data`가 단일 원본이다. 서버 코드에는 같은 데이터를 bundled JSON이나 fallback 상수로 보관하지 않는다. DB 조회 실패·스키마 불일치·필수 row 누락은 전체 분석을 실패시키는 참조 데이터 오류로 처리한다. 공식 RAG 인덱싱에 쓰는 데이터 적재/갱신 잡은 현재 RAG 인덱싱 경로에서 계속 호출 가능하지만, 별도 `jobs/` 디렉터리가 있다고 문서화하지 않는다.
 
 LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다. 프론트엔드의 synthetic fallback, 임의 요약, 누락 응답을 대체하는 문구 생성은 금지한다.
 
@@ -30,18 +30,12 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 
 ## 새 환경 초기 데이터
 
-`coverly.reference_data` migration은 테이블 구조만 생성한다. 새 로컬·스테이징 환경에는 migration 적용 후 아래 명령으로 누락된 초기 데이터를 한 번 넣는다.
-
-```bash
-cd backend
-DATABASE_URL=<database-url> uv run python -m scripts.seed_reference_data
-```
-
-시드 스크립트는 `claim_channels`, `disclosure_links`가 DB에 없을 때만 bundled JSON을 넣으며, 이미 존재하는 운영 값을 덮어쓰지 않는다. 초기화 이후 운영 데이터 변경은 승인된 DB 작업이나 새 migration으로 기록한다.
+`coverly.reference_data` migration은 테이블 구조와 이력을 관리한다. `claim_channels`, `disclosure_links`의 실제 payload는 Supabase 운영 데이터로 관리하며, 새 로컬·스테이징 환경도 승인된 DB 작업이나 새 migration으로 같은 row를 준비해야 한다. 서버 repo의 seed 스크립트나 bundled JSON으로 운영 데이터를 복제하지 않는다.
 
 ## 운영 규칙
 
 - 참조 사실에는 출처와 기준일을 저장하고 응답 근거에 연결한다.
 - RAG 검색 결과가 없거나 근거가 부족하면 서버는 확인 불가로 degrade한다.
-- production에서 stale JSON fallback을 silent하게 허용하지 않는다. fallback이 필요한 개발·테스트 경로는 환경을 명시하고 로그·메트릭으로 드러낸다.
+- Supabase 소유 참조 데이터에는 서버 bundled fallback을 두지 않는다.
+- `claim_channels`, `disclosure_links`가 없거나 읽히지 않으면 전체 분석을 실패시킨다.
 - 참조 데이터 스키마 변경은 새 migration과 검증 코드를 함께 추가한다.

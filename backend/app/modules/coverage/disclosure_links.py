@@ -4,10 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Literal, cast
 
-from app.modules.reference_data.loader import load_reference_data
-from app.modules.reference_data.paths import reference_data_path
-
-_DATA = reference_data_path("disclosure_links.json")
+from app.modules.reference_data.loader import load_database_reference_data
 
 DisclosureKind = Literal["life", "non_life", "integrated"]
 
@@ -22,11 +19,9 @@ class DisclosureLink:
 
 @lru_cache(maxsize=1)
 def _directory() -> dict[str, Any]:
-    return load_reference_data(
+    return load_database_reference_data(
         "disclosure_links",
-        _DATA,
         _validate_directory,
-        owner="database",
     )
 
 

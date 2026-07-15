@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,39 +13,63 @@ def _require_mapping(value: object) -> dict[str, object]:
     return value
 
 
-def test_database_reference_data_wins_over_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    fallback = tmp_path / "fallback.json"
-    fallback.write_text(json.dumps({"source": "file"}), encoding="utf-8")
+def test_database_reference_data_returns_database_payload(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         reference_data,
         "_database_reference_data",
         lambda: {"example": {"source": "database"}},
     )
-    monkeypatch.setattr(reference_data, "_database_enabled", lambda: True)
 
-    result = reference_data.load_reference_data(
-        "example", fallback, _require_mapping, owner="database"
-    )
+    result = reference_data.load_database_reference_data("example", _require_mapping)
 
     assert result == {"source": "database"}
 
 
-def test_invalid_database_reference_data_does_not_use_bundled_copy(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_missing_database_reference_data_fails_without_fallback(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fallback = tmp_path / "fallback.json"
-    fallback.write_text(json.dumps({"source": "file"}), encoding="utf-8")
+    monkeypatch.setattr(reference_data, "_database_reference_data", lambda: {})
+
+    with pytest.raises(reference_data.ReferenceDataUnavailableError):
+        reference_data.load_database_reference_data("example", _require_mapping)
+
+
+def test_invalid_database_reference_data_fails_without_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         reference_data,
         "_database_reference_data",
         lambda: {"example": ["invalid"]},
     )
-    monkeypatch.setattr(reference_data, "_database_enabled", lambda: True)
 
     with pytest.raises(reference_data.ReferenceDataUnavailableError):
-        reference_data.load_reference_data("example", fallback, _require_mapping, owner="database")
+        reference_data.load_database_reference_data("example", _require_mapping)
+
+
+def test_database_reference_data_requires_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        reference_data,
+        "get_settings",
+        lambda: SimpleNamespace(reference_data_database_enabled=True, database_url=""),
+    )
+
+    with pytest.raises(reference_data.ReferenceDataUnavailableError):
+        reference_data._database_url()
+
+
+def test_database_reference_data_requires_enabled_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        reference_data,
+        "get_settings",
+        lambda: SimpleNamespace(
+            reference_data_database_enabled=False,
+            database_url="postgresql://example",
+        ),
+    )
+
+    with pytest.raises(reference_data.ReferenceDataUnavailableError):
+        reference_data._database_url()
 
 
 def test_code_owned_reference_data_ignores_database_copy(

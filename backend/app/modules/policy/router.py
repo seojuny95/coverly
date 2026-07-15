@@ -15,6 +15,7 @@ from app.modules.policy.schemas import (
     PolicySessionRefreshResponse,
     PolicySessionRequest,
 )
+from app.modules.reference_data.loader import ReferenceDataUnavailableError
 from app.rag.policy import delete_policy_session, refresh_policy_session
 from app.rag.policy.session_tokens import InvalidPolicySessionToken
 
@@ -82,6 +83,12 @@ async def parse_policy(
             code="PDF_TEXT_EXTRACTION_FAILED",
             message="PDF에서 텍스트를 추출할 수 없습니다.",
         ) from None
+    except ReferenceDataUnavailableError as exc:
+        raise ApiError(
+            status_code=503,
+            code="reference_data_unavailable",
+            message="분석 기준 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
+        ) from exc
     return {"status": "accepted", **result}
 
 

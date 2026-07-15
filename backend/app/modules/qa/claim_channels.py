@@ -15,10 +15,7 @@ from app.modules.qa.schemas import (
     ClaimChannelInsurer,
     ClaimChannelLink,
 )
-from app.modules.reference_data.loader import load_reference_data
-from app.modules.reference_data.paths import reference_data_path
-
-_DATA = reference_data_path("claim_channels.json")
+from app.modules.reference_data.loader import load_database_reference_data
 
 
 @dataclass(frozen=True)
@@ -53,11 +50,9 @@ class ClaimChannelSet:
 
 @lru_cache(maxsize=1)
 def _directory() -> dict[str, Any]:
-    return load_reference_data(
+    return load_database_reference_data(
         "claim_channels",
-        _DATA,
         _validate_directory,
-        owner="database",
     )
 
 
