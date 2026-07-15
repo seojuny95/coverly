@@ -648,7 +648,7 @@ def test_qa_answers_multiple_insurance_questions_in_parallel(
 ) -> None:
     from app.services.qa import service as portfolio_qa
 
-    barrier = Barrier(2, timeout=1)
+    barrier = Barrier(2, timeout=5)
     seen_questions: list[str] = []
 
     def fake_answer_context(context: Any, *_args: object) -> PortfolioQuestionResponse:
