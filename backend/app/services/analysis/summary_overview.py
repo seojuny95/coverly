@@ -1,5 +1,6 @@
 """LLM overview copy for the portfolio summary screen."""
 
+import logging
 from typing import Literal, cast
 
 from pydantic import BaseModel, Field
@@ -12,6 +13,12 @@ from app.schemas.portfolio import (
 )
 from app.services.evidence.catalog import is_safe_analysis_text
 from app.services.llm import JsonCompleter, dump_prompt_json, structured_completer
+
+logger = logging.getLogger(__name__)
+
+
+class SummaryOverviewUnavailableError(RuntimeError):
+    """Raised when the required LLM overview cannot be generated safely."""
 
 
 class _LlmOverviewDraft(BaseModel):
@@ -27,7 +34,7 @@ def attach_summary_overview(
 
     overview = generate_summary_overview(summary, complete)
     if overview is None:
-        return summary
+        raise SummaryOverviewUnavailableError("Portfolio overview generation failed")
     return summary.model_copy(update={"overview": overview})
 
 
@@ -46,6 +53,7 @@ def generate_summary_overview(
         )
         draft = _LlmOverviewDraft.model_validate(raw)
     except Exception:
+        logger.exception("portfolio_overview_generation_failed")
         return None
 
     title = draft.title.strip()

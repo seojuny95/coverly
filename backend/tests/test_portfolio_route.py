@@ -1,15 +1,40 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
-from app.routes.portfolio import router
+from app.errors import ApiError, api_error_handler
+from app.routes import portfolio
+from app.schemas.portfolio import PortfolioCoverageSummary, PortfolioOverview
+from app.services.analysis.summary_overview import SummaryOverviewUnavailableError
+from app.services.portfolio import summary as portfolio_summary
+from app.services.reference_data import ReferenceDataUnavailableError
 
 
-def test_coverage_summary_route_accepts_parse_result_shape() -> None:
+def _attach_test_overview(summary: PortfolioCoverageSummary) -> PortfolioCoverageSummary:
+    return summary.model_copy(
+        update={
+            "overview": PortfolioOverview(
+                generation="llm",
+                title="테스트 총평",
+                paragraphs=["확인된 보장 정보를 정리했어요."],
+                takeaways=[],
+            )
+        }
+    )
+
+
+def _client(monkeypatch: MonkeyPatch) -> TestClient:
+    monkeypatch.setattr(portfolio, "attach_summary_overview", _attach_test_overview)
     app = FastAPI()
-    app.include_router(router)
-    client = TestClient(app)
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.include_router(portfolio.router)
+    return TestClient(app)
 
-    response = client.post(
+
+def test_coverage_summary_route_accepts_parse_result_shape(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    response = _client(monkeypatch).post(
         "/portfolio/summary",
         json={
             "policies": [
@@ -37,12 +62,12 @@ def test_coverage_summary_route_accepts_parse_result_shape() -> None:
     assert body["totals"][0]["coverageCount"] == 1
     assert body["totals"][0]["composition"][0]["policy_id"] == "p1"
     assert body["premium"]["monthly_total"] == 0
+    assert body["overview"]["generation"] == "llm"
 
 
-def test_coverage_summary_route_serializes_curated_alias_group() -> None:
-    app = FastAPI()
-    app.include_router(router)
-    client = TestClient(app)
+def test_coverage_summary_route_serializes_curated_alias_group(
+    monkeypatch: MonkeyPatch,
+) -> None:
     policies = [
         {
             "id": "p1",
@@ -68,7 +93,7 @@ def test_coverage_summary_route_serializes_curated_alias_group() -> None:
         },
     ]
 
-    response = client.post("/portfolio/summary", json={"policies": policies})
+    response = _client(monkeypatch).post("/portfolio/summary", json={"policies": policies})
 
     assert response.status_code == 200
     total = response.json()["totals"][0]
@@ -81,12 +106,11 @@ def test_coverage_summary_route_serializes_curated_alias_group() -> None:
     }
 
 
-def test_coverage_summary_route_includes_monthly_premium_benchmark_when_age_is_unique() -> None:
-    app = FastAPI()
-    app.include_router(router)
-    client = TestClient(app)
-
-    response = client.post(
+def test_coverage_summary_route_includes_monthly_premium_without_inventing_benchmark(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(portfolio_summary, "premium_benchmark_for_age", lambda _age: None)
+    response = _client(monkeypatch).post(
         "/portfolio/summary",
         json={
             "policies": [
@@ -112,5 +136,38 @@ def test_coverage_summary_route_includes_monthly_premium_benchmark_when_age_is_u
     body = response.json()
     assert body["premium"]["monthly_total"] == 90_000
     assert body["premium"]["monthly_policy_count"] == 1
-    assert body["premium_benchmark"] is not None
-    assert body["premium_benchmark"]["suggested_min_premium"] > 0
+    assert body["premium_benchmark"] is None
+
+
+def test_summary_route_returns_retryable_error_when_llm_overview_fails(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> object:
+        raise SummaryOverviewUnavailableError("offline")
+
+    monkeypatch.setattr(portfolio, "attach_summary_overview", fail)
+    app = FastAPI()
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.include_router(portfolio.router)
+
+    response = TestClient(app).post("/portfolio/summary", json={"policies": []})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "portfolio_overview_unavailable"
+
+
+def test_summary_route_returns_retryable_error_when_reference_data_fails(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> object:
+        raise ReferenceDataUnavailableError("offline")
+
+    monkeypatch.setattr(portfolio, "summarize_portfolio_coverages", fail)
+    app = FastAPI()
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.include_router(portfolio.router)
+
+    response = TestClient(app).post("/portfolio/summary", json={"policies": []})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "reference_data_unavailable"

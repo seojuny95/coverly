@@ -1,4 +1,4 @@
-"""Import bundled reference data into the Coverly private Postgres schema."""
+"""Import operational reference directories into the private Postgres schema."""
 
 import json
 from pathlib import Path
@@ -11,10 +11,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BACKEND_DIR / "app" / "services" / "data"
 DATASETS = {
     "claim_channels": DATA_DIR / "claim_channels.json",
-    "classification_rules": DATA_DIR / "classification_rules.json",
-    "coverage_matching_rules": DATA_DIR / "coverage_matching_rules.json",
     "disclosure_links": DATA_DIR / "disclosure_links.json",
-    "insurer_catalog": DATA_DIR / "insurer_catalog.json",
 }
 
 

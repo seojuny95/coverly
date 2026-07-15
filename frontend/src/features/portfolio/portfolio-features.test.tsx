@@ -242,6 +242,12 @@ describe("portfolio features", () => {
           indemnity_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
+          overview: {
+            generation: "llm",
+            title: "현재 보장을 한눈에 확인해보세요",
+            paragraphs: ["확인된 보장 정보를 바탕으로 정리했어요."],
+            takeaways: [],
+          },
           essential_coverage_check: {
             items: [
               {

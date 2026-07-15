@@ -1,7 +1,11 @@
 import pytest
 
 from app.schemas.portfolio import PolicyInput
-from app.services.analysis.summary_overview import generate_summary_overview
+from app.services.analysis.summary_overview import (
+    SummaryOverviewUnavailableError,
+    attach_summary_overview,
+    generate_summary_overview,
+)
 from app.services.portfolio.summary import (
     build_portfolio_facts,
     normalize_coverage_name,
@@ -63,6 +67,18 @@ def test_summary_overview_uses_deterministic_judgments_for_llm_copy() -> None:
     assert overview.generation == "llm"
     assert overview.title == "암 진단비는 보이고, 다른 핵심 보장은 이어서 확인해요"
     assert [item.label for item in overview.takeaways] == ["보험료", "보장 구성", "다음 확인"]
+
+
+def test_summary_overview_failure_is_not_replaced_with_deterministic_copy() -> None:
+    summary = summarize_portfolio_coverages(
+        [_policy("p1", "건강보험", "보험사A", [{"담보명": "암진단비"}])]
+    )
+
+    def fail(_system: str, _user: str) -> dict[str, object]:
+        raise RuntimeError("offline")
+
+    with pytest.raises(SummaryOverviewUnavailableError):
+        attach_summary_overview(summary, fail)
 
 
 def test_sums_safe_fixed_benefits_and_exposes_composition() -> None:

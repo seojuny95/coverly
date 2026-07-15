@@ -6,7 +6,7 @@ FastAPI + uv 백엔드. 전체 프로젝트 가이드: [../AGENTS.md](../AGENTS.
 
 ## 프로젝트 소개
 
-Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 분류·상담·Q&A 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 엔드포인트는 두 갈래다: 증권 1건을 처리하는 파싱 파이프라인(`POST /policies/parse`)과, 파싱 결과 여러 건을 묶어 다루는 포트폴리오 기능(`POST /portfolio/summary`·`/portfolio/analysis`·`POST /qa/stream`).
+Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 분류·상담·Q&A 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 증권 파싱(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 Q&A(`POST /qa/stream`)다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터의 소유권과 운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
 
 ## Development Commands
 
@@ -18,16 +18,15 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run p
 
 ## Project Structure
 
-`app/services/`는 런타임 파이프라인과 의존 방향이 드러나도록 나눈다. 상위 use case(`analysis`, `qa`)는 하위 사실 계층(`policy`, `portfolio`, `evidence`, `coverage_knowledge`, `rag`)을 사용하지만, 하위 계층은 상위 use case를 import하지 않는다. 새 코드는 아래 패키지 경로를 직접 import한다.
+`app/services/`는 런타임 파이프라인과 의존 방향이 드러나도록 나눈다. 핵심 라우트(`parse`, `summary`, `qa`)는 하위 사실 계층(`policy`, `portfolio`, `evidence`, `coverage_knowledge`, `rag`)을 사용하지만, 하위 계층은 라우트나 상위 use case를 import하지 않는다. 새 코드는 아래 패키지 경로를 직접 import한다.
 
 ```text
 app/
-├── main.py                # FastAPI app (4개 라우터 등록)
+├── main.py                # FastAPI app (핵심 3개 흐름과 보조 라우터 등록)
 ├── errors.py              # ApiError, request-id 미들웨어
 ├── routes/
 │   ├── policies.py        # POST /policies/parse — 증권 1건 파싱
 │   ├── portfolio.py       # POST /portfolio/summary — 보장금 합계
-│   ├── analysis.py        # POST /portfolio/analysis — 상담 전 검토
 │   └── qa.py              # POST /qa/stream — 근거 기반 Q&A 스트리밍
 └── services/
     ├── llm.py             # OpenAI 경계: structured/text/stream completion
@@ -49,7 +48,6 @@ app/
     │   ├── matching.py        # 담보명 정규화·교차 매칭
     │   ├── rules.py           # coverage_matching_rules.json 로딩/검증
     │   ├── purpose.py         # 담보 목적 설명
-    │   ├── recommendations.py # 상담 전 검토용 기준·추천 질문
     │   └── disclosure_links.py
     ├── portfolio/             # 여러 증권의 결정적 사실 집계
     │   ├── summary.py         # 보장금 합계·실손/중복·손해보험 별도 집계
@@ -58,20 +56,20 @@ app/
     ├── evidence/
     │   └── catalog.py         # 분석/Q&A 공용 근거 카탈로그·안전 필터
     ├── analysis/
-    │   ├── service.py         # POST /portfolio/analysis use case
-    │   └── generation.py      # 상담사 관점 LLM 생성 + fallback 검증
+    │   └── summary_overview.py # 포트폴리오 총평 LLM 생성·검증
     ├── qa/
     │   ├── service.py         # POST /qa/stream use case
     │   ├── planning.py        # 맥락 지시어·복합 질문·도메인 범위 planner
     │   ├── generation.py      # Q&A LLM 생성/streaming
     │   └── claim_channels.py  # 청구 채널 결정적 안내
-    ├── reference/             # 공용 기준 데이터 조회(보험료 벤치마크·제도 변경)
-    │   ├── premium_benchmark.py
-    │   └── policy_change.py
+    ├── reference/
+    │   └── premium_benchmark.py # 출처가 있는 보험료 부담 가이드 조회
     └── rag/                   # 공식 약관/제도 RAG + 업로드 세션 RAG
 ```
 
-의존 방향은 `routes -> policy/portfolio/analysis/qa`, `analysis/qa -> portfolio/evidence/coverage_knowledge/rag/llm`, `portfolio -> policy models/coverage_knowledge`, `policy -> llm/grounding/rag` 순서다. `analysis`와 `qa`는 서로 import하지 않고, 공통 판단은 `portfolio`, `evidence`, `coverage_knowledge`로 내려서 공유한다.
+의존 방향은 `routes -> policy/portfolio/qa`, `portfolio route -> analysis/summary_overview`, `qa -> portfolio/evidence/coverage_knowledge/rag/llm`, `portfolio -> policy models/coverage_knowledge`, `policy -> llm/grounding/rag` 순서다. 분석 총평과 Q&A는 서버에서만 생성하고, 공통 판단은 `portfolio`, `evidence`, `coverage_knowledge`로 내려서 공유한다.
+
+참조 데이터 로딩·RAG 테이블·migration 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다.
 
 전역 원칙(내 편·판매원 아님, grounding)은 [../AGENTS.md](../AGENTS.md)에 있고, 아래는 백엔드에서 그걸 강제하는 규칙이다.
 

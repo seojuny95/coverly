@@ -12,6 +12,18 @@ const summary: PortfolioSummary = {
   indemnity_coverages: [],
   excluded_coverages: [],
   excluded_auto_policy_count: 0,
+  overview: {
+    generation: "llm",
+    title: "보험료는 낮지만, 진단비 공백을 먼저 확인해야 해요",
+    paragraphs: ["현재 보장 구성을 바탕으로 확인한 내용을 정리했어요."],
+    takeaways: [
+      {
+        label: "우선 확인",
+        title: "진단비 공백",
+        detail: "뇌혈관질환과 심장질환 진단비를 확인해보세요.",
+      },
+    ],
+  },
   essential_coverage_check: {
     items: [
       {
@@ -251,11 +263,11 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
       name: "보험료는 낮지만, 진단비 공백을 먼저 확인해야 해요",
     }),
   ).toBeInTheDocument();
+  expect(
+    screen.getByText("현재 보장 구성을 바탕으로 확인한 내용을 정리했어요."),
+  ).toBeInTheDocument();
+  expect(screen.getByText("진단비 공백")).toBeInTheDocument();
   expect(screen.getAllByText("권장 범위보다 낮아요").length).toBeGreaterThan(0);
-  expect(screen.getByText("보험료")).toBeInTheDocument();
-  expect(screen.getByText("보장 구성")).toBeInTheDocument();
-  expect(screen.getByText("다음 확인")).toBeInTheDocument();
-  expect(screen.getByText("3/5개 확인")).toBeInTheDocument();
   expect(screen.getByText("월 보험료 98,000원")).toBeInTheDocument();
   expect(screen.getByText("권장보험")).toBeInTheDocument();
   expect(screen.getByText("사망보험")).toBeInTheDocument();
@@ -301,6 +313,27 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   );
   expect(screen.queryByText("확인된 보장")).not.toBeInTheDocument();
   expect(screen.queryByText("추가 확인")).not.toBeInTheDocument();
+});
+
+test("shows an explicit retry state when the LLM overview is missing", async () => {
+  const onRetry = vi.fn();
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      summary={{ ...summary, overview: null }}
+      onRetry={onRetry}
+    />,
+  );
+
+  expect(screen.getByText("총평을 생성하지 못했어요")).toBeInTheDocument();
+  expect(
+    screen.queryByText("보험료는 낮지만, 진단비 공백을 먼저 확인해야 해요"),
+  ).not.toBeInTheDocument();
+
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "총평 다시 생성하기" }));
+  expect(onRetry).toHaveBeenCalledOnce();
 });
 
 test("shows a multiple-indemnity review directly in the coverage map", () => {

@@ -18,6 +18,14 @@ class _CountingRepository:
         return (self.benchmark,)
 
 
+class _FailingRepository:
+    def find_by_age(self, age: int | None) -> PremiumBenchmark | None:
+        raise RuntimeError("database unavailable")
+
+    def list_all(self) -> tuple[PremiumBenchmark, ...]:
+        raise RuntimeError("database unavailable")
+
+
 def test_premium_benchmark_lookup_caches_successful_age_queries(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -96,3 +104,23 @@ def test_warm_premium_benchmark_cache_preloads_age_band_queries(
     assert count == 1
     assert result == benchmark
     assert repository.calls == 1
+
+
+def test_premium_benchmark_lookup_does_not_invent_fallback_data(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(subject, "_repository", lambda: _FailingRepository())
+    subject._cached_premium_benchmark_for_age.cache_clear()
+    monkeypatch.setattr(subject, "_preloaded_benchmarks", None)
+
+    assert subject.premium_benchmark_for_age(35) is None
+
+
+def test_warm_premium_benchmark_cache_keeps_failures_empty(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(subject, "_repository", lambda: _FailingRepository())
+    monkeypatch.setattr(subject, "_preloaded_benchmarks", None)
+
+    assert subject.warm_premium_benchmark_cache() == 0
+    assert subject.premium_benchmark_for_age(35) is None

@@ -119,8 +119,6 @@ export function PortfolioAnalysisPanel({
 
   const items = summary?.essential_coverage_check?.items ?? [];
   const specialAnalyses = summary?.special_policy_analyses ?? [];
-  const missingItems = items.filter((item) => item.status === "not_found");
-  const reviewItems = items.filter((item) => item.status === "needs_review");
 
   return (
     <div className="space-y-8">
@@ -128,9 +126,8 @@ export function PortfolioAnalysisPanel({
         summary={summary}
         items={items}
         policyCount={eligibleCount}
-        missingItems={missingItems}
-        reviewItems={reviewItems}
         specialAnalyses={specialAnalyses}
+        onRetry={onRetry}
       />
 
       {specialAnalyses.length > 0 ? (
@@ -146,18 +143,15 @@ function PortfolioOverview({
   summary,
   items,
   policyCount,
-  missingItems,
-  reviewItems,
   specialAnalyses,
+  onRetry,
 }: {
   summary?: PortfolioSummary;
   items: EssentialCoverageItem[];
   policyCount: number;
-  missingItems: EssentialCoverageItem[];
-  reviewItems: EssentialCoverageItem[];
   specialAnalyses: SpecialPolicyAnalysis[];
+  onRetry: () => void;
 }) {
-  const confirmedItems = items.filter((item) => item.status !== "not_found");
   const diagnosisItems = items.filter((item) => DIAGNOSIS_KINDS.has(item.kind));
   const confirmedDiagnosisCount = diagnosisItems.filter(
     (item) => item.status !== "not_found",
@@ -166,33 +160,36 @@ function PortfolioOverview({
   const premiumBenchmark = summary?.premium_benchmark ?? null;
   const premiumComparison = premiumSummaryComparison(premium, premiumBenchmark);
   const generatedOverview = summary?.overview ?? null;
-  const fallbackTitle = overallTitle(
-    confirmedItems,
-    missingItems,
-    premiumComparison,
-  );
-  const fallbackParagraphs = overallNarrativeParagraphs(
-    confirmedItems,
-    missingItems,
-    reviewItems,
-    premium,
-    premiumBenchmark,
-  );
-  const fallbackTakeaways = overallTakeaways(
-    confirmedItems,
-    missingItems,
-    reviewItems,
-    premium,
-    premiumBenchmark,
-    premiumComparison,
-  );
-  const overviewTitle = generatedOverview?.title || fallbackTitle;
-  const narrativeParagraphs = generatedOverview?.paragraphs.length
-    ? generatedOverview.paragraphs
-    : fallbackParagraphs;
-  const takeaways = generatedOverview?.takeaways.length
-    ? generatedOverview.takeaways
-    : fallbackTakeaways;
+
+  if (!generatedOverview) {
+    return (
+      <section aria-labelledby="portfolio-overview-title" className="space-y-4">
+        <div className="rounded-[28px] border border-zinc-200 bg-zinc-950 px-6 py-8 text-white sm:px-8">
+          <p className="font-mono text-[11px] font-semibold tracking-[0.16em] text-blue-300 uppercase">
+            전체 보험 총평
+          </p>
+          <h2
+            id="portfolio-overview-title"
+            className="mt-3 text-2xl font-semibold tracking-[-0.04em]"
+          >
+            총평을 생성하지 못했어요
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-300">
+            확인된 보장 정보는 그대로예요. 잠시 후 총평을 다시 생성해주세요.
+          </p>
+          <button
+            type="button"
+            className={`mt-5 ${primaryButtonClassName}`}
+            onClick={onRetry}
+          >
+            총평 다시 생성하기
+          </button>
+        </div>
+
+        <RecommendedInsuranceCards items={items} />
+      </section>
+    );
+  }
 
   return (
     <section aria-labelledby="portfolio-overview-title" className="space-y-4">
@@ -207,16 +204,16 @@ function PortfolioOverview({
               id="portfolio-overview-title"
               className="mt-3 max-w-2xl text-2xl font-semibold tracking-[-0.045em] text-balance sm:text-3xl"
             >
-              {overviewTitle}
+              {generatedOverview.title}
             </h2>
             <div className="mt-4 max-w-3xl space-y-3 text-sm leading-7 text-pretty text-zinc-300">
-              {narrativeParagraphs.map((paragraph) => (
+              {generatedOverview.paragraphs.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
 
             <div className="mt-6 grid gap-3 border-y border-white/10 py-4 text-sm sm:grid-cols-3">
-              {takeaways.map((takeaway) => (
+              {generatedOverview.takeaways.map((takeaway) => (
                 <div key={takeaway.label} className="min-w-0">
                   <p className="text-[11px] font-semibold tracking-[0.12em] text-blue-300 uppercase">
                     {takeaway.label}
@@ -302,137 +299,6 @@ function RecommendedInsuranceCards({
       </div>
     </article>
   );
-}
-
-function overallTitle(
-  confirmedItems: EssentialCoverageItem[],
-  missingItems: EssentialCoverageItem[],
-  premiumComparison:
-    ReturnType<typeof premiumSummaryComparison> | null | undefined,
-) {
-  const hasMissingDiagnosis = missingItems.some((item) =>
-    DIAGNOSIS_KINDS.has(item.kind),
-  );
-
-  if (premiumComparison?.tone === "low" && hasMissingDiagnosis) {
-    return "보험료는 낮지만, 진단비 공백을 먼저 확인해야 해요";
-  }
-  if (premiumComparison?.tone === "low") {
-    return "보험료는 권장 범위보다 낮고, 보장 구성을 함께 봐야 해요";
-  }
-  if (premiumComparison?.tone === "high" && missingItems.length > 0) {
-    return "보험료는 높은데, 현재 자료에서 비어 보이는 보장이 있어요";
-  }
-  if (premiumComparison?.tone === "high") {
-    return "보험료가 높은 편이라 보장 효율을 먼저 봐야 해요";
-  }
-  if (premiumComparison?.tone === "in_range" && missingItems.length > 0) {
-    return "보험료는 권장 범위 안이고, 빠진 보장을 이어서 확인해요";
-  }
-  if (premiumComparison?.tone === "in_range") {
-    return "보험료와 핵심 보장이 비교적 균형 있게 보여요";
-  }
-  if (confirmedItems.length >= 3 && missingItems.length > 0) {
-    return "기본 축은 보이지만, 비어 보이는 보장이 있어요";
-  }
-  if (confirmedItems.length > 0) {
-    return "확인된 가입과 미확인 보장이 함께 보여요";
-  }
-  return "현재 자료에서는 핵심 보장 가입을 확인하지 못했어요";
-}
-
-function overallNarrativeParagraphs(
-  confirmedItems: EssentialCoverageItem[],
-  missingItems: EssentialCoverageItem[],
-  reviewItems: EssentialCoverageItem[],
-  premium: PortfolioSummary["premium"] | null | undefined,
-  benchmark: PortfolioSummary["premium_benchmark"] | null | undefined,
-) {
-  return [
-    premiumSummaryNarrative(premium, benchmark),
-    coverageSummaryNarrative(confirmedItems, missingItems, reviewItems),
-    "이 총평은 업로드한 증권에서 읽은 담보명, 가입금액, 월 보험료를 기준으로 만든 1차 해석이에요. 실제 충분성은 피보험자 소득, 부양가족, 대출, 기존 병력, 약관의 면책·감액·갱신 조건까지 같이 봐야 해요.",
-  ].filter(Boolean);
-}
-
-function coverageSummaryNarrative(
-  confirmedItems: EssentialCoverageItem[],
-  missingItems: EssentialCoverageItem[],
-  reviewItems: EssentialCoverageItem[],
-) {
-  if (confirmedItems.length === 0) {
-    return `${itemLabels(missingItems, "사망·3대 진단비·실손")} 항목은 현재 올린 자료에서 찾지 못했어요. 다른 증권이나 특약명에 숨어 있는지는 추가 확인이 필요해요.`;
-  }
-
-  const confirmedText = itemLabels(confirmedItems, "");
-  if (missingItems.length === 0) {
-    const reviewText =
-      reviewItems.length > 0
-        ? ` 다만 ${itemLabels(reviewItems, "")}은 중복 가능성을 따로 봐야 해요.`
-        : "";
-    return `${confirmedText} 항목은 현재 자료에서 확인돼요.${reviewText} 가입금액이 충분한지와 지급 조건은 각 증권의 약관으로 한 번 더 확인해야 해요.`;
-  }
-
-  return `${confirmedText} 항목은 확인됐지만, ${itemLabels(missingItems, "")} 항목은 현재 올린 자료에서 찾지 못했어요. 특히 3대 진단비는 암·뇌혈관·심장질환을 함께 봐야 해서 빠진 축을 먼저 확인하는 게 좋아요.`;
-}
-
-function overallTakeaways(
-  confirmedItems: EssentialCoverageItem[],
-  missingItems: EssentialCoverageItem[],
-  reviewItems: EssentialCoverageItem[],
-  premium: PortfolioSummary["premium"] | null | undefined,
-  benchmark: PortfolioSummary["premium_benchmark"] | null | undefined,
-  premiumComparison:
-    ReturnType<typeof premiumSummaryComparison> | null | undefined,
-) {
-  return [
-    {
-      label: "보험료",
-      title: premiumComparison?.label ?? "보험료 확인 필요",
-      detail: premiumTakeawayDetail(premium, benchmark),
-    },
-    {
-      label: "보장 구성",
-      title: `${confirmedItems.length}/5개 확인`,
-      detail:
-        missingItems.length > 0
-          ? `${itemLabels(missingItems, "")} 항목은 현재 자료에서 미확인이에요.`
-          : "사망·3대 진단비·실손 축이 모두 보여요.",
-    },
-    {
-      label: "다음 확인",
-      title:
-        reviewItems.length > 0
-          ? "중복 여부 확인"
-          : missingItems.length > 0
-            ? "미확인 보장 확인"
-            : "약관 조건 확인",
-      detail:
-        reviewItems.length > 0
-          ? `${itemLabels(reviewItems, "")}의 중복 가입과 실제 보장 범위를 확인해요.`
-          : missingItems.length > 0
-            ? "다른 증권, 특약명, 가입설계서에 빠진 보장이 있는지 봐요."
-            : "면책, 감액, 갱신, 자기부담금 조건을 약관에서 확인해요.",
-    },
-  ];
-}
-
-function premiumTakeawayDetail(
-  premium: PortfolioSummary["premium"] | null | undefined,
-  benchmark: PortfolioSummary["premium_benchmark"] | null | undefined,
-) {
-  if (!premium || typeof premium.monthly_total !== "number") {
-    return "월 보험료 자료가 부족해 적정성을 판단하기 어려워요.";
-  }
-  if (!benchmark || premium.monthly_policy_count < 1) {
-    return `${formatWon(premium.monthly_total)}만 현재 자료에서 확인돼요.`;
-  }
-  return `${formatWon(premium.monthly_total)} / 권장 ${formatWon(benchmark.suggested_min_premium)}~${formatWon(benchmark.suggested_max_premium)}`;
-}
-
-function itemLabels(items: EssentialCoverageItem[], emptyCopy: string) {
-  if (items.length === 0) return emptyCopy;
-  return items.map((item) => item.label).join(" · ");
 }
 
 function RecommendedSingleCoverageCard({
@@ -975,28 +841,6 @@ function PositionLabel({
       {children}
     </div>
   );
-}
-
-function premiumSummaryNarrative(
-  premium: PortfolioSummary["premium"] | null | undefined,
-  benchmark: PortfolioSummary["premium_benchmark"] | null | undefined,
-) {
-  const comparison = premiumSummaryComparison(premium, benchmark);
-  if (!premium || typeof premium.monthly_total !== "number") {
-    return "";
-  }
-  if (!comparison || !benchmark || premium.monthly_policy_count < 1) {
-    return `월납으로 확인된 보험료는 ${formatWon(premium.monthly_total)}이에요.`;
-  }
-
-  const rangeText = `${benchmark.age_band_label} 평균 소득 기준 권장 범위 ${formatWon(benchmark.suggested_min_premium)}~${formatWon(benchmark.suggested_max_premium)}`;
-  if (comparison.tone === "low") {
-    return `월납으로 확인된 보험료는 ${formatWon(premium.monthly_total)}으로, ${rangeText}보다 낮아요. 보험료가 낮은 것 자체가 문제는 아니지만, 필요한 보장이 빠져서 낮게 보이는지 먼저 확인해야 해요.`;
-  }
-  if (comparison.tone === "high") {
-    return `월납으로 확인된 보험료는 ${formatWon(premium.monthly_total)}으로, ${rangeText}보다 높아요. 이 경우에는 보장이 충분해서 높은 건지, 중복 담보나 갱신형 보험료 때문에 부담이 커진 건지 나눠서 봐야 해요.`;
-  }
-  return `월납으로 확인된 보험료는 ${formatWon(premium.monthly_total)}으로, ${rangeText} 안에 있어요. 다만 권장 범위 안이라는 말이 보장이 충분하다는 뜻은 아니어서, 빠진 보장과 지급 조건을 함께 봐야 해요.`;
 }
 
 function progressPosition(amount: number, maxAmount: number) {

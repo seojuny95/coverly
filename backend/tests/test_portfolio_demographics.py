@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.services.analysis.service import analyze_portfolio
 from app.services.portfolio.demographics import resolve_portfolio_demographics
 from app.services.qa.service import answer_portfolio_question
 
@@ -111,24 +110,6 @@ def test_policy_demographic_schema_rejects_invalid_or_inconsistent_values() -> N
                 }
             }
         )
-
-
-def test_analysis_exposes_conflict_in_resolved_demographics_and_notice() -> None:
-    policies = [
-        _policy("p1", age=35, gender="여성"),
-        _policy("p2", age=41, gender="남성"),
-    ]
-
-    result = analyze_portfolio(
-        policies,
-        demographics=InsuredDemographics(age=35, gender="여성", source="policy"),
-    )
-
-    assert result.demographics.status == "conflict"
-    assert result.demographics.source == "unknown"
-    assert result.age is None
-    assert result.life_stage == "미상"
-    assert any("서로 달라" in notice for notice in result.notices)
 
 
 def test_qa_uses_same_policy_verified_demographics_resolver() -> None:
