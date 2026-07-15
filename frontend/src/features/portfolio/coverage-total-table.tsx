@@ -34,10 +34,10 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
             약속된 보장금액은 보험별로 합산해 봐요
           </LegendItem>
           <LegendItem
-            term="실손보상"
+            term="실손의료"
             termClassName="bg-emerald-50 text-emerald-700"
           >
-            실제 손해 기준이라 중복 합산하지 않아요
+            의료비 실손 담보라 중복 합산하지 않아요
           </LegendItem>
           <LegendItem
             term="개별 확인"

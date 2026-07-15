@@ -260,6 +260,32 @@ def build_evidence_catalog(
             )
         )
 
+    damage_index = 1
+    for group in facts.coverage_summary.damage_coverages:
+        for damage_policy in group.policies:
+            label = (
+                " · ".join(
+                    item for item in (damage_policy.insurer, damage_policy.product_name) if item
+                )
+                or "상품 정보 미확인"
+            )
+            for coverage in damage_policy.coverages:
+                amount = f" 가입금액 {coverage.original_amount}" if coverage.original_amount else ""
+                items.append(
+                    ConsultationEvidence(
+                        id=f"damage:{damage_index}",
+                        fact=(
+                            f"{label} ({group.insurance_type}) "
+                            f"{coverage.coverage_name}{amount} 확인"
+                        ),
+                        policy_id=damage_policy.policy_id,
+                        insurer=damage_policy.insurer,
+                        product_name=damage_policy.product_name,
+                        coverage_name=coverage.coverage_name,
+                    )
+                )
+                damage_index += 1
+
     for index, category in enumerate(missing_categories, start=1):
         items.append(
             ConsultationEvidence(

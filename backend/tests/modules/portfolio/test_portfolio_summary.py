@@ -479,7 +479,7 @@ def test_essential_check_flags_narrow_diagnoses_and_multiple_indemnity_contracts
     assert items["indemnity"].status == "needs_review"
 
 
-def test_essential_indemnity_check_does_not_exclude_auto_policy_rows() -> None:
+def test_essential_indemnity_check_excludes_auto_policy_rows() -> None:
     policy = _policy(
         "auto",
         "자동차보험",
@@ -491,8 +491,31 @@ def test_essential_indemnity_check_does_not_exclude_auto_policy_rows() -> None:
     items = {item.kind: item for item in result.essential_coverage_check.items}
 
     assert result.indemnity_coverages == []
-    assert items["indemnity"].status == "well_prepared"
-    assert items["indemnity"].matched_coverage_names == ["자동차상해실손의료비"]
+    assert items["indemnity"].status == "not_found"
+    assert items["indemnity"].matched_coverage_names == []
+
+
+def test_essential_indemnity_check_excludes_auto_fine_actual_loss_terms() -> None:
+    policy = _policy(
+        "driver",
+        "손해보험",
+        "보험사A",
+        [
+            {
+                "담보명": "자동차사고벌금(대물, 실손)",
+                "가입금액": "500만원",
+                "지급유형": "실손",
+            }
+        ],
+        tags=["운전자보험"],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    items = {item.kind: item for item in result.essential_coverage_check.items}
+
+    assert result.indemnity_coverages == []
+    assert items["indemnity"].status == "not_found"
+    assert items["indemnity"].matched_coverage_names == []
 
 
 def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> None:

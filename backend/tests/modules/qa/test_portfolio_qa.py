@@ -82,6 +82,28 @@ def _named_insurer_policies(insurer: str) -> list[PolicyInput]:
     ]
 
 
+def _non_life_cancer_policy() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {
+                    "보험사": "흥국화재",
+                    "상품명": "건강보험",
+                    "보험분류": "손해보험",
+                },
+                "보장목록": [
+                    {
+                        "담보명": "암진단비(유사암제외)",
+                        "가입금액": "6,000만원",
+                        "지급유형": "정액",
+                    }
+                ],
+            }
+        )
+    ]
+
+
 def _official_answer(question: str) -> RagAnswer:
     assert question
     return RagAnswer(
@@ -592,6 +614,44 @@ def test_qa_does_not_call_llm_for_deterministic_amount_questions() -> None:
 
     assert amount.status == "answered"
     assert "30,000,000원" in amount.answer
+
+
+def test_qa_answers_short_lookup_for_non_life_damage_coverage() -> None:
+    result = answer_portfolio_question("암진단비는?", _non_life_cancer_policy())
+
+    assert result.status == "answered"
+    assert "암진단비(유사암제외)" in result.answer
+    assert "6,000만원" in result.answer
+    assert {citation.coverage_name for citation in result.citations} == {"암진단비(유사암제외)"}
+
+
+def test_qa_answers_amount_lookup_for_non_life_damage_coverage() -> None:
+    result = answer_portfolio_question("암진단비는 얼마야?", _non_life_cancer_policy())
+
+    assert result.status == "answered"
+    assert "6,000만원" in result.answer
+    assert "확인 가능한 가입금액을 찾지 못했어요" not in result.answer
+
+
+def test_qa_answers_missing_indemnity_without_sales_guidance() -> None:
+    result = answer_portfolio_question("실손은?", _non_life_cancer_policy())
+
+    assert result.status == "answered"
+    assert "실손의료보험 담보를 확인하지 못했어요" in result.answer
+    assert "가입을 고려" not in result.answer
+    assert "가입하세요" not in result.answer
+
+
+def test_qa_answers_adequacy_question_from_essential_coverage_check() -> None:
+    result = answer_portfolio_question(
+        "원래 암진단비는 얼마정도 적당해?", _non_life_cancer_policy()
+    )
+
+    assert result.status == "answered"
+    assert "60,000,000원" in result.answer
+    assert "30,000,000원~50,000,000원" in result.answer
+    assert any("공식 기준이 아니라" in limitation for limitation in result.limitations)
+    assert "확인 가능한 가입금액을 찾지 못했어요" not in result.answer
 
 
 def test_qa_fast_amount_path_skips_planner_llm_and_policy_rag(

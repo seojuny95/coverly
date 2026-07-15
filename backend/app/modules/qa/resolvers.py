@@ -26,8 +26,10 @@ from app.rag.policy import PolicyGenerationResult, PolicyRetrievalHit
 _CLAIM_HOWTO_TERMS = ("청구", "신청", "접수", "서류")
 _AUTO_CLAIM_TERMS = ("자동차", "사고", "대물", "대인", "접촉", "추돌", "차량", "주차")
 _AMOUNT_TERMS = ("합계", "총액", "얼마", "가입금액")
+_ADEQUACY_TERMS = ("적당", "적정", "충분", "권장", "추천", "얼마정도", "어느 정도")
 _STATUS_TERMS = ("추출 상태", "분석 상태", "제외된", "확인 못한")
 _HOLDING_TERMS = ("몇 개", "몇개", "몇 건", "몇건", "보유 중", "목록", "가입한 보험")
+_INDEMNITY_LOOKUP_TERMS = ("실손", "실비", "실손의료", "실손의료보험", "실손의료비")
 _OFFICIAL_RAG_TERMS = (
     "계약 전 알릴 의무",
     "고지의무",
@@ -85,9 +87,15 @@ def resolve_precomputed_answer(
         if response is not None:
             return with_demographics(response, context.insured)
 
-    if not context.facts.policies and not context.auto_policies:
+    if not _has_any_uploaded_policy_data(context):
         return with_demographics(_no_uploaded_policies_response(), context.insured)
-    if any(term in context.question for term in _AMOUNT_TERMS):
+    if _is_adequacy_question(context.question):
+        response = _answer_adequacy_lookup(context.question, context.facts, context.catalog)
+        if response is not None:
+            return with_demographics(response, context.insured)
+    if any(term in context.question for term in _AMOUNT_TERMS) and not _is_adequacy_question(
+        context.question
+    ):
         response = _answer_amount(context.question, context.facts, context.catalog)
         return with_demographics(response, context.insured)
     if any(term in context.question for term in _STATUS_TERMS):
@@ -98,6 +106,9 @@ def resolve_precomputed_answer(
         return with_demographics(response, context.insured)
     if any(term in context.question for term in _CLAIM_HOWTO_TERMS):
         response = _answer_claim_channels(context.policies, context.facts, context.question)
+        return with_demographics(response, context.insured)
+    response = _answer_coverage_lookup(context.question, context.facts, context.catalog)
+    if response is not None:
         return with_demographics(response, context.insured)
 
     policy_catalog = _policy_session_catalog(
@@ -204,6 +215,14 @@ def _no_uploaded_policies_response() -> PortfolioQuestionResponse:
         citations=[],
         limitations=["보험증권을 먼저 업로드해 주세요."],
         suggestions=["업로드한 증권에서 어떤 보장을 확인할 수 있어?"],
+    )
+
+
+def _has_any_uploaded_policy_data(context: QaContext) -> bool:
+    return bool(
+        context.facts.policies
+        or context.auto_policies
+        or context.facts.coverage_summary.damage_coverages
     )
 
 
@@ -378,6 +397,9 @@ def _answer_amount(
         selected_totals = matches
 
     if not selected_totals:
+        damage_response = _answer_damage_coverage_lookup(question, facts, catalog)
+        if damage_response is not None:
+            return damage_response
         return PortfolioQuestionResponse(
             status="no_data",
             answer=(
@@ -409,6 +431,114 @@ def _answer_amount(
             f"확인 가능한 정액형 담보 **{len(selected_totals)}종**의 가입금액 합계는 "
             f"**{total_amount:,}원**이에요.\n\n{items}"
         )
+    return _fact_response(content, evidence_ids, catalog, facts)
+
+
+def _answer_coverage_lookup(
+    question: str,
+    facts: PortfolioFacts,
+    catalog: EvidenceCatalog,
+) -> PortfolioQuestionResponse | None:
+    if any(term in question for term in _INDEMNITY_LOOKUP_TERMS):
+        return _answer_indemnity_lookup(facts, catalog)
+    return _answer_damage_coverage_lookup(question, facts, catalog)
+
+
+def _answer_adequacy_lookup(
+    question: str,
+    facts: PortfolioFacts,
+    catalog: EvidenceCatalog,
+) -> PortfolioQuestionResponse | None:
+    target = _essential_target_kind(question)
+    if target is None:
+        return None
+    item = next(
+        (
+            candidate
+            for candidate in facts.coverage_summary.essential_coverage_check.items
+            if candidate.kind == target
+        ),
+        None,
+    )
+    if item is None:
+        return None
+
+    confirmed = _format_confirmed_amount(item.confirmed_amount)
+    reference = _format_reference_range(item.reference_min_amount, item.reference_max_amount)
+    lines = [item.detail]
+    if confirmed is not None:
+        lines.append(f"현재 확인된 금액은 **{confirmed}**이에요.")
+    if reference is not None:
+        lines.append(f"일반 점검용 참고 범위는 **{reference}**로 보고 있어요.")
+    lines.append("다만 적정 금액은 소득, 부양가족, 치료 중 생활비 필요액에 따라 달라져요.")
+
+    sections = [
+        AnswerSection(
+            title="현재 확인된 보장",
+            content="\n".join(f"- {line}" for line in lines),
+            basis="general_guidance",
+        )
+    ]
+    evidence_ids = _evidence_ids_for_coverage_names(item.matched_coverage_names, catalog)
+    return PortfolioQuestionResponse(
+        status="answered",
+        answer="\n\n".join(
+            _markdown_section(section.title, section.content) for section in sections
+        ),
+        sections=sections,
+        citations=[
+            citation_from_evidence(catalog.by_id[evidence_id])
+            for evidence_id in evidence_ids
+            if evidence_id in catalog.by_id
+        ],
+        limitations=standard_limitations(facts)
+        + ["참고 범위는 공식 기준이 아니라 보장 점검을 위한 일반 가이드입니다."],
+        suggestions=_fact_suggestions(facts),
+    )
+
+
+def _answer_indemnity_lookup(
+    facts: PortfolioFacts,
+    catalog: EvidenceCatalog,
+) -> PortfolioQuestionResponse:
+    if facts.coverage_summary.indemnity_coverages:
+        evidence_ids = [
+            item.id
+            for item in catalog.items
+            if item.id.startswith("indemnity:") and item.coverage_name is not None
+        ]
+        names = [item.coverage_name for item in facts.coverage_summary.indemnity_coverages]
+        content = "실손의료보험 관련 담보가 확인돼요.\n\n" + "\n".join(
+            f"- {name}" for name in names
+        )
+        return _fact_response(content, evidence_ids, catalog, facts)
+
+    gap_ids = [
+        item.id
+        for item in catalog.items
+        if item.id.startswith("gap:") and item.coverage_name == "실손의료"
+    ]
+    content = "현재 업로드된 증권에서는 **실손의료보험 담보를 확인하지 못했어요.**"
+    return _fact_response(content, gap_ids, catalog, facts)
+
+
+def _answer_damage_coverage_lookup(
+    question: str,
+    facts: PortfolioFacts,
+    catalog: EvidenceCatalog,
+) -> PortfolioQuestionResponse | None:
+    matches = [
+        item
+        for item in catalog.items
+        if item.id.startswith("damage:")
+        and item.coverage_name is not None
+        and query_contains_canonical_name(question, _base_coverage_name(item.coverage_name))
+    ]
+    if not matches:
+        return None
+
+    evidence_ids = [item.id for item in matches]
+    content = "\n".join(f"- {item.fact}" for item in matches)
     return _fact_response(content, evidence_ids, catalog, facts)
 
 
@@ -562,6 +692,55 @@ def _fact_suggestions(facts: PortfolioFacts) -> list[str]:
 
 def _is_overall_amount_question(question: str) -> bool:
     return any(term in question for term in ("전체", "총합", "모든", "총액"))
+
+
+def _is_adequacy_question(question: str) -> bool:
+    return any(term in question for term in _ADEQUACY_TERMS)
+
+
+def _essential_target_kind(question: str) -> str | None:
+    if "사망" in question:
+        return "death"
+    if "암" in question:
+        return "cancer"
+    if "뇌" in question:
+        return "cerebrovascular"
+    if "심장" in question or "심질환" in question or "허혈성" in question:
+        return "ischemic_heart"
+    return None
+
+
+def _format_confirmed_amount(amount: int | None) -> str | None:
+    if amount is None:
+        return None
+    return f"{amount:,}원"
+
+
+def _format_reference_range(min_amount: int | None, max_amount: int | None) -> str | None:
+    if min_amount is None or max_amount is None:
+        return None
+    if min_amount == max_amount:
+        return f"{min_amount:,}원"
+    return f"{min_amount:,}원~{max_amount:,}원"
+
+
+def _evidence_ids_for_coverage_names(
+    coverage_names: list[str],
+    catalog: EvidenceCatalog,
+) -> list[str]:
+    evidence_ids: list[str] = []
+    for coverage_name in coverage_names:
+        base_name = _base_coverage_name(coverage_name)
+        for item in catalog.items:
+            if item.coverage_name is None:
+                continue
+            if query_contains_canonical_name(base_name, _base_coverage_name(item.coverage_name)):
+                evidence_ids.append(item.id)
+    return list(dict.fromkeys(evidence_ids))
+
+
+def _base_coverage_name(coverage_name: str) -> str:
+    return coverage_name.split("(")[0].strip() or coverage_name
 
 
 def _markdown_section(title: str, content: str) -> str:

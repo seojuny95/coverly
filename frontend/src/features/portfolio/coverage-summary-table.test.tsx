@@ -54,7 +54,7 @@ describe("CoverageSummaryTable", () => {
   it("flags a cross-insurer indemnity coverage as a duplicate to check", () => {
     render(<CoverageSummaryTable summary={summary} />);
     expect(screen.getByText("실손입원")).toBeInTheDocument();
-    expect(screen.getByText("실손보상")).toBeInTheDocument();
+    expect(screen.getByText("실손의료")).toBeInTheDocument();
     expect(screen.getByText("중복 확인")).toBeInTheDocument();
   });
 
