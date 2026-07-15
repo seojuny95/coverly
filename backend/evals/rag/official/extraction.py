@@ -8,6 +8,7 @@ text. It intentionally does not embed, search, or generate answers.
 from __future__ import annotations
 
 import json
+import re
 from argparse import ArgumentParser
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -150,8 +151,10 @@ def _evaluate_case(case: ExtractionEvalCase, chunk: RagChunk | None) -> Extracti
         and chunk.page_end == case.expected_page_end
     )
     citation = chunk.citation_label or ""
-    citation_matched = all(term in citation for term in case.expected_citation_contains)
-    text_covered = all(term in chunk.text for term in case.must_include)
+    citation_matched = all(
+        _contains_normalized(citation, term) for term in case.expected_citation_contains
+    )
+    text_covered = all(_contains_normalized(chunk.text, term) for term in case.must_include)
     failed_checks = tuple(
         check
         for check, passed in (
@@ -181,6 +184,14 @@ def _int_value(value: object) -> int:
     if not isinstance(value, int):
         raise ValueError(f"expected int value: {value!r}")
     return value
+
+
+def _contains_normalized(text: str, term: str) -> bool:
+    return _normalize_text(term) in _normalize_text(text)
+
+
+def _normalize_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def _rate(values: Iterable[bool]) -> float:

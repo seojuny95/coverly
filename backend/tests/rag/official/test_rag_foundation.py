@@ -272,7 +272,7 @@ def test_extraction_eval_fixture_passes_current_official_sources() -> None:
     cases = load_extraction_eval_cases()
     report = evaluate_extraction(cases)
 
-    assert report.total == 8
+    assert report.total == 50
     assert report.pass_rate == 1.0
     assert report.chunk_found_rate == 1.0
     assert report.metadata_match_rate == 1.0
@@ -285,7 +285,7 @@ def test_extraction_eval_fixture_uses_existing_chunks_without_pii() -> None:
     chunks_by_id = {chunk.id: chunk for chunk in load_official_chunks()}
     fixture_text = EXTRACTION_EVAL_FIXTURE.read_text(encoding="utf-8")
 
-    assert len(cases) == 8
+    assert len(cases) == 50
     assert len({case.id for case in cases}) == len(cases)
     assert all(case.chunk_id in chunks_by_id for case in cases)
     assert re.search(r"\b\d{6}-[1-4]\d{6}\b", fixture_text) is None
