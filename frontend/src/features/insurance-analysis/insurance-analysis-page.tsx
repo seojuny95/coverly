@@ -352,7 +352,7 @@ export function InsuranceAnalysisPage({
                       <span
                         id={`classification-help-${classification}`}
                         role="tooltip"
-                        className="pointer-events-none absolute top-7 right-0 z-10 hidden w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg group-focus-within:block group-hover:block"
+                        className="pointer-events-none absolute right-0 bottom-7 z-10 hidden w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg group-focus-within:block group-hover:block"
                       >
                         {CLASSIFICATION_HELP[classification]}
                       </span>
