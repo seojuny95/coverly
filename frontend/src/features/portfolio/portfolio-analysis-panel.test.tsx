@@ -6,6 +6,28 @@ import { PortfolioAnalysisPanel } from "./portfolio-analysis-panel";
 import type { PortfolioSummary } from "./portfolio-api";
 
 const noop = () => {};
+const officialFuneralSource = {
+  label: "한국소비자원 · 평균 장례비용 조사",
+  url: "https://www.kca.go.kr",
+  published_at: "2004-09-22",
+  reliability: "official" as const,
+  caveat: "장례비용은 시기, 지역, 장례 방식에 따라 달라질 수 있어요.",
+};
+const diagnosisSource = {
+  label: "시그널플래너 · 3대 진단비 설명",
+  url: "https://blog.signalplanner.co.kr/5344/",
+  published_at: "2022-01-01",
+  reliability: "private_guidance" as const,
+  caveat: "진단비 금액은 개인 상황과 상품 조건에 따라 달라질 수 있어요.",
+};
+const indemnitySource = {
+  label: "실손24 · 서비스 안내",
+  url: "https://www.silson24.or.kr",
+  published_at: "2025-01-01",
+  reliability: "official" as const,
+  caveat:
+    "실손 청구 가능 범위는 의료기관과 보험회사 시스템에 따라 달라질 수 있어요.",
+};
 
 const summary: PortfolioSummary = {
   totals: [],
@@ -33,6 +55,8 @@ const summary: PortfolioSummary = {
         confirmed_amount: 100_000_000,
         reference_min_amount: 10_000_000,
         reference_max_amount: 20_000_000,
+        reference_basis: "장례비와 초기 정리 비용을 먼저 보는 점검용 범위",
+        reference_sources: [officialFuneralSource],
         coverage_count: 1,
         detail: "업로드한 전체 보험에서 사망 보장이 확인돼요.",
         matched_coverage_names: ["질병사망"],
@@ -44,6 +68,8 @@ const summary: PortfolioSummary = {
         confirmed_amount: 35_000_000,
         reference_min_amount: 30_000_000,
         reference_max_amount: 50_000_000,
+        reference_basis: "3대 진단비 점검용 범위",
+        reference_sources: [diagnosisSource],
         coverage_count: 2,
         detail:
           "일반암·유사암·고액암·소액암을 포함해 확인된 암 진단비를 모았어요.",
@@ -56,6 +82,8 @@ const summary: PortfolioSummary = {
         confirmed_amount: null,
         reference_min_amount: 30_000_000,
         reference_max_amount: 30_000_000,
+        reference_basis: "3대 진단비 점검용 범위",
+        reference_sources: [diagnosisSource],
         coverage_count: 0,
         detail: "현재 올린 전체 보험에서는 확인하지 못했어요.",
         matched_coverage_names: [],
@@ -67,6 +95,8 @@ const summary: PortfolioSummary = {
         confirmed_amount: null,
         reference_min_amount: 20_000_000,
         reference_max_amount: 30_000_000,
+        reference_basis: "3대 진단비 점검용 범위",
+        reference_sources: [diagnosisSource],
         coverage_count: 0,
         detail: "현재 올린 증권에서는 확인하지 못했어요.",
         matched_coverage_names: [],
@@ -78,6 +108,9 @@ const summary: PortfolioSummary = {
         confirmed_amount: null,
         reference_min_amount: null,
         reference_max_amount: null,
+        reference_basis:
+          "실손은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인",
+        reference_sources: [indemnitySource],
         coverage_count: 2,
         detail: "실손의료보험 가입 사실이 확인돼요.",
         matched_coverage_names: ["질병실손의료비", "상해실손의료비"],
@@ -278,6 +311,9 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.getByText("실손의료보험")).toBeInTheDocument();
   expect(screen.getByText("기본 장례비 기준")).toBeInTheDocument();
   expect(screen.getAllByText("민간 가이드 기준").length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/공식 출처:/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/아티클·블로그 출처:/).length).toBeGreaterThan(0);
+  expect(screen.getByText(/장례비와 초기 정리 비용/)).toBeInTheDocument();
   expect(screen.queryByText("가입이 보이는 항목")).not.toBeInTheDocument();
   expect(screen.queryByText("자료에서 찾지 못한 항목")).not.toBeInTheDocument();
   expect(screen.queryByText("함께 분석한 보험")).not.toBeInTheDocument();

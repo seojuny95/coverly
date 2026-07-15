@@ -593,7 +593,11 @@ def test_essential_coverage_check_scans_every_policy_for_core_coverages() -> Non
         "indemnity": "well_prepared",
     }
     assert items["death"].matched_coverage_names == ["교통상해사망"]
+    assert items["death"].reference_basis == "장례비와 초기 정리 비용을 먼저 보는 점검용 범위"
+    assert items["death"].reference_sources[0].reliability == "official"
     assert items["cancer"].confirmed_amount == 35_000_000
+    assert items["cancer"].reference_sources[0].reliability == "private_guidance"
+    assert items["indemnity"].reference_sources[0].label == "실손24 · 서비스 안내"
     assert items["cancer"].matched_coverage_names == ["유사암진단비", "일반암진단비"]
 
 
