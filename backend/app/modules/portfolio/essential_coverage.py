@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from app.modules.coverage.indemnity import classify_indemnity
 from app.modules.portfolio.death_benefit_guides import (
@@ -49,11 +50,27 @@ _AUTO_POLICY_COVERAGE_TERMS = (
     "대인배상",
     "대물배상",
     "자기차량손해",
+    "자기차량",
+    "자차",
     "자기신체사고",
     "자동차상해",
     "무보험자동차",
     "무보험차상해",
     "무보험차에의한상해",
+)
+_AUTO_PRODUCT_TERMS = (
+    "자동차보험",
+    "개인용자동차",
+    "업무용자동차",
+    "영업용자동차",
+    "다이렉트자동차",
+    "하이카",
+)
+_FIRE_PRODUCT_TERMS = (
+    "화재보험",
+    "주택화재보험",
+    "주택종합보험",
+    "재물보험",
 )
 
 _SPECIAL_COVERAGE_RULES: dict[SpecialPolicyKind, tuple[tuple[str, tuple[str, ...], str], ...]] = {
@@ -135,6 +152,12 @@ _SPECIAL_COVERAGE_RULES: dict[SpecialPolicyKind, tuple[tuple[str, tuple[str, ...
 }
 
 
+@dataclass(frozen=True)
+class _SpecialPolicyMatch:
+    kind: SpecialPolicyKind
+    reason: str
+
+
 def build_essential_coverage_check(
     policies: list[PolicyInput],
     death_benefit_context: DeathBenefitGuideInput | None = None,
@@ -203,8 +226,8 @@ def build_special_policy_analyses(policies: list[PolicyInput]) -> list[SpecialPo
         "fire": [],
     }
     for policy in policies:
-        for kind in _special_policy_kinds(policy):
-            grouped[kind].append(policy)
+        for match in _special_policy_matches(policy):
+            grouped[match.kind].append(policy)
 
     analyses: list[SpecialPolicyAnalysis] = []
     ordered_kinds: tuple[SpecialPolicyKind, ...] = (
@@ -227,6 +250,7 @@ def build_special_policy_analyses(policies: list[PolicyInput]) -> list[SpecialPo
             }
         )
         coverage_checks = _build_special_coverage_checks(kind, coverage_names)
+        classification_reasons = _classification_reasons_for(kind, matched)
         analyses.append(
             SpecialPolicyAnalysis(
                 kind=kind,
@@ -234,6 +258,7 @@ def build_special_policy_analyses(policies: list[PolicyInput]) -> list[SpecialPo
                 policy_count=len(matched),
                 product_names=product_names,
                 confirmed_coverage_names=coverage_names,
+                classification_reasons=classification_reasons,
                 overview=_special_policy_overview(coverage_checks),
                 coverage_checks=coverage_checks,
             )
@@ -391,7 +416,7 @@ def _is_indemnity_coverage(coverage: CoverageInput, policy: PolicyInput) -> bool
     return classify_indemnity(coverage, policy=policy).medical_indemnity_status == "confirmed"
 
 
-def _special_policy_kinds(policy: PolicyInput) -> tuple[SpecialPolicyKind, ...]:
+def _special_policy_matches(policy: PolicyInput) -> tuple[_SpecialPolicyMatch, ...]:
     category = _normalize(policy.기본정보.보험분류 or "")
     product = _normalize(policy.기본정보.상품명 or "")
     tags = tuple(_normalize(tag) for tag in _product_tags(policy))
@@ -399,21 +424,49 @@ def _special_policy_kinds(policy: PolicyInput) -> tuple[SpecialPolicyKind, ...]:
     identity = f"{category} {product} {tags_text}"
     coverage_names = [_normalize(coverage.담보명) for coverage in policy.보장목록]
 
-    kinds: list[SpecialPolicyKind] = []
+    matches: list[_SpecialPolicyMatch] = []
     if (
-        "자동차" in category
-        or "자동차보험" in product
-        or "자동차" in tags
-        or _has_auto_policy_coverages(category, tags, coverage_names)
+        _normalize("자동차보험") in category
+        or any(term in product for term in _normalized_terms(_AUTO_PRODUCT_TERMS))
+        or any(_normalize("자동차") in tag or _normalize("자동차보험") in tag for tag in tags)
     ):
-        kinds.append("auto")
-    if "운전자" in identity:
-        kinds.append("driver")
-    if "여행자" in identity or "여행보험" in identity or "해외여행" in identity:
-        kinds.append("travel")
+        matches.append(
+            _SpecialPolicyMatch(
+                "auto",
+                "보험분류, 상품명 또는 상품태그에서 자동차보험 성격이 확인돼요.",
+            )
+        )
+    elif _has_auto_policy_coverages(category, tags, coverage_names):
+        matches.append(
+            _SpecialPolicyMatch(
+                "auto",
+                "손해보험 증권 안에서 대인배상, 대물배상, 자차처럼 자동차보험 담보명이 확인돼요.",
+            )
+        )
+    if "운전자" in identity and _is_damage_policy_identity(category, tags):
+        matches.append(
+            _SpecialPolicyMatch(
+                "driver",
+                "손해보험 증권 안에서 운전자보험 상품명 또는 태그가 확인돼요.",
+            )
+        )
+    if (
+        "여행자" in identity or "여행보험" in identity or "해외여행" in identity
+    ) and _is_damage_policy_identity(category, tags):
+        matches.append(
+            _SpecialPolicyMatch(
+                "travel",
+                "손해보험 증권 안에서 여행자보험 상품명 또는 태그가 확인돼요.",
+            )
+        )
     if _is_fire_policy(category, product, tags, coverage_names):
-        kinds.append("fire")
-    return tuple(dict.fromkeys(kinds))
+        matches.append(
+            _SpecialPolicyMatch(
+                "fire",
+                "손해보험 증권 안에서 화재, 주택, 재물 손해 관련 상품명이나 담보명이 확인돼요.",
+            )
+        )
+    return tuple(dict.fromkeys(matches))
 
 
 def _has_auto_policy_coverages(
@@ -444,7 +497,7 @@ def _is_fire_policy(
         return True
     if any(tag in {_normalize("화재보험"), _normalize("주택화재보험")} for tag in tags):
         return True
-    if _normalize("화재보험") in product or _normalize("주택화재보험") in product:
+    if any(term in product for term in _normalized_terms(_FIRE_PRODUCT_TERMS)):
         return True
     if not _is_damage_policy_identity(category, tags):
         return False
@@ -454,6 +507,20 @@ def _is_fire_policy(
         for term in terms
     )
     return any(any(term in name for term in fire_terms) for name in coverage_names)
+
+
+def _classification_reasons_for(kind: SpecialPolicyKind, policies: list[PolicyInput]) -> list[str]:
+    reasons = [
+        match.reason
+        for policy in policies
+        for match in _special_policy_matches(policy)
+        if match.kind == kind
+    ]
+    return list(dict.fromkeys(reasons))
+
+
+def _normalized_terms(terms: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(_normalize(term) for term in terms)
 
 
 def _is_damage_policy_identity(category: str, tags: tuple[str, ...]) -> bool:

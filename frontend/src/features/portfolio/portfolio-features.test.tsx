@@ -257,15 +257,16 @@ describe("portfolio features", () => {
                 confirmed_amount: 10_000_000,
                 reference_min_amount: 30_000_000,
                 reference_max_amount: 50_000_000,
-                reference_basis: "3대 진단비 점검용 범위",
+                reference_basis:
+                  "암 진단비는 치료 중 쉬는 기간의 생활비 성격까지 고려하는 기본 범위",
                 reference_sources: [
                   {
-                    label: "시그널플래너 · 3대 진단비 설명",
-                    url: "https://blog.signalplanner.co.kr/5344/",
-                    published_at: "2022-01-01",
+                    label: "비즈워치 · 암 진단비 평균 범위",
+                    url: "https://news.bizwatch.co.kr/article/finance/2024/07/05/0038",
+                    published_at: "2024-07-06",
                     reliability: "private_guidance",
                     caveat:
-                      "진단비 금액은 개인 상황과 상품 조건에 따라 달라질 수 있어요.",
+                      "암 진단비 금액은 소득, 가족 부양, 보험료 부담에 따라 달라질 수 있어요.",
                   },
                 ],
                 coverage_count: 1,
@@ -348,15 +349,16 @@ describe("portfolio features", () => {
                 confirmed_amount: 30_000_000,
                 reference_min_amount: 30_000_000,
                 reference_max_amount: 50_000_000,
-                reference_basis: "3대 진단비 점검용 범위",
+                reference_basis:
+                  "암 진단비는 치료 중 쉬는 기간의 생활비 성격까지 고려하는 기본 범위",
                 reference_sources: [
                   {
-                    label: "시그널플래너 · 3대 진단비 설명",
-                    url: "https://blog.signalplanner.co.kr/5344/",
-                    published_at: "2022-01-01",
+                    label: "비즈워치 · 암 진단비 평균 범위",
+                    url: "https://news.bizwatch.co.kr/article/finance/2024/07/05/0038",
+                    published_at: "2024-07-06",
                     reliability: "private_guidance",
                     caveat:
-                      "진단비 금액은 개인 상황과 상품 조건에 따라 달라질 수 있어요.",
+                      "암 진단비 금액은 소득, 가족 부양, 보험료 부담에 따라 달라질 수 있어요.",
                   },
                 ],
                 coverage_count: 1,

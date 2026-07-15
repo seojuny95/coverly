@@ -13,12 +13,20 @@ const deathBenefitSource = {
   reliability: "private_guidance" as const,
   caveat: "민간 재무설계 관점의 일반 가이드예요.",
 };
-const diagnosisSource = {
-  label: "시그널플래너 · 3대 진단비 설명",
-  url: "https://blog.signalplanner.co.kr/5344/",
-  published_at: "2022-01-01",
+const bizwatchDiagnosisSource = {
+  label: "비즈워치 · 암 진단비 평균 범위",
+  url: "https://news.bizwatch.co.kr/article/finance/2024/07/05/0038",
+  published_at: "2024-07-06",
   reliability: "private_guidance" as const,
-  caveat: "진단비 금액은 개인 상황과 상품 조건에 따라 달라질 수 있어요.",
+  caveat:
+    "암 진단비 금액은 소득, 가족 부양, 보험료 부담에 따라 달라질 수 있어요.",
+};
+const banksaladDiagnosisSource = {
+  label: "뱅크샐러드 · 3대 진단비 구성 예시",
+  url: "https://www.banksalad.com/articles/%EB%B3%B4%ED%97%98-%EC%A2%85%ED%95%A9%EB%B3%B4%ED%97%98-%EC%A7%88%EB%B3%B4%ED%97%98",
+  published_at: "2026-07-01",
+  reliability: "private_guidance" as const,
+  caveat: "구성 예시는 상품과 개인 상황에 따라 달라질 수 있어요.",
 };
 const indemnitySource = {
   label: "실손24 · 서비스 안내",
@@ -73,8 +81,9 @@ const summary: PortfolioSummary = {
         confirmed_amount: 35_000_000,
         reference_min_amount: 30_000_000,
         reference_max_amount: 50_000_000,
-        reference_basis: "3대 진단비 점검용 범위",
-        reference_sources: [diagnosisSource],
+        reference_basis:
+          "암 진단비는 치료 중 쉬는 기간의 생활비 성격까지 고려하는 기본 범위",
+        reference_sources: [bizwatchDiagnosisSource, banksaladDiagnosisSource],
         coverage_count: 2,
         detail:
           "일반암·유사암·고액암·소액암을 포함해 확인된 암 진단비를 모았어요.",
@@ -85,10 +94,11 @@ const summary: PortfolioSummary = {
         label: "뇌혈관질환 진단비",
         status: "not_found",
         confirmed_amount: null,
-        reference_min_amount: 30_000_000,
-        reference_max_amount: 30_000_000,
-        reference_basis: "3대 진단비 점검용 범위",
-        reference_sources: [diagnosisSource],
+        reference_min_amount: 10_000_000,
+        reference_max_amount: 20_000_000,
+        reference_basis:
+          "뇌혈관질환 진단비는 재활, 간병, 후유장해 가능성을 고려하는 기본 범위",
+        reference_sources: [banksaladDiagnosisSource],
         coverage_count: 0,
         detail: "현재 올린 전체 보험에서는 확인하지 못했어요.",
         matched_coverage_names: [],
@@ -98,10 +108,11 @@ const summary: PortfolioSummary = {
         label: "심장질환 진단비",
         status: "not_found",
         confirmed_amount: null,
-        reference_min_amount: 20_000_000,
-        reference_max_amount: 30_000_000,
-        reference_basis: "3대 진단비 점검용 범위",
-        reference_sources: [diagnosisSource],
+        reference_min_amount: 10_000_000,
+        reference_max_amount: 20_000_000,
+        reference_basis:
+          "심장질환 진단비는 시술, 수술, 입원으로 생길 수 있는 소득 공백을 고려하는 기본 범위",
+        reference_sources: [banksaladDiagnosisSource],
         coverage_count: 0,
         detail: "현재 올린 증권에서는 확인하지 못했어요.",
         matched_coverage_names: [],
@@ -129,6 +140,9 @@ const summary: PortfolioSummary = {
       policy_count: 1,
       product_names: ["개인용 자동차보험"],
       confirmed_coverage_names: ["대인배상Ⅰ", "대물배상"],
+      classification_reasons: [
+        "손해보험 증권 안에서 대인배상, 대물배상, 자차처럼 자동차보험 담보명이 확인돼요.",
+      ],
       overview:
         "상대방의 신체 피해와 상대방의 재물 피해는 확인돼요. 나머지는 현재 자료에서 더 확인해야 해요.",
       coverage_checks: [
@@ -324,7 +338,7 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(
     screen.queryByText("업로드한 전체 보험에서 사망 보장이 확인돼요."),
   ).not.toBeInTheDocument();
-  expect(screen.getAllByText("민간 가이드 기준").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("적정 진단비 감").length).toBeGreaterThan(0);
   expect(screen.getAllByText(/공식 출처:/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/아티클·블로그 출처:/).length).toBeGreaterThan(0);
   expect(screen.getByText(/생활비 공백/)).toBeInTheDocument();
@@ -340,6 +354,11 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   ).not.toBeInTheDocument();
   expect(screen.getByText("손해보험 분석")).toBeInTheDocument();
   expect(screen.getByText("자동차보험")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "손해보험 증권 안에서 대인배상, 대물배상, 자차처럼 자동차보험 담보명이 확인돼요.",
+    ),
+  ).toBeInTheDocument();
   expect(screen.getByText("운전자보험")).toBeInTheDocument();
   expect(screen.getByText("여행자보험")).toBeInTheDocument();
   expect(screen.getByText("화재보험")).toBeInTheDocument();

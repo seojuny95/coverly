@@ -202,6 +202,7 @@ class SpecialPolicyAnalysis(BaseModel):
     policy_count: int
     product_names: list[str] = Field(default_factory=list)
     confirmed_coverage_names: list[str] = Field(default_factory=list)
+    classification_reasons: list[str] = Field(default_factory=list)
     overview: str
     coverage_checks: list[SpecialCoverageCheck] = Field(default_factory=list)
 
