@@ -47,9 +47,7 @@ describe("InsuranceChatbot", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "가입금액 합계·집계에는 자동차 보험을 포함하지 않았어요.",
-      ),
+      screen.getByText("손해보험은 보장금 합계에 포함하지 않았어요."),
     ).toBeInTheDocument();
   });
 
@@ -126,7 +124,7 @@ describe("InsuranceChatbot", () => {
             "보상 조건·면책·지급 가능성은 약관 근거 없이 판단하지 않습니다.",
             "실손형 담보는 가입금액 합계에 포함하지 않았습니다.",
             "지급유형 또는 금액이 확인되지 않은 담보는 합계에 포함하지 않았습니다.",
-            "가입금액 합계·집계에는 자동차 보험을 포함하지 않았어요.",
+            "손해보험은 보장금 합계에 포함하지 않았어요.",
             "이 답변에만 필요한 안내예요.",
           ],
           suggestions: [],

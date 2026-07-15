@@ -25,7 +25,7 @@ function fixture(): InsuranceAnalysis {
           문자수: 100,
           기본정보: {
             상품명: "건강보험",
-            보험분류: "상해·질병·실손",
+            보험분류: "제3보험",
             피보험자정보: {
               나이: 35,
               성별: "여성",
@@ -59,7 +59,7 @@ describe("portfolio features", () => {
             totals: [
               {
                 category: "암 진단비",
-                majorCategory: "진단비",
+                majorCategory: "진단",
                 totalAmount: 10_000_000,
                 coverageCount: 1,
                 normalizedName: "암진단비",
@@ -79,10 +79,8 @@ describe("portfolio features", () => {
 
     await screen.findByText("1,000만원");
     const text = container.textContent ?? "";
-    expect(text.indexOf("상해·질병·실손")).toBeLessThan(
-      text.indexOf("보험금 합계"),
-    );
-    expect(text.indexOf("보험금 합계")).toBeLessThan(text.indexOf("건강보험"));
+    expect(text.indexOf("제3보험")).toBeLessThan(text.indexOf("보장금 합계"));
+    expect(text.indexOf("보장금 합계")).toBeLessThan(text.indexOf("건강보험"));
     expect(screen.getByText("1,000만원")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/portfolio/summary"),
@@ -97,7 +95,7 @@ describe("portfolio features", () => {
           totals: [
             {
               category: "암 진단비",
-              majorCategory: "진단비",
+              majorCategory: "진단",
               totalAmount: 150_001_000,
               coverageCount: 2,
               normalizedName: "암진단비",
@@ -105,7 +103,7 @@ describe("portfolio features", () => {
             },
             {
               category: "통원비",
-              majorCategory: "통원",
+              majorCategory: "치료",
               totalAmount: 3_000,
               coverageCount: 1,
               normalizedName: "통원비",
@@ -121,7 +119,7 @@ describe("portfolio features", () => {
 
     expect(screen.getByText("1억 5,000만원 1천원")).toBeInTheDocument();
     expect(screen.getByText("3천원")).toBeInTheDocument();
-    expect(screen.getByText("2개 합산")).toBeInTheDocument();
+    expect(screen.getByText("정액보상 · 2개 합산")).toBeInTheDocument();
   });
 
   test("groups every amount basis under the same coverage category", async () => {
@@ -134,7 +132,7 @@ describe("portfolio features", () => {
               totals: [
                 {
                   category: "암치료비",
-                  majorCategory: "치료비",
+                  majorCategory: "치료",
                   totalAmount: 10_000_000,
                   coverageCount: 1,
                   normalizedName: "암치료비",
@@ -148,7 +146,7 @@ describe("portfolio features", () => {
                   product_name: "건강보험",
                   coverage_name: "질병실손의료비",
                   original_amount: "5천만원",
-                  major_category: "치료비",
+                  major_category: "치료",
                   cross_insurer_duplicate: true,
                 },
               ],
@@ -158,7 +156,7 @@ describe("portfolio features", () => {
                   insurer: "보험사A",
                   product_name: "건강보험",
                   coverage_name: "특정치료비",
-                  major_category: "치료비",
+                  major_category: "치료",
                   original_amount: "1천만원",
                   reason: "지급 방식을 확인하지 못해 합계에는 더하지 않았어요.",
                 },
@@ -179,7 +177,7 @@ describe("portfolio features", () => {
     });
 
     const treatmentGroup = await screen.findByRole("rowgroup", {
-      name: "치료비",
+      name: "치료",
     });
     const otherGroup = screen.getByRole("rowgroup", { name: "기타" });
     expect(within(treatmentGroup).getByText("암치료비")).toBeInTheDocument();
@@ -187,13 +185,9 @@ describe("portfolio features", () => {
       within(treatmentGroup).getByText(/질병실손의료비/),
     ).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("특정치료비")).toBeInTheDocument();
-    expect(
-      within(treatmentGroup).getByText("합산 보장금액"),
-    ).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("실손형 보장")).toBeInTheDocument();
-    expect(
-      within(treatmentGroup).getByText("그대로 보는 보장"),
-    ).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("정액보상")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("실손보상")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("개별 확인")).toBeInTheDocument();
     for (const coverageName of ["암치료비", "질병실손의료비", "특정치료비"]) {
       const disclosure = within(treatmentGroup)
         .getByText(coverageName)
@@ -212,7 +206,7 @@ describe("portfolio features", () => {
       ),
     ).toHaveLength(2);
     expect(
-      screen.getByRole("table", { name: "보험금 합계" }),
+      screen.getByRole("table", { name: "보장금 합계" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/합산하지 않은 담보/)).not.toBeInTheDocument();
   });
@@ -252,7 +246,7 @@ describe("portfolio features", () => {
             baseline_notice: "참고 정보예요.",
             classifications: [
               {
-                classification: "상해·질병·실손",
+                classification: "제3보험",
                 policy_count: 1,
                 confirmed_total_count: 1,
                 confirmed_total_amount: 10_000_000,
@@ -494,7 +488,7 @@ describe("portfolio features", () => {
     expect(screen.getByLabelText("성별")).toBeInTheDocument();
   });
 
-  test("sends auto policies so the backend can report their exclusion", async () => {
+  test("sends damage policies so the backend can list them separately", async () => {
     const analysis = fixture();
     analysis.insuranceDocuments.push({
       id: "auto-1",
@@ -502,7 +496,7 @@ describe("portfolio features", () => {
       result: {
         status: "accepted",
         문자수: 50,
-        기본정보: { 보험분류: "자동차" },
+        기본정보: { 보험분류: "손해보험", 상품태그: ["자동차보험"] },
         보장목록: [],
       },
     });

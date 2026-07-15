@@ -41,14 +41,11 @@ type CoverageGroup = {
 };
 
 const MAJOR_CATEGORY_ORDER = [
-  "진단비",
-  "수술비",
-  "치료비",
-  "입원",
-  "통원",
-  "후유장해",
   "사망",
-  "간병",
+  "후유장해",
+  "진단",
+  "수술",
+  "치료",
   "기타",
 ];
 
@@ -58,53 +55,58 @@ export function CoverageSummaryTable({
   summary: PortfolioSummary;
 }) {
   const groups = buildCoverageGroups(summary);
+  const hasLifeThirdRows = groups.length > 0;
 
   return (
-    <div className="overflow-x-auto">
-      <table
-        aria-labelledby="coverage-total-title"
-        className="w-full min-w-[42rem] table-fixed text-left text-sm"
-      >
-        <colgroup>
-          <col className="w-[52%]" />
-          <col className="w-[23%]" />
-          <col className="w-[25%]" />
-        </colgroup>
-        <thead className="bg-zinc-50 text-xs text-zinc-500">
-          <tr>
-            <th scope="col" className="px-6 py-3 font-medium">
-              보장
-            </th>
-            <th scope="col" className="px-6 py-3 text-right font-medium">
-              금액
-            </th>
-            <th scope="col" className="px-6 py-3 text-right font-medium">
-              금액 해석 기준
-            </th>
-          </tr>
-        </thead>
-        {groups.map((group) => (
-          <tbody
-            key={group.majorCategory}
-            aria-label={group.majorCategory}
-            className="divide-y divide-zinc-100 border-t border-zinc-200"
+    <>
+      {hasLifeThirdRows ? (
+        <div className="overflow-x-auto">
+          <table
+            aria-labelledby="coverage-total-title"
+            className="w-full min-w-[42rem] table-fixed text-left text-sm"
           >
-            <tr className="bg-blue-50/50">
-              <th
-                colSpan={3}
-                scope="rowgroup"
-                className="px-6 py-3 text-xs font-semibold text-blue-700"
+            <colgroup>
+              <col className="w-[52%]" />
+              <col className="w-[23%]" />
+              <col className="w-[25%]" />
+            </colgroup>
+            <thead className="bg-zinc-50 text-xs text-zinc-500">
+              <tr>
+                <th scope="col" className="px-6 py-3 font-medium">
+                  보장
+                </th>
+                <th scope="col" className="px-6 py-3 text-right font-medium">
+                  금액
+                </th>
+                <th scope="col" className="px-6 py-3 text-right font-medium">
+                  금액 해석 기준
+                </th>
+              </tr>
+            </thead>
+            {groups.map((group) => (
+              <tbody
+                key={group.majorCategory}
+                aria-label={group.majorCategory}
+                className="divide-y divide-zinc-100 border-t border-zinc-200"
               >
-                {group.majorCategory}
-              </th>
-            </tr>
-            {group.rows.map((row) => (
-              <CoverageTableRow key={row.key} row={row} />
+                <tr className="bg-blue-50/50">
+                  <th
+                    colSpan={3}
+                    scope="rowgroup"
+                    className="px-6 py-3 text-xs font-semibold text-blue-700"
+                  >
+                    {group.majorCategory}
+                  </th>
+                </tr>
+                {group.rows.map((row) => (
+                  <CoverageTableRow key={row.key} row={row} />
+                ))}
+              </tbody>
             ))}
-          </tbody>
-        ))}
-      </table>
-    </div>
+          </table>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -166,7 +168,7 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right align-top">
-        <CoverageBasis tone="indemnity">실손형 보장</CoverageBasis>
+        <CoverageBasis tone="indemnity">실손보상</CoverageBasis>
       </td>
     </tr>
   );
@@ -192,7 +194,7 @@ function IndividualCoverage({ row }: { row: IndividualCoverageRow }) {
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right align-top">
-        <CoverageBasis tone="individual">그대로 보는 보장</CoverageBasis>
+        <CoverageBasis tone="individual">개별 확인</CoverageBasis>
       </td>
     </tr>
   );
@@ -320,5 +322,7 @@ function coverageSourceLabel(source: {
 }
 
 function summedBasisLabel(coverageCount: number) {
-  return coverageCount === 1 ? "합산 보장금액" : `${coverageCount}개 합산`;
+  return coverageCount === 1
+    ? "정액보상"
+    : `정액보상 · ${coverageCount}개 합산`;
 }

@@ -8,14 +8,37 @@ export function hasAnalyzableCoverage(result: InsuranceUploadResult): boolean {
   return coverages.some((coverage) => coverage.유형 !== "부가");
 }
 
-export function isAutoInsurance(result: InsuranceUploadResult): boolean {
-  return Boolean(result.기본정보?.보험분류?.includes("자동차"));
+export function isDamageInsurance(result: InsuranceUploadResult): boolean {
+  const classification = result.기본정보?.보험분류;
+  return (
+    classification === "손해보험" ||
+    classification === "자동차" ||
+    classification === "자동차보험" ||
+    classification === "운전자보험" ||
+    classification === "운전자상해보험" ||
+    classification === "여행자보험" ||
+    classification === "화재보험" ||
+    classification === "주택화재보험" ||
+    classification === "배상책임보험" ||
+    classification === "보증보험" ||
+    classification === "배상·화재·기타"
+  );
 }
 
-// Auto exclusion is kept to stay consistent with the backend is_auto_policy.
+export function isAutoInsurance(result: InsuranceUploadResult): boolean {
+  const classification = result.기본정보?.보험분류;
+  return (
+    classification === "자동차" ||
+    classification === "자동차보험" ||
+    Boolean(result.기본정보?.상품태그?.includes("자동차보험"))
+  );
+}
+
+// Damage insurance is handled separately from the life/third-insurance analysis.
 export function isAnalyzableDocument(document: AnalyzedInsurance): boolean {
   return (
-    !isAutoInsurance(document.result) && hasAnalyzableCoverage(document.result)
+    !isDamageInsurance(document.result) &&
+    hasAnalyzableCoverage(document.result)
   );
 }
 

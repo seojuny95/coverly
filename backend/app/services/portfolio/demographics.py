@@ -2,7 +2,7 @@
 
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.services.portfolio.summary import is_auto_policy
+from app.services.portfolio.summary import is_damage_policy
 
 
 def resolve_portfolio_demographics(
@@ -14,7 +14,7 @@ def resolve_portfolio_demographics(
     policy_values = {
         (info.나이, info.성별)
         for policy in policies
-        if not is_auto_policy(policy)
+        if not is_damage_policy(policy)
         if (info := policy.기본정보.피보험자정보) is not None
     }
 

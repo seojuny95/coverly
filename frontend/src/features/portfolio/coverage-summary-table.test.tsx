@@ -7,7 +7,7 @@ const summary: PortfolioSummary = {
   totals: [
     {
       category: "암진단비",
-      majorCategory: "진단비",
+      majorCategory: "진단",
       totalAmount: 30_000_000,
       coverageCount: 2,
       normalizedName: "암진단비",
@@ -28,7 +28,7 @@ const summary: PortfolioSummary = {
       original_amount: "5,000만원",
       insurer: "현대해상",
       product_name: "실손보험",
-      major_category: "입원",
+      major_category: "치료",
       cross_insurer_duplicate: true,
     },
   ],
@@ -48,28 +48,26 @@ describe("CoverageSummaryTable", () => {
     render(<CoverageSummaryTable summary={summary} />);
     expect(screen.getByText("암진단비")).toBeInTheDocument();
     expect(screen.getByText("3,000만원")).toBeInTheDocument();
-    expect(screen.getByText("2개 합산")).toBeInTheDocument();
+    expect(screen.getByText("정액보상 · 2개 합산")).toBeInTheDocument();
   });
 
   it("flags a cross-insurer indemnity coverage as a duplicate to check", () => {
     render(<CoverageSummaryTable summary={summary} />);
     expect(screen.getByText("실손입원")).toBeInTheDocument();
-    expect(screen.getByText("실손형 보장")).toBeInTheDocument();
+    expect(screen.getByText("실손보상")).toBeInTheDocument();
     expect(screen.getByText("중복 확인")).toBeInTheDocument();
   });
 
   it("renders an excluded coverage as an individually-viewed row", () => {
     render(<CoverageSummaryTable summary={summary} />);
     expect(screen.getByText("기타특약")).toBeInTheDocument();
-    expect(screen.getByText("그대로 보는 보장")).toBeInTheDocument();
+    expect(screen.getByText("개별 확인")).toBeInTheDocument();
   });
 
   it("groups rows under their major category headers", () => {
     render(<CoverageSummaryTable summary={summary} />);
-    expect(
-      screen.getByRole("rowgroup", { name: "진단비" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("rowgroup", { name: "입원" })).toBeInTheDocument();
+    expect(screen.getByRole("rowgroup", { name: "진단" })).toBeInTheDocument();
+    expect(screen.getByRole("rowgroup", { name: "치료" })).toBeInTheDocument();
     expect(screen.getByRole("rowgroup", { name: "기타" })).toBeInTheDocument();
   });
 
@@ -80,6 +78,8 @@ describe("CoverageSummaryTable", () => {
     expect(screen.getByText("3,000만원").closest("td")).toHaveClass(
       "align-top",
     );
-    expect(screen.getByText("2개 합산").closest("td")).toHaveClass("align-top");
+    expect(screen.getByText("정액보상 · 2개 합산").closest("td")).toHaveClass(
+      "align-top",
+    );
   });
 });
