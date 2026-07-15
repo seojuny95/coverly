@@ -189,6 +189,7 @@ def test_normalize_table_coverages_keeps_name_only_rider_tables() -> None:
         "| 대인배상Ⅰ | 자배법에서 정한 금액 |\n\n"
         "| 특약명 |\n"
         "| --- |\n"
+        "| 특별요율 |\n"
         "| 마일리지특약 |\n"
         "| 블랙박스특약 |\n"
     )
@@ -217,6 +218,20 @@ def test_normalize_table_coverages_keeps_name_only_rider_tables() -> None:
             "유형": "부가",
         },
     ]
+
+
+def test_normalize_coverages_drops_section_headers_from_model_rows() -> None:
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": "특별요율", "보장내용": None, "가입금액": "", "유형": "부가"},
+                {"담보명": "마일리지특약", "보장내용": None, "가입금액": "", "유형": "부가"},
+            ]
+        }
+
+    result = normalize_coverages("특별요율 마일리지특약", complete=fake_complete)
+
+    assert [coverage["담보명"] for coverage in result] == ["마일리지특약"]
 
 
 def test_build_coverage_source_includes_name_only_tables_with_strict_tables() -> None:
