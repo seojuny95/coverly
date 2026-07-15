@@ -62,6 +62,20 @@ _SECTION_HEADER_NAMES = (
     "기타특약",
     "특별요율",
 )
+_NOTICE_NAME_MARKERS = (
+    "보험금지급",
+    "보상되지",
+    "보상되지않",
+    "알리지",
+    "알려야",
+    "청약서",
+    "자필서명",
+    "직업이나직무",
+    "이륜자동차",
+    "감액될수있",
+    "거절되거나",
+    "사실그대로",
+)
 
 # One prompt for every policy type. The 담보/부가 split and the verbatim-amount
 # rules are structural (driven by the table's shape), so an unfriendly non-auto
@@ -159,6 +173,15 @@ def _normalized_header_name(value: str) -> str:
 def _is_section_header_name(value: str) -> bool:
     normalized = _normalized_header_name(value)
     return normalized in _SECTION_HEADER_NAMES
+
+
+def _is_notice_name(value: str) -> bool:
+    normalized = _normalized_header_name(value)
+    return len(normalized) >= 30 and any(marker in normalized for marker in _NOTICE_NAME_MARKERS)
+
+
+def _should_skip_coverage_name(value: str) -> bool:
+    return _is_section_header_name(value) or _is_notice_name(value)
 
 
 def _markdown_tables(source: str) -> list[list[list[str]]]:
@@ -287,7 +310,7 @@ def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
 
         name = cells[name_column].strip()
         raw_amount = cells[amount_column].strip() if amount_column is not None else ""
-        if not name or _is_section_header_name(name):
+        if not name or _should_skip_coverage_name(name):
             continue
 
         row_type: Literal["담보", "부가"] = "담보" if raw_amount else "부가"
@@ -494,7 +517,7 @@ def normalize_coverages(source: str, complete: JsonCompleter | None = None) -> l
             parsed = _CoverageRow.model_validate(row)
         except ValidationError:
             continue
-        if _is_section_header_name(parsed.담보명):
+        if _should_skip_coverage_name(parsed.담보명):
             continue
         coverages.append(_coverage_from_row(parsed, source))
     return coverages

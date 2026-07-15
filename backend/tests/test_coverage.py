@@ -234,6 +234,40 @@ def test_normalize_coverages_drops_section_headers_from_model_rows() -> None:
     assert [coverage["담보명"] for coverage in result] == ["마일리지특약"]
 
 
+def test_normalize_coverages_drops_notice_sentences_from_model_rows() -> None:
+    notice = (
+        "상해담보가입시, 보험기간 중에 피보험자가 직업이나 직무를 변경하거나 "
+        "이륜자동차를 계속적으로 사용하게 된 경우에는 지체없이 회사에 알려야 하며 "
+        "그렇지 않은 경우 보험금 지급이 거절되거나 감액될 수 있습니다."
+    )
+
+    def fake_complete(system: str, user: str) -> dict[str, object]:
+        return {
+            "보장목록": [
+                {"담보명": notice, "보장내용": None, "가입금액": "", "유형": "담보"},
+                {"담보명": "마일리지특약", "보장내용": None, "가입금액": "", "유형": "부가"},
+            ]
+        }
+
+    result = normalize_coverages(notice, complete=fake_complete)
+
+    assert [coverage["담보명"] for coverage in result] == ["마일리지특약"]
+
+
+def test_normalize_table_coverages_drops_notice_sentences() -> None:
+    source = (
+        "| 보장내용 |\n"
+        "| --- |\n"
+        "| 청약서 주요내용 작성시 사실 그대로를 알리지 않았거나, "
+        "자필서명을 본인이 직접서명(날인)하지 않은경우는 보상되지 않을 수 있습니다. |\n"
+        "| 마일리지특약 |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert [coverage["담보명"] for coverage in result] == ["마일리지특약"]
+
+
 def test_build_coverage_source_includes_name_only_tables_with_strict_tables() -> None:
     strict_table: Table = (
         ("담보종목", "보험가입금액"),
