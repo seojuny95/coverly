@@ -346,7 +346,7 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.queryByText("자료에서 찾지 못한 항목")).not.toBeInTheDocument();
   expect(screen.queryByText("함께 분석한 보험")).not.toBeInTheDocument();
   expect(
-    screen.queryByRole("heading", { name: "사망·3대 진단비·실손" }),
+    screen.queryByRole("heading", { name: "사망·3대 진단비·실손의료비" }),
   ).not.toBeInTheDocument();
   expect(screen.queryByText("암진단비 · 유사암진단비")).not.toBeInTheDocument();
   expect(

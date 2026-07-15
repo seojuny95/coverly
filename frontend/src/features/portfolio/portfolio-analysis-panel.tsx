@@ -80,7 +80,7 @@ const RECOMMENDED_INSURANCE_COPY = {
       "입원·통원처럼 자주 생기는 의료비 중 실제로 쓴 돈을 약관 한도 안에서 돌려받는 보험이에요.",
     rangeLabel: "금액보다 구조 확인",
     rangeNote:
-      "실손은 가입금액 합계보다 가입 여부, 세대, 자기부담금, 중복 여부가 더 중요해요.",
+      "실손의료비는 가입금액 합계보다 가입 여부, 세대, 자기부담금, 중복 여부가 더 중요해요.",
   },
 } as const;
 
@@ -1097,12 +1097,12 @@ function ClaimGuide({
     {
       title: "청구 서류 준비",
       description:
-        "공통으로 청구서와 신분증을 준비해요. 진단비는 진단서, 실손은 진료비 계산서·영수증과 세부내역서가 기본이에요.",
+        "공통으로 청구서와 신분증을 준비해요. 진단비는 진단서, 실손의료비는 진료비 계산서·영수증과 세부내역서가 기본이에요.",
     },
     {
       title: "청구 채널 선택",
       description:
-        "실손은 실손24와 보험사 채널 중에서 고를 수 있어요. 그 외 보험금은 보험사 앱·홈페이지·우편·방문 중 가능한 방법으로 접수해요.",
+        "실손의료비는 실손24와 보험사 채널 중에서 고를 수 있어요. 그 외 보험금은 보험사 앱·홈페이지·우편·방문 중 가능한 방법으로 접수해요.",
     },
     {
       title: "접수와 심사 결과 확인",
@@ -1169,8 +1169,8 @@ function ClaimGuide({
                                 가입한 보험사 청구 채널 보기
                               </span>
                               <span className="mt-1 block text-xs text-zinc-500">
-                                실손도 보험사 앱이나 홈페이지에서 직접 청구할 수
-                                있어요.
+                                실손의료비도 보험사 앱이나 홈페이지에서 직접
+                                청구할 수 있어요.
                               </span>
                             </span>
                             <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-600">
@@ -1283,7 +1283,7 @@ function AnalysisLoading() {
         전체 보험의 핵심 보장을 확인하고 있어요
       </h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
-        사망·3대 진단비·실손과 보험 종류별 담보를 정리하고 있어요.
+        사망·3대 진단비·실손의료비와 보험 종류별 담보를 정리하고 있어요.
       </p>
       <div className="mt-7 grid gap-4 md:grid-cols-2">
         {[1, 2, 3, 4].map((item) => (

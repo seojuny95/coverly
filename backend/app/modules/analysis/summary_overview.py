@@ -184,7 +184,7 @@ def _takeaways(
             "detail": (
                 f"{_joined_labels(missing)} 항목은 현재 자료에서 미확인이에요."
                 if missing
-                else "사망·3대 진단비·실손 축이 모두 보여요."
+                else "사망·3대 진단비·실손의료비 축이 모두 보여요."
             ),
         },
         {

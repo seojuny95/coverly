@@ -523,7 +523,7 @@ export function InsuranceAnalysisPage({
                 가입한 보험을 한눈에 확인해요
               </h1>
               <p className="mt-3 text-sm leading-6 text-zinc-500">
-                전체 보험에서 사망·3대 진단비·실손을 확인하고, 보험 종류별
+                전체 보험에서 사망·3대 진단비·실손의료비를 확인하고, 보험 종류별
                 보장도 함께 정리해요.
               </p>
             </div>
