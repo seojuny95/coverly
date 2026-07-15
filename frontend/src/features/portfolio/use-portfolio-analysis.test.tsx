@@ -46,7 +46,7 @@ describe("usePortfolioAnalysis", () => {
       result: {
         status: "accepted",
         문자수,
-        기본정보: { 보험분류: "자동차" },
+        기본정보: { 보험분류: "손해보험" },
       },
     });
     const spy = vi.spyOn(api, "requestPortfolioAnalysis").mockResolvedValue({

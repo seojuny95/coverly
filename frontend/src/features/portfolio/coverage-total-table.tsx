@@ -24,27 +24,26 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
           id="coverage-total-title"
           className="text-xl font-semibold tracking-[-0.04em]"
         >
-          보험금 합계
+          보장금 합계
         </h2>
         <p className="mt-1 text-sm leading-6 text-zinc-500">
-          합산해도 되는 보장은 묶어서 보여드리고, 따로 확인해야 하는 보장은
-          구분해서 보여드려요.
+          생명보험과 제3보험의 보장을 합산 기준에 따라 묶어서 보여드려요.
         </p>
         <dl className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs leading-5">
-          <LegendItem term="N개 합산" termClassName="bg-blue-50 text-blue-700">
-            같은 보장을 합쳐 총액으로 봐요
+          <LegendItem term="정액보상" termClassName="bg-blue-50 text-blue-700">
+            약속된 보장금액은 보험별로 합산해 봐요
           </LegendItem>
           <LegendItem
-            term="실손형 보장"
+            term="실손보상"
             termClassName="bg-emerald-50 text-emerald-700"
           >
-            실제 쓴 만큼 주는 보장이라 합치지 않아요
+            실제 손해 기준이라 중복 합산하지 않아요
           </LegendItem>
           <LegendItem
-            term="그대로 보는 보장"
+            term="개별 확인"
             termClassName="bg-zinc-100 text-zinc-600"
           >
-            합산 기준을 확인 못 해 따로 봐요
+            지급 방식을 확인 못 해 따로 봐요
           </LegendItem>
         </dl>
       </div>
@@ -88,7 +87,7 @@ function LegendItem({
 function CoverageSummaryLoading() {
   return (
     <div role="status" className="space-y-3 px-6 py-7">
-      <p className="text-sm text-zinc-500">보험금 합계를 불러오고 있어요.</p>
+      <p className="text-sm text-zinc-500">보장금 합계를 불러오고 있어요.</p>
       <div className="h-10 animate-pulse rounded-lg bg-zinc-100" />
     </div>
   );
@@ -97,7 +96,7 @@ function CoverageSummaryLoading() {
 function CoverageSummaryError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="px-6 py-7">
-      <p className="text-sm text-zinc-600">보험금 합계를 불러오지 못했어요.</p>
+      <p className="text-sm text-zinc-600">보장금 합계를 불러오지 못했어요.</p>
       <button
         type="button"
         onClick={onRetry}

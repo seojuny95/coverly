@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi, beforeEach } from "vitest";
 
@@ -248,8 +248,8 @@ describe("InsuranceUploadForm", () => {
           상품명: "건강보험",
           계약자: "테스트고객",
           피보험자: "테스트고객",
-          보험분류: "상해·질병·실손",
-          상품태그: ["질병", "어린이"],
+          보험분류: "제3보험",
+          상품태그: ["질병보험", "어린이보험"],
           증권번호: "POLICY-TEST-001",
           납입기간: "20년납",
           만기일: "2027-01-01",
@@ -271,7 +271,7 @@ describe("InsuranceUploadForm", () => {
           상품명: "개인용자동차보험",
           계약자: "테스트고객",
           피보험자: "테스트고객",
-          보험분류: "자동차",
+          보험분류: "손해보험",
           상품태그: [],
         },
       });
@@ -302,7 +302,7 @@ describe("InsuranceUploadForm", () => {
             result: expect.objectContaining({
               기본정보: expect.objectContaining({
                 피보험자: "테스트고객",
-                보험분류: "상해·질병·실손",
+                보험분류: "제3보험",
               }),
             }),
           }),
@@ -311,7 +311,7 @@ describe("InsuranceUploadForm", () => {
             result: expect.objectContaining({
               기본정보: expect.objectContaining({
                 피보험자: "테스트고객",
-                보험분류: "자동차",
+                보험분류: "손해보험",
               }),
             }),
           }),
@@ -330,8 +330,8 @@ describe("InsuranceUploadForm", () => {
       기본정보: {
         보험사: "삼성화재",
         상품명: "건강보험",
-        보험분류: "상해·질병·실손",
-        상품태그: ["질병"],
+        보험분류: "제3보험",
+        상품태그: ["질병보험"],
       },
     });
     const onAnalysisComplete = vi.fn();
@@ -363,8 +363,8 @@ describe("InsuranceUploadForm", () => {
         보험사: "삼성화재",
         상품명: "건강보험",
         계약자: "테스트고객",
-        보험분류: "상해·질병·실손",
-        상품태그: ["질병"],
+        보험분류: "제3보험",
+        상품태그: ["질병보험"],
       },
     });
     const onAnalysisComplete = vi.fn();
@@ -394,8 +394,8 @@ describe("InsuranceUploadForm", () => {
           상품명: "건강보험",
           계약자: "테스트고객",
           피보험자: "테스트고객",
-          보험분류: "상해·질병·실손",
-          상품태그: ["질병"],
+          보험분류: "제3보험",
+          상품태그: ["질병보험"],
         },
       })
       .mockResolvedValueOnce({
@@ -406,7 +406,7 @@ describe("InsuranceUploadForm", () => {
           상품명: "개인용자동차보험",
           계약자: "테스트고객B",
           피보험자: "테스트고객B",
-          보험분류: "자동차",
+          보험분류: "손해보험",
           상품태그: [],
         },
       });
@@ -481,8 +481,8 @@ describe("InsuranceUploadForm", () => {
           보험사: "현대해상화재보험",
           상품명: "개인용자동차보험",
           피보험자: "테스트고객",
-          보험분류: "자동차",
-          상품태그: ["자동차"],
+          보험분류: "손해보험",
+          상품태그: ["자동차보험"],
         },
       })
       .mockResolvedValueOnce({
@@ -492,8 +492,8 @@ describe("InsuranceUploadForm", () => {
           보험사: "현대해상화재보험",
           상품명: "개인용자동차보험",
           피보험자: "테스트고객",
-          보험분류: "자동차",
-          상품태그: ["자동차"],
+          보험분류: "손해보험",
+          상품태그: ["자동차보험"],
         },
       });
     const onAnalysisComplete = vi.fn();
@@ -555,8 +555,8 @@ describe("InsuranceUploadForm", () => {
           보험사: "삼성화재",
           상품명: "건강보험",
           피보험자: "테스트고객",
-          보험분류: "상해·질병·실손",
-          상품태그: ["질병"],
+          보험분류: "제3보험",
+          상품태그: ["질병보험"],
         },
       });
     const onAnalysisComplete = vi.fn();
@@ -632,8 +632,8 @@ describe("InsuranceUploadForm", () => {
         상품명: "건강보험",
         증권번호: "POLICY-TEST-001",
         피보험자: "테스트고객",
-        보험분류: "상해·질병·실손",
-        상품태그: ["질병"],
+        보험분류: "제3보험",
+        상품태그: ["질병보험"],
       },
     });
     const onAnalysisComplete = vi.fn();
@@ -672,8 +672,8 @@ describe("InsuranceUploadForm", () => {
           상품명: "건강보험",
           증권번호: "POLICY-TEST-999",
           피보험자: "테스트고객",
-          보험분류: "상해·질병·실손",
-          상품태그: ["질병"],
+          보험분류: "제3보험",
+          상품태그: ["질병보험"],
         },
       })
       .mockResolvedValueOnce({
@@ -684,8 +684,8 @@ describe("InsuranceUploadForm", () => {
           상품명: "개인용자동차보험",
           증권번호: "POLICY-TEST-NEW",
           피보험자: "테스트고객",
-          보험분류: "자동차",
-          상품태그: ["자동차"],
+          보험분류: "손해보험",
+          상품태그: ["자동차보험"],
         },
       });
     const existingDocuments: AnalyzedInsurance[] = [
@@ -700,8 +700,8 @@ describe("InsuranceUploadForm", () => {
             상품명: "건강보험",
             증권번호: "POLICY-TEST-999",
             피보험자: "테스트고객",
-            보험분류: "상해·질병·실손",
-            상품태그: ["질병"],
+            보험분류: "제3보험",
+            상품태그: ["질병보험"],
           },
         },
       },
@@ -779,8 +779,8 @@ describe("InsuranceUploadForm", () => {
             보험사: "삼성화재",
             상품명: "건강보험",
             피보험자: "테스트고객",
-            보험분류: "상해·질병·실손",
-            상품태그: ["질병"],
+            보험분류: "제3보험",
+            상품태그: ["질병보험"],
           },
         },
       },
@@ -814,8 +814,8 @@ describe("InsuranceUploadForm", () => {
                 기본정보: {
                   보험사: "삼성화재",
                   피보험자: "테스트고객",
-                  보험분류: "상해·질병·실손",
-                  상품태그: ["질병"],
+                  보험분류: "제3보험",
+                  상품태그: ["질병보험"],
                   만기일: "2027-01-01",
                 },
               }),
@@ -854,8 +854,8 @@ describe("InsuranceUploadForm", () => {
         상품명: "건강보험",
         계약자: "테스트고객",
         피보험자: "테스트고객",
-        보험분류: "상해·질병·실손",
-        상품태그: ["질병"],
+        보험분류: "제3보험",
+        상품태그: ["질병보험"],
       },
     });
     const originalLocation = window.location;
@@ -912,8 +912,8 @@ describe("InsuranceUploadForm", () => {
                 기본정보: {
                   보험사: "삼성화재",
                   피보험자: "테스트고객",
-                  보험분류: "상해·질병·실손",
-                  상품태그: ["질병"],
+                  보험분류: "제3보험",
+                  상품태그: ["질병보험"],
                 },
               });
           }),
@@ -933,7 +933,9 @@ describe("InsuranceUploadForm", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText("읽는 중")).toHaveLength(2);
 
-    resolveFirstUpload?.();
+    await act(async () => {
+      resolveFirstUpload?.();
+    });
 
     expect(await screen.findByText("완료")).toBeInTheDocument();
     expect(screen.getAllByText("읽는 중")).toHaveLength(1);

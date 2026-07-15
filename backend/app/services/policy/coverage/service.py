@@ -108,7 +108,13 @@ def _select_coverage_tables(tables: list[_TableRows]) -> list[_TableRows]:
     """Coverage tables by tiered matching: strict (name+amount) first, then name-only."""
     strict = [table for table in tables if _is_coverage_table(table)]
     if strict:
-        return strict
+        strict_ids = {id(table) for table in strict}
+        name_only = [
+            table
+            for table in tables
+            if id(table) not in strict_ids and _is_coverage_table(table, require_amount=False)
+        ]
+        return strict + name_only
     return [table for table in tables if _is_coverage_table(table, require_amount=False)]
 
 
@@ -233,10 +239,7 @@ def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
 
     header_index: int | None = None
     for index, candidate in enumerate(rows):
-        if (
-            _name_column_index(candidate) is not None
-            and _amount_column_index(candidate) is not None
-        ):
+        if _name_column_index(candidate) is not None:
             header_index = index
             break
 
@@ -246,7 +249,7 @@ def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
     header = rows[header_index]
     name_column = _name_column_index(header)
     amount_column = _amount_column_index(header)
-    if name_column is None or amount_column is None:
+    if name_column is None:
         return []
 
     detail_column = _header_column_index(header, _DETAIL_HEADERS)
@@ -255,13 +258,18 @@ def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
 
     coverages: list[Coverage] = []
     for index, cells in enumerate(rows[header_index + 1 :], start=header_index + 1):
-        if len(cells) <= max(name_column, amount_column):
+        required_columns = [name_column]
+        if amount_column is not None:
+            required_columns.append(amount_column)
+        if detail_column is not None:
+            required_columns.append(detail_column)
+        if len(cells) <= max(required_columns):
             continue
-        if _is_continuation_row(cells, name_column, amount_column):
+        if amount_column is not None and _is_continuation_row(cells, name_column, amount_column):
             continue
 
         name = cells[name_column].strip()
-        raw_amount = cells[amount_column].strip()
+        raw_amount = cells[amount_column].strip() if amount_column is not None else ""
         if not name:
             continue
 
@@ -271,7 +279,7 @@ def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
             if detail_column is not None and len(cells) > detail_column
             else None
         )
-        if detail is None:
+        if detail is None and amount_column is not None:
             detail = _continuation_detail(rows, index, name_column, amount_column)
         parsed = _CoverageRow(
             담보명=name,
@@ -328,6 +336,33 @@ def _amount_from_source_row(name: str, source: str) -> str | None:
     return None
 
 
+def _detail_from_source_row(name: str, source: str) -> str | None:
+    target = re.sub(r"\s", "", name)
+    if not target:
+        return None
+
+    for rows in _markdown_tables(source):
+        header = rows[0]
+        name_column = _name_column_index(header)
+        detail_column = _header_column_index(header, _DETAIL_HEADERS)
+        if name_column is None or detail_column is None or detail_column == name_column:
+            continue
+
+        for index, cells in enumerate(rows):
+            if len(cells) <= max(name_column, detail_column):
+                continue
+            if re.sub(r"\s", "", cells[name_column]) != target:
+                continue
+            detail = cells[detail_column].strip()
+            if detail:
+                return detail
+            amount_column = _amount_column_index(header)
+            if amount_column is not None:
+                return _continuation_detail(rows, index, name_column, amount_column)
+
+    return None
+
+
 class _CoverageRow(BaseModel):
     담보명: str
     보장내용: str | None
@@ -374,7 +409,9 @@ def _resolve_detail(parsed: _CoverageRow, raw_amount: str, source: str) -> str |
     """
     detail = parsed.보장내용.strip() if parsed.보장내용 else None
     if not detail:
-        return None
+        detail = _detail_from_source_row(parsed.담보명, source)
+        if not detail:
+            return None
     if not wording_grounded(detail, source):
         return None
     if _same_ignoring_whitespace(detail, raw_amount):
@@ -404,6 +441,8 @@ def _coverage_from_row(parsed: _CoverageRow, source: str) -> Coverage:
     """
     raw_amount, row_type = _resolve_amount_and_type(parsed, source)
     detail = _resolve_detail(parsed, raw_amount, source)
+    if not raw_amount and not detail:
+        row_type = "부가"
 
     coverage = Coverage(
         담보명=parsed.담보명.strip(),

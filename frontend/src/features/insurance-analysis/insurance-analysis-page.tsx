@@ -65,28 +65,37 @@ const InsuranceChatbot = dynamic(
   { ssr: false },
 );
 
-const CLASSIFICATION_ORDER = [
+const CLASSIFICATION_ORDER = ["생명보험", "제3보험", "손해보험", "미분류"];
+
+const LIFE_CLASSIFICATIONS = new Set(["생명보험", "생명·연금"]);
+const THIRD_CLASSIFICATIONS = new Set(["제3보험", "상해·질병·실손"]);
+const DAMAGE_CLASSIFICATIONS = new Set([
+  "손해보험",
   "자동차",
-  "상해·질병·실손",
-  "생명·연금",
+  "자동차보험",
+  "운전자보험",
+  "운전자상해보험",
   "배상·화재·기타",
-  "미분류",
-];
+]);
 
 const TAG_STYLES: Record<string, string> = {
-  자동차: "border-[#2563EB]/10 bg-[#2563EB]/[0.06] text-[#111827]/60",
-  실손: "border-[#2563EB]/10 bg-[#2563EB]/[0.06] text-[#111827]/60",
-  암: "border-[#DC2626]/10 bg-[#DC2626]/[0.06] text-[#111827]/60",
-  상해: "border-[#EA580C]/10 bg-[#EA580C]/[0.06] text-[#111827]/60",
-  질병: "border-[#0891B2]/10 bg-[#0891B2]/[0.06] text-[#111827]/60",
-  간병: "border-[#7C3AED]/10 bg-[#7C3AED]/[0.06] text-[#111827]/60",
-  운전자: "border-[#2563EB]/10 bg-[#2563EB]/[0.06] text-[#111827]/60",
-  화재: "border-[#F97316]/10 bg-[#F97316]/[0.06] text-[#111827]/60",
-  배상책임: "border-[#0F766E]/10 bg-[#0F766E]/[0.06] text-[#111827]/60",
-  종신: "border-[#4F46E5]/10 bg-[#4F46E5]/[0.06] text-[#111827]/60",
-  정기: "border-[#6366F1]/10 bg-[#6366F1]/[0.06] text-[#111827]/60",
-  연금: "border-[#0284C7]/10 bg-[#0284C7]/[0.06] text-[#111827]/60",
-  어린이: "border-[#DB2777]/10 bg-[#DB2777]/[0.06] text-[#111827]/60",
+  사망보험: "border-[#4F46E5]/10 bg-[#4F46E5]/[0.06] text-[#111827]/60",
+  종신보험: "border-[#4F46E5]/10 bg-[#4F46E5]/[0.06] text-[#111827]/60",
+  정기보험: "border-[#6366F1]/10 bg-[#6366F1]/[0.06] text-[#111827]/60",
+  연금보험: "border-[#0284C7]/10 bg-[#0284C7]/[0.06] text-[#111827]/60",
+  양로보험: "border-[#0D9488]/10 bg-[#0D9488]/[0.06] text-[#111827]/60",
+  저축보험: "border-[#65A30D]/10 bg-[#65A30D]/[0.06] text-[#111827]/60",
+  질병보험: "border-[#0891B2]/10 bg-[#0891B2]/[0.06] text-[#111827]/60",
+  상해보험: "border-[#EA580C]/10 bg-[#EA580C]/[0.06] text-[#111827]/60",
+  간병보험: "border-[#7C3AED]/10 bg-[#7C3AED]/[0.06] text-[#111827]/60",
+  실손보험: "border-[#2563EB]/10 bg-[#2563EB]/[0.06] text-[#111827]/60",
+  어린이보험: "border-[#DB2777]/10 bg-[#DB2777]/[0.06] text-[#111827]/60",
+  자동차보험: "border-[#2563EB]/10 bg-[#2563EB]/[0.06] text-[#111827]/60",
+  운전자보험: "border-[#1D4ED8]/10 bg-[#1D4ED8]/[0.06] text-[#111827]/60",
+  여행자보험: "border-[#0F766E]/10 bg-[#0F766E]/[0.06] text-[#111827]/60",
+  화재보험: "border-[#F97316]/10 bg-[#F97316]/[0.06] text-[#111827]/60",
+  배상책임보험: "border-[#0F766E]/10 bg-[#0F766E]/[0.06] text-[#111827]/60",
+  보증보험: "border-[#71717A]/10 bg-[#71717A]/[0.06] text-[#111827]/60",
 };
 
 const INSURER_LOGOS = insurerLogos;
@@ -154,6 +163,7 @@ export function InsuranceAnalysisPage({
     () => groupInsuranceDocuments(insuranceDocuments),
     [insuranceDocuments],
   );
+  const classificationTypeCount = CLASSIFICATION_ORDER.length;
   const portfolioSummary = usePortfolioSummary(insuranceDocuments);
 
   const demographics =
@@ -288,8 +298,8 @@ export function InsuranceAnalysisPage({
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-zinc-500">
                   {analysis.selectedName
-                    ? `${analysis.selectedName}님의 보험 ${insuranceDocuments.length}개를 종류별로 보기 쉽게 정리했어요.`
-                    : `보험 ${insuranceDocuments.length}개를 종류별로 보기 쉽게 정리했어요.`}
+                    ? `${analysis.selectedName}님의 보험을 ${classificationTypeCount}가지 종류로 보기 쉽게 정리했어요.`
+                    : `보험을 ${classificationTypeCount}가지 종류로 보기 쉽게 정리했어요.`}
                 </p>
               </div>
               <div className="flex flex-col items-start gap-3 sm:items-end">
@@ -306,7 +316,7 @@ export function InsuranceAnalysisPage({
               </div>
             </div>
 
-            <dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {CLASSIFICATION_ORDER.map((classification) => (
                 <div
                   key={classification}
@@ -636,8 +646,9 @@ function TagBadge({ tag }: { tag: string }) {
 function groupInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
   return insuranceDocuments.reduce<Record<string, AnalyzedInsurance[]>>(
     (groups, insuranceDocument) => {
-      const classification =
-        insuranceDocument.result.기본정보?.보험분류 ?? "미분류";
+      const classification = displayClassification(
+        insuranceDocument.result.기본정보?.보험분류,
+      );
       groups[classification] = [
         ...(groups[classification] ?? []),
         insuranceDocument,
@@ -646,6 +657,19 @@ function groupInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
     },
     {},
   );
+}
+
+function displayClassification(classification?: string) {
+  if (classification && LIFE_CLASSIFICATIONS.has(classification)) {
+    return "생명보험";
+  }
+  if (classification && THIRD_CLASSIFICATIONS.has(classification)) {
+    return "제3보험";
+  }
+  if (classification && DAMAGE_CLASSIFICATIONS.has(classification)) {
+    return "손해보험";
+  }
+  return "미분류";
 }
 
 function formatPeriod(

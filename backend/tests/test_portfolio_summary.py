@@ -13,6 +13,7 @@ def _policy(
     category: str,
     insurer: str,
     coverages: list[dict[str, object]],
+    tags: list[str] | None = None,
 ) -> PolicyInput:
     return PolicyInput.model_validate(
         {
@@ -21,6 +22,7 @@ def _policy(
                 "보험사": insurer,
                 "상품명": f"상품-{policy_id}",
                 "보험분류": category,
+                "상품태그": tags or [],
             },
             "보장목록": coverages,
         }
@@ -55,7 +57,7 @@ def test_sums_safe_fixed_benefits_and_exposes_composition() -> None:
 
     cancer = next(item for item in result.totals if item.normalized_name == "암진단비")
     assert cancer.total_amount == 30_000_000
-    assert cancer.major_category == "진단비"
+    assert cancer.major_category == "진단"
     assert [item.policy_id for item in cancer.composition] == ["p1", "p2"]
     assert cancer.composition[0].original_amount == "1,000만원"
 
@@ -88,8 +90,8 @@ def test_treatment_benefits_without_payment_type_are_kept_for_display() -> None:
         (item.coverage_name, item.major_category, item.original_amount)
         for item in result.excluded_coverages
     } == {
-        ("중대한화상및부식치료비", "치료비", "1천만원"),
-        ("항암방사선약물치료비(감액없음)", "치료비", "2천만원"),
+        ("중대한화상및부식치료비", "치료", "1천만원"),
+        ("항암방사선약물치료비(감액없음)", "치료", "2천만원"),
     }
 
 
@@ -110,7 +112,7 @@ def test_explicit_fixed_treatment_benefit_is_summed() -> None:
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals[0].display_name == "항암방사선약물치료비"
-    assert result.totals[0].major_category == "치료비"
+    assert result.totals[0].major_category == "치료"
     assert result.totals[0].total_amount == 20_000_000
     assert result.excluded_coverages == []
 
@@ -149,7 +151,7 @@ def test_medical_expense_without_payment_type_is_kept_for_display() -> None:
     assert result.totals == []
     assert result.indemnity_coverages == []
     assert result.excluded_coverages[0].coverage_name == "상해입원의료비"
-    assert result.excluded_coverages[0].major_category == "치료비"
+    assert result.excluded_coverages[0].major_category == "치료"
 
 
 def test_explicit_indemnity_category_classifies_medical_expense() -> None:
@@ -171,7 +173,7 @@ def test_explicit_indemnity_category_classifies_medical_expense() -> None:
     assert result.totals == []
     assert result.excluded_coverages == []
     assert result.indemnity_coverages[0].coverage_name == "상해입원의료비"
-    assert result.indemnity_coverages[0].major_category == "치료비"
+    assert result.indemnity_coverages[0].major_category == "치료"
 
 
 def test_unknown_coverage_is_kept_for_display_under_other() -> None:
@@ -273,32 +275,37 @@ def test_unknown_amount_is_excluded_instead_of_becoming_zero() -> None:
     )
 
 
-def test_auto_policies_are_completely_excluded() -> None:
+def test_damage_policies_are_listed_separately() -> None:
     policy = _policy(
         "car",
-        "자동차보험",
+        "손해보험",
         "보험사A",
-        [{"담보명": "사망", "가입금액": "1억원", "지급유형": "정액"}],
+        [{"담보명": "대인배상Ⅰ", "가입금액": "무한", "지급유형": "실손"}],
+        tags=["자동차보험"],
     )
 
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
     assert result.excluded_coverages == []
+    assert result.damage_coverages[0].insurance_type == "자동차보험"
+    assert result.damage_coverages[0].policies[0].coverages[0].coverage_name == "대인배상Ⅰ"
     assert result.excluded_auto_policy_count == 1
 
 
 def test_driver_policy_is_not_mistaken_for_auto_policy() -> None:
     policy = _policy(
         "driver",
-        "운전자보험",
+        "손해보험",
         "보험사A",
         [{"담보명": "상해사망", "가입금액": "1억원", "지급유형": "정액"}],
+        tags=["운전자보험"],
     )
 
     result = summarize_portfolio_coverages([policy])
 
-    assert result.totals[0].total_amount == 100_000_000
+    assert result.totals == []
+    assert result.damage_coverages[0].insurance_type == "운전자보험"
     assert result.excluded_auto_policy_count == 0
 
 
@@ -341,9 +348,9 @@ def test_major_category_does_not_merge_distinct_coverage_names() -> None:
 
     actual = [(item.display_name, item.major_category, item.total_amount) for item in result.totals]
     assert actual == [
-        ("암수술비", "수술비", 5_000_000),
-        ("암진단비", "진단비", 30_000_000),
-        ("유사암진단비", "진단비", 10_000_000),
+        ("암수술비", "수술", 5_000_000),
+        ("암진단비", "진단", 30_000_000),
+        ("유사암진단비", "진단", 10_000_000),
     ]
 
 

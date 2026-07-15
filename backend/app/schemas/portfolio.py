@@ -17,6 +17,7 @@ class CoverageInput(BaseModel):
     지급유형: str | None = None
     가입금액숫자: int | None = Field(default=None, ge=0)
     보장분류: str | None = None
+    유형: str | None = None
 
 
 class PolicyInsuredDemographicsInput(BaseModel):
@@ -51,6 +52,7 @@ class PolicyInfoInput(BaseModel):
     보험사: str | None = None
     상품명: str | None = None
     보험분류: str | None = None
+    상품태그: list[str] = Field(default_factory=list)
     피보험자정보: PolicyInsuredDemographicsInput | None = None
     보험료: PremiumInput | None = None
 
@@ -112,8 +114,27 @@ class ExcludedCoverageItem(BaseModel):
     major_category: str = "기타"
 
 
+class DamageCoverageItem(BaseModel):
+    coverage_name: str
+    original_amount: str
+    major_category: str = "기타"
+
+
+class DamagePolicyCoverageGroup(BaseModel):
+    policy_id: str | None
+    insurer: str | None = None
+    product_name: str | None = None
+    coverages: list[DamageCoverageItem]
+
+
+class DamageCoverageGroup(BaseModel):
+    insurance_type: str
+    policies: list[DamagePolicyCoverageGroup]
+
+
 class PortfolioCoverageSummary(BaseModel):
     totals: list[CoverageTotalItem]
     indemnity_coverages: list[IndemnityItem]
     excluded_coverages: list[ExcludedCoverageItem]
+    damage_coverages: list[DamageCoverageGroup] = Field(default_factory=list)
     excluded_auto_policy_count: int

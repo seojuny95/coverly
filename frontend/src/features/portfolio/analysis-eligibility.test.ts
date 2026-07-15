@@ -48,35 +48,45 @@ describe("analysis-eligibility", () => {
     expect(hasAnalyzableCoverage(makeResult({ 보장목록: [] }))).toBe(false);
   });
 
-  it("detects auto insurance by 보험분류", () => {
+  it("detects auto insurance by product tag", () => {
     expect(
-      isAutoInsurance(makeResult({ 기본정보: { 보험분류: "자동차보험" } })),
+      isAutoInsurance(
+        makeResult({
+          기본정보: { 보험분류: "손해보험", 상품태그: ["자동차보험"] },
+        }),
+      ),
     ).toBe(true);
     expect(
-      isAutoInsurance(makeResult({ 기본정보: { 보험분류: "실손의료보험" } })),
+      isAutoInsurance(
+        makeResult({
+          기본정보: { 보험분류: "제3보험", 상품태그: ["실손보험"] },
+        }),
+      ),
     ).toBe(false);
   });
 
-  it("is analyzable only when not auto and has coverage", () => {
+  it("is analyzable only when not damage insurance and has coverage", () => {
     const covered = makeResult({
       보장목록: [
         { 담보명: "암진단", 가입금액: "3천만원", 보장내용: null, 해설: null },
       ],
     });
-    const auto = makeResult({
-      기본정보: { 보험분류: "자동차보험" },
+    const damage = makeResult({
+      기본정보: { 보험분류: "손해보험", 상품태그: ["자동차보험"] },
       보장목록: [
         { 담보명: "대인배상", 가입금액: "무한", 보장내용: null, 해설: null },
       ],
     });
     expect(isAnalyzableDocument(makeDoc(covered))).toBe(true);
-    expect(isAnalyzableDocument(makeDoc(auto))).toBe(false);
+    expect(isAnalyzableDocument(makeDoc(damage))).toBe(false);
     expect(isAnalyzableDocument(makeDoc(makeResult()))).toBe(false);
   });
 
   it("chooses an empty reason for non-eligible document sets", () => {
     const auto = makeDoc(
-      makeResult({ 기본정보: { 보험분류: "자동차보험" } }),
+      makeResult({
+        기본정보: { 보험분류: "손해보험", 상품태그: ["자동차보험"] },
+      }),
       "a",
     );
     const noCov = makeDoc(makeResult(), "b");

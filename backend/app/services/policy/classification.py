@@ -40,9 +40,7 @@ _HEAD_CHARS = 3_000
 
 _RULES_PATH = SERVICE_DATA_DIR / "classification_rules.json"
 
-_ClassificationLiteral = Literal[
-    "자동차", "상해·질병·실손", "배상·화재·기타", "생명·연금", "미분류"
-]
+_ClassificationLiteral = Literal["생명보험", "제3보험", "손해보험", "미분류"]
 
 _SYSTEM = (
     "# 역할\n"
@@ -51,13 +49,13 @@ _SYSTEM = (
     "상품명과 증권 앞부분 텍스트만 근거로, 가장 알맞은 보험분류 하나를 선택한다. "
     "근거가 부족하면 미분류를 선택한다.\n\n"
     "# 선택 가능한 보험분류\n"
-    "1. 자동차: 자동차보험.\n"
-    "2. 상해·질병·실손: 제3보험 성격의 상해, 질병, 간병, 실손의료보험. "
-    "진단비, 수술비, 입원일당 중심의 건강·어린이 상품을 포함한다.\n"
-    "3. 배상·화재·기타: 운전자보험, 운전자상해보험, 화재보험, 배상책임보험 등 "
-    "그 외 손해보험.\n"
-    "4. 생명·연금: 사망보장 중심의 생명보험, 정기보험, 연금보험.\n"
-    "5. 미분류: 위 범주 중 하나로 판단할 근거가 부족한 경우.\n\n"
+    "1. 생명보험: 사람의 사망·노후 보장을 중심으로 하는 종신보험, 정기보험, "
+    "연금보험, 양로보험, 저축보험.\n"
+    "2. 제3보험: 사람의 질병·상해·간병 보장을 중심으로 하는 질병보험, 상해보험, "
+    "간병보험, 실손보험, 어린이보험.\n"
+    "3. 손해보험: 사고로 인한 재산 손해나 법적 책임을 중심으로 하는 자동차보험, "
+    "운전자보험, 여행자보험, 화재보험, 배상책임보험, 보증보험.\n"
+    "4. 미분류: 위 범주 중 하나로 판단할 근거가 부족한 경우.\n\n"
     "# 작업 순서\n"
     "1. 상품명에 명확한 보험종목 단서가 있는지 먼저 확인한다.\n"
     "2. 상품명이 부족하면 증권 앞부분 텍스트에서 회사명, 보장 성격, 상품 설명 단서를 확인한다.\n"
@@ -66,11 +64,11 @@ _SYSTEM = (
     "5. 충분한 근거가 없거나 후보가 충돌하면 미분류를 반환한다.\n\n"
     "# 해야 할 것\n"
     "- 상품명 단서를 본문 단서보다 우선한다.\n"
-    "- 손해보험사(회사명에 화재·해상·손해보험 포함)의 상품은 생명·연금으로 분류하지 않는다.\n"
-    "- 생명보험사(회사명에 생명 포함)의 상품은 자동차나 배상·화재·기타로 분류하지 않는다.\n"
-    "- 어린이/건강/진단비/수술비/입원일당 중심 상품은 상해·질병·실손 후보로 검토한다.\n\n"
+    "- 손해보험사(회사명에 화재·해상·손해보험 포함)의 상품은 생명보험으로 분류하지 않는다.\n"
+    "- 생명보험사(회사명에 생명 포함)의 상품은 손해보험으로 분류하지 않는다.\n"
+    "- 어린이/건강/진단비/수술비/입원일당 중심 상품은 제3보험 후보로 검토한다.\n\n"
     "# 하지 말아야 할 것\n"
-    "- 운전자보험이나 운전자상해보험을 자동차로 분류하지 않는다.\n"
+    "- 운전자보험이나 운전자상해보험을 자동차보험 태그로 분류하지 않는다.\n"
     "- 자동차부상치료비, 교통사고처리지원금 같은 운전자보험 담보명만 보고 "
     "자동차로 분류하지 않는다.\n"
     "- 단순히 본문에 담보명이 한 번 나온 것만으로 상품 전체 분류를 바꾸지 않는다.\n"
@@ -144,13 +142,13 @@ def _search_space(text: str, product_name: str | None) -> str:
 
 def _enrich_tags(
     classification: str,
-    search_space: str,
+    tag_space: str,
     seed_tags: list[str] | None = None,
 ) -> PolicyClassification:
-    """Tags = the matched category's own tags plus every tag_terms hit, in TAG_ORDER."""
+    """Tags = insurance type terms found around product identity, in TAG_ORDER."""
     tags_found = set(seed_tags or [])
     for tag, terms in _TAG_TERMS.items():
-        if _contains_any(search_space, terms):
+        if _contains_any(tag_space, terms):
             tags_found.add(tag)
 
     tags = [tag for tag in TAG_ORDER if tag in tags_found]
@@ -186,7 +184,7 @@ def _match_contextual(search_space: str, product_name: str | None) -> _Category 
     if not _contains_any(search_space, _DAMAGE_GENERAL_CONTEXT_TERMS):
         return None
 
-    return next(category for category in _CATEGORIES if category.classification == "배상·화재·기타")
+    return _Category(classification="손해보험", tags=[], terms=[])
 
 
 @lru_cache
@@ -218,17 +216,18 @@ def classify_policy(
     complete: JsonCompleter | None = None,
 ) -> PolicyClassification:
     search_space = _search_space(text, product_name)
+    tag_space = _normalize_text(product_name or "")
 
     category = _match_deterministic(product_name)
     if category is not None:
-        return _enrich_tags(category.classification, search_space, seed_tags=category.tags)
+        return _enrich_tags(category.classification, tag_space, seed_tags=category.tags)
 
     category = _match_contextual(search_space, product_name)
     if category is not None:
-        return _enrich_tags(category.classification, search_space, seed_tags=category.tags)
+        return _enrich_tags(category.classification, tag_space, seed_tags=category.tags)
 
     classification = _classify_with_llm(search_space, complete)
     if classification == CLASSIFICATION_UNKNOWN:
         return {"보험분류": CLASSIFICATION_UNKNOWN, "상품태그": []}
 
-    return _enrich_tags(classification, search_space)
+    return _enrich_tags(classification, tag_space)

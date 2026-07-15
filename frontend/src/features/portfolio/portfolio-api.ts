@@ -1,5 +1,5 @@
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
-import { isAutoInsurance } from "./analysis-eligibility";
+import { isDamageInsurance } from "./analysis-eligibility";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -39,6 +39,19 @@ export type PortfolioSummary = {
     major_category?: string;
     original_amount?: string;
     reason: string;
+  }>;
+  damage_coverages?: Array<{
+    insurance_type: string;
+    policies: Array<{
+      policy_id?: string;
+      insurer?: string;
+      product_name?: string;
+      coverages: Array<{
+        coverage_name: string;
+        original_amount?: string;
+        major_category?: string;
+      }>;
+    }>;
   }>;
   excluded_auto_policy_count: number;
 };
@@ -431,7 +444,7 @@ export type PolicyDemographicsCandidate = {
   lifeStage?: string;
 };
 
-// Shared scan over non-auto policies for usable (age, gender) info. Callers
+// Shared scan over life/third-insurance policies for usable (age, gender) info. Callers
 // apply their own policy on top: getPolicyDemographics here takes the first
 // match (best-effort, for Q&A context); deriveDemographics in
 // use-portfolio-analysis.ts requires a single unambiguous match across all
@@ -441,7 +454,7 @@ export function collectPolicyDemographicsCandidates(
 ): PolicyDemographicsCandidate[] {
   const candidates: PolicyDemographicsCandidate[] = [];
   for (const document of insuranceDocuments) {
-    if (isAutoInsurance(document.result)) continue;
+    if (isDamageInsurance(document.result)) continue;
     const info = document.result.기본정보?.피보험자정보;
     if (typeof info?.나이 === "number" && info.성별) {
       candidates.push({

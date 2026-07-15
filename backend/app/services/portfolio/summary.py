@@ -9,6 +9,9 @@ from app.schemas.portfolio import (
     CoverageInput,
     CoverageSourceItem,
     CoverageTotalItem,
+    DamageCoverageGroup,
+    DamageCoverageItem,
+    DamagePolicyCoverageGroup,
     ExcludedCoverageItem,
     IndemnityItem,
     PolicyInput,
@@ -19,7 +22,19 @@ from app.services.coverage_knowledge.matching import (
     choose_display_name,
 )
 
-_AUTO_CATEGORY_TERMS = ("자동차",)
+_DAMAGE_CLASSIFICATION = "손해보험"
+_LEGACY_DAMAGE_CLASSIFICATIONS = frozenset(
+    {
+        "자동차",
+        "자동차보험",
+        "운전자보험",
+        "운전자상해보험",
+        "화재보험",
+        "주택화재보험",
+        "배상·화재·기타",
+    }
+)
+_AUTO_TAG_TERMS = ("자동차", "자동차보험")
 _INDEMNITY_NAME_TERMS = ("실손", "실비")
 _INDEMNITY_CATEGORIES = frozenset({"실손", "실손형", "실비", "실비형"})
 _NEGATED_INDEMNITY_PATTERNS = (
@@ -71,15 +86,21 @@ _UNITS = {
     "억원": 100_000_000,
 }
 MAJOR_CATEGORY_ORDER = (
-    "진단비",
-    "수술비",
-    "치료비",
-    "입원",
-    "통원",
-    "후유장해",
     "사망",
-    "간병",
+    "후유장해",
+    "진단",
+    "수술",
+    "치료",
     "기타",
+)
+_DAMAGE_INSURANCE_TYPE_ORDER = (
+    "자동차보험",
+    "운전자보험",
+    "여행자보험",
+    "화재보험",
+    "배상책임보험",
+    "보증보험",
+    "손해보험",
 )
 
 
@@ -107,30 +128,35 @@ def major_category(name: str) -> str:
     """Return a display-only group without changing coverage identity."""
 
     normalized = normalize_coverage_name(name)
+    if "사망" in normalized:
+        return "사망"
     if "후유장해" in normalized:
         return "후유장해"
     if "수술" in normalized:
-        return "수술비"
-    if "간병" in normalized or "요양" in normalized:
-        return "간병"
+        return "수술"
     if "진단" in normalized or "악성신생물" in normalized:
-        return "진단비"
-    if "사망" in normalized:
-        return "사망"
-    if "치료비" in normalized or "의료비" in normalized:
-        return "치료비"
-    if "입원" in normalized:
-        return "입원"
-    if "통원" in normalized:
-        return "통원"
+        return "진단"
+    if (
+        "치료" in normalized
+        or "의료비" in normalized
+        or "입원" in normalized
+        or "통원" in normalized
+    ):
+        return "치료"
     return "기타"
 
 
-def is_auto_policy(policy: PolicyInput) -> bool:
-    """Return whether a policy belongs to the separately handled auto branch."""
+def is_damage_policy(policy: PolicyInput) -> bool:
+    """Return whether a policy belongs to the separately handled non-life branch."""
 
     category = policy.기본정보.보험분류 or ""
-    return any(term in category for term in _AUTO_CATEGORY_TERMS)
+    return category == _DAMAGE_CLASSIFICATION or category in _LEGACY_DAMAGE_CLASSIFICATIONS
+
+
+def is_auto_policy(policy: PolicyInput) -> bool:
+    """Return whether a policy is an auto policy inside the damage branch."""
+
+    return any(term in _damage_insurance_type(policy) for term in _AUTO_TAG_TERMS)
 
 
 def _classify_payout_kind(coverage: CoverageInput) -> _PayoutKind:
@@ -185,11 +211,14 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
     source_names_by_group: dict[str, list[str]] = defaultdict(list)
     indemnity_rows: list[tuple[PolicyInput, CoverageInput, str]] = []
     excluded: list[ExcludedCoverageItem] = []
+    damage_rows: dict[str, list[DamagePolicyCoverageGroup]] = defaultdict(list)
     auto_count = 0
 
     for policy in policies:
-        if is_auto_policy(policy):
-            auto_count += 1
+        if is_damage_policy(policy):
+            damage_rows[_damage_insurance_type(policy)].append(_damage_policy_group(policy))
+            if is_auto_policy(policy):
+                auto_count += 1
             continue
         for coverage in policy.보장목록:
             group_key = canonicalize_coverage_name(coverage.담보명).normalized_key
@@ -237,6 +266,7 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
         totals=totals,
         indemnity_coverages=indemnity,
         excluded_coverages=excluded,
+        damage_coverages=_build_damage_groups(damage_rows),
         excluded_auto_policy_count=auto_count,
     )
 
@@ -258,7 +288,7 @@ def build_portfolio_facts(policies: list[PolicyInput]) -> PortfolioFacts:
     """Build the deterministic common input for summary, analysis, and Q&A."""
 
     return PortfolioFacts(
-        policies=tuple(policy for policy in policies if not is_auto_policy(policy)),
+        policies=tuple(policy for policy in policies if not is_damage_policy(policy)),
         coverage_summary=summarize_portfolio_coverages(policies),
     )
 
@@ -272,6 +302,78 @@ def _excluded(policy: PolicyInput, coverage: CoverageInput, reason: str) -> Excl
         major_category=major_category(coverage.담보명),
         original_amount=coverage.가입금액,
         reason=reason,
+    )
+
+
+def _damage_insurance_type(policy: PolicyInput) -> str:
+    category = policy.기본정보.보험분류 or ""
+    if category in {"자동차", "자동차보험"}:
+        return "자동차보험"
+    if category in {"운전자보험", "운전자상해보험"}:
+        return "운전자보험"
+    if category in {"화재보험", "주택화재보험"}:
+        return "화재보험"
+
+    tags = policy.기본정보.상품태그
+    for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:
+        if insurance_type in tags:
+            return insurance_type
+
+    product_name = policy.기본정보.상품명 or ""
+    normalized_product = normalize_coverage_name(product_name)
+    for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:
+        if normalize_coverage_name(insurance_type) in normalized_product:
+            return insurance_type
+
+    return "손해보험"
+
+
+def _damage_policy_group(policy: PolicyInput) -> DamagePolicyCoverageGroup:
+    return DamagePolicyCoverageGroup(
+        policy_id=policy.id,
+        insurer=policy.기본정보.보험사,
+        product_name=policy.기본정보.상품명,
+        coverages=[
+            DamageCoverageItem(
+                coverage_name=coverage.담보명,
+                original_amount=coverage.가입금액,
+                major_category=major_category(coverage.담보명),
+            )
+            for coverage in policy.보장목록
+            if coverage.유형 != "부가"
+        ],
+    )
+
+
+def _build_damage_groups(
+    damage_rows: dict[str, list[DamagePolicyCoverageGroup]],
+) -> list[DamageCoverageGroup]:
+    return [
+        DamageCoverageGroup(
+            insurance_type=insurance_type,
+            policies=sorted(policies, key=_damage_policy_sort_key),
+        )
+        for insurance_type, policies in sorted(
+            damage_rows.items(),
+            key=lambda item: _damage_insurance_type_rank(item[0]),
+        )
+    ]
+
+
+def _damage_insurance_type_rank(insurance_type: str) -> tuple[int, str]:
+    try:
+        return (_DAMAGE_INSURANCE_TYPE_ORDER.index(insurance_type), insurance_type)
+    except ValueError:
+        return (len(_DAMAGE_INSURANCE_TYPE_ORDER), insurance_type)
+
+
+def _damage_policy_sort_key(
+    policy: DamagePolicyCoverageGroup,
+) -> tuple[str, str, str]:
+    return (
+        policy.insurer or "",
+        policy.product_name or "",
+        policy.policy_id or "",
     )
 
 

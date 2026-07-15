@@ -591,8 +591,10 @@ def _analysis_notices(facts: PortfolioFacts, demographics: InsuredDemographics) 
         notices.append("일부 담보는 지급유형 또는 금액을 확인할 수 없어 합계에서 제외했습니다.")
     if summary.indemnity_coverages:
         notices.append("실손형 담보는 가입금액 합산 대상이 아니며 보유 건수만 표시합니다.")
-    if summary.excluded_auto_policy_count:
-        notices.append("자동차 보험은 별도 분석 대상이므로 현재 포트폴리오 분석에서 제외했습니다.")
+    if summary.damage_coverages:
+        notices.append(
+            "손해보험은 종류별 보장금으로 따로 표시하고 현재 포트폴리오 분석에서 제외했습니다."
+        )
     if demographics.status == "conflict":
         notices.append("증권별 피보험자 나이 또는 성별이 서로 달라 개인화 분석에서 제외했습니다.")
     if demographics.status == "conflict_user_override":

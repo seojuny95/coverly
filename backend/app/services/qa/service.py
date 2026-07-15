@@ -962,8 +962,10 @@ def _standard_limitations(facts: PortfolioFacts) -> list[str]:
         limitations.append("실손형 담보는 가입금액 합계에 포함하지 않았습니다.")
     if summary.excluded_coverages:
         limitations.append("지급유형 또는 금액이 확인되지 않은 담보는 합계에 포함하지 않았습니다.")
-    if summary.excluded_auto_policy_count:
-        limitations.append("가입금액 합계·집계에는 자동차 보험을 포함하지 않았어요.")
+    if summary.damage_coverages:
+        limitations.append(
+            "손해보험은 종류별 보장금으로 따로 표시하고 가입금액 합계에는 포함하지 않았어요."
+        )
     return limitations
 
 
