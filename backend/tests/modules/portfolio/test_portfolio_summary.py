@@ -5,7 +5,17 @@ from app.modules.analysis.summary_overview import (
     attach_summary_overview,
     generate_summary_overview,
 )
-from app.modules.portfolio.schemas import PolicyInput
+from app.modules.portfolio.schemas import (
+    EssentialCoverageCheck,
+    EssentialCoverageItem,
+    EssentialCoverageKind,
+    PolicyInput,
+    PortfolioCoverageSummary,
+    PremiumBenchmark,
+    PremiumBenchmarkSource,
+    PremiumOverview,
+    ReferenceSource,
+)
 from app.modules.portfolio.summary import (
     build_portfolio_facts,
     normalize_coverage_name,
@@ -31,6 +41,74 @@ def _policy(
             },
             "보장목록": coverages,
         }
+    )
+
+
+def _summary_for_premium_guidance(
+    monthly_total: int,
+    missing_kinds: set[EssentialCoverageKind],
+) -> PortfolioCoverageSummary:
+    coverage_source = ReferenceSource(
+        label="테스트 출처",
+        url="https://example.com",
+        published_at="2025-01-01",
+        reliability="official",
+        caveat="테스트용 출처예요.",
+    )
+    benchmark_source = PremiumBenchmarkSource(
+        label="테스트 출처",
+        url="https://example.com",
+        published_at="2025-01-01",
+        reliability="official",
+        caveat="테스트용 출처예요.",
+    )
+    labels: dict[EssentialCoverageKind, str] = {
+        "death": "사망 보장",
+        "cancer": "암 진단비",
+        "cerebrovascular": "뇌혈관질환 진단비",
+        "ischemic_heart": "심장질환 진단비",
+        "indemnity": "실손의료보험",
+    }
+    items = [
+        EssentialCoverageItem(
+            kind=kind,
+            label=label,
+            status="not_found" if kind in missing_kinds else "well_prepared",
+            confirmed_amount=None if kind in missing_kinds else 10_000_000,
+            reference_min_amount=None if kind == "indemnity" else 10_000_000,
+            reference_max_amount=None if kind == "indemnity" else 20_000_000,
+            reference_basis="테스트 기준",
+            reference_sources=[coverage_source],
+            coverage_count=0 if kind in missing_kinds else 1,
+            detail="테스트 상세",
+            matched_coverage_names=[] if kind in missing_kinds else [label],
+        )
+        for kind, label in labels.items()
+    ]
+    return PortfolioCoverageSummary(
+        totals=[],
+        indemnity_coverages=[],
+        excluded_coverages=[],
+        excluded_auto_policy_count=0,
+        essential_coverage_check=EssentialCoverageCheck(items=items),
+        premium=PremiumOverview(
+            monthly_total=monthly_total,
+            monthly_policy_count=1,
+            unconfirmed_policy_count=0,
+            items=[],
+        ),
+        premium_benchmark=PremiumBenchmark(
+            age_band_label="테스트 연령대",
+            min_age=30,
+            max_age=39,
+            average_monthly_income=2_000_000,
+            suggested_min_ratio=0.05,
+            suggested_max_ratio=0.10,
+            suggested_min_premium=100_000,
+            suggested_max_premium=200_000,
+            income_source=benchmark_source,
+            guide_source=benchmark_source,
+        ),
     )
 
 
@@ -79,6 +157,73 @@ def test_summary_overview_failure_is_not_replaced_with_deterministic_copy() -> N
 
     with pytest.raises(SummaryOverviewUnavailableError):
         attach_summary_overview(summary, fail)
+
+
+@pytest.mark.parametrize(
+    (
+        "monthly_total",
+        "missing_kinds",
+        "expected_title",
+        "expected_detail",
+    ),
+    [
+        (
+            90_000,
+            set(),
+            "보험료는 낮고 핵심 보장은 보여요",
+            "좋은 신호",
+        ),
+        (
+            90_000,
+            {"death"},
+            "보험료는 낮지만 권장보험 점검이 필요해요",
+            "권장보험 항목을 먼저 점검",
+        ),
+        (
+            150_000,
+            set(),
+            "보험료와 핵심 보장이 균형 있게 보여요",
+            "세부 약관 조건만 확인",
+        ),
+        (
+            150_000,
+            {"death"},
+            "보험료는 권장 범위지만 권장보험 점검이 필요해요",
+            "보장 구성을 점검",
+        ),
+        (
+            250_000,
+            set(),
+            "보험료가 권장 범위보다 높아요",
+            "가입한 보험과 보장내용을 다시 확인",
+        ),
+    ],
+)
+def test_summary_overview_combines_premium_range_with_core_coverage_status(
+    monthly_total: int,
+    missing_kinds: set[EssentialCoverageKind],
+    expected_title: str,
+    expected_detail: str,
+) -> None:
+    summary = _summary_for_premium_guidance(monthly_total, missing_kinds)
+
+    def complete(_system: str, user: str) -> dict[str, object]:
+        assert expected_title in user
+        assert expected_detail in user
+        return {
+            "title": "보험료와 핵심 보장을 함께 확인해요",
+            "paragraphs": [
+                "보험료는 권장 구간과 핵심 보장 확인 상태를 함께 봐야 해요.",
+                "업로드한 자료 기준의 1차 해석이므로 약관 조건을 이어서 확인해요.",
+            ],
+        }
+
+    overview = generate_summary_overview(summary, complete)
+
+    assert overview is not None
+    premium_takeaway = overview.takeaways[0]
+    assert premium_takeaway.title == expected_title
+    assert expected_detail in premium_takeaway.detail
 
 
 def test_sums_safe_fixed_benefits_and_exposes_composition() -> None:

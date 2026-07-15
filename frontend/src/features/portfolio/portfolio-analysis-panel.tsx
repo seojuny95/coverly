@@ -158,7 +158,11 @@ function PortfolioOverview({
   ).length;
   const premium = summary?.premium ?? null;
   const premiumBenchmark = summary?.premium_benchmark ?? null;
-  const premiumComparison = premiumSummaryComparison(premium, premiumBenchmark);
+  const premiumComparison = premiumSummaryComparison(
+    premium,
+    premiumBenchmark,
+    items,
+  );
   const generatedOverview = summary?.overview ?? null;
 
   if (!generatedOverview) {
@@ -754,6 +758,7 @@ function PremiumSummaryBar({
 function premiumSummaryComparison(
   premium: PortfolioSummary["premium"] | null | undefined,
   benchmark: PortfolioSummary["premium_benchmark"] | null | undefined,
+  items: EssentialCoverageItem[],
 ) {
   if (
     !premium ||
@@ -764,24 +769,36 @@ function premiumSummaryComparison(
     return null;
   }
 
+  const allCoreCoverageVisible = items.every(
+    (item) => item.status !== "not_found",
+  );
+
   if (premium.monthly_total < benchmark.suggested_min_premium) {
     return {
       tone: "low" as const,
-      label: "권장 범위보다 낮아요",
-      title: "월 보험료가 권장 범위보다 낮아요",
+      label: allCoreCoverageVisible
+        ? "보험료는 낮고 핵심 보장은 보여요"
+        : "보험료는 낮지만 권장보험 점검이 필요해요",
+      title: allCoreCoverageVisible
+        ? "월 보험료는 낮고 핵심 보장은 보여요"
+        : "월 보험료는 낮지만 권장보험 점검이 필요해요",
     };
   }
   if (premium.monthly_total > benchmark.suggested_max_premium) {
     return {
       tone: "high" as const,
-      label: "권장 범위보다 높아요",
-      title: "월 보험료가 권장 범위보다 높아요",
+      label: "보험료가 권장 범위보다 높아요",
+      title: "가입한 보험과 보장내용을 다시 확인해보세요",
     };
   }
   return {
     tone: "in_range" as const,
-    label: "권장 범위 안에 있어요",
-    title: "월 보험료가 권장 범위 안에 있어요",
+    label: allCoreCoverageVisible
+      ? "보험료와 핵심 보장이 균형 있게 보여요"
+      : "보험료는 권장 범위지만 권장보험 점검이 필요해요",
+    title: allCoreCoverageVisible
+      ? "월 보험료와 핵심 보장이 균형 있게 보여요"
+      : "월 보험료는 권장 범위지만 권장보험 점검이 필요해요",
   };
 }
 

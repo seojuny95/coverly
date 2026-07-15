@@ -267,7 +267,9 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
     screen.getByText("현재 보장 구성을 바탕으로 확인한 내용을 정리했어요."),
   ).toBeInTheDocument();
   expect(screen.getByText("진단비 공백")).toBeInTheDocument();
-  expect(screen.getAllByText("권장 범위보다 낮아요").length).toBeGreaterThan(0);
+  expect(
+    screen.getByText("보험료는 낮지만 권장보험 점검이 필요해요"),
+  ).toBeInTheDocument();
   expect(screen.getByText("월 보험료 98,000원")).toBeInTheDocument();
   expect(screen.getByText("권장보험")).toBeInTheDocument();
   expect(screen.getByText("사망보험")).toBeInTheDocument();

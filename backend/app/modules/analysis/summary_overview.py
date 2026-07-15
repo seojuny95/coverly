@@ -77,7 +77,7 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
     confirmed = [item for item in items if item.status != "not_found"]
     missing = [item for item in items if item.status == "not_found"]
     review = [item for item in items if item.status == "needs_review"]
-    premium = _premium_judgment(summary)
+    premium = _premium_judgment(summary, missing)
 
     return {
         "premium": premium,
@@ -112,7 +112,10 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
     }
 
 
-def _premium_judgment(summary: PortfolioCoverageSummary) -> dict[str, object]:
+def _premium_judgment(
+    summary: PortfolioCoverageSummary,
+    missing: list[EssentialCoverageItem],
+) -> dict[str, object]:
     premium = summary.premium
     benchmark = summary.premium_benchmark
     if premium is None:
@@ -124,20 +127,37 @@ def _premium_judgment(summary: PortfolioCoverageSummary) -> dict[str, object]:
             "monthly_total": premium.monthly_total,
         }
 
+    all_core_coverage_visible = len(missing) == 0
     tone: Literal["low", "high", "in_range"]
     if premium.monthly_total < benchmark.suggested_min_premium:
         tone = "low"
-        label = "권장 범위보다 낮아요"
+        if all_core_coverage_visible:
+            label = "보험료는 낮고 핵심 보장은 보여요"
+            guidance = "핵심 보장이 보인다면 보험료가 낮은 것 자체는 좋은 신호예요."
+        else:
+            label = "보험료는 낮지만 권장보험 점검이 필요해요"
+            guidance = (
+                "보험료가 낮은 이유가 핵심 보장 공백일 수 있으니 권장보험 항목을 먼저 점검해보세요."
+            )
     elif premium.monthly_total > benchmark.suggested_max_premium:
         tone = "high"
-        label = "권장 범위보다 높아요"
+        label = "보험료가 권장 범위보다 높아요"
+        guidance = "보험료가 과할 수 있으니 가입한 보험과 보장내용을 다시 확인해보세요."
     else:
         tone = "in_range"
-        label = "권장 범위 안에 있어요"
+        if all_core_coverage_visible:
+            label = "보험료와 핵심 보장이 균형 있게 보여요"
+            guidance = "권장 구간 안에서 핵심 보장도 보여요. 세부 약관 조건만 확인해요."
+        else:
+            label = "보험료는 권장 범위지만 권장보험 점검이 필요해요"
+            guidance = "보험료는 권장 구간이어도 미확인 권장보험이 있으니 보장 구성을 점검해보세요."
 
     return {
         "status": tone,
         "label": label,
+        "guidance": guidance,
+        "all_core_coverage_visible": all_core_coverage_visible,
+        "missing_core_labels": _joined_labels(missing) if missing else "",
         "monthly_total": premium.monthly_total,
         "benchmark_label": benchmark.age_band_label,
         "recommended_min": benchmark.suggested_min_premium,
@@ -185,9 +205,13 @@ def _premium_detail(premium: dict[str, object]) -> str:
         return "월 보험료 자료가 부족해 적정성을 판단하기 어려워요."
     if not isinstance(recommended_min, int) or not isinstance(recommended_max, int):
         return f"{_format_won(total)}만 현재 자료에서 확인돼요."
-    return (
+    amount_comparison = (
         f"{_format_won(total)} / 권장 {_format_won(recommended_min)}~{_format_won(recommended_max)}"
     )
+    guidance = premium.get("guidance")
+    if isinstance(guidance, str) and guidance:
+        return f"{amount_comparison}. {guidance}"
+    return amount_comparison
 
 
 def _next_detail(
@@ -229,6 +253,7 @@ def _system_prompt() -> str:
 해야 할 것:
 - 입력 JSON의 판단값만 사용한다.
 - 보험료 판단, 보장 구성, 다음 확인 내용을 자연스러운 한국어로 연결한다.
+- 보험료는 금액 단독으로 좋다/나쁘다 판단하지 말고 premium.guidance와 보장 확인 상태를 함께 따른다.
 - 사용자가 올린 자료의 한계를 분명히 말한다.
 - 해요체로 쓴다.
 
