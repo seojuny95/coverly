@@ -140,6 +140,21 @@ EssentialCoverageKind = Literal[
     "indemnity",
 ]
 EssentialCoverageStatus = Literal["well_prepared", "needs_review", "not_found"]
+SourceReliability = Literal[
+    "official",
+    "public_research",
+    "industry",
+    "large_private_analysis",
+    "private_guidance",
+]
+
+
+class ReferenceSource(BaseModel):
+    label: str
+    url: str
+    published_at: str
+    reliability: SourceReliability
+    caveat: str
 
 
 class EssentialCoverageItem(BaseModel):
@@ -149,6 +164,8 @@ class EssentialCoverageItem(BaseModel):
     confirmed_amount: int | None = None
     reference_min_amount: int | None = None
     reference_max_amount: int | None = None
+    reference_basis: str | None = None
+    reference_sources: list[ReferenceSource] = Field(default_factory=list)
     coverage_count: int
     detail: str
     matched_coverage_names: list[str] = Field(default_factory=list)
@@ -222,7 +239,7 @@ class PremiumBenchmarkSource(BaseModel):
     label: str
     url: str
     published_at: str
-    reliability: str
+    reliability: SourceReliability
     caveat: str
 
 

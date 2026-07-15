@@ -9,7 +9,11 @@ from psycopg import sql
 from psycopg.rows import dict_row
 
 from app.core.config import get_settings
-from app.modules.portfolio.schemas import PremiumBenchmark, PremiumBenchmarkSource
+from app.modules.portfolio.schemas import (
+    PremiumBenchmark,
+    PremiumBenchmarkSource,
+    SourceReliability,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +224,19 @@ def _source_from_row(row: dict[str, Any], *, prefix: str) -> PremiumBenchmarkSou
         label=label,
         url=str(row[f"{prefix}_url"]),
         published_at=str(row[f"{prefix}_published_at"]),
-        reliability=str(row[f"{prefix}_reliability"]),
+        reliability=_source_reliability(row[f"{prefix}_reliability"]),
         caveat=str(row[f"{prefix}_caveat"]),
     )
+
+
+def _source_reliability(value: object) -> SourceReliability:
+    allowed: set[SourceReliability] = {
+        "official",
+        "public_research",
+        "industry",
+        "large_private_analysis",
+        "private_guidance",
+    }
+    if value not in allowed:
+        raise ValueError("unknown premium benchmark source reliability")
+    return value

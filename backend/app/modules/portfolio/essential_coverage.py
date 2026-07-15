@@ -3,6 +3,10 @@
 import re
 from collections.abc import Callable
 
+from app.modules.portfolio.essential_guides import (
+    EssentialCoverageGuide,
+    essential_coverage_guides,
+)
 from app.modules.portfolio.schemas import (
     CoverageInput,
     EssentialCoverageCheck,
@@ -56,14 +60,6 @@ _NEGATED_INDEMNITY_TERMS = (
     "실손미포함",
     "실비미포함",
 )
-
-_REFERENCE_AMOUNTS: dict[EssentialCoverageKind, tuple[int, int] | None] = {
-    "death": (10_000_000, 20_000_000),
-    "cancer": (30_000_000, 50_000_000),
-    "cerebrovascular": (30_000_000, 30_000_000),
-    "ischemic_heart": (20_000_000, 30_000_000),
-    "indemnity": None,
-}
 
 _SPECIAL_POLICY_LABELS: dict[SpecialPolicyKind, str] = {
     "auto": "자동차보험",
@@ -156,10 +152,12 @@ def build_essential_coverage_check(
 ) -> EssentialCoverageCheck:
     """Check uploaded policies without excluding any insurance category."""
 
+    guides = essential_coverage_guides()
     return EssentialCoverageCheck(
         items=[
             _fixed_coverage_item(
                 policies,
+                guide=guides["death"],
                 kind="death",
                 label="사망 보장",
                 matches=lambda name: "사망" in name,
@@ -167,6 +165,7 @@ def build_essential_coverage_check(
             ),
             _fixed_coverage_item(
                 policies,
+                guide=guides["cancer"],
                 kind="cancer",
                 label="암 진단비",
                 matches=lambda name: "진단" in name and any(term in name for term in _CANCER_TERMS),
@@ -176,6 +175,7 @@ def build_essential_coverage_check(
             ),
             _fixed_coverage_item(
                 policies,
+                guide=guides["cerebrovascular"],
                 kind="cerebrovascular",
                 label="뇌혈관질환 진단비",
                 matches=lambda name: (
@@ -185,12 +185,13 @@ def build_essential_coverage_check(
             ),
             _fixed_coverage_item(
                 policies,
+                guide=guides["ischemic_heart"],
                 kind="ischemic_heart",
                 label="심장질환 진단비",
                 matches=lambda name: "진단" in name and any(term in name for term in _HEART_TERMS),
                 confirmed_detail="심장질환·심질환 진단비가 확인돼요.",
             ),
-            _indemnity_item(policies),
+            _indemnity_item(policies, guides["indemnity"]),
         ]
     )
 
@@ -288,6 +289,7 @@ def _special_policy_overview(checks: list[SpecialCoverageCheck]) -> str:
 def _fixed_coverage_item(
     policies: list[PolicyInput],
     *,
+    guide: EssentialCoverageGuide,
     kind: EssentialCoverageKind,
     label: str,
     matches: Callable[[str], bool],
@@ -309,21 +311,25 @@ def _fixed_coverage_item(
         status = "not_found"
         detail = "현재 올린 전체 보험에서는 확인하지 못했어요."
 
-    reference_amount = _REFERENCE_AMOUNTS[kind]
     return EssentialCoverageItem(
         kind=kind,
         label=label,
         status=status,
         confirmed_amount=amount,
-        reference_min_amount=reference_amount[0] if reference_amount is not None else None,
-        reference_max_amount=reference_amount[1] if reference_amount is not None else None,
+        reference_min_amount=guide.reference_min_amount,
+        reference_max_amount=guide.reference_max_amount,
+        reference_basis=guide.basis,
+        reference_sources=list(guide.sources),
         coverage_count=len(matched),
         detail=detail,
         matched_coverage_names=sorted({coverage.담보명 for coverage in matched}),
     )
 
 
-def _indemnity_item(policies: list[PolicyInput]) -> EssentialCoverageItem:
+def _indemnity_item(
+    policies: list[PolicyInput],
+    guide: EssentialCoverageGuide,
+) -> EssentialCoverageItem:
     coverages = [
         (policy, coverage)
         for policy in policies
@@ -351,6 +357,8 @@ def _indemnity_item(policies: list[PolicyInput]) -> EssentialCoverageItem:
         kind="indemnity",
         label="실손의료보험",
         status=status,
+        reference_basis=guide.basis,
+        reference_sources=list(guide.sources),
         coverage_count=len(coverages),
         detail=detail,
         matched_coverage_names=sorted({coverage.담보명 for _policy, coverage in coverages}),

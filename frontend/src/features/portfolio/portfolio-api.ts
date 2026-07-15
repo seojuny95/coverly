@@ -80,20 +80,8 @@ export type PortfolioSummary = {
     suggested_max_ratio: number;
     suggested_min_premium: number;
     suggested_max_premium: number;
-    income_source: {
-      label: string;
-      url: string;
-      published_at: string;
-      reliability: string;
-      caveat: string;
-    };
-    guide_source: {
-      label: string;
-      url: string;
-      published_at: string;
-      reliability: string;
-      caveat: string;
-    };
+    income_source: ReferenceSource;
+    guide_source: ReferenceSource;
   } | null;
   overview?: {
     generation: "llm";
@@ -107,6 +95,21 @@ export type PortfolioSummary = {
   } | null;
 };
 
+export type SourceReliability =
+  | "official"
+  | "public_research"
+  | "industry"
+  | "large_private_analysis"
+  | "private_guidance";
+
+export type ReferenceSource = {
+  label: string;
+  url: string;
+  published_at: string;
+  reliability: SourceReliability;
+  caveat: string;
+};
+
 export type EssentialCoverageItem = {
   kind: "death" | "cancer" | "cerebrovascular" | "ischemic_heart" | "indemnity";
   label: string;
@@ -114,6 +117,8 @@ export type EssentialCoverageItem = {
   confirmed_amount: number | null;
   reference_min_amount: number | null;
   reference_max_amount: number | null;
+  reference_basis: string | null;
+  reference_sources: ReferenceSource[];
   coverage_count: number;
   detail: string;
   matched_coverage_names: string[];
