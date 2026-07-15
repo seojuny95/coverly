@@ -1,6 +1,7 @@
 """Conversational Q&A grounded in uploaded portfolio facts."""
 
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from app.schemas.consultation import (
@@ -38,7 +39,7 @@ from app.services.qa.generation import (
     generate_consultation_answer,
     stream_consultation_answer,
 )
-from app.services.qa.planning import QuestionPlan, plan_questions
+from app.services.qa.planning import PlannedQuestion, QuestionPlan, plan_questions
 from app.services.rag.official.answer import RagAnswer, RagCitation, answer_official_question
 from app.services.rag.policy import (
     PolicyGenerationResult,
@@ -77,6 +78,8 @@ _OFFICIAL_CLAIM_CHECK_TERMS = (
     "면책",
 )
 _MAX_SUGGESTIONS = 3
+_GREETING_ANSWER = "안녕하세요. 가입한 보험과 보장에 관해 궁금한 내용을 물어봐 주세요."
+_OUT_OF_SCOPE_ANSWER = "보험과 관련 없는 정보는 답변하기 어려워요."
 
 OfficialAnswerer = Callable[[str], RagAnswer]
 
@@ -93,6 +96,13 @@ class _QaContext:
     catalog: EvidenceCatalog
 
 
+@dataclass(frozen=True)
+class _QuestionTurn:
+    question: str
+    history: list[ConversationMessage]
+    plan: QuestionPlan | None
+
+
 def answer_portfolio_question(
     question: str,
     policies: list[PolicyInput],
@@ -105,10 +115,16 @@ def answer_portfolio_question(
 ) -> PortfolioQuestionResponse:
     """Answer with cited facts, or refuse conclusions that require policy terms."""
 
-    context = _build_qa_context(question, policies, demographics, history)
-    question_plan = plan_questions(context.question, context.history, complete=plan)
-    if question_plan is not None:
-        return _answer_question_plan(context, question_plan, complete, official_answer)
+    turn = _plan_question_turn(question, history, plan)
+    if turn.plan is not None:
+        if turn.plan.clarification is not None:
+            return _clarification_response(turn.plan.clarification)
+        if _is_scope_only_plan(turn.plan):
+            return _answer_scope_only_plan(turn.plan)
+        context = _build_qa_context(turn.question, policies, demographics, turn.history)
+        return _answer_question_plan(context, turn.plan, complete, official_answer)
+
+    context = _build_qa_context(turn.question, policies, demographics, turn.history)
     return _answer_context(context, complete, official_answer)
 
 
@@ -170,6 +186,20 @@ def _stream_response(response: PortfolioQuestionResponse) -> Iterator[QaStreamEv
     }
 
 
+def _plan_question_turn(
+    question: str,
+    history: list[ConversationMessage] | None,
+    complete: JsonCompleter | None,
+) -> _QuestionTurn:
+    normalized_question = question.strip()
+    conversation_history = history or []
+    return _QuestionTurn(
+        question=normalized_question,
+        history=conversation_history,
+        plan=plan_questions(normalized_question, conversation_history, complete=complete),
+    )
+
+
 def stream_portfolio_answer(
     question: str,
     policies: list[PolicyInput],
@@ -182,17 +212,22 @@ def stream_portfolio_answer(
 ) -> Iterator[QaStreamEvent]:
     """Stream the answer: deterministic routes emit at once, the LLM route streams."""
 
-    context = _build_qa_context(question, policies, demographics, history)
-    question_plan = plan_questions(context.question, context.history, complete=plan)
-    if question_plan is not None:
-        if question_plan.clarification is not None:
-            yield from _stream_clarification(question_plan.clarification)
+    turn = _plan_question_turn(question, history, plan)
+    if turn.plan is not None:
+        if turn.plan.clarification is not None:
+            yield from _stream_clarification(turn.plan.clarification)
             return
-        if len(question_plan.questions) != 1 or question_plan.questions[0].scope != "insurance":
-            response = _answer_question_plan(context, question_plan, None, official_answer)
+        if _is_scope_only_plan(turn.plan):
+            yield from _stream_response(_answer_scope_only_plan(turn.plan))
+            return
+        context = _build_qa_context(turn.question, policies, demographics, turn.history)
+        if len(turn.plan.questions) != 1 or turn.plan.questions[0].scope != "insurance":
+            response = _answer_question_plan(context, turn.plan, None, official_answer)
             yield from _stream_response(response)
             return
-        context = _context_with_question(context, question_plan.questions[0].resolved)
+        context = _context_with_question(context, turn.plan.questions[0].resolved)
+    else:
+        context = _build_qa_context(turn.question, policies, demographics, turn.history)
 
     yield from _stream_context(context, stream, official_answer)
 
@@ -283,6 +318,55 @@ def _context_with_question(context: _QaContext, question: str) -> _QaContext:
     )
 
 
+def _clarification_response(question: str) -> PortfolioQuestionResponse:
+    return PortfolioQuestionResponse(
+        status="clarify",
+        answer=question,
+        citations=[],
+        limitations=[],
+        suggestions=[],
+    )
+
+
+def _is_scope_only_plan(question_plan: QuestionPlan) -> bool:
+    return all(planned.scope != "insurance" for planned in question_plan.questions)
+
+
+def _scope_answer(planned: PlannedQuestion) -> tuple[str, bool]:
+    if planned.scope == "greeting":
+        return _GREETING_ANSWER, True
+    return _OUT_OF_SCOPE_ANSWER, False
+
+
+def _append_planned_answer(
+    answers: list[str],
+    question_count: int,
+    planned: PlannedQuestion,
+    answer: str,
+) -> None:
+    if question_count == 1:
+        answers.append(answer)
+    else:
+        answers.append(f"{planned.original}\n{answer}")
+
+
+def _answer_scope_only_plan(question_plan: QuestionPlan) -> PortfolioQuestionResponse:
+    answers: list[str] = []
+    answered = False
+    for planned in question_plan.questions:
+        answer, planned_answered = _scope_answer(planned)
+        answered = answered or planned_answered
+        _append_planned_answer(answers, len(question_plan.questions), planned, answer)
+
+    return PortfolioQuestionResponse(
+        status="answered" if answered else "refused",
+        answer="\n\n".join(answers),
+        citations=[],
+        limitations=[],
+        suggestions=[],
+    )
+
+
 def _answer_question_plan(
     context: _QaContext,
     question_plan: QuestionPlan,
@@ -290,13 +374,7 @@ def _answer_question_plan(
     official_answer: OfficialAnswerer | None,
 ) -> PortfolioQuestionResponse:
     if question_plan.clarification is not None:
-        return PortfolioQuestionResponse(
-            status="clarify",
-            answer=question_plan.clarification,
-            citations=[],
-            limitations=[],
-            suggestions=[],
-        )
+        return _clarification_response(question_plan.clarification)
 
     answers: list[str] = []
     citations: list[AnswerCitation] = []
@@ -305,19 +383,16 @@ def _answer_question_plan(
     answered = False
     generation: GenerationMode = "fallback"
     claim_channels = None
+    insurance_answers = _answer_insurance_questions(
+        context,
+        question_plan,
+        complete,
+        official_answer,
+    )
 
-    for planned in question_plan.questions:
-        if planned.scope == "out_of_scope":
-            answer = "보험과 관련 없는 정보는 답변하기 어려워요."
-        elif planned.scope == "greeting":
-            answer = "안녕하세요. 가입한 보험과 보장에 관해 궁금한 내용을 물어봐 주세요."
-            answered = True
-        else:
-            response = _answer_context(
-                _context_with_question(context, planned.resolved),
-                complete,
-                official_answer,
-            )
+    for index, planned in enumerate(question_plan.questions):
+        if planned.scope == "insurance":
+            response = insurance_answers[index]
             answer = response.answer
             answered = answered or response.status == "answered"
             generation = "llm" if response.generation == "llm" else generation
@@ -325,10 +400,10 @@ def _answer_question_plan(
             limitations.extend(response.limitations)
             suggestions.extend(response.suggestions)
             claim_channels = claim_channels or response.claim_channels
-        if len(question_plan.questions) == 1:
-            answers.append(answer)
         else:
-            answers.append(f"{planned.original}\n{answer}")
+            answer, planned_answered = _scope_answer(planned)
+            answered = answered or planned_answered
+        _append_planned_answer(answers, len(question_plan.questions), planned, answer)
 
     return PortfolioQuestionResponse(
         status="answered" if answered else "refused",
@@ -340,6 +415,42 @@ def _answer_question_plan(
         demographics=context.insured,
         claim_channels=claim_channels,
     )
+
+
+def _answer_insurance_questions(
+    context: _QaContext,
+    question_plan: QuestionPlan,
+    complete: JsonCompleter | None,
+    official_answer: OfficialAnswerer | None,
+) -> dict[int, PortfolioQuestionResponse]:
+    insurance_tasks = [
+        (index, planned)
+        for index, planned in enumerate(question_plan.questions)
+        if planned.scope == "insurance"
+    ]
+    if not insurance_tasks:
+        return {}
+    if len(insurance_tasks) == 1:
+        index, planned = insurance_tasks[0]
+        return {
+            index: _answer_context(
+                _context_with_question(context, planned.resolved),
+                complete,
+                official_answer,
+            )
+        }
+
+    with ThreadPoolExecutor(max_workers=len(insurance_tasks)) as executor:
+        futures = {
+            index: executor.submit(
+                _answer_context,
+                _context_with_question(context, planned.resolved),
+                complete,
+                official_answer,
+            )
+            for index, planned in insurance_tasks
+        }
+        return {index: future.result() for index, future in futures.items()}
 
 
 def _unique_citations(citations: list[AnswerCitation]) -> list[AnswerCitation]:

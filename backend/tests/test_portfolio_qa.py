@@ -1,11 +1,13 @@
 import json
 from datetime import UTC, datetime, timedelta
+from threading import Barrier
+from typing import Any
 
 from pytest import MonkeyPatch
 
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.schemas.qa import ConversationMessage
+from app.schemas.qa import ConversationMessage, PortfolioQuestionResponse
 from app.services.qa.service import answer_portfolio_question
 from app.services.rag.official.answer import RagAnswer, RagCitation
 from app.services.rag.policy import PolicyChunk, PolicyRetrievalHit
@@ -585,6 +587,111 @@ def test_qa_does_not_call_llm_for_deterministic_amount_questions() -> None:
 
     assert amount.status == "answered"
     assert "30,000,000원" in amount.answer
+
+
+def test_qa_fast_amount_path_skips_planner_llm_and_policy_rag(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    from app.services.qa import service as portfolio_qa
+
+    policy = _policies()[0]
+    policy.문서세션ID = "session-1"
+
+    def forbidden_json(_: str, __: str) -> dict[str, object]:
+        raise AssertionError("LLM should not be called for deterministic amount questions")
+
+    def forbidden_retrieval(_ids: list[str], _query: str) -> list[PolicyRetrievalHit]:
+        raise AssertionError("policy RAG should not run for deterministic amount questions")
+
+    monkeypatch.setattr(portfolio_qa, "retrieve_policy_context", forbidden_retrieval)
+
+    result = portfolio_qa.answer_portfolio_question(
+        "암진단비 가입금액은 얼마야?",
+        [policy],
+        complete=forbidden_json,
+        plan=forbidden_json,
+    )
+
+    assert result.status == "answered"
+    assert "30,000,000원" in result.answer
+
+
+def test_qa_scope_only_plan_skips_portfolio_context(monkeypatch: MonkeyPatch) -> None:
+    from app.services.qa import service as portfolio_qa
+
+    def forbidden_context(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("scope-only plans should not build portfolio context")
+
+    monkeypatch.setattr(portfolio_qa, "_build_qa_context", forbidden_context)
+
+    result = portfolio_qa.answer_portfolio_question(
+        "오늘 날씨 알려줘",
+        _policies(),
+        plan=lambda _system, _user: {
+            "questions": [
+                {
+                    "original": "오늘 날씨 알려줘",
+                    "resolved": "오늘 날씨 알려줘",
+                    "scope": "out_of_scope",
+                }
+            ],
+            "clarification": None,
+        },
+    )
+
+    assert result.status == "refused"
+    assert "보험과 관련 없는 정보" in result.answer
+
+
+def test_qa_answers_multiple_insurance_questions_in_parallel(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    from app.services.qa import service as portfolio_qa
+
+    barrier = Barrier(2, timeout=5)
+    seen_questions: list[str] = []
+
+    def fake_answer_context(context: Any, *_args: object) -> PortfolioQuestionResponse:
+        question = context.question
+        seen_questions.append(question)
+        barrier.wait()
+        return PortfolioQuestionResponse(
+            status="answered",
+            answer=f"{question} 답변",
+            citations=[],
+            limitations=[],
+        )
+
+    monkeypatch.setattr(portfolio_qa, "_answer_context", fake_answer_context)
+
+    result = portfolio_qa.answer_portfolio_question(
+        "암진단비하고 실손의료비 알려줘",
+        _policies(),
+        plan=lambda _system, _user: {
+            "questions": [
+                {
+                    "original": "암진단비",
+                    "resolved": "암진단비 가입금액은 얼마야?",
+                    "scope": "insurance",
+                },
+                {
+                    "original": "실손의료비",
+                    "resolved": "실손의료비 가입 여부는 어때?",
+                    "scope": "insurance",
+                },
+            ],
+            "clarification": None,
+        },
+    )
+
+    assert set(seen_questions) == {
+        "암진단비 가입금액은 얼마야?",
+        "실손의료비 가입 여부는 어때?",
+    }
+    assert result.answer.split("\n\n") == [
+        "암진단비\n암진단비 가입금액은 얼마야? 답변",
+        "실손의료비\n실손의료비 가입 여부는 어때? 답변",
+    ]
 
 
 def test_qa_adds_session_policy_text_to_llm_context(monkeypatch: MonkeyPatch) -> None:

@@ -181,7 +181,6 @@ export type QaAnswer = {
     evidence_id?: string;
   }>;
   limitations: string[];
-  suggested_questions?: string[];
   suggestions?: string[];
   generation?: "llm" | "fallback";
   sections?: Array<{

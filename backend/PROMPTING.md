@@ -131,7 +131,16 @@ Retrieval 평가는 질문에 맞는 근거를 찾아오는지 측정하고, gen
 특히 업로드 증권(policy) RAG generation 평가는 실제 사용자의 증권 원문 조각을 다루므로, 평가 fixture에는 개인정보 원문을 넣지 않고 `[전화번호]`, `[주민등록번호]`, `[이메일]`, `[계좌번호]` 같은 마스킹 토큰만 둔다.
 다중 증권, 같은 담보명 충돌, OCR 노이즈, 프롬프트 인젝션, 긴 distractor, 근거 부족 fallback처럼 generation 단계에서 흔히 깨지는 edge case를 별도 케이스로 유지한다.
 
-Policy RAG generation 평가는 practice와 test를 분리한다. practice는 실패 원인을 분석하고 프롬프트·후처리를 반복 개선하는 데 사용하며, 단일 fixture인 `app/services/rag/policy/evaluation/generation_dataset.json`에 둔다. 정답 근거가 첫 위치에 몰리지 않도록 3개 이상의 근거, 다중 근거 정답, 관련 있어 보이는 근거 부족 사례, 실제 샘플 증권에서 비식별화한 edge case를 충분히 포함한다. test는 `app/services/rag/policy/evaluation/generation_test_dataset.json`에 따로 두고 practice 개선을 끝낸 뒤 별도 fixture로 한 번만 실행한다. test 결과를 본 뒤 같은 test에 맞춰 수정하지 않으며, 추가 개선이 필요하면 해당 실패 유형은 다음 practice에 반영하고 새로운 test로 다시 검증한다. 질문을 읽지 않고 첫 근거만 고르는 baseline도 함께 측정해 평가셋 자체가 지나치게 쉽지 않은지 확인한다.
+Policy RAG generation 평가는 practice와 test를 분리한다.
+practice는 실패 원인을 분석하고 프롬프트·후처리를 반복 개선하는 데 사용하며,
+단일 fixture인 `app/services/rag/policy/evaluation/generation_dataset.json`에 둔다.
+정답 근거가 첫 위치에 몰리지 않도록 3개 이상의 근거, 다중 근거 정답,
+관련 있어 보이는 근거 부족 사례, 실제 샘플 증권에서 비식별화한 edge case를 충분히 포함한다.
+test는 `app/services/rag/policy/evaluation/generation_test_dataset.json`에 따로 두고
+practice 개선을 끝낸 뒤 별도 fixture로 한 번만 실행한다.
+test 결과를 본 뒤 같은 test에 맞춰 수정하지 않으며,
+추가 개선이 필요하면 해당 실패 유형은 다음 practice에 반영하고 새로운 test로 다시 검증한다.
+질문을 읽지 않고 첫 근거만 고르는 baseline도 함께 측정해 평가셋 자체가 지나치게 쉽지 않은지 확인한다.
 
 Policy RAG generation은 공용 상담 생성기가 아니라 `app/services/rag/policy/generation.py`의 독립 생성기를 사용한다. 평가 러너도 이 생성기를 직접 호출해 검색 품질이나 공용 QA 후처리 변경 없이 policy 답변 계약만 측정한다.
 
@@ -146,3 +155,6 @@ Policy RAG generation은 공용 상담 생성기가 아니라 `app/services/rag/
 - planner 입력에는 최근 12개 대화만 넣고, 주민등록번호 형태뿐 아니라 전화번호와 이메일도 외부 모델 호출 전에 마스킹한다.
 - planner가 실패해도 명백한 도메인 밖 질문은 보험 상담 답변으로 흘려보내지 않는다. 복합 질문에 외부 도메인이 섞이면 가능한 범위에서 보험 부분과 외부 도메인 부분을 나누고, 외부 도메인 부분은 정중하게 제한한다.
 - 후속 질문 추천은 사용자가 그대로 누를 수 있는 질문 원문만 사용한다. `~해 보세요`, `~확인해 주세요` 같은 행동 제안 문장은 추천 질문에 넣지 않고, 최대 3개만 반환한다.
+- Q&A 응답 속도는 실제 시간 임계값보다 호출 경로로 먼저 관리한다. 단순 가입금액·보유 목록·청구 채널 질문은 planner completer, policy RAG, 상담 LLM을 호출하지 않아야 한다.
+- planner만으로 끝나는 인사·도메인 밖 질문·되묻기 turn은 포트폴리오 facts/catalog 계산을 만들지 않는다.
+- 복합 질문 안의 보험 질문들은 서로 독립된 resolved question으로 답할 수 있을 때 병렬로 처리하고, 사용자에게 보여주는 답변 순서는 원문 질문 순서를 유지한다.
