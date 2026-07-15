@@ -1,0 +1,90 @@
+[
+  {
+    "id": "standard_terms_payment_article",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "chunk_id": "8da6a82c4c693d03db88",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제3조(보험금의 지급사유)",
+    "expected_citation_contains": ["표준약관", "제3조(보험금의 지급사유)"],
+    "expected_page_start": 1,
+    "expected_page_end": 54,
+    "must_include": ["보험금의 지급사유", "약정한 보험금을 지급합니다"]
+  },
+  {
+    "id": "standard_terms_explanation_duty_article",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "chunk_id": "44ffae7610bf84b4bcf1",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제18조(약관교부 및 설명의무 등)",
+    "expected_citation_contains": ["표준약관", "제18조(약관교부 및 설명의무 등)"],
+    "expected_page_start": 1,
+    "expected_page_end": 54,
+    "must_include": ["약관의 중요한 내용을 설명", "약관 및 계약자"]
+  },
+  {
+    "id": "roadmap_main_contents_page",
+    "source_id": "fsc_policy_terms_roadmap_2019_10_22",
+    "chunk_id": "ee6594cdeb89ed4e0f0c",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "Ⅱ 보험약관 개선 로드맵의 주요 내용",
+    "expected_citation_contains": ["보험약관 개선 로드맵", "p.2"],
+    "expected_page_start": 2,
+    "expected_page_end": 2,
+    "must_include": ["소비자 친화적으로", "약관순화위원회"]
+  },
+  {
+    "id": "roadmap_simplification_committee_page",
+    "source_id": "fsc_policy_terms_roadmap_2019_10_22",
+    "chunk_id": "89d9681d461361955c4a",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "2 약관순화위원회 설치 ※ ‘19.9.5. 제1차 약관순화위원회 개최",
+    "expected_citation_contains": ["보험약관 개선 로드맵", "p.3"],
+    "expected_page_start": 3,
+    "expected_page_end": 3,
+    "must_include": ["약관순화위원회", "전문적인 자문"]
+  },
+  {
+    "id": "insurance_business_act_product_definition",
+    "source_id": "insurance_business_act",
+    "chunk_id": "insurance_business_act:2조:1",
+    "expected_source_category": "law",
+    "expected_label": "제2조(정의)",
+    "expected_citation_contains": ["보험업법", "제2조(정의)"],
+    "expected_page_start": 3,
+    "expected_page_end": 3,
+    "must_include": ["보험상품", "위험보장을 목적"]
+  },
+  {
+    "id": "insurance_business_act_explanation_duty",
+    "source_id": "insurance_business_act",
+    "chunk_id": "insurance_business_act:95조의2",
+    "expected_source_category": "law",
+    "expected_label": "제95조의2(설명의무 등)",
+    "expected_citation_contains": ["보험업법", "제95조의2(설명의무 등)"],
+    "expected_page_start": 126,
+    "expected_page_end": 126,
+    "must_include": ["설명의무", "보험금 지급 시까지의 주요 과정"]
+  },
+  {
+    "id": "financial_consumer_protection_act_product_types",
+    "source_id": "financial_consumer_protection_act",
+    "chunk_id": "financial_consumer_protection_act:3조",
+    "expected_source_category": "law",
+    "expected_label": "제3조(금융상품의 유형)",
+    "expected_citation_contains": ["금융소비자 보호에 관한 법률", "제3조(금융상품의 유형)"],
+    "expected_page_start": 4,
+    "expected_page_end": 4,
+    "must_include": ["금융상품은", "보장성 상품"]
+  },
+  {
+    "id": "financial_consumer_protection_act_withdrawal",
+    "source_id": "financial_consumer_protection_act",
+    "chunk_id": "financial_consumer_protection_act:46조:1",
+    "expected_source_category": "law",
+    "expected_label": "제46조(청약의 철회)",
+    "expected_citation_contains": ["금융소비자 보호에 관한 법률", "제46조(청약의 철회)"],
+    "expected_page_start": 59,
+    "expected_page_end": 59,
+    "must_include": ["청약의 철회", "일반금융소비자"]
+  }
+]

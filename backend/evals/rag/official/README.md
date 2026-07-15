@@ -1,11 +1,49 @@
 # Official RAG 평가
 
-이 문서는 공식문서 RAG의 Retrieval과 Generation 품질을 서로 분리해 평가하는 기준을 정리한다.
-Retrieval은 필요한 근거 chunk를 찾는 능력을, Generation은 고정된 근거에서 안전하고 충실한 답변을 만드는 능력을 본다.
+이 문서는 공식문서 RAG의 Extraction, Retrieval, Generation 품질을 서로 분리해 평가하는 기준을 정리한다.
+Extraction은 공식 PDF/XML을 citation 가능한 chunk로 뽑는 능력, Retrieval은 필요한 근거 chunk를 찾는 능력, Generation은 고정된 근거에서 안전하고 충실한 답변을 만드는 능력을 본다.
 
+Extraction 평가셋은 **8개 대표 chunk 케이스**로 시작한다.
 Retrieval 평가셋은 **36개 시나리오 × 질문 표현 2개 = 72개 케이스**로 구성한다.
 Generation 평가셋은 **30개 시나리오 × 질문 표현 2개 = 60개 케이스**로 구성한다.
 같은 사실이나 질문 의도를 서로 다른 표현으로 물어 단순 키워드 일치에만 유리한 평가가 되지 않도록 한다.
+
+## Extraction 평가
+
+Extraction 평가는 [extraction_dataset.json](extraction_dataset.json)에 지정된 공식문서 chunk가 현재 loader/chunker 결과에 그대로 존재하는지 확인한다.
+Retrieval이나 Generation을 실행하지 않고, 공식 source 원문에서 만들어진 chunk의 metadata와 본문만 본다.
+
+### 데이터셋
+
+각 케이스는 다음 필드를 가진다.
+
+- `id`: 케이스 식별자.
+- `source_id`: 공식 source ID.
+- `chunk_id`: 사람이 확인한 기대 chunk ID.
+- `expected_source_category`: `standard_clause`, `consumer_guide`, `law` 같은 source category.
+- `expected_label`: citation에 사용할 조항/섹션 label.
+- `expected_citation_contains`: citation label에 포함되어야 하는 문자열.
+- `expected_page_start`, `expected_page_end`: chunk page range.
+- `must_include`: chunk 본문에 포함되어야 하는 핵심 문자열.
+
+초기 데이터셋은 표준약관, 금융위원회 보험약관 개선 로드맵, 보험업법 XML, 금융소비자보호법 XML을 모두 포함한다.
+
+### 지표
+
+| 지표 | 계산 기준 | 높으면 의미하는 것 |
+|---|---|---|
+| `pass_rate` | 모든 check를 통과한 케이스 비율 | 공식문서 extraction 계약이 유지됨 |
+| `chunk_found_rate` | 기대 chunk ID가 존재하는 비율 | chunk ID가 사라지거나 바뀌지 않음 |
+| `metadata_match_rate` | source/category/label/page가 일치하는 비율 | citation metadata가 안정적임 |
+| `citation_match_rate` | citation label 필수 문자열을 포함한 비율 | 사용자에게 보여줄 근거명이 유지됨 |
+| `text_coverage_rate` | 본문 필수 문자열을 포함한 비율 | chunk 본문이 누락되지 않음 |
+
+### 실행
+
+```bash
+cd backend
+uv run python -m evals.rag.official.extraction --show-passing
+```
 
 ## Retrieval 평가
 
@@ -158,6 +196,16 @@ uv run python -m evals.rag.official.generation --show-passing
 |---|---:|---:|---:|---:|---:|---:|---:|
 | 오프라인 Hashing | 26/72 | 0.481 | 0.096 | 0.305 | 0.318 | 0/18 | 0.166초 |
 | 운영 pgvector | 43/72 | 0.796 | 0.178 | 0.646 | 0.643 | 0/18 | 1.052초 |
+
+### Extraction
+
+| 지표 | 결과 |
+|---|---:|
+| 전체 통과 | 8/8 (1.000) |
+| chunk 존재 | 1.000 |
+| metadata 일치 | 1.000 |
+| citation 일치 | 1.000 |
+| 본문 포함 | 1.000 |
 
 운영 검색은 positive 질문에서 관련 근거를 찾는 능력은 유지하지만, negative 질문에서도 항상 결과를 반환한다.
 이는 현재 설계상 예상된 결과다. Official RAG retrieval은 공식문서 후보 검색을 담당하고, out-of-scope 질문 거절은 상위 QA 전체 라우터가 맡는다.

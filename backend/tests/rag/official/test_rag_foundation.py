@@ -11,10 +11,14 @@ from app.rag.official.models import RagChunk, RetrievalHit
 from app.rag.official.retrieval import retrieve, transform_query
 from app.rag.official.sources import OfficialSource, rag_sources, verify_downloaded_sources
 from evals.rag.official import (
+    ExtractionEvalCase,
     RetrievalEvalCase,
+    evaluate_extraction,
     evaluate_retrieval,
+    load_extraction_eval_cases,
     load_retrieval_eval_cases,
 )
+from evals.rag.official.extraction import EVAL_FIXTURE as EXTRACTION_EVAL_FIXTURE
 from evals.rag.official.retrieval import EVAL_FIXTURE
 
 
@@ -262,6 +266,64 @@ def test_retrieval_eval_fixture_uses_exact_existing_chunks_without_pii() -> None
     assert re.search(r"\b\d{6}-[1-4]\d{6}\b", fixture_text) is None
     assert re.search(r"\b01[016789]-?\d{3,4}-?\d{4}\b", fixture_text) is None
     assert re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", fixture_text) is None
+
+
+def test_extraction_eval_fixture_passes_current_official_sources() -> None:
+    cases = load_extraction_eval_cases()
+    report = evaluate_extraction(cases)
+
+    assert report.total == 8
+    assert report.pass_rate == 1.0
+    assert report.chunk_found_rate == 1.0
+    assert report.metadata_match_rate == 1.0
+    assert report.citation_match_rate == 1.0
+    assert report.text_coverage_rate == 1.0
+
+
+def test_extraction_eval_fixture_uses_existing_chunks_without_pii() -> None:
+    cases = load_extraction_eval_cases()
+    chunks_by_id = {chunk.id: chunk for chunk in load_official_chunks()}
+    fixture_text = EXTRACTION_EVAL_FIXTURE.read_text(encoding="utf-8")
+
+    assert len(cases) == 8
+    assert len({case.id for case in cases}) == len(cases)
+    assert all(case.chunk_id in chunks_by_id for case in cases)
+    assert re.search(r"\b\d{6}-[1-4]\d{6}\b", fixture_text) is None
+    assert re.search(r"\b01[016789]-?\d{3,4}-?\d{4}\b", fixture_text) is None
+    assert re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", fixture_text) is None
+
+
+def test_extraction_eval_reports_metadata_citation_and_text_failures() -> None:
+    chunk = RagChunk(
+        id="chunk",
+        source_id="source",
+        source_title="문서",
+        source_category="law",
+        publisher="테스트",
+        text="본문",
+        page_start=1,
+        page_end=1,
+        label="제1조(목적)",
+        citation_label="문서 제1조(목적)",
+    )
+    cases = (
+        ExtractionEvalCase(
+            id="case",
+            source_id="source",
+            chunk_id="chunk",
+            expected_source_category="standard_clause",
+            expected_label="제2조(정의)",
+            expected_citation_contains=("없는 citation",),
+            expected_page_start=2,
+            expected_page_end=2,
+            must_include=("없는 본문",),
+        ),
+    )
+
+    report = evaluate_extraction(cases, chunks=(chunk,))
+
+    assert report.passed == 0
+    assert report.results[0].failed_checks == ("metadata", "citation", "text")
 
 
 def test_retrieval_eval_reports_first_passing_rank_and_mrr(
