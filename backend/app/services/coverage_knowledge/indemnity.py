@@ -29,6 +29,10 @@ class IndemnityClassification:
     medical_indemnity_status: MedicalIndemnityStatus
 
 
+def _normalize(value: str) -> str:
+    return re.sub(r"[^0-9A-Za-z가-힣]", "", value).casefold()
+
+
 _FIXED_PAYMENT_TYPES = frozenset({"정액", "정액형", "고정액", "고정액형"})
 _INDEMNITY_PAYMENT_TYPES = frozenset(
     {
@@ -45,6 +49,11 @@ _INDEMNITY_PAYMENT_TYPES = frozenset(
     }
 )
 _INDEMNITY_CATEGORIES = frozenset({"실손", "실손형", "실비", "실비형"})
+_NORMALIZED_FIXED_PAYMENT_TYPES = frozenset(_normalize(item) for item in _FIXED_PAYMENT_TYPES)
+_NORMALIZED_INDEMNITY_PAYMENT_TYPES = frozenset(
+    _normalize(item) for item in _INDEMNITY_PAYMENT_TYPES
+)
+_NORMALIZED_INDEMNITY_CATEGORIES = frozenset(_normalize(item) for item in _INDEMNITY_CATEGORIES)
 _INDEMNITY_NAME_TERMS = ("실손", "실비")
 _NEGATED_INDEMNITY_PATTERNS = (
     "비실손",
@@ -149,9 +158,10 @@ def is_medical_indemnity_name(name: str) -> bool:
 
 def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
     payment_type = (coverage.지급유형 or "").strip()
-    if payment_type in _INDEMNITY_PAYMENT_TYPES:
+    normalized_payment_type = _normalize(payment_type)
+    if normalized_payment_type in _NORMALIZED_INDEMNITY_PAYMENT_TYPES:
         return "indemnity"
-    if payment_type in _FIXED_PAYMENT_TYPES:
+    if normalized_payment_type in _NORMALIZED_FIXED_PAYMENT_TYPES:
         return "fixed"
     if payment_type:
         return "unknown"
@@ -164,7 +174,7 @@ def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
         for pattern in _NEGATED_INDEMNITY_PATTERNS
     ):
         return "unknown"
-    if coverage_category in _INDEMNITY_CATEGORIES:
+    if normalized_category in _NORMALIZED_INDEMNITY_CATEGORIES:
         return "indemnity"
     if _contains_any(normalized_name, _INDEMNITY_NAME_TERMS):
         return "indemnity"
@@ -172,27 +182,30 @@ def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
 
 
 def _coverage_domain(text: str, policy: PolicyInput | None) -> CoverageDomain:
-    if _is_damage_policy(policy):
-        if _contains_any(text, _AUTO_TERMS):
-            return "auto"
-        if _contains_any(text, _LEGAL_TERMS):
-            return "legal_cost"
-        if _contains_any(text, _LIABILITY_TERMS):
-            return "liability"
-        if _contains_any(text, _PROPERTY_TERMS):
-            return "property_damage"
-
-    if _contains_any(text, _LEGAL_TERMS):
-        return "legal_cost"
-    if _contains_any(text, _LIABILITY_TERMS):
-        return "liability"
-    if _contains_any(text, _AUTO_TERMS):
-        return "auto"
-    if _contains_any(text, _PROPERTY_TERMS):
-        return "property_damage"
-    if _contains_any(text, _MEDICAL_TERMS):
-        return "medical_expense"
+    for domain, terms in _domain_priorities(policy):
+        if _contains_any(text, terms):
+            return domain
     return "other"
+
+
+def _domain_priorities(
+    policy: PolicyInput | None,
+) -> tuple[tuple[CoverageDomain, tuple[str, ...]], ...]:
+    if _is_damage_policy(policy):
+        return (
+            ("auto", _AUTO_TERMS),
+            ("legal_cost", _LEGAL_TERMS),
+            ("liability", _LIABILITY_TERMS),
+            ("property_damage", _PROPERTY_TERMS),
+            ("medical_expense", _MEDICAL_TERMS),
+        )
+    return (
+        ("legal_cost", _LEGAL_TERMS),
+        ("liability", _LIABILITY_TERMS),
+        ("auto", _AUTO_TERMS),
+        ("property_damage", _PROPERTY_TERMS),
+        ("medical_expense", _MEDICAL_TERMS),
+    )
 
 
 def _coverage_text(coverage: CoverageInput, policy: PolicyInput | None) -> str:
@@ -224,7 +237,3 @@ def _is_damage_policy(policy: PolicyInput | None) -> bool:
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
     return any(_normalize(term) in text for term in terms)
-
-
-def _normalize(value: str) -> str:
-    return re.sub(r"[^0-9A-Za-z가-힣]", "", value).casefold()
