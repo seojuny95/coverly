@@ -8,7 +8,7 @@ Next.js App Router + TypeScript 프론트엔드. 전체 프로젝트 가이드: 
 
 ## 프로젝트 소개
 
-Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 AI가 정리한 종류별 정리·보험금 합계·상담 전 검토·근거 기반 Q&A를 보여준다. "보험을 팔지 않는 내 편 AI 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
+Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 AI가 정리한 보험 종류별 정리·보장금 합계·상담 전 검토·근거 기반 Q&A를 보여준다. "보험을 팔지 않는 내 편 AI 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
 
 ## Development Commands
 
@@ -35,7 +35,7 @@ src/
 └── features/
     ├── insurance-upload/       # 업로드 폼 + upload-insurance API
     ├── insurance-analysis/     # 분석 페이지, 보장 목록, 인메모리 데이터 Context, 이탈 경고, 보험사 로고
-    └── portfolio/              # 보험금 합계표, 상담 전 검토 패널, Q&A 챗봇, portfolio API
+    └── portfolio/              # 보장금 합계표, 손해보험 별도 보장, 상담 전 검토 패널, Q&A 챗봇, portfolio API
 ```
 
 - 증권·분석 데이터는 `insurance-analysis-store.tsx`의 인메모리 React Context(`InsuranceDataProvider`)가 관리한다(업로드 → 분석 전달). 로그인이 없고 민감정보라 **영속 저장은 하지 않는다** — 새로고침·화면 이탈 시 사라지며, 그 전에 경고한다.

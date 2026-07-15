@@ -26,7 +26,7 @@ app/
 ├── errors.py              # ApiError, request-id 미들웨어
 ├── routes/
 │   ├── policies.py        # POST /policies/parse — 증권 1건 파싱
-│   ├── portfolio.py       # POST /portfolio/summary — 보험금 합계
+│   ├── portfolio.py       # POST /portfolio/summary — 보장금 합계
 │   ├── analysis.py        # POST /portfolio/analysis — 상담 전 검토
 │   └── qa.py              # POST /qa/stream — 근거 기반 Q&A 스트리밍
 └── services/
@@ -49,9 +49,10 @@ app/
     │   ├── matching.py        # 담보명 정규화·교차 매칭
     │   ├── rules.py           # coverage_matching_rules.json 로딩/검증
     │   ├── purpose.py         # 담보 목적 설명
+    │   ├── recommendations.py # 상담 전 검토용 기준·추천 질문
     │   └── disclosure_links.py
     ├── portfolio/             # 여러 증권의 결정적 사실 집계
-    │   ├── summary.py         # 보장 합산·실손/중복·제외 사유
+    │   ├── summary.py         # 보장금 합계·실손/중복·손해보험 별도 집계
     │   ├── premium.py         # 보험료 집계
     │   └── demographics.py    # 포트폴리오 단위 인구정보 판정
     ├── evidence/
@@ -64,6 +65,9 @@ app/
     │   ├── planning.py        # 맥락 지시어·복합 질문·도메인 범위 planner
     │   ├── generation.py      # Q&A LLM 생성/streaming
     │   └── claim_channels.py  # 청구 채널 결정적 안내
+    ├── reference/             # 공용 기준 데이터 조회(보험료 벤치마크·제도 변경)
+    │   ├── premium_benchmark.py
+    │   └── policy_change.py
     └── rag/                   # 공식 약관/제도 RAG + 업로드 세션 RAG
 ```
 
