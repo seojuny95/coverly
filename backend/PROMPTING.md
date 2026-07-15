@@ -72,20 +72,19 @@ Coverly의 LLM 프롬프트는 사용자의 보험 정보를 근거 기반으로
 
 ## 파일로 분리할 때의 규칙
 
-프롬프트 파일을 만들 때는 기본적으로 `backend/app/services/prompts/` 아래에 둔다.
-다만 RAG처럼 prompt가 특정 pipeline, evaluation dataset, 후처리 contract와 강하게 결합된 경우에는 사용하는 코드 가까이에 둔다.
-예를 들어 공식자료 RAG 응답 prompt는 `backend/app/services/rag/official/rag_answer_prompt.md`에 둔다.
+프롬프트 파일을 만들 때는 기본적으로 사용하는 모듈 가까이에 둔다.
+`app/modules/*`의 기능 프롬프트는 해당 모듈 옆에, `app/rag/*`의 런타임 프롬프트는 해당 RAG 하위 디렉터리 옆에 둔다.
+예를 들어 공식자료 RAG 응답 prompt는 `backend/app/rag/official/rag_answer_prompt.md`에 둔다.
 
 기본 위치 예시는 다음과 같다.
 
 ```text
-backend/app/services/prompts/
-  coverage_normalization.md
-  coverage_explanation.md
-  portfolio_analysis.md
-  rag_answer.md
-  portfolio_qa.md
-  portfolio_qa_stream.md
+backend/app/modules/policy/...
+backend/app/modules/portfolio/...
+backend/app/modules/analysis/...
+backend/app/modules/qa/...
+backend/app/rag/official/...
+backend/app/rag/policy/...
 ```
 
 파일 분리 시에는 반드시 다음을 함께 둔다.
@@ -133,16 +132,31 @@ Retrieval 평가는 질문에 맞는 근거를 찾아오는지 측정하고, gen
 
 Policy RAG generation 평가는 practice와 test를 분리한다.
 practice는 실패 원인을 분석하고 프롬프트·후처리를 반복 개선하는 데 사용하며,
-단일 fixture인 `app/services/rag/policy/evaluation/generation_dataset.json`에 둔다.
+단일 fixture인 `backend/evals/rag/policy/generation_dataset.json`에 둔다.
 정답 근거가 첫 위치에 몰리지 않도록 3개 이상의 근거, 다중 근거 정답,
 관련 있어 보이는 근거 부족 사례, 실제 샘플 증권에서 비식별화한 edge case를 충분히 포함한다.
-test는 `app/services/rag/policy/evaluation/generation_test_dataset.json`에 따로 두고
+test는 `backend/evals/rag/policy/generation_test_dataset.json`에 따로 두고
 practice 개선을 끝낸 뒤 별도 fixture로 한 번만 실행한다.
 test 결과를 본 뒤 같은 test에 맞춰 수정하지 않으며,
 추가 개선이 필요하면 해당 실패 유형은 다음 practice에 반영하고 새로운 test로 다시 검증한다.
 질문을 읽지 않고 첫 근거만 고르는 baseline도 함께 측정해 평가셋 자체가 지나치게 쉽지 않은지 확인한다.
 
-Policy RAG generation은 공용 상담 생성기가 아니라 `app/services/rag/policy/generation.py`의 독립 생성기를 사용한다. 평가 러너도 이 생성기를 직접 호출해 검색 품질이나 공용 QA 후처리 변경 없이 policy 답변 계약만 측정한다.
+Policy RAG generation은 공용 상담 생성기가 아니라 `backend/app/rag/policy/generation.py`의 독립 생성기를 사용한다. 평가 러너도 이 생성기를 직접 호출해 검색 품질이나 공용 QA 후처리 변경 없이 policy 답변 계약만 측정한다.
+
+## 평가 실행
+
+평가 러너는 `backend/evals` 아래에 있다. module path 기준 실행 명령은 다음과 같다.
+
+```bash
+cd backend
+uv run python -m evals.rag.official.retrieval
+uv run python -m evals.rag.official.generation --show-passing
+uv run python -m evals.rag.policy.retrieval
+uv run python -m evals.rag.policy.generation --set practice --show-passing
+uv run python -m evals.rag.policy.generation --set test
+```
+
+`official` 평가는 공식문서 retrieval/generation 품질을 다루고, `policy` 평가는 업로드 세션 RAG의 retrieval/generation 품질을 다룬다. 운영 API correctness는 `tests/`가 담당하고, `evals`는 품질 회귀를 보는 별도 계층이다.
 
 ## 현재 결정
 

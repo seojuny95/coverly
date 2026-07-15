@@ -1,0 +1,160 @@
+"""Curated insurer claim-channel directory (verified links/phones — not RAG).
+
+Turns the user's insurers + whether they hold 실손 into a deterministic claim-
+channel block so answers can point to the right place without an LLM inventing
+URLs. Insurer names live only in the data file, never in this module.
+"""
+
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Any, cast
+
+from app.modules.qa.schemas import (
+    ClaimChannelBlock,
+    ClaimChannelIndemnity,
+    ClaimChannelInsurer,
+    ClaimChannelLink,
+)
+from app.modules.reference_data.loader import load_reference_data
+from app.modules.reference_data.paths import reference_data_path
+
+_DATA = reference_data_path("claim_channels.json")
+
+
+@dataclass(frozen=True)
+class ChannelLink:
+    label: str
+    url: str
+
+
+@dataclass(frozen=True)
+class InsurerChannel:
+    name: str
+    customer_center: str | None
+    homepage: str | None
+    claim_link: str | None
+    app: str | None
+    note: str | None
+
+
+@dataclass(frozen=True)
+class IndemnityService:
+    name: str
+    description: str | None
+    call_center: str | None
+    links: tuple[ChannelLink, ...]
+
+
+@dataclass(frozen=True)
+class ClaimChannelSet:
+    insurers: tuple[InsurerChannel, ...]
+    indemnity: IndemnityService | None
+
+
+@lru_cache(maxsize=1)
+def _directory() -> dict[str, Any]:
+    return load_reference_data(
+        "claim_channels",
+        _DATA,
+        _validate_directory,
+        owner="database",
+    )
+
+
+def _validate_directory(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or not isinstance(value.get("보험사"), list):
+        raise ValueError("claim channels must contain an insurer list")
+    return cast(dict[str, Any], value)
+
+
+def _match(insurer: str, entries: list[dict[str, Any]]) -> dict[str, Any] | None:
+    name = insurer.strip()
+    if not name:
+        return None
+    for entry in entries:  # exact first
+        if entry["보험사"] == name:
+            return entry
+    # Then only when the parsed name contains the (shorter) directory name — a
+    # full legal name resolves to its short form. Never the reverse: a too-short
+    # parsed fragment must not bind to an arbitrary longer entry (wrong channel).
+    for entry in entries:
+        if entry["보험사"] in name:
+            return entry
+    return None
+
+
+def _indemnity_service(directory: dict[str, Any]) -> IndemnityService:
+    block = directory["실손"]
+    links = tuple(
+        ChannelLink(label=channel["이름"], url=channel["링크"])
+        for channel in block.get("채널", [])
+        if channel.get("링크")
+    )
+    return IndemnityService(
+        name=block["이름"],
+        description=block.get("설명"),
+        call_center=block.get("콜센터"),
+        links=links,
+    )
+
+
+def channels_for(insurers: list[str], *, has_indemnity: bool) -> ClaimChannelSet:
+    """Deterministic claim-channel block for the user's insurers.
+
+    `has_indemnity` True → include the 실손24 auto-claim service (서류 없이 청구).
+    Unknown insurers are skipped; duplicates collapse to one entry.
+    """
+
+    directory = _directory()
+    matched: list[InsurerChannel] = []
+    seen: set[str] = set()
+    for insurer in insurers:
+        entry = _match(insurer, directory["보험사"])
+        if entry is None or entry["보험사"] in seen:
+            continue
+        seen.add(entry["보험사"])
+        matched.append(
+            InsurerChannel(
+                name=entry["보험사"],
+                customer_center=entry.get("고객센터"),
+                homepage=entry.get("홈페이지"),
+                claim_link=entry.get("청구링크"),
+                app=entry.get("앱"),
+                note=entry.get("비고"),
+            )
+        )
+
+    indemnity = _indemnity_service(directory) if has_indemnity else None
+    return ClaimChannelSet(insurers=tuple(matched), indemnity=indemnity)
+
+
+def claim_channel_block(insurers: list[str], *, has_indemnity: bool) -> ClaimChannelBlock:
+    """API-shaped claim channels (with clickable links) for the given insurers."""
+
+    channel_set = channels_for(insurers, has_indemnity=has_indemnity)
+    schema_insurers: list[ClaimChannelInsurer] = []
+    for insurer in channel_set.insurers:
+        links: list[ClaimChannelLink] = []
+        if insurer.claim_link:
+            links.append(ClaimChannelLink(label="청구 링크", url=insurer.claim_link))
+        if insurer.homepage and insurer.homepage != insurer.claim_link:
+            links.append(ClaimChannelLink(label="홈페이지", url=insurer.homepage))
+        schema_insurers.append(
+            ClaimChannelInsurer(
+                name=insurer.name,
+                customer_center=insurer.customer_center,
+                note=insurer.note,
+                links=links,
+            )
+        )
+
+    indemnity: ClaimChannelIndemnity | None = None
+    if channel_set.indemnity is not None:
+        source = channel_set.indemnity
+        indemnity = ClaimChannelIndemnity(
+            name=source.name,
+            description=source.description,
+            call_center=source.call_center,
+            links=[ClaimChannelLink(label=link.label, url=link.url) for link in source.links],
+        )
+    return ClaimChannelBlock(insurers=schema_insurers, indemnity=indemnity)
