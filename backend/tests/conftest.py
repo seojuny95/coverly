@@ -179,10 +179,10 @@ _REFERENCE_DATA_ROWS: dict[str, object] = {
                 "source_ids": ["banksalad_three_diagnosis_2026"],
             },
             {
-                "kind": "indemnity",
+                "kind": "medical_indemnity",
                 "reference_min_amount": None,
                 "reference_max_amount": None,
-                "basis": "실손은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인",
+                "basis": ("실손의료보험은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인"),
                 "source_ids": ["silson24_official"],
             },
         ],

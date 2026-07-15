@@ -211,7 +211,7 @@ def build_essential_coverage_check(
                 matches=lambda name: "진단" in name and any(term in name for term in _HEART_TERMS),
                 confirmed_detail="심장질환·심질환 진단비가 확인돼요.",
             ),
-            _medical_indemnity_item(policies, guides["indemnity"]),
+            _medical_indemnity_item(policies, guides["medical_indemnity"]),
         ]
     )
 

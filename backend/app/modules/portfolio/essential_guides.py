@@ -48,7 +48,7 @@ def _validate_essential_coverage_guides(
         "cancer",
         "cerebrovascular",
         "ischemic_heart",
-        "indemnity",
+        "medical_indemnity",
     }
     if set(guides) != required:
         raise ValueError("essential coverage guides must cover every essential kind")
@@ -109,7 +109,7 @@ def _kind(value: object) -> EssentialCoverageKind:
         "cancer",
         "cerebrovascular",
         "ischemic_heart",
-        "indemnity",
+        "medical_indemnity",
     }
     if value not in allowed:
         raise ValueError("unknown essential coverage guide kind")

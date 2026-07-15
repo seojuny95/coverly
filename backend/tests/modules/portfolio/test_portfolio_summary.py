@@ -603,7 +603,7 @@ def test_essential_coverage_check_scans_every_policy_for_core_coverages() -> Non
     assert items["death"].reference_sources[0].reliability == "private_guidance"
     assert items["cancer"].confirmed_amount == 35_000_000
     assert items["cancer"].reference_sources[0].reliability == "private_guidance"
-    assert items["indemnity"].reference_sources[0].label == "실손24 · 서비스 안내"
+    assert items["medical_indemnity"].reference_sources[0].label == "실손24 · 서비스 안내"
     assert items["cancer"].matched_coverage_names == ["유사암진단비", "일반암진단비"]
     assert items["cerebrovascular"].reference_min_amount == 10_000_000
     assert items["cerebrovascular"].reference_max_amount == 20_000_000
