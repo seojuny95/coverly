@@ -84,10 +84,10 @@ class PostgresPremiumBenchmarkRepository:
 
 class NullPremiumBenchmarkRepository:
     def find_by_age(self, age: int | None) -> PremiumBenchmark | None:
-        return None
+        return _fallback_benchmark_for_age(age)
 
     def list_all(self) -> tuple[PremiumBenchmark, ...]:
-        return ()
+        return _FALLBACK_BENCHMARKS
 
 
 _preloaded_benchmarks: tuple[PremiumBenchmark, ...] | None = None
@@ -103,9 +103,10 @@ def premium_benchmark_for_age(age: int | None) -> PremiumBenchmark | None:
         return _find_preloaded_benchmark(age)
 
     try:
-        return _cached_premium_benchmark_for_age(age)
+        benchmark = _cached_premium_benchmark_for_age(age)
     except Exception:
-        return None
+        return _fallback_benchmark_for_age(age)
+    return benchmark or _fallback_benchmark_for_age(age)
 
 
 def warm_premium_benchmark_cache() -> int:
@@ -116,7 +117,10 @@ def warm_premium_benchmark_cache() -> int:
     try:
         benchmarks = _repository().list_all()
     except Exception:
-        return 0
+        benchmarks = _FALLBACK_BENCHMARKS
+
+    if not benchmarks:
+        benchmarks = _FALLBACK_BENCHMARKS
 
     _preloaded_benchmarks = benchmarks
     return len(benchmarks)
@@ -142,11 +146,11 @@ def _repository() -> PremiumBenchmarkRepository:
 
 def _find_preloaded_benchmark(age: int) -> PremiumBenchmark | None:
     if _preloaded_benchmarks is None:
-        return None
+        return _fallback_benchmark_for_age(age)
     for benchmark in _preloaded_benchmarks:
         if benchmark.min_age <= age <= benchmark.max_age:
             return benchmark
-    return None
+    return _fallback_benchmark_for_age(age)
 
 
 def _benchmark_query(
@@ -218,3 +222,91 @@ def _source_from_row(row: dict[str, Any], *, prefix: str) -> PremiumBenchmarkSou
         reliability=str(row[f"{prefix}_reliability"]),
         caveat=str(row[f"{prefix}_caveat"]),
     )
+
+
+_KOSIS_SOURCE = PremiumBenchmarkSource(
+    label="KOSIS 국가통계포털 · 성별 연령대별 소득",
+    url=(
+        "https://kosis.kr/statHtml/statHtml.do?sso=ok&returnurl="
+        "https%3A%2F%2Fkosis.kr%3A443%2FstatHtml%2FstatHtml.do%3F"
+        "conn_path%3DI2%26tblId%3DDT_1EP_2010%26orgId%3D101%26"
+    ),
+    published_at="2025-01-01",
+    reliability="official",
+    caveat="연령대 평균 소득은 개인 소득과 다를 수 있어요.",
+)
+_INCOME_GUIDE_SOURCE = PremiumBenchmarkSource(
+    label="뱅크샐러드 · 나에게 맞는 보험료 계산법",
+    url=(
+        "https://www.banksalad.com/articles/"
+        "%EB%B3%B4%ED%97%98-%EB%B3%B4%ED%97%98%EB%A6%AC%EB%AA%A8%EB%8D%B8%EB%A7%81-"
+        "%EB%B3%B4%ED%97%98%EB%A3%8C"
+    ),
+    published_at="2025-01-01",
+    reliability="private_guidance",
+    caveat="월 소득의 5%~10% 범위는 민간 가이드예요. 적정 보험료의 공식 기준은 아니에요.",
+)
+
+
+def _fallback_benchmark(
+    *,
+    age_band_label: str,
+    min_age: int,
+    max_age: int,
+    average_monthly_income: int,
+) -> PremiumBenchmark:
+    return PremiumBenchmark(
+        age_band_label=age_band_label,
+        min_age=min_age,
+        max_age=max_age,
+        average_monthly_income=average_monthly_income,
+        suggested_min_ratio=0.05,
+        suggested_max_ratio=0.10,
+        suggested_min_premium=round(average_monthly_income * 0.05),
+        suggested_max_premium=round(average_monthly_income * 0.10),
+        income_source=_KOSIS_SOURCE,
+        guide_source=_INCOME_GUIDE_SOURCE,
+    )
+
+
+_FALLBACK_BENCHMARKS = (
+    _fallback_benchmark(
+        age_band_label="20~29세",
+        min_age=20,
+        max_age=29,
+        average_monthly_income=2_630_000,
+    ),
+    _fallback_benchmark(
+        age_band_label="30~39세",
+        min_age=30,
+        max_age=39,
+        average_monthly_income=3_860_000,
+    ),
+    _fallback_benchmark(
+        age_band_label="40~49세",
+        min_age=40,
+        max_age=49,
+        average_monthly_income=4_510_000,
+    ),
+    _fallback_benchmark(
+        age_band_label="50~59세",
+        min_age=50,
+        max_age=59,
+        average_monthly_income=4_290_000,
+    ),
+    _fallback_benchmark(
+        age_band_label="60세 이상",
+        min_age=60,
+        max_age=120,
+        average_monthly_income=2_500_000,
+    ),
+)
+
+
+def _fallback_benchmark_for_age(age: int | None) -> PremiumBenchmark | None:
+    if age is None:
+        return None
+    for benchmark in _FALLBACK_BENCHMARKS:
+        if benchmark.min_age <= age <= benchmark.max_age:
+            return benchmark
+    return None

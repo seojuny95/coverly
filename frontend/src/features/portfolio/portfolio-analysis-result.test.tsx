@@ -127,7 +127,7 @@ describe("PortfolioAnalysisResultView", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows priority checks when the analysis response provides them", () => {
+  it("does not render internal priority checks as a separate section", () => {
     render(
       <PortfolioAnalysisResultView
         result={{
@@ -158,18 +158,13 @@ describe("PortfolioAnalysisResultView", () => {
       />,
     );
 
-    expect(screen.getByText("우선 확인 3가지")).toBeInTheDocument();
-    expect(screen.getByText("지금 화면에서 먼저 볼 부분")).toBeInTheDocument();
+    expect(screen.queryByText("우선 확인 3가지")).not.toBeInTheDocument();
     expect(
-      screen.getByText("월 보험료가 소득 기준 참고 범위보다 낮아요"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("간병 보장이 다른 증권에 있는지 확인하세요"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("근거 보기")).toBeInTheDocument();
+      screen.queryByText("월 보험료가 소득 기준 참고 범위보다 낮아요"),
+    ).not.toBeInTheDocument();
   });
 
-  it("shows amount status, claim conditions, and relevant policy changes", () => {
+  it("shows claim conditions and relevant policy changes without amount status", () => {
     render(
       <PortfolioAnalysisResultView
         result={{
@@ -228,13 +223,7 @@ describe("PortfolioAnalysisResultView", () => {
       />,
     );
 
-    expect(screen.getByText("보장금액 상태")).toBeInTheDocument();
-    expect(
-      screen.getByText("확인된 보장금액만 먼저 모았어요"),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText("30,000,000원").length).toBeGreaterThanOrEqual(
-      1,
-    );
+    expect(screen.queryByText("보장금액 상태")).not.toBeInTheDocument();
     expect(screen.getByText("받을 때 확인할 조건")).toBeInTheDocument();
     expect(screen.getByText("최근 제도 변화")).toBeInTheDocument();
     expect(
@@ -242,18 +231,13 @@ describe("PortfolioAnalysisResultView", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the age-band coverage recommendation status", () => {
+  it("does not render age-band recommendation as a separate section", () => {
     render(<PortfolioAnalysisResultView result={base} />);
 
-    expect(screen.getByText("연령대 기준 준비 상태")).toBeInTheDocument();
+    expect(screen.queryByText("연령대 기준 준비 상태")).not.toBeInTheDocument();
     expect(
-      screen.getByText("실손 + 3대 진단비를 먼저 보는 구간이에요"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("기본 4개 중 3개 확인")).toBeInTheDocument();
-    expect(
-      screen.getByText("심장질환 진단 성격 보장은 아직 확인되지 않았어요"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("아직 안 보임")).toBeInTheDocument();
+      screen.queryByText("실손 + 3대 진단비를 먼저 보는 구간이에요"),
+    ).not.toBeInTheDocument();
   });
 
   it("uses the income guide bands through age 60+", () => {
