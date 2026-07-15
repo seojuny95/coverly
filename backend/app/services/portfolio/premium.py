@@ -4,8 +4,7 @@ Only 월납 premiums are summed; annual/lump-sum/unknown are reported separately
 rather than converted, to avoid inventing a monthly figure.
 """
 
-from app.schemas.analysis import PremiumOverview, PremiumPolicyItem
-from app.schemas.portfolio import PolicyInput
+from app.schemas.portfolio import PolicyInput, PremiumOverview, PremiumPolicyItem
 
 _MONTHLY_CYCLE = "월납"
 
@@ -44,5 +43,14 @@ def summarize_premiums(policies: list[PolicyInput]) -> PremiumOverview:
         monthly_total=monthly_total,
         monthly_policy_count=monthly_policy_count,
         unconfirmed_policy_count=unconfirmed_policy_count,
-        items=items,
+        items=sorted(
+            items,
+            key=lambda item: (
+                item.policy_id or "",
+                item.insurer or "",
+                item.product_name or "",
+                item.monthly_amount or -1,
+                item.cycle or "",
+            ),
+        ),
     )

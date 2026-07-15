@@ -1,6 +1,7 @@
 import pytest
 
 from app.schemas.portfolio import PolicyInput
+from app.services.analysis.summary_overview import generate_summary_overview
 from app.services.portfolio.summary import (
     build_portfolio_facts,
     normalize_coverage_name,
@@ -27,6 +28,41 @@ def _policy(
             "보장목록": coverages,
         }
     )
+
+
+def test_summary_overview_uses_deterministic_judgments_for_llm_copy() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {
+                "담보명": "암진단비",
+                "가입금액": "3천만원",
+                "지급유형": "정액",
+            }
+        ],
+    )
+    summary = summarize_portfolio_coverages([policy])
+
+    def complete(_system: str, user: str) -> dict[str, object]:
+        assert "confirmed_count" in user
+        assert "missing" in user
+        assert "takeaways" in user
+        return {
+            "title": "암 진단비는 보이고, 다른 핵심 보장은 이어서 확인해요",
+            "paragraphs": [
+                "현재 자료에서는 암 진단비가 확인돼요.",
+                "다른 핵심 보장은 현재 자료에서 찾지 못해 추가 확인이 필요해요.",
+            ],
+        }
+
+    overview = generate_summary_overview(summary, complete)
+
+    assert overview is not None
+    assert overview.generation == "llm"
+    assert overview.title == "암 진단비는 보이고, 다른 핵심 보장은 이어서 확인해요"
+    assert [item.label for item in overview.takeaways] == ["보험료", "보장 구성", "다음 확인"]
 
 
 def test_sums_safe_fixed_benefits_and_exposes_composition() -> None:
@@ -342,6 +378,204 @@ def test_indemnity_is_listed_and_flagged_only_across_insurers() -> None:
     assert amounts == {"p1": "5천만원", "p2": "5천만원", "p3": "3천만원"}
 
 
+def test_essential_coverage_check_scans_every_policy_for_core_coverages() -> None:
+    policies = [
+        _policy(
+            "p1",
+            "건강보험",
+            "보험사A",
+            [
+                {"담보명": "일반암진단비", "가입금액": "3천만원", "지급유형": "정액"},
+                {"담보명": "유사암진단비", "가입금액": "5백만원", "지급유형": "정액"},
+                {
+                    "담보명": "뇌혈관질환진단비",
+                    "가입금액": "3천만원",
+                    "지급유형": "정액",
+                },
+                {
+                    "담보명": "심질환진단비",
+                    "가입금액": "2천만원",
+                    "지급유형": "정액",
+                },
+                {"담보명": "질병실손의료비", "가입금액": "", "지급유형": "실손"},
+            ],
+        ),
+        _policy(
+            "p2",
+            "자동차보험",
+            "보험사B",
+            [
+                {
+                    "담보명": "교통상해사망",
+                    "가입금액": "1억원",
+                    "지급유형": "정액",
+                }
+            ],
+        ),
+    ]
+
+    result = summarize_portfolio_coverages(policies)
+    items = {item.kind: item for item in result.essential_coverage_check.items}
+
+    assert {kind: item.status for kind, item in items.items()} == {
+        "death": "well_prepared",
+        "cancer": "well_prepared",
+        "cerebrovascular": "well_prepared",
+        "ischemic_heart": "well_prepared",
+        "indemnity": "well_prepared",
+    }
+    assert items["death"].matched_coverage_names == ["교통상해사망"]
+    assert items["cancer"].confirmed_amount == 35_000_000
+    assert items["cancer"].matched_coverage_names == ["유사암진단비", "일반암진단비"]
+
+
+def test_essential_check_flags_narrow_diagnoses_and_multiple_indemnity_contracts() -> None:
+    policies = [
+        _policy(
+            "p1",
+            "건강보험",
+            "보험사A",
+            [
+                {"담보명": "뇌출혈진단비", "가입금액": "5천만원", "지급유형": "정액"},
+                {
+                    "담보명": "급성심근경색진단비",
+                    "가입금액": "5천만원",
+                    "지급유형": "정액",
+                },
+                {"담보명": "질병실손의료비", "가입금액": "", "지급유형": "실손"},
+            ],
+        ),
+        _policy(
+            "p2",
+            "실손보험",
+            "보험사B",
+            [{"담보명": "상해실비", "가입금액": "", "지급유형": "실손"}],
+        ),
+    ]
+
+    result = summarize_portfolio_coverages(policies)
+    items = {item.kind: item for item in result.essential_coverage_check.items}
+
+    assert items["death"].status == "not_found"
+    assert items["cancer"].status == "not_found"
+    assert items["cerebrovascular"].status == "not_found"
+    assert items["ischemic_heart"].status == "not_found"
+    assert items["indemnity"].status == "needs_review"
+
+
+def test_essential_indemnity_check_does_not_exclude_auto_policy_rows() -> None:
+    policy = _policy(
+        "auto",
+        "자동차보험",
+        "보험사A",
+        [{"담보명": "자동차상해실손의료비", "가입금액": "", "지급유형": "실손"}],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    items = {item.kind: item for item in result.essential_coverage_check.items}
+
+    assert result.indemnity_coverages == []
+    assert items["indemnity"].status == "well_prepared"
+    assert items["indemnity"].matched_coverage_names == ["자동차상해실손의료비"]
+
+
+def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> None:
+    raw_policies = [
+        {
+            "id": "auto",
+            "기본정보": {
+                "보험사": "보험사A",
+                "상품명": "개인용 자동차보험",
+                "보험분류": "자동차보험",
+            },
+            "보장목록": [{"담보명": "대인배상Ⅰ", "가입금액": ""}],
+        },
+        {
+            "id": "driver",
+            "기본정보": {
+                "보험사": "보험사B",
+                "상품명": "안심 운전자보험",
+                "보험분류": "상해보험",
+            },
+            "보장목록": [{"담보명": "교통사고처리지원금", "가입금액": "1억원"}],
+        },
+        {
+            "id": "travel",
+            "기본정보": {
+                "보험사": "보험사C",
+                "상품명": "해외여행보험",
+                "보험분류": "여행자보험",
+            },
+            "보장목록": [{"담보명": "해외의료비", "가입금액": "3천만원"}],
+        },
+        {
+            "id": "fire",
+            "기본정보": {
+                "보험사": "보험사D",
+                "상품명": "우리집 화재보험",
+                "보험분류": "재산보험",
+            },
+            "보장목록": [{"담보명": "화재손해", "가입금액": "1억원"}],
+        },
+    ]
+    policies = [PolicyInput.model_validate(policy) for policy in raw_policies]
+
+    result = summarize_portfolio_coverages(policies)
+
+    assert [item.kind for item in result.special_policy_analyses] == [
+        "auto",
+        "driver",
+        "travel",
+        "fire",
+    ]
+    assert result.special_policy_analyses[0].confirmed_coverage_names == ["대인배상Ⅰ"]
+    assert result.special_policy_analyses[1].product_names == ["안심 운전자보험"]
+    auto_checks = {item.label: item for item in result.special_policy_analyses[0].coverage_checks}
+    assert auto_checks["상대방의 신체 피해"].status == "confirmed"
+    assert auto_checks["상대방의 재물 피해"].status == "not_found"
+    assert auto_checks["상대방의 신체 피해"].matched_coverage_names == ["대인배상Ⅰ"]
+    assert "미가입이라고 단정할 수는 없어요" in result.special_policy_analyses[0].overview
+
+    driver_checks = {item.label: item for item in result.special_policy_analyses[1].coverage_checks}
+    assert driver_checks["교통사고 처리 지원"].status == "confirmed"
+    assert driver_checks["변호사 선임 비용"].status == "not_found"
+
+
+def test_premium_summary_includes_auto_policy_premiums() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "health",
+                "기본정보": {
+                    "보험사": "보험사A",
+                    "상품명": "건강보험",
+                    "보험분류": "건강보험",
+                    "보험료": {"금액": 40_000, "납입주기": "월납"},
+                },
+                "보장목록": [],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "auto",
+                "기본정보": {
+                    "보험사": "보험사B",
+                    "상품명": "개인용 자동차보험",
+                    "보험분류": "자동차보험",
+                    "보험료": {"금액": 70_000, "납입주기": "월납"},
+                },
+                "보장목록": [],
+            }
+        ),
+    ]
+
+    result = summarize_portfolio_coverages(policies)
+
+    assert result.premium is not None
+    assert result.premium.monthly_total == 110_000
+    assert result.premium.monthly_policy_count == 2
+
+
 def test_name_normalization_does_not_apply_semantic_aliases() -> None:
     assert normalize_coverage_name(" 암-진단비(일반) ") == "암진단비일반"
     assert normalize_coverage_name("암진단금") != normalize_coverage_name("암진단비")
@@ -515,6 +749,33 @@ def test_build_portfolio_facts_reuses_the_same_summary_contract() -> None:
 
     assert facts.policies == (policy,)
     assert facts.coverage_summary.totals[0].total_amount == 10_000_000
+
+
+def test_summary_includes_claim_channels_for_known_insurers_and_indemnity() -> None:
+    policies = [
+        _policy(
+            "p1",
+            "건강보험",
+            "삼성화재",
+            [{"담보명": "암진단비", "가입금액": "1천만원", "지급유형": "정액"}],
+        ),
+        _policy(
+            "p2",
+            "실손보험",
+            "메리츠화재",
+            [{"담보명": "질병실손의료비", "가입금액": "5천만원", "지급유형": "실손"}],
+        ),
+    ]
+
+    result = summarize_portfolio_coverages(policies)
+
+    assert result.claim_channels is not None
+    assert [insurer.name for insurer in result.claim_channels.insurers] == [
+        "삼성화재",
+        "메리츠화재",
+    ]
+    assert result.claim_channels.indemnity is not None
+    assert result.claim_channels.indemnity.name == "실손24"
 
 
 def test_counts_distinct_indemnity_coverages_duplicated_across_insurers() -> None:

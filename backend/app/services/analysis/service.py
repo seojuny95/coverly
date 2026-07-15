@@ -19,12 +19,16 @@ from app.schemas.analysis import (
     CoverageGap,
     PolicyChangeCheck,
     PortfolioAnalysisResponse,
-    PremiumBenchmark,
-    PremiumOverview,
     PriorityCheck,
 )
 from app.schemas.consultation import Gender, GenerationMode, InsuredDemographics
-from app.schemas.portfolio import CoverageTotalItem, PolicyInput, PortfolioCoverageSummary
+from app.schemas.portfolio import (
+    CoverageTotalItem,
+    PolicyInput,
+    PortfolioCoverageSummary,
+    PremiumBenchmark,
+    PremiumOverview,
+)
 from app.services.analysis.generation import generate_counselor
 from app.services.coverage_knowledge.purpose import coverage_purpose
 from app.services.coverage_knowledge.recommendations import (

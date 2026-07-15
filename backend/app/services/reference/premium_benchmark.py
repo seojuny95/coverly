@@ -7,7 +7,7 @@ import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
 
-from app.schemas.analysis import PremiumBenchmark, PremiumBenchmarkSource
+from app.schemas.portfolio import PremiumBenchmark, PremiumBenchmarkSource
 from app.settings import get_settings
 
 

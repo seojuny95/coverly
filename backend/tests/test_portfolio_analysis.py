@@ -4,11 +4,9 @@ from app.schemas.analysis import (
     AnalysisContextAnswer,
     PolicyChangeCheck,
     PolicyChangeSource,
-    PremiumBenchmark,
-    PremiumBenchmarkSource,
 )
 from app.schemas.consultation import InsuredDemographics
-from app.schemas.portfolio import PolicyInput
+from app.schemas.portfolio import PolicyInput, PremiumBenchmark, PremiumBenchmarkSource
 from app.services.analysis import service as portfolio_analysis
 from app.services.analysis.generation import _system_prompt
 from app.services.analysis.service import analyze_portfolio

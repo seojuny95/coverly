@@ -1,6 +1,6 @@
 from pytest import MonkeyPatch
 
-from app.schemas.analysis import PremiumBenchmark, PremiumBenchmarkSource
+from app.schemas.portfolio import PremiumBenchmark, PremiumBenchmarkSource
 from app.services.reference import premium_benchmark as subject
 
 

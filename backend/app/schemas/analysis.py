@@ -11,7 +11,12 @@ from app.schemas.consultation import (
     GenerationMode,
     InsuredDemographics,
 )
-from app.schemas.portfolio import ExcludedCoverageItem, PolicyInput
+from app.schemas.portfolio import (
+    ExcludedCoverageItem,
+    PolicyInput,
+    PremiumBenchmark,
+    PremiumOverview,
+)
 
 
 class AnalysisContextAnswer(BaseModel):
@@ -90,42 +95,6 @@ class CounselorAnalysis(BaseModel):
     amount_review_items: list[AmountReviewItem]
     next_questions: list[str]
     next_steps: list[str]
-
-
-class PremiumPolicyItem(BaseModel):
-    policy_id: str | None
-    insurer: str | None
-    product_name: str | None
-    monthly_amount: int | None
-    cycle: str | None
-
-
-class PremiumOverview(BaseModel):
-    monthly_total: int
-    monthly_policy_count: int
-    unconfirmed_policy_count: int
-    items: list[PremiumPolicyItem]
-
-
-class PremiumBenchmarkSource(BaseModel):
-    label: str
-    url: str
-    published_at: str
-    reliability: str
-    caveat: str
-
-
-class PremiumBenchmark(BaseModel):
-    age_band_label: str
-    min_age: int
-    max_age: int
-    average_monthly_income: int
-    suggested_min_ratio: float
-    suggested_max_ratio: float
-    suggested_min_premium: int
-    suggested_max_premium: int
-    income_source: PremiumBenchmarkSource
-    guide_source: PremiumBenchmarkSource
 
 
 PriorityCheckKind = Literal["premium", "duplicate", "coverage_gap", "contract"]

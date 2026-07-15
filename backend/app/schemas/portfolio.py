@@ -132,9 +132,137 @@ class DamageCoverageGroup(BaseModel):
     policies: list[DamagePolicyCoverageGroup]
 
 
+EssentialCoverageKind = Literal[
+    "death",
+    "cancer",
+    "cerebrovascular",
+    "ischemic_heart",
+    "indemnity",
+]
+EssentialCoverageStatus = Literal["well_prepared", "needs_review", "not_found"]
+
+
+class EssentialCoverageItem(BaseModel):
+    kind: EssentialCoverageKind
+    label: str
+    status: EssentialCoverageStatus
+    confirmed_amount: int | None = None
+    reference_min_amount: int | None = None
+    reference_max_amount: int | None = None
+    coverage_count: int
+    detail: str
+    matched_coverage_names: list[str] = Field(default_factory=list)
+
+
+class EssentialCoverageCheck(BaseModel):
+    items: list[EssentialCoverageItem]
+
+
+SpecialPolicyKind = Literal["auto", "driver", "travel", "fire"]
+SpecialCoverageStatus = Literal["confirmed", "not_found"]
+
+
+class SpecialCoverageCheck(BaseModel):
+    label: str
+    status: SpecialCoverageStatus
+    detail: str
+    matched_coverage_names: list[str] = Field(default_factory=list)
+
+
+class SpecialPolicyAnalysis(BaseModel):
+    kind: SpecialPolicyKind
+    label: str
+    policy_count: int
+    product_names: list[str] = Field(default_factory=list)
+    confirmed_coverage_names: list[str] = Field(default_factory=list)
+    overview: str
+    coverage_checks: list[SpecialCoverageCheck] = Field(default_factory=list)
+
+
+class ClaimChannelLink(BaseModel):
+    label: str
+    url: str
+
+
+class ClaimChannelInsurer(BaseModel):
+    name: str
+    customer_center: str | None = None
+    note: str | None = None
+    links: list[ClaimChannelLink] = Field(default_factory=list)
+
+
+class ClaimChannelIndemnity(BaseModel):
+    name: str
+    description: str | None = None
+    call_center: str | None = None
+    links: list[ClaimChannelLink] = Field(default_factory=list)
+
+
+class ClaimChannelBlock(BaseModel):
+    insurers: list[ClaimChannelInsurer] = Field(default_factory=list)
+    indemnity: ClaimChannelIndemnity | None = None
+
+
+class PremiumPolicyItem(BaseModel):
+    policy_id: str | None
+    insurer: str | None
+    product_name: str | None
+    monthly_amount: int | None
+    cycle: str | None
+
+
+class PremiumOverview(BaseModel):
+    monthly_total: int
+    monthly_policy_count: int
+    unconfirmed_policy_count: int
+    items: list[PremiumPolicyItem]
+
+
+class PremiumBenchmarkSource(BaseModel):
+    label: str
+    url: str
+    published_at: str
+    reliability: str
+    caveat: str
+
+
+class PremiumBenchmark(BaseModel):
+    age_band_label: str
+    min_age: int
+    max_age: int
+    average_monthly_income: int
+    suggested_min_ratio: float
+    suggested_max_ratio: float
+    suggested_min_premium: int
+    suggested_max_premium: int
+    income_source: PremiumBenchmarkSource
+    guide_source: PremiumBenchmarkSource
+
+
+class PortfolioOverviewTakeaway(BaseModel):
+    label: str
+    title: str
+    detail: str
+
+
+class PortfolioOverview(BaseModel):
+    generation: Literal["llm"]
+    title: str
+    paragraphs: list[str] = Field(default_factory=list, min_length=1, max_length=3)
+    takeaways: list[PortfolioOverviewTakeaway] = Field(default_factory=list, max_length=3)
+
+
 class PortfolioCoverageSummary(BaseModel):
     totals: list[CoverageTotalItem]
     indemnity_coverages: list[IndemnityItem]
     excluded_coverages: list[ExcludedCoverageItem]
     damage_coverages: list[DamageCoverageGroup] = Field(default_factory=list)
     excluded_auto_policy_count: int
+    essential_coverage_check: EssentialCoverageCheck = Field(
+        default_factory=lambda: EssentialCoverageCheck(items=[])
+    )
+    special_policy_analyses: list[SpecialPolicyAnalysis] = Field(default_factory=list)
+    claim_channels: ClaimChannelBlock | None = None
+    premium: PremiumOverview | None = None
+    premium_benchmark: PremiumBenchmark | None = None
+    overview: PortfolioOverview | None = None
