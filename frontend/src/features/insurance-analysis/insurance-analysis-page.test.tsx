@@ -28,7 +28,7 @@ function stubEmptySummary() {
       new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
         }),
@@ -463,7 +463,7 @@ describe("InsuranceAnalysisPage", () => {
       return new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
         }),
@@ -516,7 +516,7 @@ describe("InsuranceAnalysisPage", () => {
       return new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
         }),

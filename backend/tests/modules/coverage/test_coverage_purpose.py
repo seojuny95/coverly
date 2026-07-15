@@ -11,7 +11,7 @@ _CATEGORIES = (
     coverage_taxonomy.HOSPITAL,
     coverage_taxonomy.SURGERY,
     coverage_taxonomy.DEATH,
-    coverage_taxonomy.INDEMNITY,
+    coverage_taxonomy.MEDICAL_INDEMNITY,
     coverage_taxonomy.CARE,
 )
 

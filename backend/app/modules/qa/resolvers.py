@@ -14,7 +14,7 @@ from app.modules.evidence.catalog import (
     citation_from_evidence,
     with_session_evidence,
 )
-from app.modules.portfolio.schemas import PolicyInput
+from app.modules.portfolio.schemas import ActualLossCoverageItem, PolicyInput
 from app.modules.portfolio.summary import PortfolioFacts, is_auto_policy
 from app.modules.qa.claim_channels import claim_channel_block
 from app.modules.qa.context import QaContext
@@ -29,7 +29,15 @@ _AMOUNT_TERMS = ("합계", "총액", "얼마", "가입금액")
 _ADEQUACY_TERMS = ("적당", "적정", "충분", "권장", "추천", "얼마정도", "어느 정도")
 _STATUS_TERMS = ("추출 상태", "분석 상태", "제외된", "확인 못한")
 _HOLDING_TERMS = ("몇 개", "몇개", "몇 건", "몇건", "보유 중", "목록", "가입한 보험")
-_INDEMNITY_LOOKUP_TERMS = ("실손", "실비", "실손의료", "실손의료보험", "실손의료비")
+_MEDICAL_INDEMNITY_LOOKUP_TERMS = (
+    "실비",
+    "실손보험",
+    "실손의료",
+    "실손의료보험",
+    "실손의료비",
+)
+_ACTUAL_LOSS_LOOKUP_TERMS = ("실손", "실손형", "비례보상")
+_EXPLICIT_ACTUAL_LOSS_LOOKUP_TERMS = ("실손형", "실비형", "비례보상")
 _OFFICIAL_RAG_TERMS = (
     "계약 전 알릴 의무",
     "고지의무",
@@ -154,10 +162,12 @@ def contextual_suggestions(context: QaContext) -> list[str]:
         candidates = [
             "가입한 보험은 몇 개야?",
             "분석 상태는 어때?",
-            "실손 청구는 어디서 해?",
+            "실손의료비 청구는 어디서 해?",
         ]
-    if context.facts.coverage_summary.indemnity_coverages:
-        candidates.append("실손 청구는 어디서 해?")
+    if any(
+        item.is_medical_indemnity for item in context.facts.coverage_summary.actual_loss_coverages
+    ):
+        candidates.append("실손의료비 청구는 어디서 해?")
     return question_suggestions(*candidates)
 
 
@@ -176,7 +186,7 @@ def question_suggestions(*candidates: str) -> list[str]:
 def standard_limitations(facts: PortfolioFacts) -> list[str]:
     summary = facts.coverage_summary
     limitations = ["보상 조건·면책·지급 가능성은 약관 근거 없이 판단하지 않습니다."]
-    if summary.indemnity_coverages:
+    if summary.actual_loss_coverages:
         limitations.append("실손형 담보는 가입금액 합계에 포함하지 않았습니다.")
     if summary.excluded_coverages:
         limitations.append("지급유형 또는 금액이 확인되지 않은 담보는 합계에 포함하지 않았습니다.")
@@ -439,8 +449,12 @@ def _answer_coverage_lookup(
     facts: PortfolioFacts,
     catalog: EvidenceCatalog,
 ) -> PortfolioQuestionResponse | None:
-    if any(term in question for term in _INDEMNITY_LOOKUP_TERMS):
-        return _answer_indemnity_lookup(facts, catalog)
+    if any(term in question for term in _EXPLICIT_ACTUAL_LOSS_LOOKUP_TERMS):
+        return _answer_actual_loss_lookup(facts, catalog)
+    if any(term in question for term in _MEDICAL_INDEMNITY_LOOKUP_TERMS):
+        return _answer_medical_indemnity_lookup(facts, catalog)
+    if any(term in question for term in _ACTUAL_LOSS_LOOKUP_TERMS):
+        return _answer_actual_loss_lookup(facts, catalog)
     return _answer_damage_coverage_lookup(question, facts, catalog)
 
 
@@ -497,17 +511,23 @@ def _answer_adequacy_lookup(
     )
 
 
-def _answer_indemnity_lookup(
+def _answer_medical_indemnity_lookup(
     facts: PortfolioFacts,
     catalog: EvidenceCatalog,
 ) -> PortfolioQuestionResponse:
-    if facts.coverage_summary.indemnity_coverages:
+    medical_coverages = [
+        item for item in facts.coverage_summary.actual_loss_coverages if item.is_medical_indemnity
+    ]
+    if medical_coverages:
         evidence_ids = [
-            item.id
-            for item in catalog.items
-            if item.id.startswith("indemnity:") and item.coverage_name is not None
+            f"actual-loss:{index}"
+            for index, item in enumerate(
+                facts.coverage_summary.actual_loss_coverages,
+                start=1,
+            )
+            if item.is_medical_indemnity
         ]
-        names = [item.coverage_name for item in facts.coverage_summary.indemnity_coverages]
+        names = [item.coverage_name for item in medical_coverages]
         content = "실손의료보험 관련 담보가 확인돼요.\n\n" + "\n".join(
             f"- {name}" for name in names
         )
@@ -516,10 +536,49 @@ def _answer_indemnity_lookup(
     gap_ids = [
         item.id
         for item in catalog.items
-        if item.id.startswith("gap:") and item.coverage_name == "실손의료"
+        if item.id.startswith("gap:") and item.coverage_name == "실손의료비"
     ]
     content = "현재 업로드된 증권에서는 **실손의료보험 담보를 확인하지 못했어요.**"
     return _fact_response(content, gap_ids, catalog, facts)
+
+
+def _answer_actual_loss_lookup(
+    facts: PortfolioFacts,
+    catalog: EvidenceCatalog,
+) -> PortfolioQuestionResponse:
+    actual_loss_coverages = facts.coverage_summary.actual_loss_coverages
+    if not actual_loss_coverages:
+        content = "현재 업로드된 증권에서는 **실손형 담보를 확인하지 못했어요.**"
+        return _fact_response(content, [], catalog, facts)
+
+    coverage_by_name: dict[str, ActualLossCoverageItem] = {}
+    for coverage in actual_loss_coverages:
+        key = coverage.normalized_name or coverage.coverage_name
+        coverage_by_name.setdefault(key, coverage)
+
+    lines = []
+    for coverage in coverage_by_name.values():
+        domain = _actual_loss_domain_label(coverage.coverage_domain)
+        duplicate = " · 여러 계약에서 확인" if coverage.duplicate_across_contracts else ""
+        lines.append(f"- {coverage.coverage_name} ({domain}{duplicate})")
+    content = (
+        "실손형은 실제 발생한 손해를 약관 범위에서 보상하는 지급 방식이에요. "
+        "실손의료보험은 그중 의료비 영역이에요.\n\n" + "\n".join(lines)
+    )
+    evidence_ids = [item.id for item in catalog.items if item.id.startswith("actual-loss:")]
+    return _fact_response(content, evidence_ids, catalog, facts)
+
+
+def _actual_loss_domain_label(domain: str) -> str:
+    return {
+        "medical_expense": "실손의료비",
+        "travel_medical_expense": "여행 의료비 실손형",
+        "legal_cost": "법률 비용 실손형",
+        "property_damage": "재산 손해 실손형",
+        "liability": "배상책임 실손형",
+        "auto": "자동차 손해 실손형",
+        "other": "기타 실손형",
+    }.get(domain, "기타 실손형")
 
 
 def _answer_damage_coverage_lookup(
@@ -553,7 +612,11 @@ def _answer_status(
         [
             f"- 비자동차 보험: **{len(facts.policies)}건**{auto_note}",
             f"- 정액형 합계: **{len(summary.totals)}종**",
-            f"- 실손형: **{len(summary.indemnity_coverages)}건**",
+            f"- 실손형 담보: **{len(summary.actual_loss_coverages)}건**",
+            (
+                "- 실손의료비 담보: "
+                f"**{sum(item.is_medical_indemnity for item in summary.actual_loss_coverages)}건**"
+            ),
             f"- 합계 제외: **{len(summary.excluded_coverages)}건**",
         ]
     )
@@ -656,7 +719,9 @@ def _answer_claim_channels(
     insurers = [policy.기본정보.보험사 for policy in relevant if policy.기본정보.보험사]
     block = claim_channel_block(
         insurers,
-        has_indemnity=bool(facts.coverage_summary.indemnity_coverages),
+        has_medical_indemnity=any(
+            item.is_medical_indemnity for item in facts.coverage_summary.actual_loss_coverages
+        ),
     )
     lead_in = (
         "**청구는 아래 채널에서 확인하실 수 있어요.**\n\n"

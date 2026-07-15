@@ -100,13 +100,26 @@ class CoverageTotalItem(BaseModel):
     composition: list[CoverageSourceItem]
 
 
-class IndemnityItem(BaseModel):
+ActualLossCoverageDomain = Literal[
+    "medical_expense",
+    "travel_medical_expense",
+    "legal_cost",
+    "property_damage",
+    "liability",
+    "auto",
+    "other",
+]
+
+
+class ActualLossCoverageItem(BaseModel):
     policy_id: str | None
     insurer: str | None
     product_name: str | None
     coverage_name: str
     normalized_name: str
-    cross_insurer_duplicate: bool
+    coverage_domain: ActualLossCoverageDomain
+    is_medical_indemnity: bool
+    duplicate_across_contracts: bool
     original_amount: str = ""
     major_category: str = "기타"
 
@@ -144,7 +157,7 @@ EssentialCoverageKind = Literal[
     "cancer",
     "cerebrovascular",
     "ischemic_heart",
-    "indemnity",
+    "medical_indemnity",
 ]
 EssentialCoverageStatus = Literal["well_prepared", "needs_review", "not_found"]
 SourceReliability = Literal[
@@ -219,7 +232,7 @@ class ClaimChannelInsurer(BaseModel):
     links: list[ClaimChannelLink] = Field(default_factory=list)
 
 
-class ClaimChannelIndemnity(BaseModel):
+class ClaimChannelMedicalIndemnity(BaseModel):
     name: str
     description: str | None = None
     call_center: str | None = None
@@ -228,7 +241,7 @@ class ClaimChannelIndemnity(BaseModel):
 
 class ClaimChannelBlock(BaseModel):
     insurers: list[ClaimChannelInsurer] = Field(default_factory=list)
-    indemnity: ClaimChannelIndemnity | None = None
+    medical_indemnity: ClaimChannelMedicalIndemnity | None = None
 
 
 class PremiumPolicyItem(BaseModel):
@@ -282,7 +295,7 @@ class PortfolioOverview(BaseModel):
 
 class PortfolioCoverageSummary(BaseModel):
     totals: list[CoverageTotalItem]
-    indemnity_coverages: list[IndemnityItem]
+    actual_loss_coverages: list[ActualLossCoverageItem]
     excluded_coverages: list[ExcludedCoverageItem]
     damage_coverages: list[DamageCoverageGroup] = Field(default_factory=list)
     excluded_auto_policy_count: int

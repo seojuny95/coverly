@@ -37,7 +37,28 @@ const INDEMNITY_SOURCE = {
 
 const PREVIEW_SUMMARY: PortfolioSummary = {
   totals: [],
-  indemnity_coverages: [],
+  actual_loss_coverages: [
+    {
+      policy_id: "health-1",
+      insurer: "삼성화재",
+      product_name: "건강보험",
+      coverage_name: "질병실손의료비",
+      normalized_name: "질병실손의료비",
+      coverage_domain: "medical_expense",
+      is_medical_indemnity: true,
+      duplicate_across_contracts: true,
+    },
+    {
+      policy_id: "health-2",
+      insurer: "메리츠화재",
+      product_name: "실손보험",
+      coverage_name: "질병실손의료비",
+      normalized_name: "질병실손의료비",
+      coverage_domain: "medical_expense",
+      is_medical_indemnity: true,
+      duplicate_across_contracts: true,
+    },
+  ],
   excluded_coverages: [],
   excluded_auto_policy_count: 0,
   overview: {
@@ -45,7 +66,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
     title: "권장보험을 먼저 점검해보세요",
     paragraphs: [
       "월납으로 확인된 보험료는 98,000원으로, 20~30대 평균 소득 기준 권장 범위보다 낮아요. 보험료가 낮은 것 자체는 문제가 아니지만, 뇌혈관질환과 심장질환 진단비가 현재 자료에서 보이지 않아 권장보험 항목을 먼저 점검해야 해요.",
-      "사망 보장과 암 진단비, 실손의료보험은 확인됐고, 실손의료비는 여러 계약에서 보여 중복 여부를 따로 볼 필요가 있어요. 자동차·운전자·여행자·화재보험은 담보명이 확인된 범위 안에서 주요 보장 영역을 나눠 정리했어요.",
+      "사망 보장과 암 진단비, 실손의료보험은 확인됐고, 실손 보장은 여러 계약에서 보여 중복 여부를 따로 볼 필요가 있어요. 자동차·운전자·여행자·화재보험은 담보명이 확인된 범위 안에서 주요 보장 영역을 나눠 정리했어요.",
       "이 총평은 업로드한 증권에서 읽은 담보명, 가입금액, 월 보험료를 바탕으로 만든 1차 해석이에요. 실제 충분성은 소득, 부양가족, 대출, 병력, 약관의 면책·감액·갱신 조건까지 함께 확인해야 해요.",
     ],
     takeaways: [
@@ -134,7 +155,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         matched_coverage_names: [],
       },
       {
-        kind: "indemnity",
+        kind: "medical_indemnity",
         label: "실손의료보험",
         status: "needs_review",
         confirmed_amount: null,
@@ -309,7 +330,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         ],
       },
     ],
-    indemnity: {
+    medical_indemnity: {
       name: "실손24",
       description:
         "병원이 진료비 서류를 보험사로 자동 전송해, 서류 없이 실손보험금을 청구하는 공식 서비스예요.",

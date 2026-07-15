@@ -50,7 +50,7 @@ class ClaimChannelInsurer(BaseModel):
     links: list[ClaimChannelLink] = Field(default_factory=list)
 
 
-class ClaimChannelIndemnity(BaseModel):
+class ClaimChannelMedicalIndemnity(BaseModel):
     name: str
     description: str | None = None
     call_center: str | None = None
@@ -59,7 +59,7 @@ class ClaimChannelIndemnity(BaseModel):
 
 class ClaimChannelBlock(BaseModel):
     insurers: list[ClaimChannelInsurer] = Field(default_factory=list)
-    indemnity: ClaimChannelIndemnity | None = None
+    medical_indemnity: ClaimChannelMedicalIndemnity | None = None
 
 
 class PortfolioQuestionResponse(BaseModel):

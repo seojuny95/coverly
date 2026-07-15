@@ -73,7 +73,8 @@ def claim_targets(context: QaContext) -> list[tuple[str, str, bool]]:
 
     medical_indemnity_names = {
         base_normalized_coverage_name(item.coverage_name)
-        for item in context.facts.coverage_summary.indemnity_coverages
+        for item in context.facts.coverage_summary.actual_loss_coverages
+        if item.is_medical_indemnity
     }
     targets: list[tuple[str, str, bool]] = []
     for policy in context.policies:
@@ -83,8 +84,7 @@ def claim_targets(context: QaContext) -> list[tuple[str, str, bool]]:
         for coverage in policy.보장목록:
             normalized = base_normalized_coverage_name(coverage.담보명)
             if normalized:
-                # Use the shared medical-indemnity result so only eligible
-                # coverages route to the dedicated indemnity claim channel.
+                # Only personal medical-indemnity coverage routes to 실손24.
                 targets.append((normalized, insurer, normalized in medical_indemnity_names))
     return targets
 
@@ -103,4 +103,6 @@ def _life_stage_check(
     if demographics.age is None:
         return LifeStageCheck(life_stage="미상", held=(), missing=())
     coverage_names = [coverage.담보명 for policy in facts.policies for coverage in policy.보장목록]
+    if any(item.is_medical_indemnity for item in facts.coverage_summary.actual_loss_coverages):
+        coverage_names.append("실손의료비")
     return check_life_stage(demographics.age, coverage_names)

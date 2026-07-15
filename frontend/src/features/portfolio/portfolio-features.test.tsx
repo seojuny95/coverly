@@ -66,7 +66,7 @@ describe("portfolio features", () => {
                 composition: [],
               },
             ],
-            indemnity_coverages: [],
+            actual_loss_coverages: [],
             excluded_coverages: [],
             excluded_auto_policy_count: 0,
           }),
@@ -110,7 +110,7 @@ describe("portfolio features", () => {
               composition: [],
             },
           ],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
         }}
@@ -139,15 +139,18 @@ describe("portfolio features", () => {
                   composition: [],
                 },
               ],
-              indemnity_coverages: [
+              actual_loss_coverages: [
                 {
                   policy_id: "health-1",
                   insurer: "보험사A",
                   product_name: "건강보험",
                   coverage_name: "질병실손의료비",
+                  normalized_name: "질병실손의료비",
                   original_amount: "5천만원",
                   major_category: "치료",
-                  cross_insurer_duplicate: true,
+                  coverage_domain: "medical_expense",
+                  is_medical_indemnity: true,
+                  duplicate_across_contracts: true,
                 },
               ],
               excluded_coverages: [
@@ -186,7 +189,7 @@ describe("portfolio features", () => {
     ).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("특정치료비")).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("정액보상")).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("실손의료")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("실손의료비")).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("개별 확인")).toBeInTheDocument();
     for (const coverageName of ["암치료비", "질병실손의료비", "특정치료비"]) {
       const disclosure = within(treatmentGroup)
@@ -239,7 +242,7 @@ describe("portfolio features", () => {
       return new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
           overview: {
@@ -337,7 +340,7 @@ describe("portfolio features", () => {
       new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
           essential_coverage_check: {
@@ -409,7 +412,7 @@ describe("portfolio features", () => {
         new Response(
           JSON.stringify({
             totals: [],
-            indemnity_coverages: [],
+            actual_loss_coverages: [],
             excluded_coverages: [],
             excluded_auto_policy_count: 0,
           }),
@@ -443,7 +446,7 @@ describe("portfolio features", () => {
       return new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 1,
           essential_coverage_check: { items: [] },

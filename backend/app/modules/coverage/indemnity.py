@@ -13,6 +13,7 @@ from app.modules.portfolio.schemas import CoverageInput, PolicyInput
 PaymentBasis = Literal["fixed", "indemnity", "unknown"]
 CoverageDomain = Literal[
     "medical_expense",
+    "travel_medical_expense",
     "legal_cost",
     "property_damage",
     "liability",
@@ -81,12 +82,14 @@ _MEDICAL_TERMS = (
     "처방조제비",
     "약제비",
     "병원비",
-    "치료비",
+    "질병치료비",
+    "상해치료비",
     "상해실비",
     "질병실비",
     "상해실손",
     "질병실손",
 )
+_TRAVEL_MEDICAL_TERMS = ("해외의료비", "해외실손의료비", "국외의료비")
 _LEGAL_TERMS = ("벌금", "변호사", "교통사고처리지원금", "형사합의", "방어비용")
 _PROPERTY_TERMS = (
     "화재",
@@ -114,6 +117,21 @@ _DAMAGE_TAG_TERMS = (
     "주택화재보험",
     "배상책임보험",
     "보증보험",
+)
+_DAMAGE_CLASSIFICATIONS = frozenset(
+    {
+        "손해보험",
+        "자동차",
+        "자동차보험",
+        "운전자보험",
+        "운전자상해보험",
+        "여행자보험",
+        "화재보험",
+        "주택화재보험",
+        "배상책임보험",
+        "보증보험",
+        "배상·화재·기타",
+    }
 )
 
 
@@ -156,6 +174,17 @@ def is_medical_indemnity_name(name: str) -> bool:
     )
 
 
+def has_negated_actual_loss_marker(coverage: CoverageInput) -> bool:
+    """Return whether coverage metadata explicitly denies actual-loss payment."""
+
+    normalized_name = _normalize(coverage.담보명)
+    normalized_category = _normalize(coverage.보장분류 or "")
+    return any(
+        pattern in normalized_name or pattern in normalized_category
+        for pattern in _NEGATED_INDEMNITY_PATTERNS
+    )
+
+
 def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
     payment_type = (coverage.지급유형 or "").strip()
     normalized_payment_type = _normalize(payment_type)
@@ -169,10 +198,7 @@ def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
     coverage_category = (coverage.보장분류 or "").strip()
     normalized_name = _normalize(coverage.담보명)
     normalized_category = _normalize(coverage_category)
-    if any(
-        pattern in normalized_name or pattern in normalized_category
-        for pattern in _NEGATED_INDEMNITY_PATTERNS
-    ):
+    if has_negated_actual_loss_marker(coverage):
         return "unknown"
     if normalized_category in _NORMALIZED_INDEMNITY_CATEGORIES:
         return "indemnity"
@@ -191,12 +217,13 @@ def _coverage_domain(text: str, policy: PolicyInput | None) -> CoverageDomain:
 def _domain_priorities(
     policy: PolicyInput | None,
 ) -> tuple[tuple[CoverageDomain, tuple[str, ...]], ...]:
-    if _is_damage_policy(policy):
+    if is_damage_policy_context(policy):
         return (
             ("auto", _AUTO_TERMS),
             ("legal_cost", _LEGAL_TERMS),
             ("liability", _LIABILITY_TERMS),
             ("property_damage", _PROPERTY_TERMS),
+            ("travel_medical_expense", _TRAVEL_MEDICAL_TERMS),
             ("medical_expense", _MEDICAL_TERMS),
         )
     return (
@@ -204,6 +231,7 @@ def _domain_priorities(
         ("liability", _LIABILITY_TERMS),
         ("auto", _AUTO_TERMS),
         ("property_damage", _PROPERTY_TERMS),
+        ("travel_medical_expense", _TRAVEL_MEDICAL_TERMS),
         ("medical_expense", _MEDICAL_TERMS),
     )
 
@@ -227,12 +255,14 @@ def _coverage_text(coverage: CoverageInput, policy: PolicyInput | None) -> str:
     return _normalize(" ".join(parts))
 
 
-def _is_damage_policy(policy: PolicyInput | None) -> bool:
+def is_damage_policy_context(policy: PolicyInput | None) -> bool:
+    """Return whether policy belongs to the separately handled damage branch."""
+
     if policy is None:
         return False
     category = policy.기본정보.보험분류 or ""
     tags = policy.기본정보.상품태그
-    return category == "손해보험" or any(tag in _DAMAGE_TAG_TERMS for tag in tags)
+    return category in _DAMAGE_CLASSIFICATIONS or any(tag in _DAMAGE_TAG_TERMS for tag in tags)
 
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:

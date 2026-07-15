@@ -61,14 +61,14 @@ def test_non_medical_actual_loss_terms_are_excluded_even_with_health_category() 
         assert result.medical_indemnity_status == "excluded"
 
 
-def test_travel_medical_expense_can_still_be_medical_indemnity() -> None:
+def test_travel_medical_expense_is_not_personal_medical_indemnity() -> None:
     result = classify_indemnity(
         _coverage(담보명="해외의료비(실손)", 지급유형="실손"),
         policy=_policy(category="손해보험", tags=["여행자보험"]),
     )
 
-    assert result.coverage_domain == "medical_expense"
-    assert result.medical_indemnity_status == "confirmed"
+    assert result.coverage_domain == "travel_medical_expense"
+    assert result.medical_indemnity_status == "excluded"
 
 
 def test_auto_medical_expense_stays_outside_medical_indemnity() -> None:

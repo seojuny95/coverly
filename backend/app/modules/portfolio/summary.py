@@ -3,9 +3,14 @@
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
 
-from app.modules.coverage.indemnity import classify_indemnity
+from app.modules.coverage.indemnity import (
+    IndemnityClassification,
+    PaymentBasis,
+    classify_indemnity,
+    has_negated_actual_loss_marker,
+    is_damage_policy_context,
+)
 from app.modules.coverage.matching import (
     canonicalize_coverage_name,
     choose_display_name,
@@ -16,6 +21,7 @@ from app.modules.portfolio.essential_coverage import (
 )
 from app.modules.portfolio.premium import summarize_premiums
 from app.modules.portfolio.schemas import (
+    ActualLossCoverageItem,
     ClaimChannelBlock,
     CoverageInput,
     CoverageSourceItem,
@@ -26,7 +32,6 @@ from app.modules.portfolio.schemas import (
     DeathBenefitGuideInput,
     EssentialCoverageCheck,
     ExcludedCoverageItem,
-    IndemnityItem,
     PolicyInput,
     PortfolioCoverageSummary,
     PremiumBenchmark,
@@ -35,21 +40,6 @@ from app.modules.portfolio.schemas import (
 from app.modules.qa.claim_channels import claim_channel_block
 from app.modules.reference_data.premium_benchmark import premium_benchmark_for_age
 
-_DAMAGE_CLASSIFICATION = "손해보험"
-_LEGACY_DAMAGE_CLASSIFICATIONS = frozenset(
-    {
-        "자동차",
-        "자동차보험",
-        "운전자보험",
-        "운전자상해보험",
-        "여행자보험",
-        "화재보험",
-        "주택화재보험",
-        "배상책임보험",
-        "보증보험",
-        "배상·화재·기타",
-    }
-)
 _AUTO_TAG_TERMS = ("자동차", "자동차보험")
 _AUTO_COVERAGE_TERMS = (
     "대인배상",
@@ -88,37 +78,6 @@ _FIRE_COVERAGE_TERMS = (
     "폭발포함배상책임",
     "화재폭발",
 )
-_INDEMNITY_NAME_TERMS = ("실손", "실비")
-_INDEMNITY_CATEGORIES = frozenset({"실손", "실손형", "실비", "실비형"})
-_NEGATED_INDEMNITY_PATTERNS = (
-    "비실손",
-    "비실비",
-    "실손제외",
-    "실비제외",
-    "실손미해당",
-    "실비미해당",
-    "실손아님",
-    "실비아님",
-    "실손비대상",
-    "실비비대상",
-    "실손미포함",
-    "실비미포함",
-)
-_FIXED_PAYMENT_TYPES = frozenset({"정액", "정액형", "고정액", "고정액형"})
-_INDEMNITY_PAYMENT_TYPES = frozenset(
-    {
-        "실손",
-        "실손형",
-        "실비",
-        "실비형",
-        "비례",
-        "비례형",
-        "비례보상",
-        "실액",
-        "실액형",
-        "실액보상",
-    }
-)
 _SAFE_FIXED_NAME_TERMS = (
     "진단비",
     "수술비",
@@ -130,9 +89,7 @@ _SAFE_FIXED_NAME_TERMS = (
 _UNCONFIRMED_PAYMENT_REASON = "지급 방식을 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_AMOUNT_REASON = "가입금액을 숫자로 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_NAME_REASON = "담보명을 분류하지 못해 합계에는 더하지 않았어요."
-_NON_MEDICAL_INDEMNITY_REASON = (
-    "실손 보상 방식이지만 실손의료보험 담보로 확인되지 않아 합계에는 더하지 않았어요."
-)
+_ACTUAL_LOSS_EXCLUSION_REASON = "실손형 담보라 가입금액 합계에는 더하지 않았어요."
 _UNITS = {
     "원": 1,
     "천원": 1_000,
@@ -168,10 +125,13 @@ class PortfolioFacts:
     coverage_summary: PortfolioCoverageSummary
 
 
-class _PayoutKind(Enum):
-    FIXED = "fixed"
-    INDEMNITY = "indemnity"
-    UNKNOWN = "unknown"
+@dataclass(frozen=True)
+class _ActualLossRow:
+    contract_index: int
+    policy: PolicyInput
+    coverage: CoverageInput
+    normalized_name: str
+    classification: IndemnityClassification
 
 
 def normalize_coverage_name(name: str) -> str:
@@ -205,8 +165,7 @@ def major_category(name: str) -> str:
 def is_damage_policy(policy: PolicyInput) -> bool:
     """Return whether a policy belongs to the separately handled non-life branch."""
 
-    category = policy.기본정보.보험분류 or ""
-    return category == _DAMAGE_CLASSIFICATION or category in _LEGACY_DAMAGE_CLASSIFICATIONS
+    return is_damage_policy_context(policy)
 
 
 def is_auto_policy(policy: PolicyInput) -> bool:
@@ -215,38 +174,21 @@ def is_auto_policy(policy: PolicyInput) -> bool:
     return any(term in _damage_insurance_type(policy) for term in _AUTO_TAG_TERMS)
 
 
-def _classify_payout_kind(coverage: CoverageInput) -> _PayoutKind:
-    """Classify explicit payment evidence before conservative name inference."""
+def _summary_payment_basis(
+    coverage: CoverageInput,
+    classification: IndemnityClassification,
+) -> PaymentBasis:
+    """Keep conservative fixed-benefit inference beside summary aggregation."""
 
-    payment_type = (coverage.지급유형 or "").strip()
-    if payment_type in _INDEMNITY_PAYMENT_TYPES:
-        return _PayoutKind.INDEMNITY
-    if payment_type in _FIXED_PAYMENT_TYPES:
-        return _PayoutKind.FIXED
-    if payment_type:
-        return _PayoutKind.UNKNOWN
-
-    coverage_category = (coverage.보장분류 or "").strip()
-    normalized_name = normalize_coverage_name(coverage.담보명)
-    normalized_category = normalize_coverage_name(coverage_category)
-    has_negated_indemnity = any(
-        pattern in normalized_name or pattern in normalized_category
-        for pattern in _NEGATED_INDEMNITY_PATTERNS
-    )
-    if has_negated_indemnity:
-        return _PayoutKind.UNKNOWN
-    if coverage_category in _INDEMNITY_CATEGORIES:
-        return _PayoutKind.INDEMNITY
-    if any(term in normalized_name for term in _INDEMNITY_NAME_TERMS):
-        return _PayoutKind.INDEMNITY
+    if classification.payment_basis != "unknown":
+        return classification.payment_basis
+    if coverage.지급유형:
+        return "unknown"
+    if has_negated_actual_loss_marker(coverage):
+        return "unknown"
     if any(term in coverage.담보명 for term in _SAFE_FIXED_NAME_TERMS):
-        return _PayoutKind.FIXED
-
-    return _PayoutKind.UNKNOWN
-
-
-def _is_medical_indemnity(coverage: CoverageInput, policy: PolicyInput) -> bool:
-    return classify_indemnity(coverage, policy=policy).medical_indemnity_status == "confirmed"
+        return "fixed"
+    return "unknown"
 
 
 def _parse_amount(coverage: CoverageInput) -> int | None:
@@ -272,27 +214,41 @@ def summarize_portfolio_coverages(
 
     grouped_sources: dict[str, list[CoverageSourceItem]] = defaultdict(list)
     source_names_by_group: dict[str, list[str]] = defaultdict(list)
-    indemnity_rows: list[tuple[PolicyInput, CoverageInput, str]] = []
+    actual_loss_rows: list[_ActualLossRow] = []
     excluded: list[ExcludedCoverageItem] = []
     damage_rows: dict[str, list[DamagePolicyCoverageGroup]] = defaultdict(list)
     auto_count = 0
 
-    for policy in policies:
+    for contract_index, policy in enumerate(policies):
+        classified_coverages = [
+            (coverage, classify_indemnity(coverage, policy=policy)) for coverage in policy.보장목록
+        ]
+        for coverage, classification in classified_coverages:
+            if classification.payment_basis != "indemnity":
+                continue
+            actual_loss_rows.append(
+                _ActualLossRow(
+                    contract_index=contract_index,
+                    policy=policy,
+                    coverage=coverage,
+                    normalized_name=canonicalize_coverage_name(coverage.담보명).normalized_key,
+                    classification=classification,
+                )
+            )
+
         if is_damage_policy(policy):
             damage_rows[_damage_insurance_type(policy)].append(_damage_policy_group(policy))
             if is_auto_policy(policy):
                 auto_count += 1
             continue
-        for coverage in policy.보장목록:
+        for coverage, classification in classified_coverages:
             group_key = canonicalize_coverage_name(coverage.담보명).normalized_key
-            payout_kind = _classify_payout_kind(coverage)
-            if payout_kind is _PayoutKind.INDEMNITY:
-                if _is_medical_indemnity(coverage, policy):
-                    indemnity_rows.append((policy, coverage, group_key))
-                else:
-                    excluded.append(_excluded(policy, coverage, _NON_MEDICAL_INDEMNITY_REASON))
+            payment_basis = _summary_payment_basis(coverage, classification)
+            if payment_basis == "indemnity":
+                if classification.medical_indemnity_status != "confirmed":
+                    excluded.append(_excluded(policy, coverage, _ACTUAL_LOSS_EXCLUSION_REASON))
                 continue
-            if payout_kind is _PayoutKind.UNKNOWN:
+            if payment_basis == "unknown":
                 excluded.append(_excluded(policy, coverage, _UNCONFIRMED_PAYMENT_REASON))
                 continue
             amount = _parse_amount(coverage)
@@ -319,7 +275,7 @@ def summarize_portfolio_coverages(
         for group_key, source_names in source_names_by_group.items()
     }
     totals = _build_fixed_totals(grouped_sources, display_names)
-    indemnity = _build_indemnity_items(indemnity_rows)
+    actual_loss_coverages = _build_actual_loss_items(actual_loss_rows)
     excluded.sort(
         key=lambda item: (
             item.policy_id or "",
@@ -331,7 +287,7 @@ def summarize_portfolio_coverages(
     essential_coverage_check = build_essential_coverage_check(policies, death_benefit_context)
     summary = PortfolioCoverageSummary(
         totals=totals,
-        indemnity_coverages=indemnity,
+        actual_loss_coverages=actual_loss_coverages,
         excluded_coverages=excluded,
         damage_coverages=_build_damage_groups(damage_rows),
         excluded_auto_policy_count=auto_count,
@@ -349,17 +305,22 @@ def summarize_portfolio_coverages(
     )
 
 
-def count_duplicate_indemnity_coverages(summary: PortfolioCoverageSummary) -> int:
-    """Count distinct indemnity coverage names duplicated across ≥2 insurers.
+def duplicate_actual_loss_coverage_names(
+    summary: PortfolioCoverageSummary,
+) -> list[str]:
+    """Return actual-loss coverage names found in multiple contracts.
 
-    Duplicated indemnity coverage cannot pay out more (비례보상), so this is the
-    'can be tidied up' signal — counted by distinct coverage, not by row.
+    This is a review signal, not a payout conclusion. Exact proportional
+    compensation and overlap rules still depend on each policy's terms.
     """
 
-    duplicated = {
-        item.normalized_name for item in summary.indemnity_coverages if item.cross_insurer_duplicate
-    }
-    return len(duplicated)
+    names_by_normalized_name: dict[str, str] = {}
+    for item in summary.actual_loss_coverages:
+        if not item.duplicate_across_contracts:
+            continue
+        key = item.normalized_name or item.coverage_name
+        names_by_normalized_name.setdefault(key, item.coverage_name)
+    return sorted(names_by_normalized_name.values())
 
 
 def build_portfolio_facts(policies: list[PolicyInput]) -> PortfolioFacts:
@@ -376,15 +337,18 @@ def _claim_channels(
     essential_coverage_check: EssentialCoverageCheck,
 ) -> ClaimChannelBlock | None:
     insurers = [policy.기본정보.보험사 for policy in policies if policy.기본정보.보험사]
-    has_indemnity = any(
-        item.kind == "indemnity" and item.status != "not_found"
+    has_medical_indemnity = any(
+        item.kind == "medical_indemnity" and item.status != "not_found"
         for item in essential_coverage_check.items
     )
-    if not insurers and not has_indemnity:
+    if not insurers and not has_medical_indemnity:
         return None
 
-    channels = claim_channel_block(insurers, has_indemnity=has_indemnity)
-    if not channels.insurers and channels.indemnity is None:
+    channels = claim_channel_block(
+        insurers,
+        has_medical_indemnity=has_medical_indemnity,
+    )
+    if not channels.insurers and channels.medical_indemnity is None:
         return None
     return ClaimChannelBlock.model_validate(channels.model_dump(mode="python"))
 
@@ -559,37 +523,40 @@ def _build_fixed_totals(
     return totals
 
 
-def _build_indemnity_items(
-    rows: list[tuple[PolicyInput, CoverageInput, str]],
-) -> list[IndemnityItem]:
-    insurers_by_name: dict[str, set[str]] = defaultdict(set)
-    for policy, _, normalized_name in rows:
-        insurer = policy.기본정보.보험사
-        if insurer:
-            insurers_by_name[normalized_name].add(insurer)
+def _build_actual_loss_items(
+    rows: list[_ActualLossRow],
+) -> list[ActualLossCoverageItem]:
+    contracts_by_name: dict[str, set[int]] = defaultdict(set)
+    for row in rows:
+        if row.normalized_name:
+            contracts_by_name[row.normalized_name].add(row.contract_index)
 
     ordered_rows = sorted(
         rows,
         key=lambda row: (
-            row[2],
-            row[0].기본정보.보험사 or "",
-            row[0].기본정보.상품명 or "",
-            row[0].id or "",
-            row[1].담보명,
+            row.normalized_name,
+            row.policy.기본정보.보험사 or "",
+            row.policy.기본정보.상품명 or "",
+            row.policy.id or "",
+            row.coverage.담보명,
         ),
     )
-    items: list[IndemnityItem] = []
-    for policy, coverage, normalized_name in ordered_rows:
+    items: list[ActualLossCoverageItem] = []
+    for row in ordered_rows:
         items.append(
-            IndemnityItem(
-                policy_id=policy.id,
-                insurer=policy.기본정보.보험사,
-                product_name=policy.기본정보.상품명,
-                coverage_name=coverage.담보명,
-                original_amount=coverage.가입금액,
-                normalized_name=normalized_name,
-                cross_insurer_duplicate=len(insurers_by_name[normalized_name]) >= 2,
-                major_category=major_category(coverage.담보명),
+            ActualLossCoverageItem(
+                policy_id=row.policy.id,
+                insurer=row.policy.기본정보.보험사,
+                product_name=row.policy.기본정보.상품명,
+                coverage_name=row.coverage.담보명,
+                original_amount=row.coverage.가입금액,
+                normalized_name=row.normalized_name,
+                coverage_domain=row.classification.coverage_domain,
+                is_medical_indemnity=(row.classification.medical_indemnity_status == "confirmed"),
+                duplicate_across_contracts=(
+                    bool(row.normalized_name) and len(contracts_by_name[row.normalized_name]) >= 2
+                ),
+                major_category=major_category(row.coverage.담보명),
             )
         )
     return items

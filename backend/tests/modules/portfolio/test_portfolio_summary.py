@@ -18,6 +18,7 @@ from app.modules.portfolio.schemas import (
 )
 from app.modules.portfolio.summary import (
     build_portfolio_facts,
+    duplicate_actual_loss_coverage_names,
     normalize_coverage_name,
     summarize_portfolio_coverages,
 )
@@ -60,7 +61,7 @@ def _summary_for_premium_guidance(
         "cancer": "암 진단비",
         "cerebrovascular": "뇌혈관질환 진단비",
         "ischemic_heart": "심장질환 진단비",
-        "indemnity": "실손의료보험",
+        "medical_indemnity": "실손의료보험",
     }
     items = [
         EssentialCoverageItem(
@@ -68,8 +69,8 @@ def _summary_for_premium_guidance(
             label=label,
             status="not_found" if kind in missing_kinds else "well_prepared",
             confirmed_amount=None if kind in missing_kinds else 10_000_000,
-            reference_min_amount=None if kind == "indemnity" else 10_000_000,
-            reference_max_amount=None if kind == "indemnity" else 20_000_000,
+            reference_min_amount=None if kind == "medical_indemnity" else 10_000_000,
+            reference_max_amount=None if kind == "medical_indemnity" else 20_000_000,
             coverage_count=0 if kind in missing_kinds else 1,
             detail="테스트 상세",
             matched_coverage_names=[] if kind in missing_kinds else [label],
@@ -78,7 +79,7 @@ def _summary_for_premium_guidance(
     ]
     return PortfolioCoverageSummary(
         totals=[],
-        indemnity_coverages=[],
+        actual_loss_coverages=[],
         excluded_coverages=[],
         excluded_auto_policy_count=0,
         essential_coverage_check=EssentialCoverageCheck(items=items),
@@ -323,7 +324,8 @@ def test_explicit_indemnity_treatment_benefit_is_never_summed() -> None:
 
     assert result.totals == []
     assert result.excluded_coverages == []
-    assert result.indemnity_coverages[0].coverage_name == "질병치료비"
+    assert result.actual_loss_coverages[0].coverage_name == "질병치료비"
+    assert result.actual_loss_coverages[0].is_medical_indemnity is True
 
 
 def test_medical_expense_without_payment_type_is_kept_for_display() -> None:
@@ -337,7 +339,7 @@ def test_medical_expense_without_payment_type_is_kept_for_display() -> None:
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
-    assert result.indemnity_coverages == []
+    assert result.actual_loss_coverages == []
     assert result.excluded_coverages[0].coverage_name == "상해입원의료비"
     assert result.excluded_coverages[0].major_category == "치료"
 
@@ -360,8 +362,9 @@ def test_explicit_indemnity_category_classifies_medical_expense() -> None:
 
     assert result.totals == []
     assert result.excluded_coverages == []
-    assert result.indemnity_coverages[0].coverage_name == "상해입원의료비"
-    assert result.indemnity_coverages[0].major_category == "치료"
+    assert result.actual_loss_coverages[0].coverage_name == "상해입원의료비"
+    assert result.actual_loss_coverages[0].major_category == "치료"
+    assert result.actual_loss_coverages[0].is_medical_indemnity is True
 
 
 def test_unknown_coverage_is_kept_for_display_under_other() -> None:
@@ -381,7 +384,7 @@ def test_unknown_coverage_is_kept_for_display_under_other() -> None:
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
-    assert result.indemnity_coverages == []
+    assert result.actual_loss_coverages == []
     assert result.excluded_coverages[0].coverage_name == "특정질환보장"
     assert result.excluded_coverages[0].major_category == "기타"
     assert result.excluded_coverages[0].original_amount == "1천만원"
@@ -411,7 +414,7 @@ def test_negated_or_ambiguous_payment_type_is_never_inferred(
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
-    assert result.indemnity_coverages == []
+    assert result.actual_loss_coverages == []
     assert result.excluded_coverages[0].coverage_name == "암진단비"
 
 
@@ -443,7 +446,7 @@ def test_negated_indemnity_name_or_category_is_never_inferred(
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
-    assert result.indemnity_coverages == []
+    assert result.actual_loss_coverages == []
     assert result.excluded_coverages[0].coverage_name == coverage_name
 
 
@@ -525,7 +528,9 @@ def test_legacy_specific_damage_classification_is_excluded_from_totals() -> None
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
-    assert result.indemnity_coverages == []
+    assert len(result.actual_loss_coverages) == 1
+    assert result.actual_loss_coverages[0].coverage_domain == "property_damage"
+    assert result.actual_loss_coverages[0].is_medical_indemnity is False
     assert result.damage_coverages[0].insurance_type == "여행자보험"
 
 
@@ -540,10 +545,10 @@ def test_indemnity_is_listed_and_flagged_only_across_insurers() -> None:
 
     assert result.totals == []
     duplicates = {
-        item.policy_id: item.cross_insurer_duplicate for item in result.indemnity_coverages
+        item.policy_id: item.duplicate_across_contracts for item in result.actual_loss_coverages
     }
     assert duplicates == {"p1": True, "p2": True, "p3": False}
-    amounts = {item.policy_id: item.original_amount for item in result.indemnity_coverages}
+    amounts = {item.policy_id: item.original_amount for item in result.actual_loss_coverages}
     assert amounts == {"p1": "5천만원", "p2": "5천만원", "p3": "3천만원"}
 
 
@@ -591,7 +596,7 @@ def test_essential_coverage_check_scans_every_policy_for_core_coverages() -> Non
         "cancer": "well_prepared",
         "cerebrovascular": "well_prepared",
         "ischemic_heart": "well_prepared",
-        "indemnity": "well_prepared",
+        "medical_indemnity": "well_prepared",
     }
     assert items["death"].matched_coverage_names == ["교통상해사망"]
     assert "생활비 공백" in (items["death"].reference_basis or "")
@@ -663,7 +668,7 @@ def test_essential_check_flags_narrow_diagnoses_and_multiple_indemnity_contracts
     assert items["cancer"].status == "not_found"
     assert items["cerebrovascular"].status == "not_found"
     assert items["ischemic_heart"].status == "not_found"
-    assert items["indemnity"].status == "needs_review"
+    assert items["medical_indemnity"].status == "needs_review"
 
 
 def test_essential_indemnity_check_excludes_auto_policy_rows() -> None:
@@ -677,9 +682,9 @@ def test_essential_indemnity_check_excludes_auto_policy_rows() -> None:
     result = summarize_portfolio_coverages([policy])
     items = {item.kind: item for item in result.essential_coverage_check.items}
 
-    assert result.indemnity_coverages == []
-    assert items["indemnity"].status == "not_found"
-    assert items["indemnity"].matched_coverage_names == []
+    assert not any(item.is_medical_indemnity for item in result.actual_loss_coverages)
+    assert items["medical_indemnity"].status == "not_found"
+    assert items["medical_indemnity"].matched_coverage_names == []
 
 
 def test_essential_indemnity_check_excludes_auto_fine_actual_loss_terms() -> None:
@@ -700,9 +705,9 @@ def test_essential_indemnity_check_excludes_auto_fine_actual_loss_terms() -> Non
     result = summarize_portfolio_coverages([policy])
     items = {item.kind: item for item in result.essential_coverage_check.items}
 
-    assert result.indemnity_coverages == []
-    assert items["indemnity"].status == "not_found"
-    assert items["indemnity"].matched_coverage_names == []
+    assert not any(item.is_medical_indemnity for item in result.actual_loss_coverages)
+    assert items["medical_indemnity"].status == "not_found"
+    assert items["medical_indemnity"].matched_coverage_names == []
 
 
 def test_essential_indemnity_check_excludes_property_and_driver_actual_loss_terms() -> None:
@@ -743,10 +748,10 @@ def test_essential_indemnity_check_excludes_property_and_driver_actual_loss_term
     result = summarize_portfolio_coverages([policy])
     items = {item.kind: item for item in result.essential_coverage_check.items}
 
-    assert result.indemnity_coverages == []
-    assert items["indemnity"].status == "not_found"
-    assert items["indemnity"].coverage_count == 0
-    assert items["indemnity"].matched_coverage_names == []
+    assert not any(item.is_medical_indemnity for item in result.actual_loss_coverages)
+    assert items["medical_indemnity"].status == "not_found"
+    assert items["medical_indemnity"].coverage_count == 0
+    assert items["medical_indemnity"].matched_coverage_names == []
 
 
 def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> None:
@@ -988,7 +993,7 @@ def test_non_medical_indemnity_terms_are_not_listed_as_medical_indemnity() -> No
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
-    assert result.indemnity_coverages == []
+    assert not any(item.is_medical_indemnity for item in result.actual_loss_coverages)
     assert result.excluded_coverages[0].coverage_name == "가족화재벌금(실손)"
 
 
@@ -1002,7 +1007,7 @@ def test_medical_indemnity_classifier_does_not_treat_income_benefit_as_medical()
 
     result = summarize_portfolio_coverages([policy])
 
-    assert result.indemnity_coverages == []
+    assert not any(item.is_medical_indemnity for item in result.actual_loss_coverages)
     assert result.excluded_coverages[0].coverage_name == "운전자보험 휴업급여"
 
 
@@ -1204,13 +1209,11 @@ def test_summary_includes_claim_channels_for_known_insurers_and_indemnity() -> N
         "삼성화재",
         "메리츠화재",
     ]
-    assert result.claim_channels.indemnity is not None
-    assert result.claim_channels.indemnity.name == "실손24"
+    assert result.claim_channels.medical_indemnity is not None
+    assert result.claim_channels.medical_indemnity.name == "실손24"
 
 
-def test_counts_distinct_indemnity_coverages_duplicated_across_insurers() -> None:
-    from app.modules.portfolio.summary import count_duplicate_indemnity_coverages
-
+def test_counts_distinct_actual_loss_coverages_duplicated_across_contracts() -> None:
     policies = [
         _policy("p1", "실손", "보험사A", [{"담보명": "실손의료비", "지급유형": "실손"}]),
         _policy("p2", "실손", "보험사B", [{"담보명": "실손의료비", "지급유형": "실손"}]),
@@ -1219,17 +1222,61 @@ def test_counts_distinct_indemnity_coverages_duplicated_across_insurers() -> Non
 
     summary = summarize_portfolio_coverages(policies)
 
-    # 3 rows, but one distinct coverage name duplicated across insurers -> count 1
-    assert count_duplicate_indemnity_coverages(summary) == 1
+    # Three rows represent one coverage name repeated across contracts.
+    assert duplicate_actual_loss_coverage_names(summary) == ["실손의료비"]
 
 
-def test_indemnity_held_at_single_insurer_is_not_counted_as_duplicate() -> None:
-    from app.modules.portfolio.summary import count_duplicate_indemnity_coverages
-
+def test_actual_loss_held_in_one_contract_is_not_counted_as_duplicate() -> None:
     policies = [
         _policy("p1", "실손", "보험사A", [{"담보명": "실손의료비", "지급유형": "실손"}]),
     ]
 
     summary = summarize_portfolio_coverages(policies)
 
-    assert count_duplicate_indemnity_coverages(summary) == 0
+    assert duplicate_actual_loss_coverage_names(summary) == []
+
+
+def test_actual_loss_duplicate_check_includes_damage_coverages_at_same_insurer() -> None:
+    policies = [
+        _policy(
+            "driver-1",
+            "손해보험",
+            "보험사A",
+            [{"담보명": "자동차사고벌금(실손)", "지급유형": "실손"}],
+            tags=["운전자보험"],
+        ),
+        _policy(
+            "driver-2",
+            "손해보험",
+            "보험사A",
+            [{"담보명": "자동차사고벌금(실손)", "지급유형": "실손"}],
+            tags=["운전자보험"],
+        ),
+    ]
+
+    summary = summarize_portfolio_coverages(policies)
+
+    assert duplicate_actual_loss_coverage_names(summary) == ["자동차사고벌금(실손)"]
+    assert all(item.duplicate_across_contracts for item in summary.actual_loss_coverages)
+    assert not any(item.is_medical_indemnity for item in summary.actual_loss_coverages)
+
+
+def test_travel_medical_actual_loss_does_not_count_as_personal_medical_indemnity() -> None:
+    policy = _policy(
+        "travel",
+        "손해보험",
+        "삼성화재",
+        [{"담보명": "해외의료비(실손)", "지급유형": "실손"}],
+        tags=["여행자보험"],
+    )
+
+    summary = summarize_portfolio_coverages([policy])
+    medical_item = next(
+        item for item in summary.essential_coverage_check.items if item.kind == "medical_indemnity"
+    )
+
+    assert summary.actual_loss_coverages[0].coverage_domain == "travel_medical_expense"
+    assert summary.actual_loss_coverages[0].is_medical_indemnity is False
+    assert medical_item.status == "not_found"
+    assert summary.claim_channels is not None
+    assert summary.claim_channels.medical_indemnity is None

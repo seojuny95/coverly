@@ -26,7 +26,7 @@ _PURPOSES: dict[str, str] = {
     coverage_taxonomy.DEATH: (
         "남은 가족의 생활비와 고정 지출을 이어갈 수 있는지 볼 때 핵심이 되는 항목이에요."
     ),
-    coverage_taxonomy.INDEMNITY: (
+    coverage_taxonomy.MEDICAL_INDEMNITY: (
         "실제 치료비 부담을 약관상 조건, 한도, 자기부담금과 함께 확인해야 하는 보장이에요."
     ),
     coverage_taxonomy.CARE: "혼자 일상생활이 어려워 간병비가 생길 때 부담을 점검하는 항목이에요.",

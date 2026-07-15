@@ -17,13 +17,13 @@ DISEASE_DISABILITY = "질병 후유장해"
 HOSPITAL = "입원"
 SURGERY = "수술"
 DEATH = "사망"
-INDEMNITY = "실손의료"
+MEDICAL_INDEMNITY = "실손의료비"
 CARE = "간병"
 
 _LIFE_STAGE_ESSENTIALS = {
-    "어린이": (INDEMNITY, DISEASE_DISABILITY, SURGERY, HOSPITAL, CANCER),
-    "성인": (CANCER, CEREBRO, HEART, INDEMNITY, DEATH, INJURY_DISABILITY),
-    "시니어": (CANCER, CEREBRO, HEART, INDEMNITY, CARE),
+    "어린이": (MEDICAL_INDEMNITY, DISEASE_DISABILITY, SURGERY, HOSPITAL, CANCER),
+    "성인": (CANCER, CEREBRO, HEART, MEDICAL_INDEMNITY, DEATH, INJURY_DISABILITY),
+    "시니어": (CANCER, CEREBRO, HEART, MEDICAL_INDEMNITY, CARE),
 }
 
 
@@ -45,7 +45,7 @@ def life_stage_for(age: int) -> str:
 def classify_coverage(name: str) -> str | None:
     normalized = re.sub(r"\s+", "", name)
     if is_medical_indemnity_name(normalized):
-        return INDEMNITY
+        return MEDICAL_INDEMNITY
     if "상해" in normalized and "후유장해" in normalized:
         return INJURY_DISABILITY
     if "질병" in normalized and "후유장해" in normalized:

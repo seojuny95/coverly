@@ -179,15 +179,17 @@ function ClaimChannels({ block }: { block: ClaimChannelBlock }) {
             <ChannelLinks links={insurer.links} />
           </li>
         ))}
-        {block.indemnity ? (
+        {block.medical_indemnity ? (
           <li>
             <span className="font-medium text-zinc-700">
-              {block.indemnity.name}
+              {block.medical_indemnity.name}
             </span>
-            {block.indemnity.call_center ? (
-              <span className="ml-1">콜센터 {block.indemnity.call_center}</span>
+            {block.medical_indemnity.call_center ? (
+              <span className="ml-1">
+                콜센터 {block.medical_indemnity.call_center}
+              </span>
             ) : null}
-            <ChannelLinks links={block.indemnity.links} />
+            <ChannelLinks links={block.medical_indemnity.links} />
           </li>
         ) : null}
       </ul>

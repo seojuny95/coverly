@@ -203,8 +203,8 @@ def test_stream_indemnity_channel_survives_paren_suffix() -> None:
     channels = events[-1]["claim_channels"]
     assert isinstance(channels, dict)
     assert any(insurer["name"] == "삼성화재" for insurer in channels["insurers"])
-    assert channels["indemnity"] is not None
-    assert channels["indemnity"]["name"] == "실손24"
+    assert channels["medical_indemnity"] is not None
+    assert channels["medical_indemnity"]["name"] == "실손24"
 
 
 def _auto_policy(insurer: str) -> PolicyInput:

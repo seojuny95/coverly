@@ -76,7 +76,7 @@ describe("ChatMessage", () => {
           ],
         },
       ],
-      indemnity: null,
+      medical_indemnity: null,
     };
     render(
       <ChatMessage

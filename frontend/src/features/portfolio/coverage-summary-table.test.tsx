@@ -22,14 +22,17 @@ const summary: PortfolioSummary = {
       ],
     },
   ],
-  indemnity_coverages: [
+  actual_loss_coverages: [
     {
       coverage_name: "실손입원",
+      normalized_name: "실손입원",
       original_amount: "5,000만원",
       insurer: "현대해상",
       product_name: "실손보험",
       major_category: "치료",
-      cross_insurer_duplicate: true,
+      coverage_domain: "medical_expense",
+      is_medical_indemnity: true,
+      duplicate_across_contracts: true,
     },
   ],
   excluded_coverages: [
@@ -51,10 +54,10 @@ describe("CoverageSummaryTable", () => {
     expect(screen.getByText("정액보상 · 2개 합산")).toBeInTheDocument();
   });
 
-  it("flags a cross-insurer indemnity coverage as a duplicate to check", () => {
+  it("flags medical indemnity repeated across contracts for review", () => {
     render(<CoverageSummaryTable summary={summary} />);
     expect(screen.getByText("실손입원")).toBeInTheDocument();
-    expect(screen.getByText("실손의료")).toBeInTheDocument();
+    expect(screen.getByText("실손의료비")).toBeInTheDocument();
     expect(screen.getByText("중복 확인")).toBeInTheDocument();
   });
 

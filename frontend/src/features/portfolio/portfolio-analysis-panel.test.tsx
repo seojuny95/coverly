@@ -39,7 +39,7 @@ const indemnitySource = {
 
 const summary: PortfolioSummary = {
   totals: [],
-  indemnity_coverages: [],
+  actual_loss_coverages: [],
   excluded_coverages: [],
   excluded_auto_policy_count: 0,
   overview: {
@@ -118,7 +118,7 @@ const summary: PortfolioSummary = {
         matched_coverage_names: [],
       },
       {
-        kind: "indemnity",
+        kind: "medical_indemnity",
         label: "실손의료보험",
         status: "well_prepared",
         confirmed_amount: null,
@@ -228,7 +228,7 @@ const summary: PortfolioSummary = {
         links: [{ label: "청구 링크", url: "https://www.meritzfire.com" }],
       },
     ],
-    indemnity: {
+    medical_indemnity: {
       name: "실손24",
       description:
         "병원이 진료비 서류를 보험사로 자동 전송해, 서류 없이 실손보험금을 청구하는 공식 서비스예요.",
@@ -413,7 +413,7 @@ test("shows a multiple-indemnity review directly in the coverage map", () => {
     ...summary,
     essential_coverage_check: {
       items: summary.essential_coverage_check!.items.map((item) =>
-        item.kind === "indemnity"
+        item.kind === "medical_indemnity"
           ? {
               ...item,
               status: "needs_review",
@@ -429,6 +429,40 @@ test("shows a multiple-indemnity review directly in the coverage map", () => {
 
   expect(screen.queryByText("한 번 더 볼 항목")).not.toBeInTheDocument();
   expect(screen.getByText("중복 가능성 확인")).toBeInTheDocument();
+});
+
+test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
+  const reviewSummary: PortfolioSummary = {
+    ...summary,
+    actual_loss_coverages: [
+      {
+        policy_id: "driver-1",
+        insurer: "보험사A",
+        product_name: "운전자보험 A",
+        coverage_name: "자동차사고벌금(실손)",
+        normalized_name: "자동차사고벌금",
+        coverage_domain: "auto",
+        is_medical_indemnity: false,
+        duplicate_across_contracts: true,
+      },
+      {
+        policy_id: "driver-2",
+        insurer: "보험사A",
+        product_name: "운전자보험 B",
+        coverage_name: "자동차사고벌금(실손)",
+        normalized_name: "자동차사고벌금",
+        coverage_domain: "auto",
+        is_medical_indemnity: false,
+        duplicate_across_contracts: true,
+      },
+    ],
+  };
+
+  render(<PortfolioAnalysisPanel {...baseProps()} summary={reviewSummary} />);
+
+  expect(
+    screen.getByText(/여러 계약에서 확인된 실손형 담보: 자동차사고벌금/),
+  ).toBeInTheDocument();
 });
 
 test("shows the loading state while the deterministic summary runs", () => {

@@ -5,7 +5,7 @@ import type { PortfolioSummary } from "./portfolio-api";
 
 const emptySummary: PortfolioSummary = {
   totals: [],
-  indemnity_coverages: [],
+  actual_loss_coverages: [],
   excluded_coverages: [],
   excluded_auto_policy_count: 0,
 };

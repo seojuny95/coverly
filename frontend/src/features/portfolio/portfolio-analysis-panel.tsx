@@ -74,13 +74,13 @@ const RECOMMENDED_INSURANCE_COPY = {
     rangeNote:
       "3대 진단비는 치료비만을 위한 돈이 아니라, 치료와 회복으로 일을 쉬는 동안의 생활비까지 대비하는 금액이에요. 일반적으로 암 진단비는 3천만~5천만 원, 뇌혈관·심장질환 진단비는 각각 1천만~2천만 원을 기본 범위로 보고, 소득이나 가족 부양 부담이 크다면 더 높게 준비할 수 있어요.",
   },
-  indemnity: {
+  medicalIndemnity: {
     title: "실손의료보험",
     description:
       "입원·통원처럼 자주 생기는 의료비 중 실제로 쓴 돈을 약관 한도 안에서 돌려받는 보험이에요.",
-    rangeLabel: "금액보다 구조 확인",
+    rangeLabel: "실손형 보장 함께 점검",
     rangeNote:
-      "실손의료비는 가입금액 합계보다 가입 여부, 세대, 자기부담금, 중복 여부가 더 중요해요.",
+      "실손 보장은 가입금액 합계보다 가입 여부, 세대, 자기부담금, 중복 여부가 더 중요해요.",
   },
 } as const;
 
@@ -236,6 +236,7 @@ function PortfolioOverview({
           items={items}
           deathBenefitContext={deathBenefitContext}
           onDeathBenefitContextChange={onDeathBenefitContextChange}
+          actualLossCoverages={summary?.actual_loss_coverages ?? []}
         />
       </section>
     );
@@ -312,6 +313,7 @@ function PortfolioOverview({
         items={items}
         deathBenefitContext={deathBenefitContext}
         onDeathBenefitContextChange={onDeathBenefitContextChange}
+        actualLossCoverages={summary?.actual_loss_coverages ?? []}
       />
     </section>
   );
@@ -321,14 +323,20 @@ function RecommendedInsuranceCards({
   items,
   deathBenefitContext,
   onDeathBenefitContextChange,
+  actualLossCoverages,
 }: {
   items: EssentialCoverageItem[];
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
+  actualLossCoverages: PortfolioSummary["actual_loss_coverages"];
 }) {
   const death = items.find((item) => item.kind === "death");
   const diagnosisItems = items.filter((item) => DIAGNOSIS_KINDS.has(item.kind));
-  const indemnity = items.find((item) => item.kind === "indemnity");
+  const medicalIndemnity = items.find(
+    (item) => item.kind === "medical_indemnity",
+  );
+  const duplicateActualLossNames =
+    duplicateActualLossCoverageNames(actualLossCoverages);
   const diagnosisConfirmedCount = diagnosisItems.filter(
     (item) => item.status !== "not_found",
   ).length;
@@ -355,10 +363,27 @@ function RecommendedInsuranceCards({
           confirmedCount={diagnosisConfirmedCount}
         />
 
-        <RecommendedIndemnityCard item={indemnity} />
+        <RecommendedMedicalIndemnityCard
+          item={medicalIndemnity}
+          duplicateActualLossNames={duplicateActualLossNames}
+        />
       </div>
     </article>
   );
+}
+
+function duplicateActualLossCoverageNames(
+  coverages: PortfolioSummary["actual_loss_coverages"],
+) {
+  const namesByNormalizedName = new Map<string, string>();
+  for (const coverage of coverages) {
+    if (!coverage.duplicate_across_contracts) continue;
+    const key = coverage.normalized_name || coverage.coverage_name;
+    if (!namesByNormalizedName.has(key)) {
+      namesByNormalizedName.set(key, coverage.coverage_name);
+    }
+  }
+  return [...namesByNormalizedName.values()];
 }
 
 function RecommendedSingleCoverageCard({
@@ -549,10 +574,12 @@ function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
   );
 }
 
-function RecommendedIndemnityCard({
+function RecommendedMedicalIndemnityCard({
   item,
+  duplicateActualLossNames,
 }: {
   item: EssentialCoverageItem | undefined;
+  duplicateActualLossNames: string[];
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
@@ -562,20 +589,20 @@ function RecommendedIndemnityCard({
             실제 의료비
           </p>
           <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
-            {RECOMMENDED_INSURANCE_COPY.indemnity.title}
+            {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.title}
           </h4>
         </div>
         <CoverageStatusBadge status={item?.status ?? "not_found"} />
       </div>
 
       <p className="mt-4 text-sm leading-6 text-zinc-700">
-        {RECOMMENDED_INSURANCE_COPY.indemnity.description}
+        {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.description}
       </p>
 
       <div className="mt-5 rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
         <p className="text-xs font-semibold text-zinc-500">현재 확인 결과</p>
         <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-950">
-          {indemnityHeadline(item)}
+          {medicalIndemnityHeadline(item)}
         </p>
         <p className="mt-2 text-xs leading-5 text-zinc-500">
           {item?.detail ?? "현재 자료에서 가입 여부를 확인하지 못했어요."}
@@ -584,11 +611,21 @@ function RecommendedIndemnityCard({
 
       <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3">
         <p className="text-xs font-semibold text-zinc-500">
-          {RECOMMENDED_INSURANCE_COPY.indemnity.rangeLabel}
+          {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.rangeLabel}
         </p>
         <p className="mt-1 text-sm leading-6 text-zinc-700">
-          {RECOMMENDED_INSURANCE_COPY.indemnity.rangeNote}
+          {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.rangeNote}
         </p>
+        {duplicateActualLossNames.length > 0 ? (
+          <p className="mt-2 text-xs leading-5 text-amber-700">
+            여러 계약에서 확인된 실손형 담보:{" "}
+            {duplicateActualLossNames.join(" · ")}
+          </p>
+        ) : (
+          <p className="mt-2 text-xs leading-5 text-zinc-500">
+            같은 실손형 담보가 여러 계약에서 확인되지는 않았어요.
+          </p>
+        )}
       </div>
 
       {item?.matched_coverage_names.length ? (
@@ -770,7 +807,7 @@ function sourceTypeLabel(reliability: SourceReliability) {
   }
 }
 
-function indemnityHeadline(item: EssentialCoverageItem | undefined) {
+function medicalIndemnityHeadline(item: EssentialCoverageItem | undefined) {
   if (!item || item.status === "not_found") {
     return "가입 여부 미확인";
   }
@@ -1135,28 +1172,28 @@ function ClaimGuide({
                   <p className="mt-1 text-sm leading-6 text-zinc-600">
                     {step.description}
                   </p>
-                  {index === 2 && claimChannels?.indemnity ? (
+                  {index === 2 && claimChannels?.medical_indemnity ? (
                     <div className="mt-3 space-y-3">
                       <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs leading-5 text-zinc-600">
                         <p className="font-semibold text-zinc-900">
-                          {claimChannels.indemnity.name}
+                          {claimChannels.medical_indemnity.name}
                         </p>
-                        {claimChannels.indemnity.description ? (
+                        {claimChannels.medical_indemnity.description ? (
                           <p className="mt-1">
-                            {claimChannels.indemnity.description}
+                            {claimChannels.medical_indemnity.description}
                           </p>
                         ) : null}
                         <p className="mt-1">
                           참여 병원이라면 진료비 서류를 전자 전송할 수 있어요.
                           먼저 연계 병원인지 확인해요.
                         </p>
-                        {claimChannels.indemnity.call_center ? (
+                        {claimChannels.medical_indemnity.call_center ? (
                           <p className="mt-1 text-zinc-500">
-                            콜센터 {claimChannels.indemnity.call_center}
+                            콜센터 {claimChannels.medical_indemnity.call_center}
                           </p>
                         ) : null}
                         <ChannelLinkList
-                          links={claimChannels.indemnity.links}
+                          links={claimChannels.medical_indemnity.links}
                           className="mt-2"
                         />
                       </div>

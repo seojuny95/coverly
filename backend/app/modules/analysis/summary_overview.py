@@ -13,6 +13,7 @@ from app.modules.portfolio.schemas import (
     PortfolioOverview,
     PortfolioOverviewTakeaway,
 )
+from app.modules.portfolio.summary import duplicate_actual_loss_coverage_names
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
     missing = [item for item in items if item.status == "not_found"]
     review = [item for item in items if item.status == "needs_review"]
     premium = _premium_judgment(summary, missing)
+    duplicate_actual_loss_names = duplicate_actual_loss_coverage_names(summary)
 
     return {
         "premium": premium,
@@ -87,6 +89,7 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
             "confirmed": _coverage_names(confirmed),
             "missing": _coverage_names(missing),
             "needs_review": _coverage_names(review),
+            "duplicate_actual_loss_coverages": duplicate_actual_loss_names,
             "missing_diagnosis_count": len(
                 [
                     item
@@ -103,7 +106,14 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
             }
             for analysis in summary.special_policy_analyses
         ],
-        "takeaways": _takeaways(summary, premium, confirmed, missing, review),
+        "takeaways": _takeaways(
+            summary,
+            premium,
+            confirmed,
+            missing,
+            review,
+            duplicate_actual_loss_names,
+        ),
         "limitations": [
             "업로드한 증권에서 읽은 담보명, 가입금액, 월 보험료 기준의 1차 해석",
             "실제 충분성은 소득, 부양가족, 대출, 병력, 약관의 면책·감액·갱신 조건 확인 필요",
@@ -171,6 +181,7 @@ def _takeaways(
     confirmed: list[EssentialCoverageItem],
     missing: list[EssentialCoverageItem],
     review: list[EssentialCoverageItem],
+    duplicate_actual_loss_names: list[str],
 ) -> list[dict[str, str]]:
     return [
         {
@@ -190,9 +201,17 @@ def _takeaways(
         {
             "label": "다음 확인",
             "title": (
-                "중복 여부 확인" if review else "미확인 보장 확인" if missing else "약관 조건 확인"
+                "중복 여부 확인"
+                if duplicate_actual_loss_names or review
+                else "미확인 보장 확인"
+                if missing
+                else "약관 조건 확인"
             ),
-            "detail": _next_detail(missing, review),
+            "detail": _next_detail(
+                missing,
+                review,
+                duplicate_actual_loss_names,
+            ),
         },
     ]
 
@@ -214,7 +233,11 @@ def _premium_detail(premium: dict[str, object]) -> str:
 def _next_detail(
     missing: list[EssentialCoverageItem],
     review: list[EssentialCoverageItem],
+    duplicate_actual_loss_names: list[str],
 ) -> str:
+    if duplicate_actual_loss_names:
+        names = " · ".join(duplicate_actual_loss_names)
+        return f"{names} 실손형 담보의 중복 보상 제한 여부를 약관에서 확인해요."
     if review:
         return f"{_joined_labels(review)}의 중복 가입과 실제 보장 범위를 확인해요."
     if missing:
