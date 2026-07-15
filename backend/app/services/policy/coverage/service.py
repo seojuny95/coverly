@@ -76,6 +76,36 @@ _NOTICE_NAME_MARKERS = (
     "거절되거나",
     "사실그대로",
 )
+_COVERAGE_NAME_MARKERS = (
+    "보험",
+    "특약",
+    "담보",
+    "배상",
+    "손해",
+    "상해",
+    "질병",
+    "진단",
+    "수술",
+    "입원",
+    "후유장해",
+    "벌금",
+    "비용",
+    "지원금",
+)
+_STRONG_COVERAGE_NAME_MARKERS = ("특약", "담보")
+_DETAIL_SENTENCE_MARKERS = (
+    "보험기간",
+    "경우",
+    "때",
+    "하면",
+    "한 경우",
+    "된 경우",
+    "받은 경우",
+    "지급",
+    "보상",
+    "발생",
+    "확정",
+)
 
 # One prompt for every policy type. The 담보/부가 split and the verbatim-amount
 # rules are structural (driven by the table's shape), so an unfriendly non-auto
@@ -180,8 +210,30 @@ def _is_notice_name(value: str) -> bool:
     return len(normalized) >= 30 and any(marker in normalized for marker in _NOTICE_NAME_MARKERS)
 
 
+def _is_rate_name(value: str) -> bool:
+    return "요율" in _normalized_header_name(value)
+
+
 def _should_skip_coverage_name(value: str) -> bool:
-    return _is_section_header_name(value) or _is_notice_name(value)
+    return _is_section_header_name(value) or _is_rate_name(value) or _is_notice_name(value)
+
+
+def _coverage_identity(value: str) -> str:
+    return _normalized_header_name(value)
+
+
+def _looks_like_standalone_coverage_name(value: str) -> bool:
+    """True when a wrapped-looking row is more likely a separate coverage name."""
+    stripped = value.strip()
+    if not stripped or _should_skip_coverage_name(stripped):
+        return False
+    normalized = _normalized_header_name(stripped)
+    if any(marker in normalized for marker in _STRONG_COVERAGE_NAME_MARKERS):
+        return True
+    if any(marker in stripped for marker in _DETAIL_SENTENCE_MARKERS):
+        return False
+
+    return any(marker in normalized for marker in _COVERAGE_NAME_MARKERS)
 
 
 def _markdown_tables(source: str) -> list[list[list[str]]]:
@@ -259,16 +311,45 @@ def _continuation_detail(
             break
 
         detail = cells[name_column].strip()
+        if _looks_like_standalone_coverage_name(detail):
+            break
         if detail:
             details.append(detail)
 
     return "\n".join(details) or None
 
 
+def _continuation_amount(
+    rows: list[list[str]], start_index: int, name_column: int, amount_column: int
+) -> str:
+    """Amount text wrapped onto following rows for the same coverage."""
+    amounts: list[str] = []
+    for cells in rows[start_index + 1 :]:
+        if len(cells) <= max(name_column, amount_column):
+            continue
+
+        has_previous_marker = any(cell.strip() for cell in cells[:name_column])
+        name_text = cells[name_column].strip()
+        if has_previous_marker or _looks_like_standalone_coverage_name(name_text):
+            break
+
+        amount = cells[amount_column].strip()
+        if amount:
+            amounts.append(amount)
+            continue
+
+        if name_text:
+            break
+
+    return "\n".join(amounts)
+
+
 def _is_continuation_row(cells: list[str], name_column: int, amount_column: int) -> bool:
     if len(cells) <= max(name_column, amount_column):
         return False
     if cells[amount_column].strip():
+        return False
+    if _looks_like_standalone_coverage_name(cells[name_column]):
         return False
     return name_column > 0 and not any(cell.strip() for cell in cells[:name_column])
 
@@ -296,7 +377,9 @@ def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
     if detail_column == name_column:
         detail_column = None
 
+    source = "\n".join("|".join(row) for row in rows)
     coverages: list[Coverage] = []
+    seen: set[str] = set()
     for index, cells in enumerate(rows[header_index + 1 :], start=header_index + 1):
         required_columns = [name_column]
         if amount_column is not None:
@@ -310,24 +393,49 @@ def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
 
         name = cells[name_column].strip()
         raw_amount = cells[amount_column].strip() if amount_column is not None else ""
-        if not name or _should_skip_coverage_name(name):
-            continue
+        if not raw_amount and amount_column is not None:
+            raw_amount = _continuation_amount(rows, index, name_column, amount_column)
+        if name and not _should_skip_coverage_name(name):
+            row_type: Literal["담보", "부가"] = "담보" if raw_amount else "부가"
+            detail = (
+                cells[detail_column].strip()
+                if detail_column is not None and len(cells) > detail_column
+                else None
+            )
+            if detail is None and amount_column is not None:
+                detail = _continuation_detail(rows, index, name_column, amount_column)
+            parsed = _CoverageRow(
+                담보명=name,
+                가입금액=raw_amount,
+                보장내용=detail or None,
+                유형=row_type,
+            )
+            coverages.append(_coverage_from_row(parsed, source))
+            seen.add(_coverage_identity(name))
 
-        row_type: Literal["담보", "부가"] = "담보" if raw_amount else "부가"
-        detail = (
-            cells[detail_column].strip()
-            if detail_column is not None and len(cells) > detail_column
-            else None
-        )
-        if detail is None and amount_column is not None:
-            detail = _continuation_detail(rows, index, name_column, amount_column)
-        parsed = _CoverageRow(
-            담보명=name,
-            가입금액=raw_amount,
-            보장내용=detail or None,
-            유형=row_type,
-        )
-        coverages.append(_coverage_from_row(parsed, "\n".join("|".join(row) for row in rows)))
+        ignored_columns = {name_column}
+        if amount_column is not None:
+            ignored_columns.add(amount_column)
+        if detail_column is not None:
+            ignored_columns.add(detail_column)
+
+        for column, cell in enumerate(cells):
+            auxiliary_name = cell.strip()
+            if column in ignored_columns or not _looks_like_standalone_coverage_name(
+                auxiliary_name
+            ):
+                continue
+            identity = _coverage_identity(auxiliary_name)
+            if identity in seen:
+                continue
+            auxiliary = _CoverageRow(
+                담보명=auxiliary_name,
+                가입금액="",
+                보장내용=None,
+                유형="부가",
+            )
+            coverages.append(_coverage_from_row(auxiliary, source))
+            seen.add(identity)
 
     return coverages
 

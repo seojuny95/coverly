@@ -182,6 +182,106 @@ def test_normalize_table_coverages_handles_content_column_as_name_with_wrapped_d
     ]
 
 
+def test_normalize_table_coverages_does_not_merge_next_coverage_name_into_detail() -> None:
+    source = (
+        "| 구분 | 보장내용 | 납입/보험기간 | 가입금액 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 기본 | 자기차량손해 | 1년 | 차량가입금액 2,423만원\\n자기부담금 "
+        "피보험자동차에 생긴 손해액의20%(최소 20만원,최대 50만원) |\n"
+        "|  | 긴급출동특약 |  |  |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "자기차량손해",
+            "가입금액": (
+                "차량가입금액 2,423만원\\n자기부담금 "
+                "피보험자동차에 생긴 손해액의20%(최소 20만원,최대 50만원)"
+            ),
+            "보장내용": None,
+            "해설": None,
+        },
+        {
+            "담보명": "긴급출동특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+    ]
+
+
+def test_normalize_table_coverages_keeps_wrapped_amount_with_its_coverage() -> None:
+    source = (
+        "| 담보종목 | 보험가입금액 |\n"
+        "| --- | --- |\n"
+        "| 긴급출동특약 |  |\n"
+        "|  | 하이카서비스 총 6회 |\n"
+        "|  | 견인 100km한도 |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "긴급출동특약",
+            "가입금액": "하이카서비스 총 6회\n견인 100km한도",
+            "보장내용": None,
+            "해설": None,
+        }
+    ]
+
+
+def test_normalize_table_coverages_collects_sidecar_riders_but_skips_rates() -> None:
+    source = (
+        "| 담보종목 | 보험가입금액 | 보험료 할인특약 | 보장확대 및 기타 특약 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 대인배상Ⅰ | 자배법에서 정한 금액 | 마일리지특약 | 다른자동차운전담보특약 |\n"
+        "|  |  | 잠금장치해제불가요율 | 친환경차배터리신품가액보상특약 |\n"
+        "| 자기차량손해 | 차량가입금액 2,423만원 | 특별요율 |  |\n"
+    )
+
+    result = normalize_table_coverages(source)
+
+    assert result == [
+        {
+            "담보명": "대인배상Ⅰ",
+            "가입금액": "자배법에서 정한 금액",
+            "보장내용": None,
+            "해설": None,
+        },
+        {
+            "담보명": "마일리지특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+        {
+            "담보명": "다른자동차운전담보특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+        {
+            "담보명": "친환경차배터리신품가액보상특약",
+            "가입금액": "",
+            "보장내용": None,
+            "해설": None,
+            "유형": "부가",
+        },
+        {
+            "담보명": "자기차량손해",
+            "가입금액": "차량가입금액 2,423만원",
+            "보장내용": None,
+            "해설": None,
+        },
+    ]
+
+
 def test_normalize_table_coverages_keeps_name_only_rider_tables() -> None:
     source = (
         "| 담보종목 | 보험가입금액 |\n"
