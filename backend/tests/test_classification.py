@@ -31,20 +31,20 @@ def _forbidden_completer(_system: str, _user: str) -> dict[str, object]:
 @pytest.mark.parametrize(
     ("product_name", "text", "expected_classification"),
     [
-        ("삼성 개인용자동차보험", "자동차보험 대인배상 대물배상 자기차량손해", "자동차"),
-        ("주택화재보험", "화재손해 화재배상책임", "배상·화재·기타"),
-        ("메리츠 실비보험", "실손의료비 급여 비급여 자기부담금 보상", "상해·질병·실손"),
-        ("무배당 연금보험", "연금개시 연금수령", "생명·연금"),
-        ("무배당 교보New종신보험", "사망보험금 해약환급금 20년납 종신", "생명·연금"),
+        ("삼성 개인용자동차보험", "자동차보험 대인배상 대물배상 자기차량손해", "손해보험"),
+        ("주택화재보험", "화재손해 화재배상책임", "손해보험"),
+        ("메리츠 실비보험", "실손의료비 급여 비급여 자기부담금 보상", "제3보험"),
+        ("무배당 연금보험", "연금개시 연금수령", "생명보험"),
+        ("무배당 교보New종신보험", "사망보험금 해약환급금 20년납 종신", "생명보험"),
         (
             "무배당 참좋은운전자상해보험",
             "교통사고처리지원금 자동차부상치료비 벌금",
-            "배상·화재·기타",
+            "손해보험",
         ),
         (
             "무배당 프로미라이프 나에게 맞춘 생활종합보험2404_TM",
             "가족화재벌금 12대가전제품고장수리비용 소재지",
-            "배상·화재·기타",
+            "손해보험",
         ),
     ],
 )
@@ -63,8 +63,8 @@ def test_classify_policy_matches_driver_accident_product_without_llm() -> None:
         complete=_forbidden_completer,
     )
 
-    assert result["보험분류"] == "배상·화재·기타"
-    assert "운전자" in result["상품태그"]
+    assert result["보험분류"] == "손해보험"
+    assert "운전자보험" in result["상품태그"]
 
 
 def test_classify_policy_requires_context_for_broad_lifestyle_package() -> None:
@@ -89,7 +89,7 @@ def test_classify_policy_falls_back_to_llm_when_no_official_term_matches() -> No
 
     def fake_completer(system: str, user: str) -> dict[str, object]:
         calls.append((system, user))
-        return {"보험분류": "상해·질병·실손", "상품태그": []}
+        return {"보험분류": "제3보험", "상품태그": []}
 
     result = classify_policy(
         text="이 상품은 다양한 위험을 폭넓게 보장합니다.",
@@ -97,7 +97,7 @@ def test_classify_policy_falls_back_to_llm_when_no_official_term_matches() -> No
         complete=fake_completer,
     )
 
-    assert result["보험분류"] == "상해·질병·실손"
+    assert result["보험분류"] == "제3보험"
     assert len(calls) == 1
 
 
@@ -124,8 +124,8 @@ def test_classify_policy_adds_tags_from_tag_terms_sorted_by_tag_order() -> None:
         complete=_forbidden_completer,
     )
 
-    assert result["보험분류"] == "상해·질병·실손"
-    assert result["상품태그"] == ["암", "상해", "질병", "어린이"]
+    assert result["보험분류"] == "제3보험"
+    assert result["상품태그"] == ["상해보험", "어린이보험"]
 
 
 def test_classification_rules_json_has_no_magic_number_fields() -> None:
@@ -149,7 +149,7 @@ def test_classify_policy_signature_accepts_json_completer_type() -> None:
         text="자동차보험 대인배상", product_name="자동차보험", complete=completer
     )
 
-    assert result["보험분류"] == "자동차"
+    assert result["보험분류"] == "손해보험"
 
 
 def test_classification_llm_prompt_is_structured_and_conservative() -> None:
@@ -161,6 +161,6 @@ def test_classification_llm_prompt_is_structured_and_conservative() -> None:
     assert "# 해야 할 것" in _SYSTEM
     assert "# 하지 말아야 할 것" in _SYSTEM
     assert "근거가 부족하면 미분류" in _SYSTEM
-    assert "운전자보험이나 운전자상해보험을 자동차로 분류하지 않는다" in _SYSTEM
+    assert "운전자보험이나 운전자상해보험을 자동차보험 태그로 분류하지 않는다" in _SYSTEM
     assert "# 입력" in prompt
     assert "# 분류 대상 텍스트" in prompt

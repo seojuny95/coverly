@@ -62,8 +62,8 @@ describe("InsuranceAnalysisPage", () => {
               보험사: "삼성화재",
               상품명: "건강보험",
               피보험자: "테스트고객",
-              보험분류: "상해·질병·실손",
-              상품태그: ["질병"],
+              보험분류: "제3보험",
+              상품태그: ["질병보험"],
             },
           },
         },
@@ -77,8 +77,8 @@ describe("InsuranceAnalysisPage", () => {
               보험사: "현대해상화재보험",
               상품명: "개인용자동차보험",
               피보험자: "테스트고객",
-              보험분류: "자동차",
-              상품태그: ["자동차"],
+              보험분류: "손해보험",
+              상품태그: ["자동차보험"],
             },
           },
         },
@@ -92,23 +92,77 @@ describe("InsuranceAnalysisPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "테스트고객님의 보험 2개를 종류별로 보기 쉽게 정리했어요.",
+        "테스트고객님의 보험을 4가지 종류로 보기 쉽게 정리했어요.",
       ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "보험증권 더 올리기" }),
     ).toBeInTheDocument();
 
-    const autoCard = screen.getAllByText("자동차")[0].closest("div");
-    const healthCard = screen.getAllByText("상해·질병·실손")[0].closest("div");
+    const damageCard = screen.getAllByText("손해보험")[0].closest("div");
+    const healthCard = screen.getAllByText("제3보험")[0].closest("div");
 
-    expect(autoCard).not.toBeNull();
+    expect(damageCard).not.toBeNull();
     expect(healthCard).not.toBeNull();
-    expect(within(autoCard as HTMLElement).getByText("1")).toBeInTheDocument();
+    expect(
+      within(damageCard as HTMLElement).getByText("1"),
+    ).toBeInTheDocument();
     expect(
       within(healthCard as HTMLElement).getByText("1"),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("자동차").length).toBeGreaterThan(1);
+    expect(screen.getByText("자동차보험")).toBeInTheDocument();
+  });
+
+  test("normalizes legacy classification values into current sections", async () => {
+    const initialAnalysis: InsuranceAnalysis = {
+      generatedAt: "2026-07-09T07:30:00.000Z",
+      selectedName: "테스트고객",
+      insuranceDocuments: [
+        {
+          id: "legacy-third",
+          fileName: "legacy-health.pdf",
+          result: {
+            status: "accepted",
+            문자수: 100,
+            기본정보: {
+              보험사: "삼성화재",
+              상품명: "레거시 건강보험",
+              보험분류: "상해·질병·실손",
+              상품태그: ["실손보험"],
+            },
+          },
+        },
+        {
+          id: "legacy-fire",
+          fileName: "legacy-fire.pdf",
+          result: {
+            status: "accepted",
+            문자수: 80,
+            기본정보: {
+              보험사: "현대해상",
+              상품명: "레거시 화재보험",
+              보험분류: "화재보험",
+              상품태그: ["화재보험"],
+            },
+          },
+        },
+      ],
+    };
+
+    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
+
+    expect(await screen.findByText("레거시 건강보험")).toBeInTheDocument();
+    expect(screen.getByText("레거시 화재보험")).toBeInTheDocument();
+
+    const thirdCard = screen.getAllByText("제3보험")[0].closest("div");
+    const damageCard = screen.getAllByText("손해보험")[0].closest("div");
+
+    expect(thirdCard).not.toBeNull();
+    expect(damageCard).not.toBeNull();
+    expect(within(thirdCard as HTMLElement).getByText("1")).toBeInTheDocument();
+    expect(
+      within(damageCard as HTMLElement).getByText("1"),
+    ).toBeInTheDocument();
   });
 
   test("expands a insurance row to show detail fields", async () => {
@@ -127,8 +181,8 @@ describe("InsuranceAnalysisPage", () => {
               증권번호: "POLICY-TEST-001",
               계약자: "가나",
               피보험자: "가나",
-              보험분류: "상해·질병·실손",
-              상품태그: ["질병", "어린이"],
+              보험분류: "제3보험",
+              상품태그: ["질병보험", "어린이보험"],
               납입기간: "20년납",
               만기일: "2046-01-01",
               보험기간: {
@@ -151,8 +205,8 @@ describe("InsuranceAnalysisPage", () => {
       name: /건강보험/,
     });
     expect(row).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByText("질병")).toBeInTheDocument();
-    expect(screen.getByText("어린이")).toBeInTheDocument();
+    expect(screen.getByText("질병보험")).toBeInTheDocument();
+    expect(screen.getByText("어린이보험")).toBeInTheDocument();
 
     fireEvent.click(row);
 
@@ -181,8 +235,8 @@ describe("InsuranceAnalysisPage", () => {
               증권번호: "POLICY-TEST-002",
               계약자: "테스트고객A",
               피보험자: "테스트고객A",
-              보험분류: "상해·질병·실손",
-              상품태그: ["질병", "어린이"],
+              보험분류: "제3보험",
+              상품태그: ["질병보험", "어린이보험"],
               납입기간: "20년납",
               만기일: "2027-01-01",
               보험기간: {
@@ -208,8 +262,8 @@ describe("InsuranceAnalysisPage", () => {
     });
 
     expect(screen.getByText("db-driver.pdf")).toBeInTheDocument();
-    expect(screen.getByText("질병")).toBeInTheDocument();
-    expect(screen.getByText("어린이")).toBeInTheDocument();
+    expect(screen.getByText("질병보험")).toBeInTheDocument();
+    expect(screen.getByText("어린이보험")).toBeInTheDocument();
 
     const logo = container.querySelector('img[src*="samsung-fire.png"]');
     expect(logo).not.toBeNull();
@@ -250,8 +304,8 @@ describe("InsuranceAnalysisPage", () => {
               보험사: "현대해상화재보험",
               상품명: "개인용자동차보험",
               피보험자: "테스트고객",
-              보험분류: "자동차",
-              상품태그: ["자동차"],
+              보험분류: "손해보험",
+              상품태그: ["자동차보험"],
               차량정보: {
                 차량명: "아반떼",
                 차량번호: "TEST-PLATE-001",
@@ -314,8 +368,8 @@ describe("InsuranceAnalysisPage", () => {
               증권번호: "POLICY-TEST-MASKED-001",
               계약자: "테스트고객A",
               피보험자: "테스트고객A",
-              보험분류: "배상·화재·기타",
-              상품태그: ["운전자"],
+              보험분류: "손해보험",
+              상품태그: ["운전자보험"],
               납입기간: "20년납",
               만기일: "2044-07-26",
               보험기간: {
@@ -486,8 +540,8 @@ describe("InsuranceAnalysisPage", () => {
         보험사: "현대해상화재보험",
         상품명: "개인용자동차보험",
         피보험자: "테스트고객",
-        보험분류: "자동차",
-        상품태그: ["자동차"],
+        보험분류: "손해보험",
+        상품태그: ["자동차보험"],
       },
     });
 
@@ -505,8 +559,8 @@ describe("InsuranceAnalysisPage", () => {
               보험사: "삼성화재",
               상품명: "건강보험",
               피보험자: "테스트고객",
-              보험분류: "상해·질병·실손",
-              상품태그: ["질병"],
+              보험분류: "제3보험",
+              상품태그: ["질병보험"],
             },
           },
         },
@@ -540,11 +594,11 @@ describe("InsuranceAnalysisPage", () => {
     );
     expect(
       await screen.findByText(
-        "테스트고객님의 보험 2개를 종류별로 보기 쉽게 정리했어요.",
+        "테스트고객님의 보험을 4가지 종류로 보기 쉽게 정리했어요.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getAllByText("자동차").length).toBeGreaterThan(1);
+    expect(screen.getByText("자동차보험")).toBeInTheDocument();
   });
 
   test("keeps duplicate policy uploads out of the current analysis", async () => {
@@ -557,8 +611,8 @@ describe("InsuranceAnalysisPage", () => {
         상품명: "건강보험",
         증권번호: "POLICY-TEST-001",
         피보험자: "테스트고객",
-        보험분류: "상해·질병·실손",
-        상품태그: ["질병"],
+        보험분류: "제3보험",
+        상품태그: ["질병보험"],
       },
     });
 
@@ -577,8 +631,8 @@ describe("InsuranceAnalysisPage", () => {
               상품명: "건강보험",
               증권번호: "POLICY-TEST-001",
               피보험자: "테스트고객",
-              보험분류: "상해·질병·실손",
-              상품태그: ["질병"],
+              보험분류: "제3보험",
+              상품태그: ["질병보험"],
             },
           },
         },
@@ -604,7 +658,7 @@ describe("InsuranceAnalysisPage", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "테스트고객님의 보험 1개를 종류별로 보기 쉽게 정리했어요.",
+        "테스트고객님의 보험을 4가지 종류로 보기 쉽게 정리했어요.",
       ),
     ).toBeInTheDocument();
   });
