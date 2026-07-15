@@ -229,7 +229,10 @@ describe("PortfolioAnalysisResultView", () => {
     );
 
     expect(screen.queryByText("보장금액 상태")).not.toBeInTheDocument();
-    expect(screen.getByText("받을 때 확인할 조건")).toBeInTheDocument();
+    expect(screen.getByText("보험금 받을 때 확인할 조건")).toBeInTheDocument();
+    expect(
+      screen.getByText("어떤 보험금을 받는지에 따라 보는 조건이 달라요"),
+    ).toBeInTheDocument();
     expect(screen.getByText("최근 제도 변화")).toBeInTheDocument();
     expect(
       screen.getByText("실손보험 청구 전산화가 의원·약국까지 확대 예정이에요"),

@@ -250,36 +250,39 @@ function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
       </div>
 
       <div className="mt-7">
-        <div className="relative h-20" style={style}>
-          <div className="absolute inset-x-0 top-8 h-3 rounded-full bg-zinc-100" />
+        <div className="relative h-24" style={style}>
+          <div className="absolute inset-x-0 top-9 h-2 rounded-full bg-zinc-100" />
           <div
-            className="absolute top-8 h-3 rounded-full bg-emerald-200"
+            className="absolute top-9 h-2 rounded-full bg-emerald-200"
             style={rangeStyle}
           />
-          <div className="premium-position-fill absolute top-8 left-0 h-3 rounded-full bg-blue-600" />
+          <div className="premium-position-fill absolute top-9 left-0 h-2 rounded-full bg-blue-600" />
           <div
             className="absolute top-0 flex -translate-x-1/2 flex-col items-center gap-1"
             style={{ left: `${minPosition}%` }}
           >
             <span className="text-xs font-medium text-zinc-500">5%</span>
-            <span className="h-3 w-px bg-zinc-400" />
+            <span className="h-4 w-px bg-zinc-400" />
           </div>
           <div
             className="absolute top-0 flex -translate-x-1/2 flex-col items-center gap-1"
             style={{ left: `${maxPosition}%` }}
           >
             <span className="text-xs font-medium text-zinc-500">10%</span>
-            <span className="h-3 w-px bg-zinc-400" />
+            <span className="h-4 w-px bg-zinc-400" />
           </div>
-          <div className="premium-position-user absolute top-5 flex -translate-x-1/2 flex-col items-center gap-1">
-            <span className="h-5 w-5 rounded-full border-2 border-white bg-blue-600 shadow-sm" />
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+          <div className="premium-position-user absolute top-6 flex -translate-x-1/2 flex-col items-center gap-1">
+            <span className="h-4 w-4 rounded-full border-2 border-white bg-blue-600 shadow-sm" />
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
               나
             </span>
           </div>
-          <div className="absolute inset-x-0 top-14 flex justify-between text-xs text-zinc-400">
+          <div className="absolute inset-x-0 top-16 flex justify-between text-xs text-zinc-400">
             <span>0원</span>
             <span>{formatWon(Math.round(maxAmount))}</span>
+          </div>
+          <div className="absolute inset-x-0 bottom-0 flex justify-center text-xs font-medium text-emerald-700">
+            <span>소득 5~10% 참고 구간</span>
           </div>
         </div>
       </div>
@@ -329,10 +332,10 @@ function AnalysisDetailGrid({
       {claimConditionChecks.length ? (
         <section className="rounded-2xl border border-zinc-200 p-6">
           <p className="text-xs font-semibold text-blue-700">
-            받을 때 확인할 조건
+            보험금 받을 때 확인할 조건
           </p>
           <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
-            보험금은 약관 조건을 통과해야 해요
+            어떤 보험금을 받는지에 따라 보는 조건이 달라요
           </h2>
           <ul className="mt-4 space-y-3">
             {claimConditionChecks.map((item) => (
