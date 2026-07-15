@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     rag_pg_table: str = "official_rag_chunks"
     reference_schema: str = "reference"
     premium_benchmark_table: str = "premium_benchmarks"
+    premium_burden_guide_table: str = "premium_burden_guides"
     reference_source_table: str = "sources"
     policy_change_table: str = "policy_change_notes"
     rag_embedding_dim: int = 1536

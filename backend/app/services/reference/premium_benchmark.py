@@ -1,4 +1,4 @@
-"""Age-band premium benchmark lookup from the configured Postgres database."""
+"""Age-band premium burden guide lookup from the configured Postgres database."""
 
 from functools import lru_cache
 from typing import Any, Protocol
@@ -18,12 +18,21 @@ class PremiumBenchmarkRepository(Protocol):
 
 
 class PostgresPremiumBenchmarkRepository:
-    """Read reference premiums from Supabase/Postgres.
+    """Read reference premium guides from Supabase/Postgres.
 
     Expected tables:
     - reference.sources(id, title, publisher, url, published_at, reliability, caveat)
-    - reference.premium_benchmarks(source_id, age_band_label, min_age, max_age,
-      average_monthly_premium, effective_at)
+    - reference.premium_burden_guides(
+        income_source_id,
+        guide_source_id,
+        age_band_label,
+        min_age,
+        max_age,
+        average_monthly_income,
+        suggested_min_ratio,
+        suggested_max_ratio,
+        effective_at
+      )
     """
 
     def __init__(
@@ -45,8 +54,8 @@ class PostgresPremiumBenchmarkRepository:
 
         query = _benchmark_query(
             """
-            WHERE %s BETWEEN b.min_age AND b.max_age
-            ORDER BY b.effective_at DESC, b.max_age ASC
+            WHERE %s BETWEEN g.min_age AND g.max_age
+            ORDER BY g.effective_at DESC, g.max_age ASC
             LIMIT 1
             """,
             schema=self._schema,
@@ -62,7 +71,7 @@ class PostgresPremiumBenchmarkRepository:
     def list_all(self) -> tuple[PremiumBenchmark, ...]:
         query = _benchmark_query(
             """
-            ORDER BY b.effective_at DESC, b.min_age ASC, b.max_age ASC
+            ORDER BY g.effective_at DESC, g.min_age ASC, g.max_age ASC
             """,
             schema=self._schema,
             benchmark_table=self._benchmark_table,
@@ -126,7 +135,7 @@ def _repository() -> PremiumBenchmarkRepository:
     return PostgresPremiumBenchmarkRepository(
         settings.database_url,
         schema=settings.reference_schema,
-        benchmark_table=settings.premium_benchmark_table,
+        benchmark_table=settings.premium_burden_guide_table,
         source_table=settings.reference_source_table,
     )
 
@@ -150,18 +159,27 @@ def _benchmark_query(
     return sql.SQL(
         """
         SELECT
-          b.age_band_label,
-          b.min_age,
-          b.max_age,
-          b.average_monthly_premium,
-          s.title AS source_title,
-          s.publisher AS source_publisher,
-          s.url AS source_url,
-          s.published_at AS source_published_at,
-          s.reliability AS source_reliability,
-          s.caveat AS source_caveat
-        FROM {benchmark_table} b
-        JOIN {source_table} s ON s.id = b.source_id
+          g.age_band_label,
+          g.min_age,
+          g.max_age,
+          g.average_monthly_income,
+          g.suggested_min_ratio,
+          g.suggested_max_ratio,
+          income.title AS income_source_title,
+          income.publisher AS income_source_publisher,
+          income.url AS income_source_url,
+          income.published_at AS income_source_published_at,
+          income.reliability AS income_source_reliability,
+          income.caveat AS income_source_caveat,
+          guide.title AS guide_source_title,
+          guide.publisher AS guide_source_publisher,
+          guide.url AS guide_source_url,
+          guide.published_at AS guide_source_published_at,
+          guide.reliability AS guide_source_reliability,
+          guide.caveat AS guide_source_caveat
+        FROM {benchmark_table} g
+        JOIN {source_table} income ON income.id = g.income_source_id
+        JOIN {source_table} guide ON guide.id = g.guide_source_id
         """
         + suffix
     ).format(
@@ -171,20 +189,32 @@ def _benchmark_query(
 
 
 def _benchmark_from_row(row: dict[str, Any]) -> PremiumBenchmark:
-    publisher = str(row["source_publisher"] or "").strip()
-    source_title = str(row["source_title"])
-    label = f"{publisher} · {source_title}" if publisher else source_title
+    average_monthly_income = int(row["average_monthly_income"])
+    suggested_min_ratio = float(row["suggested_min_ratio"])
+    suggested_max_ratio = float(row["suggested_max_ratio"])
 
     return PremiumBenchmark(
         age_band_label=str(row["age_band_label"]),
         min_age=int(row["min_age"]),
         max_age=int(row["max_age"]),
-        average_monthly_premium=int(row["average_monthly_premium"]),
-        source=PremiumBenchmarkSource(
-            label=label,
-            url=str(row["source_url"]),
-            published_at=str(row["source_published_at"]),
-            reliability=str(row["source_reliability"]),
-            caveat=str(row["source_caveat"]),
-        ),
+        average_monthly_income=average_monthly_income,
+        suggested_min_ratio=suggested_min_ratio,
+        suggested_max_ratio=suggested_max_ratio,
+        suggested_min_premium=int(round(average_monthly_income * suggested_min_ratio)),
+        suggested_max_premium=int(round(average_monthly_income * suggested_max_ratio)),
+        income_source=_source_from_row(row, prefix="income_source"),
+        guide_source=_source_from_row(row, prefix="guide_source"),
+    )
+
+
+def _source_from_row(row: dict[str, Any], *, prefix: str) -> PremiumBenchmarkSource:
+    publisher = str(row[f"{prefix}_publisher"] or "").strip()
+    title = str(row[f"{prefix}_title"])
+    label = f"{publisher} · {title}" if publisher else title
+    return PremiumBenchmarkSource(
+        label=label,
+        url=str(row[f"{prefix}_url"]),
+        published_at=str(row[f"{prefix}_published_at"]),
+        reliability=str(row[f"{prefix}_reliability"]),
+        caveat=str(row[f"{prefix}_caveat"]),
     )

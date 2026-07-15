@@ -91,8 +91,19 @@ export type PortfolioAnalysisResult = {
     age_band_label: string;
     min_age: number;
     max_age: number;
-    average_monthly_premium: number;
-    source: {
+    average_monthly_income: number;
+    suggested_min_ratio: number;
+    suggested_max_ratio: number;
+    suggested_min_premium: number;
+    suggested_max_premium: number;
+    income_source: {
+      label: string;
+      url: string;
+      published_at: string;
+      reliability: string;
+      caveat: string;
+    };
+    guide_source: {
       label: string;
       url: string;
       published_at: string;
@@ -106,6 +117,28 @@ export type PortfolioAnalysisResult = {
     detail: string;
     evidence_ids: string[];
   }>;
+  age_coverage_recommendation?: {
+    age_band_label: string;
+    title: string;
+    detail: string;
+    confirmed_count: number;
+    recommended_count: number;
+    optional_count: number;
+    items: Array<{
+      category: string;
+      status: "confirmed" | "missing" | "optional_missing";
+      title: string;
+      detail: string;
+      evidence_ids: string[];
+    }>;
+    source: {
+      label: string;
+      url: string;
+      published_at: string;
+      reliability: string;
+      caveat: string;
+    };
+  } | null;
   coverage_amount_status?: {
     title: string;
     detail: string;

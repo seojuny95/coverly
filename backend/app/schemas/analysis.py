@@ -119,8 +119,13 @@ class PremiumBenchmark(BaseModel):
     age_band_label: str
     min_age: int
     max_age: int
-    average_monthly_premium: int
-    source: PremiumBenchmarkSource
+    average_monthly_income: int
+    suggested_min_ratio: float
+    suggested_max_ratio: float
+    suggested_min_premium: int
+    suggested_max_premium: int
+    income_source: PremiumBenchmarkSource
+    guide_source: PremiumBenchmarkSource
 
 
 PriorityCheckKind = Literal["premium", "duplicate", "coverage_gap", "contract"]
@@ -159,6 +164,36 @@ class ClaimConditionCheck(BaseModel):
     title: str
     detail: str
     evidence_ids: list[str] = Field(default_factory=list)
+
+
+class AgeCoverageRecommendationSource(BaseModel):
+    label: str
+    url: str
+    published_at: str
+    reliability: str
+    caveat: str
+
+
+RecommendationStatus = Literal["confirmed", "missing", "optional_missing"]
+
+
+class AgeCoverageRecommendationItem(BaseModel):
+    category: str
+    status: RecommendationStatus
+    title: str
+    detail: str
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class AgeCoverageRecommendationCheck(BaseModel):
+    age_band_label: str
+    title: str
+    detail: str
+    confirmed_count: int
+    recommended_count: int
+    optional_count: int
+    items: list[AgeCoverageRecommendationItem] = Field(default_factory=list)
+    source: AgeCoverageRecommendationSource
 
 
 class PolicyChangeSource(BaseModel):
@@ -205,6 +240,7 @@ class PortfolioAnalysisResponse(BaseModel):
     premium: PremiumOverview
     premium_benchmark: PremiumBenchmark | None = None
     priority_checks: list[PriorityCheck] = Field(default_factory=list, max_length=3)
+    age_coverage_recommendation: AgeCoverageRecommendationCheck | None = None
     coverage_amount_status: CoverageAmountStatus
     claim_condition_checks: list[ClaimConditionCheck] = Field(default_factory=list)
     policy_change_checks: list[PolicyChangeCheck] = Field(default_factory=list)

@@ -5,6 +5,9 @@ from functools import lru_cache
 from typing import Literal
 
 from app.schemas.analysis import (
+    AgeCoverageRecommendationCheck,
+    AgeCoverageRecommendationItem,
+    AgeCoverageRecommendationSource,
     AnalysisContextAnswer,
     AnalysisSource,
     ClaimConditionCheck,
@@ -24,10 +27,16 @@ from app.schemas.consultation import Gender, GenerationMode, InsuredDemographics
 from app.schemas.portfolio import CoverageTotalItem, PolicyInput, PortfolioCoverageSummary
 from app.services.analysis.generation import generate_counselor
 from app.services.coverage_knowledge.purpose import coverage_purpose
+from app.services.coverage_knowledge.recommendations import (
+    recommendation_for_age,
+    recommendation_reason,
+    recommendation_source,
+)
 from app.services.coverage_knowledge.taxonomy import (
     INDEMNITY,
     LifeStageCheck,
     check_life_stage,
+    classify_coverage,
 )
 from app.services.evidence.catalog import (
     EvidenceCatalog,
@@ -132,6 +141,11 @@ def analyze_portfolio(
             catalog,
             premium,
             premium_benchmark,
+        ),
+        age_coverage_recommendation=_age_coverage_recommendation(
+            facts,
+            insured,
+            catalog,
         ),
         coverage_amount_status=_coverage_amount_status(summary, catalog),
         claim_condition_checks=_claim_condition_checks(summary, catalog),
@@ -314,30 +328,136 @@ def _premium_priority_check(
     if premium.monthly_policy_count < 1 or benchmark is None:
         return None
 
-    difference = premium.monthly_total - benchmark.average_monthly_premium
-    if abs(difference) < 10_000:
-        title = "월 보험료가 같은 나이대 평균과 비슷해요"
+    if premium.monthly_total < benchmark.suggested_min_premium:
+        difference = benchmark.suggested_min_premium - premium.monthly_total
+        title = "월 보험료가 소득 기준 참고 범위보다 낮아요"
         detail = (
-            f"{benchmark.age_band_label} 평균과 큰 차이는 없어요. "
-            "다만 평균은 적정 기준이 아니라 비교용 참고값이므로, "
-            "보험료보다 보장 구성과 중복 여부를 같이 봐야 해요."
+            f"{benchmark.age_band_label} 평균 소득 기준 참고 범위의 하한보다 "
+            f"{difference:,}원 낮아요. "
+            "낮다고 부족하다는 뜻은 아니지만, 큰 진단비나 치료비 보장이 "
+            "실제로 들어 있는지는 함께 확인하는 게 좋아요."
         )
-    elif difference > 0:
-        title = "월 보험료가 같은 나이대 평균보다 높아요"
+    elif premium.monthly_total > benchmark.suggested_max_premium:
+        difference = premium.monthly_total - benchmark.suggested_max_premium
+        title = "월 보험료가 소득 기준 참고 범위보다 높아요"
         detail = (
-            f"{benchmark.age_band_label} 평균보다 {difference:,}원 높게 확인돼요. "
-            "비싸다고 바로 나쁜 것은 아니지만, "
-            "중복 보장이나 유지 필요성이 낮은 담보가 있는지 먼저 보는 게 좋아요."
+            f"{benchmark.age_band_label} 평균 소득 기준 참고 범위의 상한보다 "
+            f"{difference:,}원 높아요. "
+            "높다고 바로 과하다는 뜻은 아니지만, 중복 보장이나 지금은 "
+            "우선순위가 낮은 담보가 있는지 먼저 보는 게 좋아요."
         )
     else:
-        title = "월 보험료가 같은 나이대 평균보다 낮아요"
+        title = "월 보험료가 소득 기준 참고 범위 안에 있어요"
         detail = (
-            f"{benchmark.age_band_label} 평균보다 {abs(difference):,}원 낮게 확인돼요. "
-            "낮다고 부족하다는 뜻은 아니지만, "
-            "큰 진단비·치료비 보장이 실제로 있는지는 함께 확인해야 해요."
+            f"{benchmark.age_band_label} 평균 소득 기준 참고 범위 안에 있어요. "
+            "이 범위는 가입 권유 기준이 아니라 참고값이므로, 보험료 자체보다 "
+            "보장 구성과 중복 여부를 같이 보는 게 중요해요."
         )
 
     return PriorityCheck(kind="premium", title=title, detail=detail)
+
+
+def _age_coverage_recommendation(
+    facts: PortfolioFacts,
+    insured: InsuredDemographics,
+    catalog: EvidenceCatalog,
+) -> AgeCoverageRecommendationCheck | None:
+    recommendation = recommendation_for_age(insured.age)
+    if recommendation is None:
+        return None
+
+    held_categories = {
+        category
+        for category in (
+            classify_coverage(coverage.담보명)
+            for policy in facts.policies
+            for coverage in policy.보장목록
+        )
+        if category is not None
+    }
+    if facts.coverage_summary.indemnity_coverages:
+        held_categories.add(INDEMNITY)
+
+    items: list[AgeCoverageRecommendationItem] = []
+    confirmed_count = 0
+
+    for category in recommendation.core_categories:
+        evidence_ids = list(catalog.coverage_ids_by_category.get(category, ())[:2])
+        if category in held_categories:
+            confirmed_count += 1
+            items.append(
+                AgeCoverageRecommendationItem(
+                    category=category,
+                    status="confirmed",
+                    title=f"{category} 성격 보장이 확인돼요",
+                    detail=(
+                        f"현재 올린 증권에서 이 항목이 보여요. {recommendation_reason(category)}"
+                    ),
+                    evidence_ids=evidence_ids,
+                )
+            )
+        else:
+            items.append(
+                AgeCoverageRecommendationItem(
+                    category=category,
+                    status="missing",
+                    title=f"{category} 성격 보장은 아직 확인되지 않았어요",
+                    detail=(
+                        "이 연령대에서 함께 보는 기본 준비 묶음에는 들어가지만, "
+                        "현재 올린 증권에서는 찾지 못했어요."
+                    ),
+                )
+            )
+
+    for category in recommendation.optional_categories:
+        evidence_ids = list(catalog.coverage_ids_by_category.get(category, ())[:2])
+        if category in held_categories:
+            items.append(
+                AgeCoverageRecommendationItem(
+                    category=category,
+                    status="confirmed",
+                    title=f"{category} 성격 보장이 확인돼요",
+                    detail=(
+                        f"현재 올린 증권에서 이 항목이 보여요. {recommendation_reason(category)}"
+                    ),
+                    evidence_ids=evidence_ids,
+                )
+            )
+        else:
+            items.append(
+                AgeCoverageRecommendationItem(
+                    category=category,
+                    status="optional_missing",
+                    title=f"{category} 성격 보장은 선택 항목으로 남아 있어요",
+                    detail=(
+                        "이 연령대 가이드에서는 여유가 될 때 같이 점검하는 항목으로 보지만, "
+                        "현재 올린 증권에서는 찾지 못했어요."
+                    ),
+                )
+            )
+
+    if confirmed_count == len(recommendation.core_categories):
+        detail = (
+            f"{recommendation.age_band_label} 기준으로 자주 같이 보는 기본 항목은 "
+            "현재 증권에서 모두 확인돼요."
+        )
+    else:
+        detail = (
+            f"{recommendation.age_band_label} 기준 기본 항목 "
+            f"{len(recommendation.core_categories)}개 중 {confirmed_count}개가 확인돼요. "
+            "나머지는 다른 증권에 있는지 한 번 더 보면 좋아요."
+        )
+
+    return AgeCoverageRecommendationCheck(
+        age_band_label=recommendation.age_band_label,
+        title=recommendation.title,
+        detail=f"{detail} {recommendation.summary}",
+        confirmed_count=confirmed_count,
+        recommended_count=len(recommendation.core_categories),
+        optional_count=len(recommendation.optional_categories),
+        items=items,
+        source=AgeCoverageRecommendationSource(**recommendation_source()),
+    )
 
 
 def _coverage_amount_status(

@@ -44,6 +44,7 @@ export function PortfolioAnalysisResultView({
     result.counselor?.overview ??
     `${result.life_stage} 기준으로 보험 ${result.policy_count}건에서 확인 가능한 보장을 정리했어요.`;
   const priorityChecks = result.priority_checks ?? [];
+  const ageCoverageRecommendation = result.age_coverage_recommendation;
   const claimConditionChecks = result.claim_condition_checks ?? [];
   const policyChangeChecks = result.policy_change_checks ?? [];
 
@@ -82,6 +83,13 @@ export function PortfolioAnalysisResultView({
 
       {priorityChecks.length ? (
         <PriorityChecks items={priorityChecks} evidenceById={evidenceById} />
+      ) : null}
+
+      {ageCoverageRecommendation ? (
+        <AgeCoverageRecommendationSection
+          recommendation={ageCoverageRecommendation}
+          evidenceById={evidenceById}
+        />
       ) : null}
 
       {result.coverage_amount_status ? (
@@ -201,22 +209,24 @@ function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
   }
 
   const maxAmount =
-    Math.max(monthlyPremium, benchmark.average_monthly_premium) * 1.35;
-  const userPosition = progressPosition(monthlyPremium, maxAmount);
-  const benchmarkPosition = progressPosition(
-    benchmark.average_monthly_premium,
+    Math.max(monthlyPremium, benchmark.suggested_max_premium) * 1.2;
+  const minPosition = progressPosition(
+    benchmark.suggested_min_premium,
     maxAmount,
   );
-  const difference = monthlyPremium - benchmark.average_monthly_premium;
-  const comparison =
-    Math.abs(difference) < 10_000
-      ? "평균과 거의 비슷해요"
-      : difference > 0
-        ? "평균보다 높게 내고 있어요"
-        : "평균보다 낮게 내고 있어요";
+  const maxPosition = progressPosition(
+    benchmark.suggested_max_premium,
+    maxAmount,
+  );
+  const userPosition = progressPosition(monthlyPremium, maxAmount);
+  const comparison = premiumRangeComparison(monthlyPremium, benchmark);
   const style = {
     "--premium-position": `${userPosition}%`,
   } as CSSProperties;
+  const rangeStyle = {
+    left: `${minPosition}%`,
+    width: `${Math.max(maxPosition - minPosition, 4)}%`,
+  };
 
   return (
     <section className="rounded-2xl border border-zinc-200 p-6">
@@ -224,7 +234,7 @@ function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
         <div>
           <p className="text-xs font-semibold text-blue-700">내 보험료 위치</p>
           <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
-            {benchmark.age_band_label} 평균과 비교하면
+            {benchmark.age_band_label} 소득 기준으로 보면
           </h2>
         </div>
         <p className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600">
@@ -232,23 +242,38 @@ function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
         </p>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <Metric label="내 월 보험료" value={formatWon(monthlyPremium)} />
         <Metric
-          label={`${benchmark.age_band_label} 평균`}
-          value={formatWon(benchmark.average_monthly_premium)}
+          label={`${benchmark.age_band_label} 평균 소득`}
+          value={formatWon(benchmark.average_monthly_income)}
+        />
+        <Metric
+          label="참고 범위"
+          value={`${formatWon(benchmark.suggested_min_premium)} ~ ${formatWon(benchmark.suggested_max_premium)}`}
         />
       </div>
 
       <div className="mt-7">
         <div className="relative h-12" style={style}>
           <div className="absolute inset-x-0 top-5 h-2 rounded-full bg-zinc-100" />
+          <div
+            className="absolute top-5 h-2 rounded-full bg-emerald-200"
+            style={rangeStyle}
+          />
           <div className="premium-position-fill absolute top-5 left-0 h-2 rounded-full bg-blue-600" />
           <div
             className="absolute top-1 flex -translate-x-1/2 flex-col items-center gap-1"
-            style={{ left: `${benchmarkPosition}%` }}
+            style={{ left: `${minPosition}%` }}
           >
-            <span className="text-xs font-medium text-zinc-500">평균</span>
+            <span className="text-xs font-medium text-zinc-500">5%</span>
+            <span className="h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-zinc-500" />
+          </div>
+          <div
+            className="absolute top-1 flex -translate-x-1/2 flex-col items-center gap-1"
+            style={{ left: `${maxPosition}%` }}
+          >
+            <span className="text-xs font-medium text-zinc-500">10%</span>
             <span className="h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-zinc-500" />
           </div>
           <div className="premium-position-user absolute top-3 flex -translate-x-1/2 flex-col items-center gap-1">
@@ -262,11 +287,31 @@ function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
         </div>
       </div>
 
-      <p className="mt-4 text-xs leading-5 text-zinc-500">
-        {benchmark.source.label} 기준이에요. {benchmark.source.caveat}
-      </p>
+      <div className="mt-4 space-y-1 text-xs leading-5 text-zinc-500">
+        <p>
+          {benchmark.income_source.label} 기준 평균 소득에{" "}
+          {Math.round(benchmark.suggested_min_ratio * 100)}%~
+          {Math.round(benchmark.suggested_max_ratio * 100)}%를 적용해
+          계산했어요.
+        </p>
+        <p>{benchmark.income_source.caveat}</p>
+        <p>{benchmark.guide_source.caveat}</p>
+      </div>
     </section>
   );
+}
+
+function premiumRangeComparison(
+  monthlyPremium: number,
+  benchmark: NonNullable<PortfolioAnalysisResult["premium_benchmark"]>,
+) {
+  if (monthlyPremium < benchmark.suggested_min_premium) {
+    return "참고 범위보다 낮아요";
+  }
+  if (monthlyPremium > benchmark.suggested_max_premium) {
+    return "참고 범위보다 높아요";
+  }
+  return "참고 범위 안에 있어요";
 }
 
 function PriorityChecks({
@@ -304,6 +349,76 @@ function PriorityChecks({
           </li>
         ))}
       </ol>
+    </section>
+  );
+}
+
+function AgeCoverageRecommendationSection({
+  recommendation,
+  evidenceById,
+}: {
+  recommendation: NonNullable<
+    PortfolioAnalysisResult["age_coverage_recommendation"]
+  >;
+  evidenceById: Map<string, AnalysisEvidence>;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-blue-700">
+            연령대 기준 준비 상태
+          </p>
+          <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+            {recommendation.title}
+          </h2>
+        </div>
+        <p className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600">
+          기본 {recommendation.recommended_count}개 중{" "}
+          {recommendation.confirmed_count}개 확인
+        </p>
+      </div>
+
+      <p className="mt-3 text-sm leading-6 text-zinc-500">
+        {recommendation.detail}
+      </p>
+
+      <ul className="mt-4 space-y-3">
+        {recommendation.items.map((item) => (
+          <li
+            key={`${item.category}-${item.status}`}
+            className="rounded-xl bg-zinc-50 px-4 py-3 text-sm"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-medium text-zinc-800">{item.title}</p>
+              <span
+                className={`text-xs font-medium ${
+                  item.status === "confirmed"
+                    ? "text-emerald-700"
+                    : item.status === "optional_missing"
+                      ? "text-zinc-500"
+                      : "text-amber-700"
+                }`}
+              >
+                {item.status === "confirmed"
+                  ? "확인됨"
+                  : item.status === "optional_missing"
+                    ? "선택 항목"
+                    : "아직 안 보임"}
+              </span>
+            </div>
+            <p className="mt-2 leading-6 text-zinc-500">{item.detail}</p>
+            <EvidenceDetails
+              evidenceIds={item.evidence_ids}
+              evidenceById={evidenceById}
+            />
+          </li>
+        ))}
+      </ul>
+
+      <p className="mt-4 text-xs leading-5 text-zinc-500">
+        {recommendation.source.label} 기준이에요. {recommendation.source.caveat}
+      </p>
     </section>
   );
 }

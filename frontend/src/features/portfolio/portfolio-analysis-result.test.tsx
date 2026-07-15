@@ -25,17 +25,76 @@ const base: PortfolioAnalysisResult = {
     items: [],
   },
   premium_benchmark: {
-    age_band_label: "30대",
+    age_band_label: "30~39세",
     min_age: 30,
     max_age: 39,
-    average_monthly_premium: 278_395,
-    source: {
-      label: "KB의 생각 · 시그널플래너 40만명 분석",
-      url: "https://kbthink.com/main/asset-management/insurance/insurance-2-240828.html",
-      published_at: "2025-06-16",
-      reliability: "large_private_analysis",
+    average_monthly_income: 3_860_000,
+    suggested_min_ratio: 0.05,
+    suggested_max_ratio: 0.1,
+    suggested_min_premium: 193_000,
+    suggested_max_premium: 386_000,
+    income_source: {
+      label: "KOSIS 국가통계포털 · 성별 연령대별 소득",
+      url: "https://kosis.kr/statHtml/statHtml.do?sso=ok&returnurl=https%3A%2F%2Fkosis.kr%3A443%2FstatHtml%2FstatHtml.do%3Fconn_path%3DI2%26tblId%3DDT_1EP_2010%26orgId%3D101%26",
+      published_at: "2025-01-01",
+      reliability: "official",
+      caveat: "연령대 평균 소득은 개인 소득과 다를 수 있어요.",
+    },
+    guide_source: {
+      label: "뱅크샐러드 · 나에게 맞는 보험료 계산법",
+      url: "https://www.banksalad.com/articles/%EB%B3%B4%ED%97%98-%EB%B3%B4%ED%97%98%EB%A6%AC%EB%AA%A8%EB%8D%B8%EB%A7%81-%EB%B3%B4%ED%97%98%EB%A3%8C",
+      published_at: "2025-01-01",
+      reliability: "private_guidance",
       caveat:
-        "저축성보험을 제외한 2006년 이후 가입자의 월 평균 보험료로, 적정 보험료 기준은 아니에요.",
+        "월 소득의 5%~10% 범위는 민간 가이드예요. 적정 보험료의 공식 기준은 아니에요.",
+    },
+  },
+  age_coverage_recommendation: {
+    age_band_label: "30~39세",
+    title: "실손 + 3대 진단비를 먼저 보는 구간이에요",
+    detail:
+      "30~39세 기준 기본 항목 4개 중 3개가 확인돼요. 나머지는 다른 증권에 있는지 한 번 더 보면 좋아요.",
+    confirmed_count: 3,
+    recommended_count: 4,
+    optional_count: 0,
+    items: [
+      {
+        category: "실손의료",
+        status: "confirmed",
+        title: "실손의료 성격 보장이 확인돼요",
+        detail: "현재 올린 증권에서 이 항목이 보여요.",
+        evidence_ids: [],
+      },
+      {
+        category: "암 진단",
+        status: "confirmed",
+        title: "암 진단 성격 보장이 확인돼요",
+        detail: "현재 올린 증권에서 이 항목이 보여요.",
+        evidence_ids: [],
+      },
+      {
+        category: "뇌혈관 진단",
+        status: "confirmed",
+        title: "뇌혈관 진단 성격 보장이 확인돼요",
+        detail: "현재 올린 증권에서 이 항목이 보여요.",
+        evidence_ids: [],
+      },
+      {
+        category: "심장질환 진단",
+        status: "missing",
+        title: "심장질환 진단 성격 보장은 아직 확인되지 않았어요",
+        detail:
+          "이 연령대에서 함께 보는 기본 준비 묶음에는 들어가지만, 현재 올린 증권에서는 찾지 못했어요.",
+        evidence_ids: [],
+      },
+    ],
+    source: {
+      label: "뱅크샐러드 · 연령별 필수 보험 가이드",
+      url: "https://www.banksalad.com/articles/%EB%B3%B4%ED%97%98-%EB%B3%B4%ED%97%98%EB%A6%AC%EB%AA%A8%EB%8D%B8%EB%A7%81-%EB%B3%B4%ED%97%98%EB%A3%8C",
+      published_at: "2025-01-01",
+      reliability: "private_guidance",
+      caveat:
+        "민간 가이드예요. 가입 권유나 개인별 충분·부족 판정 기준은 아니에요.",
     },
   },
   baseline_notice: "일반 참고 기준이에요.",
@@ -54,16 +113,17 @@ describe("PortfolioAnalysisResultView", () => {
     expect(screen.getAllByText("90,000원").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("shows the monthly premium position against the age-band average", () => {
+  it("shows the monthly premium position against the age-band income guide", () => {
     render(<PortfolioAnalysisResultView result={base} />);
 
     expect(screen.getByText("내 보험료 위치")).toBeInTheDocument();
-    expect(screen.getByText("30대 평균과 비교하면")).toBeInTheDocument();
-    expect(screen.getByText("30대 평균")).toBeInTheDocument();
-    expect(screen.getByText("278,395원")).toBeInTheDocument();
-    expect(screen.getByText("평균보다 낮게 내고 있어요")).toBeInTheDocument();
+    expect(screen.getByText("30~39세 소득 기준으로 보면")).toBeInTheDocument();
+    expect(screen.getByText("30~39세 평균 소득")).toBeInTheDocument();
+    expect(screen.getByText("3,860,000원")).toBeInTheDocument();
+    expect(screen.getByText("193,000원 ~ 386,000원")).toBeInTheDocument();
+    expect(screen.getByText("참고 범위보다 낮아요")).toBeInTheDocument();
     expect(
-      screen.getByText(/KB의 생각 · 시그널플래너 40만명 분석/),
+      screen.getByText(/KOSIS 국가통계포털 · 성별 연령대별 소득/),
     ).toBeInTheDocument();
   });
 
@@ -75,7 +135,7 @@ describe("PortfolioAnalysisResultView", () => {
           priority_checks: [
             {
               kind: "premium",
-              title: "월 보험료가 같은 나이대 평균보다 낮아요",
+              title: "월 보험료가 소득 기준 참고 범위보다 낮아요",
               detail:
                 "낮다고 부족하다는 뜻은 아니지만 큰 보장은 함께 확인해야 해요.",
               evidence_ids: [],
@@ -101,7 +161,7 @@ describe("PortfolioAnalysisResultView", () => {
     expect(screen.getByText("우선 확인 3가지")).toBeInTheDocument();
     expect(screen.getByText("지금 화면에서 먼저 볼 부분")).toBeInTheDocument();
     expect(
-      screen.getByText("월 보험료가 같은 나이대 평균보다 낮아요"),
+      screen.getByText("월 보험료가 소득 기준 참고 범위보다 낮아요"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("간병 보장이 다른 증권에 있는지 확인하세요"),
@@ -182,27 +242,45 @@ describe("PortfolioAnalysisResultView", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses the full KB benchmark bands through age 70+", () => {
+  it("shows the age-band coverage recommendation status", () => {
+    render(<PortfolioAnalysisResultView result={base} />);
+
+    expect(screen.getByText("연령대 기준 준비 상태")).toBeInTheDocument();
+    expect(
+      screen.getByText("실손 + 3대 진단비를 먼저 보는 구간이에요"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("기본 4개 중 3개 확인")).toBeInTheDocument();
+    expect(
+      screen.getByText("심장질환 진단 성격 보장은 아직 확인되지 않았어요"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("아직 안 보임")).toBeInTheDocument();
+  });
+
+  it("uses the income guide bands through age 60+", () => {
     render(
       <PortfolioAnalysisResultView
         result={{
           ...base,
-          age: 72,
+          age: 68,
           premium: { ...base.premium, monthly_total: 210_000 },
           premium_benchmark: {
             ...base.premium_benchmark!,
-            age_band_label: "70대 이상",
-            min_age: 70,
+            age_band_label: "60세 이상",
+            min_age: 60,
             max_age: 120,
-            average_monthly_premium: 193_168,
+            average_monthly_income: 2_500_000,
+            suggested_min_premium: 125_000,
+            suggested_max_premium: 250_000,
           },
         }}
       />,
     );
 
-    expect(screen.getByText("70대 이상 평균과 비교하면")).toBeInTheDocument();
-    expect(screen.getByText("70대 이상 평균")).toBeInTheDocument();
-    expect(screen.getByText("193,168원")).toBeInTheDocument();
+    expect(
+      screen.getByText("60세 이상 소득 기준으로 보면"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("60세 이상 평균 소득")).toBeInTheDocument();
+    expect(screen.getByText("2,500,000원")).toBeInTheDocument();
   });
 
   it("renders an unknown monthly premium without crashing", () => {
@@ -236,9 +314,7 @@ describe("PortfolioAnalysisResultView", () => {
     );
 
     expect(screen.queryByText("내 보험료 위치")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("평균보다 낮게 내고 있어요"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("참고 범위보다 낮아요")).not.toBeInTheDocument();
   });
 
   it("falls back to prepared_coverages / coverage_gaps without a counselor", () => {
