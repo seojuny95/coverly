@@ -28,7 +28,7 @@ const summary: PortfolioSummary = {
       normalized_name: "실손입원",
       original_amount: "5,000만원",
       insurer: "현대해상",
-      product_name: "실손보험",
+      product_name: "실손의료보험",
       major_category: "치료",
       coverage_domain: "medical_expense",
       is_medical_indemnity: true,

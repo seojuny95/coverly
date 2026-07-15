@@ -1,3 +1,4 @@
+-- Keep the database guide key aligned with the public API terminology.
 do $$
 declare
   legacy_item_count integer;

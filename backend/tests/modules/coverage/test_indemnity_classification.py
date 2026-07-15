@@ -81,6 +81,19 @@ def test_domestic_medical_expense_in_travel_policy_is_not_personal_medical_indem
     assert result.medical_indemnity_status == "excluded"
 
 
+def test_medical_product_tag_does_not_override_travel_coverage_domain() -> None:
+    result = classify_indemnity(
+        _coverage(담보명="휴대품손해(실손)", 지급유형="실손"),
+        policy=_policy(
+            category="손해보험",
+            tags=["여행자보험", "실손의료보험"],
+        ),
+    )
+
+    assert result.coverage_domain == "property_damage"
+    assert result.medical_indemnity_status == "excluded"
+
+
 def test_auto_medical_expense_stays_outside_medical_indemnity() -> None:
     result = classify_indemnity(
         _coverage(담보명="자동차상해 의료비", 지급유형="실손"),

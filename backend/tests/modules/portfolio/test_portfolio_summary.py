@@ -309,7 +309,7 @@ def test_explicit_fixed_treatment_benefit_is_summed() -> None:
 def test_explicit_indemnity_treatment_benefit_is_never_summed() -> None:
     policy = _policy(
         "p1",
-        "실손보험",
+        "실손의료보험",
         "보험사A",
         [
             {
@@ -331,7 +331,7 @@ def test_explicit_indemnity_treatment_benefit_is_never_summed() -> None:
 def test_medical_expense_without_payment_type_is_kept_for_display() -> None:
     policy = _policy(
         "p1",
-        "실손보험",
+        "실손의료보험",
         "보험사A",
         [{"담보명": "상해입원의료비", "가입금액": "5천만원"}],
     )
@@ -347,7 +347,7 @@ def test_medical_expense_without_payment_type_is_kept_for_display() -> None:
 def test_explicit_indemnity_category_classifies_medical_expense() -> None:
     policy = _policy(
         "p1",
-        "실손보험",
+        "실손의료보험",
         "보험사A",
         [
             {
@@ -655,7 +655,7 @@ def test_essential_check_flags_narrow_diagnoses_and_multiple_medical_contracts()
         ),
         _policy(
             "p2",
-            "실손보험",
+            "실손의료보험",
             "보험사B",
             [{"담보명": "상해실비", "가입금액": "", "지급유형": "실손"}],
         ),
@@ -1196,7 +1196,7 @@ def test_summary_includes_claim_channels_for_known_insurers_and_indemnity() -> N
         ),
         _policy(
             "p2",
-            "실손보험",
+            "실손의료보험",
             "메리츠화재",
             [{"담보명": "질병실손의료비", "가입금액": "5천만원", "지급유형": "실손"}],
         ),

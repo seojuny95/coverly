@@ -31,7 +31,6 @@ _STATUS_TERMS = ("추출 상태", "분석 상태", "제외된", "확인 못한")
 _HOLDING_TERMS = ("몇 개", "몇개", "몇 건", "몇건", "보유 중", "목록", "가입한 보험")
 _MEDICAL_INDEMNITY_LOOKUP_TERMS = (
     "실비",
-    "실손보험",
     "실손의료",
     "실손의료보험",
     "실손의료비",
@@ -760,10 +759,10 @@ def _claim_question_targets_medical_indemnity(
         if query_contains_canonical_name(question, _base_coverage_name(item.coverage_name))
     ]
     if named_coverages:
-        return any(item.is_medical_indemnity for item in named_coverages)
+        return all(item.is_medical_indemnity for item in named_coverages)
     if any(term in question for term in _EXPLICIT_ACTUAL_LOSS_LOOKUP_TERMS):
         return False
-    return any(term in question for term in _MEDICAL_INDEMNITY_LOOKUP_TERMS) or "실손" in question
+    return any(term in question for term in _MEDICAL_INDEMNITY_LOOKUP_TERMS)
 
 
 def _fact_suggestions(facts: PortfolioFacts) -> list[str]:

@@ -246,7 +246,7 @@
   },
   {
     "id": "negative_personal_coverage_amount",
-    "questions": ["내가 가입한 암 진단비 보장금액이 얼마인지 알려줘", "내 실손보험의 자기부담금이 정확히 얼마인지 확인해줘"],
+    "questions": ["내가 가입한 암 진단비 보장금액이 얼마인지 알려줘", "내 실손의료보험의 자기부담금이 정확히 얼마인지 확인해줘"],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],

@@ -228,7 +228,9 @@ def test_qa_answers_how_to_claim_with_insurer_channels() -> None:
         raise AssertionError("LLM should not be called for claim-channel questions")
 
     result = answer_portfolio_question(
-        "실손 어떻게 청구해?", _named_insurer_policies("삼성화재"), complete=forbidden
+        "실손의료보험 어떻게 청구해?",
+        _named_insurer_policies("삼성화재"),
+        complete=forbidden,
     )
 
     assert result.status == "answered"
@@ -240,7 +242,9 @@ def test_qa_answers_how_to_claim_with_insurer_channels() -> None:
 
 
 def test_qa_claim_channels_include_clickable_links() -> None:
-    result = answer_portfolio_question("실손 어떻게 청구해?", _named_insurer_policies("삼성화재"))
+    result = answer_portfolio_question(
+        "실손의료보험 어떻게 청구해?", _named_insurer_policies("삼성화재")
+    )
 
     assert result.claim_channels is not None
     insurer = result.claim_channels.insurers[0]
@@ -250,6 +254,13 @@ def test_qa_claim_channels_include_clickable_links() -> None:
     assert any(
         link.url.startswith("http") for link in result.claim_channels.medical_indemnity.links
     )
+
+
+def test_qa_does_not_assume_bare_actual_loss_claim_is_medical() -> None:
+    result = answer_portfolio_question("실손 청구 어떻게 해?", _named_insurer_policies("삼성화재"))
+
+    assert result.claim_channels is not None
+    assert result.claim_channels.medical_indemnity is None
 
 
 def test_qa_answers_coverage_question_with_hedge_instead_of_refusing() -> None:
@@ -302,7 +313,7 @@ def _health_plus_auto() -> list[PolicyInput]:
 
 
 def test_qa_claim_howto_excludes_auto_insurer_for_non_auto_question() -> None:
-    result = answer_portfolio_question("실손 청구 어떻게 해?", _health_plus_auto())
+    result = answer_portfolio_question("실손의료보험 청구 어떻게 해?", _health_plus_auto())
 
     assert result.claim_channels is not None
     names = [insurer.name for insurer in result.claim_channels.insurers]
@@ -337,7 +348,7 @@ def test_qa_claim_howto_detects_medical_indemnity_payment_type_variant() -> None
         )
     ]
 
-    result = answer_portfolio_question("실손 청구 어떻게 해?", policies)
+    result = answer_portfolio_question("실손의료보험 청구 어떻게 해?", policies)
 
     assert result.claim_channels is not None
     assert result.claim_channels.medical_indemnity is not None

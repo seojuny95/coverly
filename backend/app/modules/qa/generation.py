@@ -91,10 +91,10 @@ def _claim_channels_for_answer(
         matched_targets = context_matched_targets
 
     insurers: list[str] = []
-    has_medical_indemnity = False
+    has_medical_indemnity = bool(matched_targets)
     for target in matched_targets:
         insurers.append(target.insurer)
-        has_medical_indemnity = has_medical_indemnity or target.is_medical_indemnity
+        has_medical_indemnity = has_medical_indemnity and target.is_medical_indemnity
     insurers = list(dict.fromkeys(insurers))
     if not insurers:
         return None

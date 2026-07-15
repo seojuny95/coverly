@@ -1,3 +1,4 @@
+-- Keep the claim service key aligned with the medical indemnity domain.
 do $$
 declare
   claim_channels jsonb;

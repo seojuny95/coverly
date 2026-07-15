@@ -73,7 +73,6 @@ _NEGATED_INDEMNITY_PATTERNS = (
 _MEDICAL_TERMS = (
     "실손의료",
     "실손의료비",
-    "실손보험",
     "실비보험",
     "의료비",
     "입원의료비",
@@ -143,7 +142,7 @@ def classify_indemnity(
 ) -> IndemnityClassification:
     """Classify actual-loss reimbursement separately from medical indemnity."""
 
-    text = _coverage_text(coverage, policy)
+    text = _coverage_text(coverage)
     payment_basis = _payment_basis(coverage)
     domain = _coverage_domain(text, policy)
     medical_status: MedicalIndemnityStatus
@@ -211,10 +210,12 @@ def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
 def _coverage_domain(text: str, policy: PolicyInput | None) -> CoverageDomain:
     if _is_travel_policy_context(policy) and _contains_any(text, _MEDICAL_TERMS):
         return "travel_medical_expense"
+    if _is_auto_policy_context(policy):
+        return "auto"
     for domain, terms in _domain_priorities(policy):
         if _contains_any(text, terms):
             return domain
-    return "other"
+    return _policy_default_domain(policy)
 
 
 def _domain_priorities(
@@ -239,23 +240,29 @@ def _domain_priorities(
     )
 
 
-def _coverage_text(coverage: CoverageInput, policy: PolicyInput | None) -> str:
-    parts = [
-        coverage.담보명,
-        coverage.보장분류 or "",
-        coverage.지급유형 or "",
-        coverage.보장내용 or "",
-        coverage.해설 or "",
-    ]
-    if policy is not None:
-        parts.extend(
+def _coverage_text(coverage: CoverageInput) -> str:
+    return _normalize(
+        " ".join(
             [
-                policy.기본정보.보험분류 or "",
-                policy.기본정보.상품명 or "",
-                *policy.기본정보.상품태그,
+                coverage.담보명,
+                coverage.보장분류 or "",
+                coverage.지급유형 or "",
+                coverage.보장내용 or "",
+                coverage.해설 or "",
             ]
         )
-    return _normalize(" ".join(parts))
+    )
+
+
+def _policy_default_domain(policy: PolicyInput | None) -> CoverageDomain:
+    if policy is None or _is_travel_policy_context(policy):
+        return "other"
+
+    identity = _policy_identity(policy)
+    for domain, terms in _domain_priorities(policy):
+        if domain != "travel_medical_expense" and _contains_any(identity, terms):
+            return domain
+    return "other"
 
 
 def is_damage_policy_context(policy: PolicyInput | None) -> bool:
@@ -271,7 +278,17 @@ def is_damage_policy_context(policy: PolicyInput | None) -> bool:
 def _is_travel_policy_context(policy: PolicyInput | None) -> bool:
     if policy is None:
         return False
-    identity = _normalize(
+    return _contains_any(_policy_identity(policy), _TRAVEL_POLICY_TERMS)
+
+
+def _is_auto_policy_context(policy: PolicyInput | None) -> bool:
+    if policy is None:
+        return False
+    return _contains_any(_policy_identity(policy), _AUTO_TERMS)
+
+
+def _policy_identity(policy: PolicyInput) -> str:
+    return _normalize(
         " ".join(
             [
                 policy.기본정보.보험분류 or "",
@@ -280,7 +297,6 @@ def _is_travel_policy_context(policy: PolicyInput | None) -> bool:
             ]
         )
     )
-    return _contains_any(identity, _TRAVEL_POLICY_TERMS)
 
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
