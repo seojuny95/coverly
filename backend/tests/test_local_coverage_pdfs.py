@@ -2,9 +2,9 @@
 
 Costs LLM calls, so it runs only when an OpenAI key is configured (same policy
 as the other test_local_ files). This is the quality gate: every personal-
-insurance sample policy must yield a non-empty coverage list where each
-coverage has a name, an amount, and either policy wording or a generated
-explanation.
+insurance sample policy must yield a non-empty coverage list. Core rows must
+carry an amount and either policy wording or a generated explanation; name-only
+rider/rate rows are tagged 부가 and intentionally keep amount/detail empty.
 
 The auto-policy skip has been removed: every classified policy, including
 자동차, now runs through the same coverage-extraction path. Auto policies
@@ -43,10 +43,15 @@ def test_local_samples_extract_nonempty_coverages(filename: str) -> None:
     assert coverages, f"no coverages extracted from {filename}"
     for coverage in coverages:
         assert coverage["담보명"]
-        assert coverage["가입금액"]
-        assert coverage["보장내용"] or coverage["해설"], (
-            f"{filename}::{coverage['담보명']} has neither policy wording nor explanation"
-        )
+        if coverage.get("유형") == "부가":
+            assert coverage["가입금액"] == ""
+            assert coverage["보장내용"] is None
+            assert coverage["해설"] is None
+        else:
+            assert coverage["가입금액"]
+            assert coverage["보장내용"] or coverage["해설"], (
+                f"{filename}::{coverage['담보명']} has neither policy wording nor explanation"
+            )
 
 
 def test_local_auto_sample_extracts_detailed_coverages() -> None:
