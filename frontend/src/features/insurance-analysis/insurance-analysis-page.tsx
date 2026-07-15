@@ -375,9 +375,8 @@ export function InsuranceAnalysisPage({
               ref={classificationHelpRef}
               className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
             >
-              {CLASSIFICATION_ORDER.map((classification, index) => {
+              {CLASSIFICATION_ORDER.map((classification) => {
                 const isHelpOpen = openClassificationHelp === classification;
-                const opensLeft = index === CLASSIFICATION_ORDER.length - 1;
 
                 return (
                   <div
@@ -409,9 +408,7 @@ export function InsuranceAnalysisPage({
                             id={`classification-help-${classification}`}
                             role="dialog"
                             aria-label={`${classification} 설명`}
-                            className={`absolute top-0 z-10 w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg ${
-                              opensLeft ? "right-7" : "left-7"
-                            }`}
+                            className="absolute right-0 bottom-7 z-10 w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg"
                           >
                             {CLASSIFICATION_HELP[classification]}
                           </span>
