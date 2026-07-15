@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,8 +9,18 @@ from app.routes.analysis import router as analysis_router
 from app.routes.policies import router as policies_router
 from app.routes.portfolio import router as portfolio_router
 from app.routes.qa import router as qa_router
+from app.services.reference.policy_change import warm_policy_change_cache
+from app.services.reference.premium_benchmark import warm_premium_benchmark_cache
 
-app = FastAPI(title="Coverly API")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    warm_premium_benchmark_cache()
+    warm_policy_change_cache()
+    yield
+
+
+app = FastAPI(title="Coverly API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

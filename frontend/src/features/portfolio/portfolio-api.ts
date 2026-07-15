@@ -87,6 +87,93 @@ export type PortfolioAnalysisResult = {
       cycle: string | null;
     }>;
   };
+  premium_benchmark?: {
+    age_band_label: string;
+    min_age: number;
+    max_age: number;
+    average_monthly_income: number;
+    suggested_min_ratio: number;
+    suggested_max_ratio: number;
+    suggested_min_premium: number;
+    suggested_max_premium: number;
+    income_source: {
+      label: string;
+      url: string;
+      published_at: string;
+      reliability: string;
+      caveat: string;
+    };
+    guide_source: {
+      label: string;
+      url: string;
+      published_at: string;
+      reliability: string;
+      caveat: string;
+    };
+  } | null;
+  priority_checks?: Array<{
+    kind: "premium" | "duplicate" | "coverage_gap" | "contract";
+    title: string;
+    detail: string;
+    evidence_ids: string[];
+  }>;
+  age_coverage_recommendation?: {
+    age_band_label: string;
+    title: string;
+    detail: string;
+    confirmed_count: number;
+    recommended_count: number;
+    optional_count: number;
+    items: Array<{
+      category: string;
+      status: "confirmed" | "missing" | "optional_missing";
+      title: string;
+      detail: string;
+      evidence_ids: string[];
+    }>;
+    source: {
+      label: string;
+      url: string;
+      published_at: string;
+      reliability: string;
+      caveat: string;
+    };
+  } | null;
+  coverage_amount_status?: {
+    title: string;
+    detail: string;
+    confirmed_total_amount: number;
+    confirmed_category_count: number;
+    unconfirmed_coverage_count: number;
+    items: Array<{
+      category: string;
+      amount: number;
+      coverage_count: number;
+      title: string;
+      detail: string;
+      evidence_ids: string[];
+    }>;
+  };
+  claim_condition_checks?: Array<{
+    kind: "fixed" | "indemnity" | "contract";
+    title: string;
+    detail: string;
+    evidence_ids: string[];
+  }>;
+  policy_change_checks?: Array<{
+    title: string;
+    summary: string;
+    user_impact: string;
+    effective_from: string | null;
+    applies_to: string;
+    source: {
+      label: string;
+      url: string;
+      published_at: string;
+      reliability: string;
+      caveat: string;
+    };
+  }>;
   baseline_notice: string;
   classifications: ClassificationAnalysis[];
   sources: Array<{

@@ -5,19 +5,39 @@ from functools import lru_cache
 from typing import Literal
 
 from app.schemas.analysis import (
+    AgeCoverageRecommendationCheck,
+    AgeCoverageRecommendationItem,
+    AgeCoverageRecommendationSource,
     AnalysisContextAnswer,
     AnalysisSource,
+    ClaimConditionCheck,
     ClassificationAnalysis,
     CounselorAnalysis,
     CounselorInsight,
+    CoverageAmountStatus,
+    CoverageAmountStatusItem,
     CoverageGap,
+    PolicyChangeCheck,
     PortfolioAnalysisResponse,
+    PremiumBenchmark,
+    PremiumOverview,
+    PriorityCheck,
 )
 from app.schemas.consultation import Gender, GenerationMode, InsuredDemographics
-from app.schemas.portfolio import PolicyInput
+from app.schemas.portfolio import CoverageTotalItem, PolicyInput, PortfolioCoverageSummary
 from app.services.analysis.generation import generate_counselor
 from app.services.coverage_knowledge.purpose import coverage_purpose
-from app.services.coverage_knowledge.taxonomy import LifeStageCheck, check_life_stage
+from app.services.coverage_knowledge.recommendations import (
+    recommendation_for_age,
+    recommendation_reason,
+    recommendation_source,
+)
+from app.services.coverage_knowledge.taxonomy import (
+    INDEMNITY,
+    LifeStageCheck,
+    check_life_stage,
+    classify_coverage,
+)
 from app.services.evidence.catalog import (
     EvidenceCatalog,
     build_evidence_catalog,
@@ -33,6 +53,8 @@ from app.services.portfolio.summary import (
 )
 from app.services.rag.official.models import RetrievalHit
 from app.services.rag.official.retrieval import retrieve
+from app.services.reference.policy_change import policy_changes_for_tags
+from app.services.reference.premium_benchmark import premium_benchmark_for_age
 
 _UNCLASSIFIED = "미분류"
 
@@ -76,6 +98,8 @@ def analyze_portfolio(
     excluded_count = len(summary.excluded_coverages)
     notices = _analysis_notices(facts, insured)
     limitations = _analysis_limitations(generation)
+    premium = summarize_premiums(list(facts.policies))
+    premium_benchmark = premium_benchmark_for_age(insured.age)
 
     return PortfolioAnalysisResponse(
         status=_analysis_status(facts),
@@ -109,7 +133,23 @@ def analyze_portfolio(
         evidence=list(catalog.items),
         notices=notices,
         limitations=limitations,
-        premium=summarize_premiums(list(facts.policies)),
+        premium=premium,
+        premium_benchmark=premium_benchmark,
+        priority_checks=_priority_checks(
+            facts,
+            life_stage_check,
+            catalog,
+            premium,
+            premium_benchmark,
+        ),
+        age_coverage_recommendation=_age_coverage_recommendation(
+            facts,
+            insured,
+            catalog,
+        ),
+        coverage_amount_status=_coverage_amount_status(summary, catalog),
+        claim_condition_checks=_claim_condition_checks(summary, catalog),
+        policy_change_checks=_policy_change_checks(facts, life_stage_check),
         generation=generation,
     )
 
@@ -214,6 +254,325 @@ def _life_stage_check(demographics: InsuredDemographics, facts: PortfolioFacts) 
     if facts.coverage_summary.indemnity_coverages:
         coverage_names.append("실손의료")
     return check_life_stage(demographics.age, coverage_names)
+
+
+def _priority_checks(
+    facts: PortfolioFacts,
+    life_stage_check: LifeStageCheck,
+    catalog: EvidenceCatalog,
+    premium: PremiumOverview,
+    premium_benchmark: PremiumBenchmark | None,
+) -> list[PriorityCheck]:
+    checks: list[PriorityCheck] = []
+
+    duplicate_count = count_duplicate_indemnity_coverages(facts.coverage_summary)
+    if duplicate_count > 0:
+        evidence_ids = [item.id for item in catalog.items if item.id.startswith("indemnity:")][:3]
+        checks.append(
+            PriorityCheck(
+                kind="duplicate",
+                title="실손·비례보상 중복 가능성을 먼저 확인하세요",
+                detail=(
+                    f"중복 수령이 어려운 성격의 보장이 {duplicate_count}건 있어요. "
+                    "같은 병원비를 여러 보험에서 모두 받는 구조가 아닐 수 있어 "
+                    "약관 조건을 먼저 보는 게 좋아요."
+                ),
+                evidence_ids=evidence_ids,
+            )
+        )
+
+    premium_check = _premium_priority_check(premium, premium_benchmark)
+    if premium_check is not None:
+        checks.append(premium_check)
+
+    for category in life_stage_check.missing:
+        if len(checks) >= 3:
+            break
+        evidence_ids = [
+            item.id
+            for item in catalog.items
+            if item.id.startswith("gap:") and item.coverage_name == category
+        ][:1]
+        checks.append(
+            PriorityCheck(
+                kind="coverage_gap",
+                title=f"{category} 보장이 다른 증권에 있는지 확인하세요",
+                detail=(
+                    "현재 올린 비자동차 보험 전체에서는 이 성격의 담보를 찾지 못했어요. "
+                    "없다고 단정하기보다 아직 올리지 않은 증권에 있는지 먼저 확인해야 해요."
+                ),
+                evidence_ids=list(evidence_ids[:1]),
+            )
+        )
+
+    if facts.policies and len(checks) < 3:
+        checks.append(
+            PriorityCheck(
+                kind="contract",
+                title="원본 약관의 지급 조건을 함께 확인하세요",
+                detail=(
+                    "가입 사실이 보여도 실제 지급은 지급사유, 면책, 감액 조건에 따라 "
+                    "달라질 수 있어요. "
+                    "큰 진단비나 치료비 담보부터 약관 원문을 같이 보는 게 좋아요."
+                ),
+            )
+        )
+
+    return checks[:3]
+
+
+def _premium_priority_check(
+    premium: PremiumOverview,
+    benchmark: PremiumBenchmark | None,
+) -> PriorityCheck | None:
+    if premium.monthly_policy_count < 1 or benchmark is None:
+        return None
+
+    if premium.monthly_total < benchmark.suggested_min_premium:
+        difference = benchmark.suggested_min_premium - premium.monthly_total
+        title = "월 보험료가 소득 기준 참고 범위보다 낮아요"
+        detail = (
+            f"{benchmark.age_band_label} 평균 소득 기준 참고 범위의 하한보다 "
+            f"{difference:,}원 낮아요. "
+            "낮다고 부족하다는 뜻은 아니지만, 큰 진단비나 치료비 보장이 "
+            "실제로 들어 있는지는 함께 확인하는 게 좋아요."
+        )
+    elif premium.monthly_total > benchmark.suggested_max_premium:
+        difference = premium.monthly_total - benchmark.suggested_max_premium
+        title = "월 보험료가 소득 기준 참고 범위보다 높아요"
+        detail = (
+            f"{benchmark.age_band_label} 평균 소득 기준 참고 범위의 상한보다 "
+            f"{difference:,}원 높아요. "
+            "높다고 바로 과하다는 뜻은 아니지만, 중복 보장이나 지금은 "
+            "우선순위가 낮은 담보가 있는지 먼저 보는 게 좋아요."
+        )
+    else:
+        title = "월 보험료가 소득 기준 참고 범위 안에 있어요"
+        detail = (
+            f"{benchmark.age_band_label} 평균 소득 기준 참고 범위 안에 있어요. "
+            "이 범위는 가입 권유 기준이 아니라 참고값이므로, 보험료 자체보다 "
+            "보장 구성과 중복 여부를 같이 보는 게 중요해요."
+        )
+
+    return PriorityCheck(kind="premium", title=title, detail=detail)
+
+
+def _age_coverage_recommendation(
+    facts: PortfolioFacts,
+    insured: InsuredDemographics,
+    catalog: EvidenceCatalog,
+) -> AgeCoverageRecommendationCheck | None:
+    recommendation = recommendation_for_age(insured.age)
+    if recommendation is None:
+        return None
+
+    held_categories = {
+        category
+        for category in (
+            classify_coverage(coverage.담보명)
+            for policy in facts.policies
+            for coverage in policy.보장목록
+        )
+        if category is not None
+    }
+    if facts.coverage_summary.indemnity_coverages:
+        held_categories.add(INDEMNITY)
+
+    items: list[AgeCoverageRecommendationItem] = []
+    confirmed_count = 0
+
+    for category in recommendation.core_categories:
+        evidence_ids = list(catalog.coverage_ids_by_category.get(category, ())[:2])
+        if category in held_categories:
+            confirmed_count += 1
+            items.append(
+                AgeCoverageRecommendationItem(
+                    category=category,
+                    status="confirmed",
+                    title=f"{category} 성격 보장이 확인돼요",
+                    detail=(
+                        f"현재 올린 증권에서 이 항목이 보여요. {recommendation_reason(category)}"
+                    ),
+                    evidence_ids=evidence_ids,
+                )
+            )
+        else:
+            items.append(
+                AgeCoverageRecommendationItem(
+                    category=category,
+                    status="missing",
+                    title=f"{category} 성격 보장은 아직 확인되지 않았어요",
+                    detail=(
+                        "이 연령대에서 함께 보는 기본 준비 묶음에는 들어가지만, "
+                        "현재 올린 증권에서는 찾지 못했어요."
+                    ),
+                )
+            )
+
+    for category in recommendation.optional_categories:
+        evidence_ids = list(catalog.coverage_ids_by_category.get(category, ())[:2])
+        if category in held_categories:
+            items.append(
+                AgeCoverageRecommendationItem(
+                    category=category,
+                    status="confirmed",
+                    title=f"{category} 성격 보장이 확인돼요",
+                    detail=(
+                        f"현재 올린 증권에서 이 항목이 보여요. {recommendation_reason(category)}"
+                    ),
+                    evidence_ids=evidence_ids,
+                )
+            )
+        else:
+            items.append(
+                AgeCoverageRecommendationItem(
+                    category=category,
+                    status="optional_missing",
+                    title=f"{category} 성격 보장은 선택 항목으로 남아 있어요",
+                    detail=(
+                        "이 연령대 가이드에서는 여유가 될 때 같이 점검하는 항목으로 보지만, "
+                        "현재 올린 증권에서는 찾지 못했어요."
+                    ),
+                )
+            )
+
+    if confirmed_count == len(recommendation.core_categories):
+        detail = (
+            f"{recommendation.age_band_label} 기준으로 자주 같이 보는 기본 항목은 "
+            "현재 증권에서 모두 확인돼요."
+        )
+    else:
+        detail = (
+            f"{recommendation.age_band_label} 기준 기본 항목 "
+            f"{len(recommendation.core_categories)}개 중 {confirmed_count}개가 확인돼요. "
+            "나머지는 다른 증권에 있는지 한 번 더 보면 좋아요."
+        )
+
+    return AgeCoverageRecommendationCheck(
+        age_band_label=recommendation.age_band_label,
+        title=recommendation.title,
+        detail=f"{detail} {recommendation.summary}",
+        confirmed_count=confirmed_count,
+        recommended_count=len(recommendation.core_categories),
+        optional_count=len(recommendation.optional_categories),
+        items=items,
+        source=AgeCoverageRecommendationSource(**recommendation_source()),
+    )
+
+
+def _coverage_amount_status(
+    summary: PortfolioCoverageSummary,
+    catalog: EvidenceCatalog,
+) -> CoverageAmountStatus:
+    confirmed_total = sum(item.total_amount for item in summary.totals)
+    top_items = sorted(summary.totals, key=lambda item: item.total_amount, reverse=True)[:5]
+    evidence_ids_by_item = {
+        id(item): f"coverage:{index}" for index, item in enumerate(summary.totals, start=1)
+    }
+
+    return CoverageAmountStatus(
+        title="확인된 보장금액만 먼저 모았어요",
+        detail=(
+            "아래 금액은 증권에서 숫자로 확인된 정액형 담보만 합산한 값이에요. "
+            "충분하거나 부족하다는 뜻은 아니고, 큰 금액부터 약관 조건을 확인하기 위한 출발점이에요."
+        ),
+        confirmed_total_amount=confirmed_total,
+        confirmed_category_count=len(summary.totals),
+        unconfirmed_coverage_count=len(summary.excluded_coverages),
+        items=[
+            _coverage_amount_status_item(item, evidence_ids_by_item, catalog) for item in top_items
+        ],
+    )
+
+
+def _coverage_amount_status_item(
+    item: CoverageTotalItem,
+    evidence_ids_by_item: dict[int, str],
+    catalog: EvidenceCatalog,
+) -> CoverageAmountStatusItem:
+    evidence_id = evidence_ids_by_item[id(item)]
+    evidence_ids = [evidence_id] if evidence_id in catalog.by_id else []
+    composition_count = len(item.composition)
+    detail = (
+        f"{composition_count}개 담보에서 숫자로 확인된 금액을 합산했어요. "
+        "실제 지급은 진단명, 지급사유, 면책·감액 조건에 따라 달라질 수 있어요."
+    )
+    return CoverageAmountStatusItem(
+        category=item.display_name,
+        amount=item.total_amount,
+        coverage_count=item.coverage_count,
+        title=f"{item.display_name} {item.total_amount:,}원 확인",
+        detail=detail,
+        evidence_ids=evidence_ids,
+    )
+
+
+def _claim_condition_checks(
+    summary: PortfolioCoverageSummary,
+    catalog: EvidenceCatalog,
+) -> list[ClaimConditionCheck]:
+    checks: list[ClaimConditionCheck] = []
+
+    if summary.totals:
+        evidence_ids = [
+            f"coverage:{index}"
+            for index, _ in enumerate(summary.totals[:3], start=1)
+            if f"coverage:{index}" in catalog.by_id
+        ]
+        checks.append(
+            ClaimConditionCheck(
+                kind="fixed",
+                title="진단비·수술비를 받을 때는 지급사유를 먼저 확인하세요",
+                detail=(
+                    "정해진 금액을 받는 담보라도 암·뇌혈관·심장질환처럼 약관상 "
+                    "진단확정 요건을 충족해야 해요. 수술비는 수술분류표, 최초 1회·반복 지급, "
+                    "면책기간과 감액기간도 함께 봐야 해요."
+                ),
+                evidence_ids=evidence_ids,
+            )
+        )
+
+    if summary.indemnity_coverages:
+        evidence_ids = [item.id for item in catalog.items if item.id.startswith("indemnity:")][:3]
+        checks.append(
+            ClaimConditionCheck(
+                kind="indemnity",
+                title="실손보험금을 받을 때는 실제 병원비와 자기부담금을 봐야 해요",
+                detail=(
+                    "실손형 담보는 가입금액을 그대로 받는 구조가 아니에요. 실제 부담한 의료비, "
+                    "급여·비급여 구분, 자기부담금, 통원·입원 한도와 보장 제외 항목에 따라 "
+                    "받는 금액이 달라져요."
+                ),
+                evidence_ids=evidence_ids,
+            )
+        )
+
+    if summary.excluded_coverages or summary.totals:
+        checks.append(
+            ClaimConditionCheck(
+                kind="contract",
+                title="청구 전에는 보험기간과 보상하지 않는 사항을 확인하세요",
+                detail=(
+                    "화면의 금액은 증권에서 읽은 가입금액이에요. 실제 보험금을 받을 수 있는지는 "
+                    "사고일·진단일이 보험기간 안인지, 계약이 정상 유지 중인지, 면책·감액과 "
+                    "보상하지 않는 사항에 걸리지 않는지를 약관 원문으로 확인해야 해요."
+                ),
+            )
+        )
+
+    return checks[:3]
+
+
+def _policy_change_checks(
+    facts: PortfolioFacts,
+    life_stage_check: LifeStageCheck,
+) -> list[PolicyChangeCheck]:
+    tags: set[str] = set()
+    if facts.coverage_summary.indemnity_coverages:
+        tags.add(INDEMNITY)
+    if INDEMNITY in life_stage_check.held or INDEMNITY in life_stage_check.missing:
+        tags.add(INDEMNITY)
+    return policy_changes_for_tags(tags, limit=2)
 
 
 def _profile_label(demographics: InsuredDemographics) -> str:

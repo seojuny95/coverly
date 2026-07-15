@@ -347,7 +347,7 @@ describe("portfolio features", () => {
       screen.getByText("증권에서 암 진단비를 확인했어요."),
     ).toBeInTheDocument();
     expect(screen.getByText("매달 내는 보험료")).toBeInTheDocument();
-    expect(screen.getByText("80,000원")).toBeInTheDocument();
+    expect(screen.getAllByText("80,000원").length).toBeGreaterThanOrEqual(1);
     expect(
       screen.getByText(/중복 수령이 안 되는데 겹쳐 가입된 보장 1건/),
     ).toBeInTheDocument();

@@ -1,6 +1,12 @@
 from pytest import MonkeyPatch
 
-from app.schemas.analysis import AnalysisContextAnswer
+from app.schemas.analysis import (
+    AnalysisContextAnswer,
+    PolicyChangeCheck,
+    PolicyChangeSource,
+    PremiumBenchmark,
+    PremiumBenchmarkSource,
+)
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.services.analysis import service as portfolio_analysis
@@ -612,6 +618,37 @@ def test_analysis_exposes_excluded_coverage_ledger_with_reasons() -> None:
     assert result.excluded_coverages[0].reason
 
 
+def test_analysis_does_not_turn_excluded_data_limits_into_gaps() -> None:
+    partial = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "테스트보험", "상품명": "상품-p1", "보험분류": "질병"},
+            "보장목록": [{"담보명": "특정질환보장", "가입금액": "별도 약정"}],
+        }
+    )
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "strengths": [],
+            "gaps": [
+                {
+                    "title": "지급 방식이 확인되지 않았어요",
+                    "detail": "증권 정보가 부족해 합계에서 제외했어요.",
+                    "evidence_ids": ["excluded:1"],
+                }
+            ],
+            "amount_review_items": [],
+            "next_questions": [],
+            "next_steps": ["확인되지 않은 보장이 다른 증권에 있는지 확인해 보세요."],
+        }
+
+    result = analyze_portfolio([partial], age=35, gender="여성", complete=complete)
+
+    assert result.generation == "llm"
+    assert result.excluded_coverage_count == 1
+    assert "지급 방식이 확인되지 않았어요" not in result.model_dump_json()
+
+
 def test_analysis_reports_monthly_premium_total() -> None:
     policy = PolicyInput.model_validate(
         {
@@ -630,6 +667,181 @@ def test_analysis_reports_monthly_premium_total() -> None:
 
     assert result.premium.monthly_total == 30000
     assert result.premium.monthly_policy_count == 1
+
+
+def test_analysis_attaches_premium_benchmark_from_reference_store(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {
+                "보험사": "테스트보험",
+                "상품명": "상품-p1",
+                "보험분류": "질병",
+                "보험료": {"금액": 30000, "납입주기": "월납"},
+            },
+            "보장목록": [{"담보명": "암진단비", "가입금액": "3,000만원", "지급유형": "정액"}],
+        }
+    )
+    benchmark = PremiumBenchmark(
+        age_band_label="30~39세",
+        min_age=30,
+        max_age=39,
+        average_monthly_income=3_860_000,
+        suggested_min_ratio=0.05,
+        suggested_max_ratio=0.10,
+        suggested_min_premium=193_000,
+        suggested_max_premium=386_000,
+        income_source=PremiumBenchmarkSource(
+            label="KOSIS 국가통계포털 · 성별 연령대별 소득",
+            url="https://kosis.kr/statHtml/statHtml.do?sso=ok&returnurl=https%3A%2F%2Fkosis.kr%3A443%2FstatHtml%2FstatHtml.do%3Fconn_path%3DI2%26tblId%3DDT_1EP_2010%26orgId%3D101%26",
+            published_at="2025-01-01",
+            reliability="official",
+            caveat="연령대 평균 소득은 개인 소득과 다를 수 있어요.",
+        ),
+        guide_source=PremiumBenchmarkSource(
+            label="뱅크샐러드 · 나에게 맞는 보험료 계산법",
+            url="https://www.banksalad.com/articles/%EB%B3%B4%ED%97%98-%EB%B3%B4%ED%97%98%EB%A6%AC%EB%AA%A8%EB%8D%B8%EB%A7%81-%EB%B3%B4%ED%97%98%EB%A3%8C",
+            published_at="2025-01-01",
+            reliability="private_guidance",
+            caveat="월 소득의 5%~10% 범위는 민간 가이드예요. 적정 보험료의 공식 기준은 아니에요.",
+        ),
+    )
+
+    monkeypatch.setattr(
+        portfolio_analysis,
+        "premium_benchmark_for_age",
+        lambda age: benchmark if age == 35 else None,
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert result.premium_benchmark == benchmark
+    assert result.priority_checks
+    assert result.priority_checks[0].kind == "premium"
+    assert "참고 범위보다 낮아요" in result.priority_checks[0].title
+
+
+def test_analysis_prioritizes_duplicate_and_gap_checks() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "테스트보험A", "상품명": "실손1", "보험분류": "실손"},
+                "보장목록": [{"담보명": "실손의료비", "가입금액": "1억원", "지급유형": "실손"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "p2",
+                "기본정보": {"보험사": "테스트보험B", "상품명": "실손2", "보험분류": "실손"},
+                "보장목록": [{"담보명": "실손의료비", "가입금액": "1억원", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+    result = analyze_portfolio(policies, age=35, gender="여성")
+
+    assert len(result.priority_checks) <= 3
+    assert result.priority_checks[0].kind == "duplicate"
+    assert result.priority_checks[0].evidence_ids
+    assert any(check.kind == "coverage_gap" for check in result.priority_checks)
+
+
+def test_analysis_exposes_amount_status_and_claim_conditions() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "테스트보험", "상품명": "상품-p1", "보험분류": "질병"},
+            "보장목록": [
+                {"담보명": "암진단비", "가입금액": "3,000만원", "지급유형": "정액"},
+                {"담보명": "특정질환보장", "가입금액": "별도 약정"},
+            ],
+        }
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert result.coverage_amount_status.confirmed_total_amount == 30_000_000
+    assert result.coverage_amount_status.confirmed_category_count == 1
+    assert result.coverage_amount_status.unconfirmed_coverage_count == 1
+    assert result.coverage_amount_status.items[0].evidence_ids == ["coverage:1"]
+    assert any(check.kind == "fixed" for check in result.claim_condition_checks)
+    assert any(check.kind == "contract" for check in result.claim_condition_checks)
+
+
+def test_analysis_adds_age_band_recommendation_status() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {
+                "보험사": "테스트보험",
+                "상품명": "건강보험",
+                "보험분류": "질병",
+            },
+            "보장목록": [
+                {"담보명": "실손의료비", "가입금액": "1억원", "지급유형": "실손"},
+                {"담보명": "암진단비", "가입금액": "3,000만원", "지급유형": "정액"},
+                {
+                    "담보명": "뇌혈관질환진단비",
+                    "가입금액": "2,000만원",
+                    "지급유형": "정액",
+                },
+                {
+                    "담보명": "허혈성심장질환진단비",
+                    "가입금액": "1,000만원",
+                    "지급유형": "정액",
+                },
+            ],
+        }
+    )
+
+    result = analyze_portfolio([policy], age=45, gender="여성")
+
+    assert result.age_coverage_recommendation is not None
+    assert result.age_coverage_recommendation.age_band_label == "40~50대"
+    assert result.age_coverage_recommendation.confirmed_count == 4
+    assert result.age_coverage_recommendation.recommended_count == 5
+    assert any(
+        item.category == "수술" and item.status == "missing"
+        for item in result.age_coverage_recommendation.items
+    )
+
+
+def test_analysis_links_relevant_policy_changes(monkeypatch: MonkeyPatch) -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "테스트보험", "상품명": "실손", "보험분류": "실손"},
+            "보장목록": [{"담보명": "실손의료비", "가입금액": "1억원", "지급유형": "실손"}],
+        }
+    )
+    change = PolicyChangeCheck(
+        title="실손보험 청구 전산화가 의원·약국까지 확대 예정이에요",
+        summary="서류 전송을 요청하면 전자문서가 전달되는 방식이에요.",
+        user_impact="실손 담보가 있다면 청구를 놓치지 않았는지 확인하기 쉬워질 수 있어요.",
+        effective_from="2025-10-25",
+        applies_to="의원급 의료기관과 약국의 실손보험 청구",
+        related_tags=["실손의료"],
+        source=PolicyChangeSource(
+            label="금융위원회 · 실손보험 청구 전산화 카드뉴스",
+            url="https://www.fsc.go.kr/edu/cardnews?cnId=1976",
+            published_at="2023-11-20",
+            reliability="official",
+            caveat="의료기관 참여 여부에 따라 달라질 수 있어요.",
+        ),
+    )
+    monkeypatch.setattr(
+        portfolio_analysis,
+        "policy_changes_for_tags",
+        lambda tags, limit=2: [change] if "실손의료" in tags else [],
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert result.policy_change_checks == [change]
+    assert "related_tags" not in result.model_dump()["policy_change_checks"][0]
 
 
 def test_fallback_gaps_explain_why() -> None:

@@ -36,7 +36,7 @@ from app.services.rag.official.models import RetrievalHit
 # Strengths cite held coverages; gaps may also cite existing coverages/실손 to
 # flag over-insurance, not only missing (gap:) categories.
 _STRENGTH_PREFIXES = ("coverage:", "indemnity:")
-_GAP_PREFIXES = ("gap:", "indemnity:", "excluded:")
+_GAP_PREFIXES = ("gap:", "indemnity:")
 _AUXILIARY_PREFIXES = ("official:",)
 
 
@@ -365,10 +365,11 @@ def _system_prompt() -> str:
 3. gaps는 다음 중 하나만 다룹니다.
    - 확인되지 않은 생애단계 점검 항목: gap:
    - 실손 등 비례보상 중복 가능성: indemnity:
-   - 금액/지급유형 불명으로 분석에서 제외된 담보: excluded:
+   금액/지급유형 불명으로 합계에서 제외된 담보는 사용자가 점검할 보장 공백이 아니라
+   분석 범위의 한계이므로 gaps로 만들지 않습니다.
 4. 인용한 evidence와 다른 주제로 말하지 않습니다.
 5. 여러 evidence를 묶을 때는 같은 주제를 뒷받침하는 경우에만 묶습니다.
-6. official: evidence는 coverage:, indemnity:, gap:, excluded: evidence와 함께 쓰는
+6. official: evidence는 coverage:, indemnity:, gap: evidence와 함께 쓰는
    보조 근거입니다. official: evidence만 단독으로 strengths/gaps를 만들지 않습니다.
 7. 지급사유, 면책, 감액, 보상하지 않는 사항, 제도 설명, 통계를 설명하는
    strengths/gaps 항목은 반드시 관련 official: evidence id도 함께 인용합니다.
