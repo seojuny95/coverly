@@ -2,6 +2,7 @@ import pytest
 
 from app.schemas.portfolio import PolicyInput
 from app.services.analysis.summary_overview import generate_summary_overview
+from app.services.coverage_knowledge.indemnity import classify_indemnity
 from app.services.portfolio.facts import build_portfolio_facts
 from app.services.portfolio.summary import (
     normalize_coverage_name,
@@ -478,6 +479,17 @@ def test_essential_indemnity_check_ignores_non_medical_indemnity_terms() -> None
     assert items["indemnity"].matched_coverage_names == []
 
 
+def test_indemnity_domain_does_not_treat_income_benefit_as_medical_expense() -> None:
+    classification = classify_indemnity(
+        coverage_name="운전자보험 휴업급여",
+        payment_type="실손",
+    )
+
+    assert classification.payment_basis == "indemnity"
+    assert classification.coverage_domain == "driver"
+    assert classification.medical_indemnity_status == "not_applicable"
+
+
 def test_essential_indemnity_check_does_not_exclude_auto_policy_rows() -> None:
     policy = _policy(
         "auto",
@@ -554,6 +566,31 @@ def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> 
     driver_checks = {item.label: item for item in result.special_policy_analyses[1].coverage_checks}
     assert driver_checks["교통사고 처리 지원"].status == "confirmed"
     assert driver_checks["변호사 선임 비용"].status == "not_found"
+
+
+def test_special_policy_analysis_uses_product_tags_when_category_and_name_are_generic() -> None:
+    policies = [
+        _policy(
+            "driver",
+            "상해보험",
+            "보험사A",
+            [{"담보명": "교통사고처리지원금", "가입금액": "1억원"}],
+            tags=["운전자보험"],
+        ),
+        _policy(
+            "fire",
+            "재산보험",
+            "보험사B",
+            [{"담보명": "화재손해", "가입금액": "1억원"}],
+            tags=["화재보험"],
+        ),
+    ]
+
+    result = summarize_portfolio_coverages(policies)
+
+    assert [item.kind for item in result.special_policy_analyses] == ["driver", "fire"]
+    assert result.special_policy_analyses[0].product_names == ["상품-driver"]
+    assert result.special_policy_analyses[1].confirmed_coverage_names == ["화재손해"]
 
 
 def test_premium_summary_includes_auto_policy_premiums() -> None:

@@ -359,10 +359,7 @@ def _special_policy_kind(policy: PolicyInput) -> SpecialPolicyKind | None:
 
 
 def _product_tags(policy: PolicyInput) -> list[str]:
-    tags = (policy.기본정보.model_extra or {}).get("상품태그", [])
-    if not isinstance(tags, list):
-        return []
-    return [tag for tag in tags if isinstance(tag, str)]
+    return [tag for tag in policy.기본정보.상품태그 if isinstance(tag, str)]
 
 
 def _parse_amount(coverage: CoverageInput) -> int | None:
