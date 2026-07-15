@@ -78,6 +78,13 @@ const CLASSIFICATION_HELP: Record<string, string> = {
     "증권에서 보험 종류를 확실히 판단할 단서가 부족한 경우예요. 상품명이나 보장 내용을 다시 확인해 주세요.",
 };
 
+const CLASSIFICATION_SUMMARY: Record<string, string> = {
+  생명보험: "사망·노후 보장",
+  제3보험: "질병·상해·간병 보장",
+  손해보험: "재산 손해·책임 보장",
+  미분류: "종류 확인 필요",
+};
+
 const LIFE_CLASSIFICATIONS = new Set(["생명보험", "생명·연금"]);
 const THIRD_CLASSIFICATIONS = new Set(["제3보험", "상해·질병·실손"]);
 const DAMAGE_CLASSIFICATIONS = new Set([
@@ -387,8 +394,11 @@ export function InsuranceAnalysisPage({
                     className="overflow-hidden rounded-2xl border border-zinc-200 bg-white"
                   >
                     <div className="border-b border-zinc-100 bg-zinc-50/60 px-5 py-4">
-                      <h2 className="text-lg font-semibold tracking-[-0.03em]">
-                        {classification}
+                      <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-[-0.03em]">
+                        <span>{classification}</span>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium tracking-normal text-zinc-500 ring-1 ring-zinc-200">
+                          {CLASSIFICATION_SUMMARY[classification]}
+                        </span>
                       </h2>
                       <p className="mt-1 text-sm text-zinc-500">
                         보험 {classificationInsuranceDocuments.length}개

@@ -169,6 +169,8 @@ describe("InsuranceAnalysisPage", () => {
     expect(
       within(damageCard as HTMLElement).getByText("1"),
     ).toBeInTheDocument();
+    expect(screen.getByText("질병·상해·간병 보장")).toBeInTheDocument();
+    expect(screen.getByText("재산 손해·책임 보장")).toBeInTheDocument();
   });
 
   test("expands a insurance row to show detail fields", async () => {
