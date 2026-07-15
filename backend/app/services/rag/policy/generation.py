@@ -88,6 +88,10 @@ _CLAIM_VERDICT_TERMS = (
 )
 
 
+def _markdown_section(title: str, content: str) -> str:
+    return f"**{title}**\n\n{content.strip()}"
+
+
 @dataclass(frozen=True)
 class PolicyGenerationResult:
     answer: str
@@ -170,9 +174,14 @@ def generate_policy_answer(
         )
     )
 
-    sections = [f"증권에서 확인된 사실\n{' · '.join(confirmed_facts)}"]
+    sections = [
+        _markdown_section(
+            "증권에서 확인된 사실",
+            "\n".join(f"- {fact}" for fact in confirmed_facts),
+        )
+    ]
     if guidance:
-        sections.append(f"함께 살펴볼 제안\n{guidance}")
+        sections.append(_markdown_section("함께 살펴볼 제안", guidance))
 
     return PolicyGenerationResult(
         answer="\n\n".join(sections),
@@ -185,7 +194,10 @@ def generate_policy_answer(
 
 def _fallback() -> PolicyGenerationResult:
     return PolicyGenerationResult(
-        answer="현재 제공된 증권 근거만으로는 이 질문에 답하기 어려워요.",
+        answer=(
+            "**현재 제공된 증권 근거만으로는 이 질문에 답하기 어려워요.**\n\n"
+            "- 근거가 확인되지 않으면 답변하지 않습니다."
+        ),
         evidence_ids=(),
         limitations=("근거가 확인되지 않으면 답변하지 않습니다.",),
         suggestions=(),
@@ -355,6 +367,11 @@ def _system_prompt() -> str:
 - 부정 표현과 질문 범위를 그대로 읽으세요.
 
 [답변]
+- 사용자에게 보여줄 답변은 Markdown으로 읽기 쉽게 구성하세요.
+- 중요한 담보명, 금액, 기간, 조건은 **굵게** 표시하세요.
+- 여러 근거를 나열할 때는 bullet list를 사용하세요.
+- 절차나 순서가 있는 설명은 numbered list를 사용하세요.
+- Mermaid나 HTML은 사용하지 마세요.
 - confirmed_fact에는 선택한 evidence로 확인되는 사실만 쓰세요.
 - 증권에 명확히 적힌 계약 사실·금액·기간·조건은 "확인됩니다"라고 자연스럽게 말해도 됩니다.
 - 다만 실제 보험금 지급 여부, 청구 가능 여부, 가입·해지·증감 행동은 최종 결론처럼 단정하지 마세요.

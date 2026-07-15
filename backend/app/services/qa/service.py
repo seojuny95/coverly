@@ -78,8 +78,11 @@ _OFFICIAL_CLAIM_CHECK_TERMS = (
     "면책",
 )
 _MAX_SUGGESTIONS = 3
-_GREETING_ANSWER = "안녕하세요. 가입한 보험과 보장에 관해 궁금한 내용을 물어봐 주세요."
-_OUT_OF_SCOPE_ANSWER = "보험과 관련 없는 정보는 답변하기 어려워요."
+_GREETING_ANSWER = "**안녕하세요.** 가입한 보험과 보장에 관해 궁금한 내용을 물어봐 주세요."
+_OUT_OF_SCOPE_ANSWER = (
+    "**보험과 관련 없는 정보**는 답변하기 어려워요.\n\n"
+    "- 가입 보험, 보장, 약관, 청구와 관련된 질문은 도와드릴 수 있어요."
+)
 
 OfficialAnswerer = Callable[[str], RagAnswer]
 
@@ -101,6 +104,10 @@ class _QuestionTurn:
     question: str
     history: list[ConversationMessage]
     plan: QuestionPlan | None
+
+
+def _markdown_section(title: str, content: str) -> str:
+    return f"**{title}**\n\n{content.strip()}"
 
 
 def answer_portfolio_question(
@@ -161,7 +168,7 @@ def _answer_context(
 def _no_uploaded_policies_response() -> PortfolioQuestionResponse:
     return PortfolioQuestionResponse(
         status="no_data",
-        answer="살펴볼 보험 정보가 아직 없어요.",
+        answer="**살펴볼 보험 정보가 아직 없어요.**\n\n- 보험증권을 먼저 업로드해 주세요.",
         citations=[],
         limitations=["보험증권을 먼저 업로드해 주세요."],
         suggestions=["업로드한 증권에서 어떤 보장을 확인할 수 있어?"],
@@ -321,7 +328,7 @@ def _context_with_question(context: _QaContext, question: str) -> _QaContext:
 def _clarification_response(question: str) -> PortfolioQuestionResponse:
     return PortfolioQuestionResponse(
         status="clarify",
-        answer=question,
+        answer=_markdown_section("확인이 필요해요", question),
         citations=[],
         limitations=[],
         suggestions=[],
@@ -347,7 +354,7 @@ def _append_planned_answer(
     if question_count == 1:
         answers.append(answer)
     else:
-        answers.append(f"{planned.original}\n{answer}")
+        answers.append(f"**{planned.original}**\n\n{answer}")
 
 
 def _answer_scope_only_plan(question_plan: QuestionPlan) -> PortfolioQuestionResponse:
@@ -639,7 +646,7 @@ def _policy_generation_response(
     )
     return PortfolioQuestionResponse(
         status="answered",
-        answer=result.answer,
+        answer=_markdown_section("업로드 증권 근거", result.answer),
         sections=[section],
         citations=[
             citation_from_evidence(catalog.by_id[item_id]) for item_id in result.evidence_ids
@@ -673,7 +680,7 @@ def _answer_with_official_rag(
     )
     return PortfolioQuestionResponse(
         status="answered",
-        answer=result.answer,
+        answer=_markdown_section("공식자료 기준 일반 안내", result.answer),
         sections=[section],
         citations=[_official_citation(citation) for citation in result.citations],
         limitations=list(result.limitations),
@@ -751,7 +758,8 @@ def _answer_holdings(
         labels.append(f"{insurer} {product}(자동차)")
         evidence_ids.append(evidence.id)
 
-    content = f"업로드된 보험은 {len(labels)}건이에요: {', '.join(labels)}."
+    items = "\n".join(f"- {label}" for label in labels)
+    content = f"업로드된 보험은 **{len(labels)}건**이에요.\n\n{items}"
     return _fact_response(content, evidence_ids, catalog, facts)
 
 
@@ -770,8 +778,8 @@ def _answer_amount(
             return PortfolioQuestionResponse(
                 status="no_data",
                 answer=(
-                    "질문과 일치하는 담보가 여러 개라 하나의 가입금액으로 답하기 어려워요. "
-                    "증권에 적힌 담보명 하나를 지정해 주세요."
+                    "**질문과 일치하는 담보가 여러 개**라 하나의 가입금액으로 답하기 어려워요.\n\n"
+                    "- 증권에 적힌 담보명 하나를 지정해 주세요."
                 ),
                 citations=[],
                 limitations=_standard_limitations(facts),
@@ -782,7 +790,10 @@ def _answer_amount(
     if not selected_totals:
         return PortfolioQuestionResponse(
             status="no_data",
-            answer="올린 증권에서 질문한 담보의 확인 가능한 가입금액을 찾지 못했습니다.",
+            answer=(
+                "**확인 가능한 가입금액을 찾지 못했어요.**\n\n"
+                "- 올린 증권에서 질문한 담보명과 일치하는 항목을 찾지 못했습니다."
+            ),
             citations=[],
             limitations=_standard_limitations(facts),
             suggestions=_fact_suggestions(facts),
@@ -799,13 +810,14 @@ def _answer_amount(
     ]
     if len(selected_totals) == 1:
         content = (
-            f"{selected_totals[0].display_name}의 확인 가능한 가입금액 합계는 "
-            f"{total_amount:,}원이에요."
+            f"**{selected_totals[0].display_name}**의 확인 가능한 가입금액 합계는 "
+            f"**{total_amount:,}원**이에요."
         )
     else:
+        items = "\n".join(f"- {total.display_name}" for total in selected_totals)
         content = (
-            f"확인 가능한 정액형 담보 {len(selected_totals)}종의 가입금액 합계는 "
-            f"{total_amount:,}원이에요."
+            f"확인 가능한 정액형 담보 **{len(selected_totals)}종**의 가입금액 합계는 "
+            f"**{total_amount:,}원**이에요.\n\n{items}"
         )
     return _fact_response(content, evidence_ids, catalog, facts)
 
@@ -817,11 +829,13 @@ def _answer_status(
 ) -> PortfolioQuestionResponse:
     summary = facts.coverage_summary
     auto_note = f", 자동차보험 {len(auto_policies)}건" if auto_policies else ""
-    content = (
-        f"비자동차 보험 {len(facts.policies)}건{auto_note}에서 "
-        f"정액형 합계 {len(summary.totals)}종을 확인했고, "
-        f"실손형 {len(summary.indemnity_coverages)}건과 "
-        f"합계 제외 {len(summary.excluded_coverages)}건이 있어요."
+    content = "\n".join(
+        [
+            f"- 비자동차 보험: **{len(facts.policies)}건**{auto_note}",
+            f"- 정액형 합계: **{len(summary.totals)}종**",
+            f"- 실손형: **{len(summary.indemnity_coverages)}건**",
+            f"- 합계 제외: **{len(summary.excluded_coverages)}건**",
+        ]
     )
     evidence_ids = [item.id for item in catalog.items]
     return _fact_response(content, evidence_ids, catalog, facts)
@@ -840,7 +854,7 @@ def _fact_response(
     )
     return PortfolioQuestionResponse(
         status="answered",
-        answer=content,
+        answer=_markdown_section("증권에서 확인된 사실", content),
         sections=[section],
         citations=[
             citation_from_evidence(catalog.by_id[evidence_id])
@@ -894,7 +908,9 @@ def _consultation_fallback(
     ]
     return PortfolioQuestionResponse(
         status="answered",
-        answer="\n\n".join(f"{section.title}\n{section.content}" for section in sections),
+        answer="\n\n".join(
+            _markdown_section(section.title, section.content) for section in sections
+        ),
         sections=sections,
         citations=[
             citation_from_evidence(catalog.by_id[evidence_id])
@@ -919,7 +935,12 @@ def _answer_claim_channels(
     # 실손24 is medical-indemnity only — keyed off the non-auto classifier, not auto 비례.
     has_indemnity = bool(facts.coverage_summary.indemnity_coverages)
     block = claim_channel_block(insurers, has_indemnity=has_indemnity)
-    lead_in = "청구는 아래 채널에서 확인하실 수 있어요."
+    lead_in = (
+        "**청구는 아래 채널에서 확인하실 수 있어요.**\n\n"
+        "1. 보험사 앱이나 홈페이지에서 청구 메뉴를 확인하세요.\n"
+        "2. 진료비 영수증, 진단서 등 필요한 서류를 준비하세요.\n"
+        "3. 실제 보상 가능 여부와 지급액은 보험사 심사로 확정돼요."
+    )
     return PortfolioQuestionResponse(
         status="answered",
         answer=lead_in,

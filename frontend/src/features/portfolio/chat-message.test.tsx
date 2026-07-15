@@ -49,6 +49,21 @@ describe("ChatMessage", () => {
     expect(anchor?.getAttribute("href")).toBeFalsy();
   });
 
+  it("renders assistant markdown emphasis and lists", () => {
+    const { container } = render(
+      <ChatMessage
+        message={assistant({
+          text: "**암진단비**는 확인돼요.\n\n- 가입금액: **3,000만원**\n- 기준: 증권 근거",
+        })}
+      />,
+    );
+
+    expect(screen.getByText("암진단비")).toHaveClass("font-semibold");
+    expect(container.querySelector("ul")).not.toBeNull();
+    expect(screen.getByText(/가입금액:/)).toBeInTheDocument();
+    expect(screen.getByText("3,000만원")).toHaveClass("font-semibold");
+  });
+
   it("keeps a safe claim-channel link but downgrades an unsafe one to text", () => {
     const claimChannels: ClaimChannelBlock = {
       insurers: [
