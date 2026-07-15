@@ -111,7 +111,7 @@ _SPECIAL_COVERAGE_RULES: dict[SpecialPolicyKind, tuple[tuple[str, tuple[str, ...
         ),
         (
             "화재 배상책임",
-            ("화재배상책임", "화재대물배상", "화재대인배상"),
+            ("화재배상책임", "화재대물배상", "화재대인배상", "폭발포함배상책임"),
             "화재로 다른 사람이나 재물에 입힌 손해를 위한 담보예요.",
         ),
         (
@@ -177,8 +177,7 @@ def build_special_policy_analyses(policies: list[PolicyInput]) -> list[SpecialPo
         "fire": [],
     }
     for policy in policies:
-        kind = _special_policy_kind(policy)
-        if kind is not None:
+        for kind in _special_policy_kinds(policy):
             grouped[kind].append(policy)
 
     analyses: list[SpecialPolicyAnalysis] = []
@@ -333,25 +332,74 @@ def _is_indemnity_coverage(coverage: CoverageInput, policy: PolicyInput) -> bool
     return classify_indemnity(coverage, policy=policy).medical_indemnity_status == "confirmed"
 
 
-def _special_policy_kind(policy: PolicyInput) -> SpecialPolicyKind | None:
+def _special_policy_kinds(policy: PolicyInput) -> tuple[SpecialPolicyKind, ...]:
     category = _normalize(policy.기본정보.보험분류 or "")
     product = _normalize(policy.기본정보.상품명 or "")
-    tags = _normalize(" ".join(_product_tags(policy)))
-    identity = f"{category} {product} {tags}"
+    tags = tuple(_normalize(tag) for tag in _product_tags(policy))
+    tags_text = " ".join(tags)
+    identity = f"{category} {product} {tags_text}"
+    coverage_names = [_normalize(coverage.담보명) for coverage in policy.보장목록]
 
+    kinds: list[SpecialPolicyKind] = []
     if "자동차" in category or "자동차보험" in product or "자동차" in tags:
-        return "auto"
+        kinds.append("auto")
     if "운전자" in identity:
-        return "driver"
+        kinds.append("driver")
     if "여행자" in identity or "여행보험" in identity or "해외여행" in identity:
-        return "travel"
-    if "화재" in product or "화재" in tags:
-        return "fire"
-    return None
+        kinds.append("travel")
+    if _is_fire_policy(category, product, tags, coverage_names):
+        kinds.append("fire")
+    return tuple(dict.fromkeys(kinds))
+
+
+def _is_fire_policy(
+    category: str,
+    product: str,
+    tags: tuple[str, ...],
+    coverage_names: list[str],
+) -> bool:
+    if category in {_normalize("화재보험"), _normalize("주택화재보험")}:
+        return True
+    if any(tag in {_normalize("화재보험"), _normalize("주택화재보험")} for tag in tags):
+        return True
+    if _normalize("화재보험") in product or _normalize("주택화재보험") in product:
+        return True
+    if not _is_damage_policy_identity(category, tags):
+        return False
+    fire_terms = tuple(
+        _normalize(term)
+        for _label, terms, _detail in _SPECIAL_COVERAGE_RULES["fire"]
+        for term in terms
+    )
+    return any(any(term in name for term in fire_terms) for name in coverage_names)
+
+
+def _is_damage_policy_identity(category: str, tags: tuple[str, ...]) -> bool:
+    damage_categories = {
+        _normalize("손해보험"),
+        _normalize("자동차보험"),
+        _normalize("운전자보험"),
+        _normalize("운전자상해보험"),
+        _normalize("여행자보험"),
+        _normalize("화재보험"),
+        _normalize("주택화재보험"),
+        _normalize("배상책임보험"),
+        _normalize("보증보험"),
+    }
+    damage_tags = {
+        _normalize("자동차보험"),
+        _normalize("운전자보험"),
+        _normalize("여행자보험"),
+        _normalize("화재보험"),
+        _normalize("주택화재보험"),
+        _normalize("배상책임보험"),
+        _normalize("보증보험"),
+    }
+    return category in damage_categories or any(tag in damage_tags for tag in tags)
 
 
 def _product_tags(policy: PolicyInput) -> list[str]:
-    tags = (policy.기본정보.model_extra or {}).get("상품태그", [])
+    tags = policy.기본정보.상품태그
     if not isinstance(tags, list):
         return []
     return [tag for tag in tags if isinstance(tag, str)]

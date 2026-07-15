@@ -624,6 +624,48 @@ def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> 
     assert driver_checks["변호사 선임 비용"].status == "not_found"
 
 
+def test_special_policy_analysis_does_not_treat_insurer_name_as_fire_policy() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "third",
+            "기본정보": {
+                "보험사": "흥국화재",
+                "상품명": "무배당 흥국화재 맘편한 자녀사랑보험",
+                "보험분류": "제3보험",
+            },
+            "보장목록": [{"담보명": "암진단비", "가입금액": "3천만원", "지급유형": "정액"}],
+        }
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert all(item.kind != "fire" for item in result.special_policy_analyses)
+
+
+def test_special_policy_analysis_can_show_driver_and_fire_for_one_damage_policy() -> None:
+    policy = _policy(
+        "damage",
+        "손해보험",
+        "보험사A",
+        [
+            {"담보명": "자동차사고벌금(대물, 실손)", "가입금액": "500만원", "지급유형": "실손"},
+            {"담보명": "화재손해", "가입금액": "1억원", "지급유형": "실손"},
+            {"담보명": "화재(폭발포함)배상책임", "가입금액": "1억원", "지급유형": "실손"},
+        ],
+        tags=["운전자보험"],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    analyses = {item.kind: item for item in result.special_policy_analyses}
+
+    assert "driver" in analyses
+    assert "fire" in analyses
+    assert analyses["fire"].product_names == ["상품-damage"]
+    fire_checks = {item.label: item for item in analyses["fire"].coverage_checks}
+    assert fire_checks["건물·가재 화재 손해"].matched_coverage_names == ["화재손해"]
+    assert fire_checks["화재 배상책임"].matched_coverage_names == ["화재(폭발포함)배상책임"]
+
+
 def test_premium_summary_includes_auto_policy_premiums() -> None:
     policies = [
         PolicyInput.model_validate(
