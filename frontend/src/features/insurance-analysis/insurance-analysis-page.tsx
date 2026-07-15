@@ -7,6 +7,7 @@ import {
   forwardRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -147,6 +148,10 @@ export function InsuranceAnalysisPage({
   const insuranceTabRef = useRef<HTMLButtonElement>(null);
   const analysisTabRef = useRef<HTMLButtonElement>(null);
   const chatTabRef = useRef<HTMLButtonElement>(null);
+  const classificationHelpRef = useRef<HTMLDListElement>(null);
+  const [openClassificationHelp, setOpenClassificationHelp] = useState<
+    string | null
+  >(null);
 
   // Arrow-key navigation between the tabs (WAI-ARIA tabs pattern,
   // automatic activation): moves focus and switches the panel in one step.
@@ -171,6 +176,33 @@ export function InsuranceAnalysisPage({
   );
   const [manualDemographics, setManualDemographics] =
     useState<Demographics | null>(null);
+
+  useEffect(() => {
+    if (!openClassificationHelp) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenClassificationHelp(null);
+      }
+    };
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        classificationHelpRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setOpenClassificationHelp(null);
+    };
+
+    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
+    };
+  }, [openClassificationHelp]);
 
   const insuranceDocuments = useMemo(
     () => analysis?.insuranceDocuments ?? [],
@@ -339,37 +371,59 @@ export function InsuranceAnalysisPage({
               </div>
             </div>
 
-            <dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {CLASSIFICATION_ORDER.map((classification) => (
-                <div
-                  key={classification}
-                  className="relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
-                >
-                  <dt className="flex items-start justify-between gap-3 text-xs font-medium text-zinc-500">
-                    <span>{classification}</span>
-                    <span className="group/help relative inline-flex">
-                      <button
-                        type="button"
-                        aria-label={`${classification} 설명 보기`}
-                        aria-describedby={`classification-help-${classification}`}
-                        className="flex size-5 items-center justify-center rounded-full border border-zinc-200 text-[11px] font-semibold text-zinc-400 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                      >
-                        ?
-                      </button>
-                      <span
-                        id={`classification-help-${classification}`}
-                        role="tooltip"
-                        className="pointer-events-none absolute right-0 bottom-7 z-10 hidden w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg group-focus-within/help:block group-hover/help:block"
-                      >
-                        {CLASSIFICATION_HELP[classification]}
+            <dl
+              ref={classificationHelpRef}
+              className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            >
+              {CLASSIFICATION_ORDER.map((classification, index) => {
+                const isHelpOpen = openClassificationHelp === classification;
+                const opensLeft = index === CLASSIFICATION_ORDER.length - 1;
+
+                return (
+                  <div
+                    key={classification}
+                    className="relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
+                  >
+                    <dt className="flex items-start justify-between gap-3 text-xs font-medium text-zinc-500">
+                      <span>{classification}</span>
+                      <span className="relative inline-flex">
+                        <button
+                          type="button"
+                          aria-label={`${classification} 설명 보기`}
+                          aria-haspopup="dialog"
+                          aria-controls={`classification-help-${classification}`}
+                          aria-expanded={isHelpOpen}
+                          onClick={() =>
+                            setOpenClassificationHelp((current) =>
+                              current === classification
+                                ? null
+                                : classification,
+                            )
+                          }
+                          className="flex size-5 items-center justify-center rounded-full border border-zinc-200 text-[11px] font-semibold text-zinc-400 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                        >
+                          ?
+                        </button>
+                        {isHelpOpen ? (
+                          <span
+                            id={`classification-help-${classification}`}
+                            role="dialog"
+                            aria-label={`${classification} 설명`}
+                            className={`absolute top-0 z-10 w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg ${
+                              opensLeft ? "right-7" : "left-7"
+                            }`}
+                          >
+                            {CLASSIFICATION_HELP[classification]}
+                          </span>
+                        ) : null}
                       </span>
-                    </span>
-                  </dt>
-                  <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
-                    {groupedInsuranceDocuments[classification]?.length ?? 0}
-                  </dd>
-                </div>
-              ))}
+                    </dt>
+                    <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
+                      {groupedInsuranceDocuments[classification]?.length ?? 0}
+                    </dd>
+                  </div>
+                );
+              })}
             </dl>
 
             <CoverageTotalTable
