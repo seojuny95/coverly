@@ -7,6 +7,8 @@ must not be used to recommend products or assert that an amount is sufficient.
 import re
 from dataclasses import dataclass
 
+from app.services.coverage_knowledge.indemnity import is_medical_indemnity_name
+
 CANCER = "암 진단"
 CEREBRO = "뇌혈관 진단"
 HEART = "심장질환 진단"
@@ -42,7 +44,7 @@ def life_stage_for(age: int) -> str:
 
 def classify_coverage(name: str) -> str | None:
     normalized = re.sub(r"\s+", "", name)
-    if "실손" in normalized or "실비" in normalized:
+    if is_medical_indemnity_name(normalized):
         return INDEMNITY
     if "상해" in normalized and "후유장해" in normalized:
         return INJURY_DISABILITY

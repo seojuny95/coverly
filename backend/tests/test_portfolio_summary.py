@@ -342,6 +342,41 @@ def test_indemnity_is_listed_and_flagged_only_across_insurers() -> None:
     assert amounts == {"p1": "5천만원", "p2": "5천만원", "p3": "3천만원"}
 
 
+def test_non_medical_indemnity_terms_are_not_listed_as_medical_indemnity() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {
+                "담보명": "가족화재벌금(실손)",
+                "가입금액": "2천만원",
+                "지급유형": "실손",
+            }
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.indemnity_coverages == []
+    assert result.excluded_coverages[0].coverage_name == "가족화재벌금(실손)"
+
+
+def test_medical_indemnity_classifier_does_not_treat_income_benefit_as_medical() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [{"담보명": "운전자보험 휴업급여", "가입금액": "100만원", "지급유형": "실손"}],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.indemnity_coverages == []
+    assert result.excluded_coverages[0].coverage_name == "운전자보험 휴업급여"
+
+
 def test_name_normalization_does_not_apply_semantic_aliases() -> None:
     assert normalize_coverage_name(" 암-진단비(일반) ") == "암진단비일반"
     assert normalize_coverage_name("암진단금") != normalize_coverage_name("암진단비")

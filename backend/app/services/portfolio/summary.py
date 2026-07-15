@@ -17,6 +17,7 @@ from app.schemas.portfolio import (
     PolicyInput,
     PortfolioCoverageSummary,
 )
+from app.services.coverage_knowledge.indemnity import classify_indemnity
 from app.services.coverage_knowledge.matching import (
     canonicalize_coverage_name,
     choose_display_name,
@@ -80,6 +81,9 @@ _SAFE_FIXED_NAME_TERMS = (
 _UNCONFIRMED_PAYMENT_REASON = "지급 방식을 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_AMOUNT_REASON = "가입금액을 숫자로 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_NAME_REASON = "담보명을 분류하지 못해 합계에는 더하지 않았어요."
+_NON_MEDICAL_INDEMNITY_REASON = (
+    "실손 보상 방식이지만 실손의료보험 담보로 확인되지 않아 합계에는 더하지 않았어요."
+)
 _UNITS = {
     "원": 1,
     "천원": 1_000,
@@ -192,6 +196,10 @@ def _classify_payout_kind(coverage: CoverageInput) -> _PayoutKind:
     return _PayoutKind.UNKNOWN
 
 
+def _is_medical_indemnity(coverage: CoverageInput, policy: PolicyInput) -> bool:
+    return classify_indemnity(coverage, policy=policy).medical_indemnity_status == "confirmed"
+
+
 def _parse_amount(coverage: CoverageInput) -> int | None:
     if coverage.가입금액숫자 is not None:
         return coverage.가입금액숫자
@@ -227,7 +235,10 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
             group_key = canonicalize_coverage_name(coverage.담보명).normalized_key
             payout_kind = _classify_payout_kind(coverage)
             if payout_kind is _PayoutKind.INDEMNITY:
-                indemnity_rows.append((policy, coverage, group_key))
+                if _is_medical_indemnity(coverage, policy):
+                    indemnity_rows.append((policy, coverage, group_key))
+                else:
+                    excluded.append(_excluded(policy, coverage, _NON_MEDICAL_INDEMNITY_REASON))
                 continue
             if payout_kind is _PayoutKind.UNKNOWN:
                 excluded.append(_excluded(policy, coverage, _UNCONFIRMED_PAYMENT_REASON))

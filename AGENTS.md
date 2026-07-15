@@ -51,7 +51,7 @@ pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
 ## Commit & Pull Request Guidelines
 
 - **커밋 메시지**: 영어. 명령형 요약 한 줄.
-- **PR 제목**: 영어로 작성한다. 예: `chore: scaffold Coverly apps and CI`
+- **PR 제목**: 영어로 작성하고 Conventional Commits 접두사(`feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:` 등)를 붙인다. 예: `chore: scaffold Coverly apps and CI`
 - **PR 본문**: 한국어로 작성해도 된다. 요약 · 변경사항 · 결정 및 고민 · 검증 · 후속/범위 밖을 포함한다.
   - **검증 섹션은 실행한 명령어 나열이 아니라, 무엇을 어떻게 검증했고 결과가 어땠는지를 서술한다.** 예: "프로덕션 pgvector에 재인덱싱 후 recall@5를 실측해 0.571 → 0.883으로 개선을 확인" — "`pytest tests/test_x.py` 실행"처럼 파일명만 나열하지 않는다.
   - 수치로 비교 가능한 검증 결과(recall, 통과/실패 개수, before/after 등)는 표로 정리한다.
