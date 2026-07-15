@@ -125,6 +125,7 @@ export type SpecialPolicyAnalysis = {
   policy_count: number;
   product_names: string[];
   confirmed_coverage_names: string[];
+  classification_reasons?: string[];
   overview: string;
   coverage_checks: Array<{
     label: string;

@@ -54,11 +54,38 @@ _AUTO_COVERAGE_TERMS = (
     "대인배상",
     "대물배상",
     "자기차량손해",
+    "자기차량",
+    "자차",
     "자기신체사고",
     "자동차상해",
     "무보험자동차",
     "무보험차상해",
     "무보험차에의한상해",
+)
+_AUTO_PRODUCT_TERMS = (
+    "자동차보험",
+    "개인용자동차",
+    "업무용자동차",
+    "영업용자동차",
+    "다이렉트자동차",
+    "하이카",
+)
+_FIRE_PRODUCT_TERMS = (
+    "화재보험",
+    "주택화재보험",
+    "주택종합보험",
+    "재물보험",
+)
+_FIRE_COVERAGE_TERMS = (
+    "화재손해",
+    "건물화재",
+    "가재화재",
+    "주택화재",
+    "화재배상책임",
+    "화재대물배상",
+    "화재대인배상",
+    "폭발포함배상책임",
+    "화재폭발",
 )
 _INDEMNITY_NAME_TERMS = ("실손", "실비")
 _INDEMNITY_CATEGORIES = frozenset({"실손", "실손형", "실비", "실비형"})
@@ -409,6 +436,12 @@ def _damage_insurance_type(policy: PolicyInput) -> str:
 
     product_name = policy.기본정보.상품명 or ""
     normalized_product = normalize_coverage_name(product_name)
+    if any(term in normalized_product for term in _normalized_terms(_AUTO_PRODUCT_TERMS)):
+        return "자동차보험"
+    if any(term in normalized_product for term in _normalized_terms(_FIRE_PRODUCT_TERMS)):
+        return "화재보험"
+    if _has_fire_insurance_coverages(policy):
+        return "화재보험"
     for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:
         if normalize_coverage_name(insurance_type) in normalized_product:
             return insurance_type
@@ -424,6 +457,20 @@ def _has_auto_insurance_coverages(policy: PolicyInput) -> bool:
         any(term in normalize_coverage_name(coverage.담보명) for term in normalized_terms)
         for coverage in policy.보장목록
     )
+
+
+def _has_fire_insurance_coverages(policy: PolicyInput) -> bool:
+    """Infer fire insurance from fire/property-specific coverage names."""
+
+    normalized_terms = _normalized_terms(_FIRE_COVERAGE_TERMS)
+    return any(
+        any(term in normalize_coverage_name(coverage.담보명) for term in normalized_terms)
+        for coverage in policy.보장목록
+    )
+
+
+def _normalized_terms(terms: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(normalize_coverage_name(term) for term in terms)
 
 
 def _damage_policy_group(policy: PolicyInput) -> DamagePolicyCoverageGroup:

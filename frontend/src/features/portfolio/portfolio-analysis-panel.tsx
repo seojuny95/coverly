@@ -604,6 +604,11 @@ function SpecialPolicySections({
               <p className="mt-2 text-xs font-medium text-zinc-500">
                 {analysis.product_names.join(" · ")}
               </p>
+              {analysis.classification_reasons?.length ? (
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  {analysis.classification_reasons.join(" ")}
+                </p>
+              ) : null}
               <p className="mt-3 text-sm leading-6 text-zinc-700">
                 {analysis.overview}
               </p>

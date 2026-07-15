@@ -730,7 +730,7 @@ def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> 
             "기본정보": {
                 "보험사": "보험사B",
                 "상품명": "안심 운전자보험",
-                "보험분류": "상해보험",
+                "보험분류": "손해보험",
             },
             "보장목록": [{"담보명": "교통사고처리지원금", "가입금액": "1억원"}],
         },
@@ -765,6 +765,9 @@ def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> 
     ]
     assert result.special_policy_analyses[0].confirmed_coverage_names == ["대인배상Ⅰ"]
     assert result.special_policy_analyses[1].product_names == ["안심 운전자보험"]
+    assert result.special_policy_analyses[1].classification_reasons == [
+        "손해보험 증권 안에서 운전자보험 상품명 또는 태그가 확인돼요."
+    ]
     auto_checks = {item.label: item for item in result.special_policy_analyses[0].coverage_checks}
     assert auto_checks["상대방의 신체 피해"].status == "confirmed"
     assert auto_checks["상대방의 재물 피해"].status == "not_found"
@@ -774,6 +777,24 @@ def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> 
     driver_checks = {item.label: item for item in result.special_policy_analyses[1].coverage_checks}
     assert driver_checks["교통사고 처리 지원"].status == "confirmed"
     assert driver_checks["변호사 선임 비용"].status == "not_found"
+
+
+def test_special_policy_analysis_skips_driver_when_policy_is_not_damage() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "driver",
+            "기본정보": {
+                "보험사": "보험사A",
+                "상품명": "안심 운전자보험",
+                "보험분류": "상해보험",
+            },
+            "보장목록": [{"담보명": "교통사고처리지원금", "가입금액": "1억원"}],
+        }
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert all(item.kind != "driver" for item in result.special_policy_analyses)
 
 
 def test_special_policy_analysis_does_not_treat_insurer_name_as_fire_policy() -> None:
@@ -812,6 +833,48 @@ def test_special_policy_analysis_infers_auto_from_auto_specific_coverages() -> N
     checks = {item.label: item for item in analyses["auto"].coverage_checks}
     assert checks["상대방의 신체 피해"].matched_coverage_names == ["대인배상Ⅰ"]
     assert checks["내 차량 손해"].matched_coverage_names == ["자기차량손해"]
+    assert analyses["auto"].classification_reasons == [
+        "손해보험 증권 안에서 대인배상, 대물배상, 자차처럼 자동차보험 담보명이 확인돼요."
+    ]
+
+
+def test_damage_policy_with_auto_product_name_is_listed_as_auto_without_tags() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "auto",
+            "기본정보": {
+                "보험사": "보험사A",
+                "상품명": "개인용자동차종합보장",
+                "보험분류": "손해보험",
+            },
+            "보장목록": [{"담보명": "기본담보", "가입금액": "", "지급유형": "실손"}],
+        }
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.damage_coverages[0].insurance_type == "자동차보험"
+
+
+def test_damage_policy_with_fire_coverages_is_listed_as_fire_without_tags() -> None:
+    policy = _policy(
+        "fire",
+        "손해보험",
+        "보험사A",
+        [
+            {"담보명": "화재(폭발포함)배상책임", "가입금액": "1억원", "지급유형": "실손"},
+            {"담보명": "잔존물제거비용", "가입금액": "1천만원", "지급유형": "실손"},
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    analyses = {item.kind: item for item in result.special_policy_analyses}
+
+    assert result.damage_coverages[0].insurance_type == "화재보험"
+    assert "fire" in analyses
+    assert analyses["fire"].classification_reasons == [
+        "손해보험 증권 안에서 화재, 주택, 재물 손해 관련 상품명이나 담보명이 확인돼요."
+    ]
 
 
 def test_special_policy_analysis_can_show_driver_and_fire_for_one_damage_policy() -> None:

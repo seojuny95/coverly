@@ -91,6 +91,9 @@ const summary: PortfolioSummary = {
       policy_count: 1,
       product_names: ["개인용 자동차보험"],
       confirmed_coverage_names: ["대인배상Ⅰ", "대물배상"],
+      classification_reasons: [
+        "손해보험 증권 안에서 대인배상, 대물배상, 자차처럼 자동차보험 담보명이 확인돼요.",
+      ],
       overview:
         "상대방의 신체 피해와 상대방의 재물 피해는 확인돼요. 나머지는 현재 자료에서 더 확인해야 해요.",
       coverage_checks: [
@@ -287,6 +290,11 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   ).not.toBeInTheDocument();
   expect(screen.getByText("손해보험 분석")).toBeInTheDocument();
   expect(screen.getByText("자동차보험")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "손해보험 증권 안에서 대인배상, 대물배상, 자차처럼 자동차보험 담보명이 확인돼요.",
+    ),
+  ).toBeInTheDocument();
   expect(screen.getByText("운전자보험")).toBeInTheDocument();
   expect(screen.getByText("여행자보험")).toBeInTheDocument();
   expect(screen.getByText("화재보험")).toBeInTheDocument();
