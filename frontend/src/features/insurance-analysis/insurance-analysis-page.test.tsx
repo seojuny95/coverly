@@ -126,6 +126,18 @@ describe("InsuranceAnalysisPage", () => {
     expect(
       screen.getByText(/사망이나 노후처럼 사람의 생명/),
     ).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(lifeHelpButton).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByText(/사망이나 노후처럼 사람의 생명/),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(lifeHelpButton);
+    await userEvent.click(document.body);
+
+    expect(lifeHelpButton).toHaveAttribute("aria-expanded", "false");
   });
 
   test("normalizes legacy classification values into current sections", async () => {
