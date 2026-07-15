@@ -13,9 +13,13 @@ type SummaryState =
   | { status: "success"; summary: PortfolioSummary }
   | { status: "error" };
 
+function portfolioSummaryQueryKey(documents: AnalyzedInsurance[]) {
+  return ["portfolio-summary", portfolioKey(documents)] as const;
+}
+
 export function usePortfolioSummary(documents: AnalyzedInsurance[]) {
   const query = useQuery({
-    queryKey: ["portfolio-summary", portfolioKey(documents)],
+    queryKey: portfolioSummaryQueryKey(documents),
     queryFn: ({ signal }) => requestPortfolioSummary(documents, signal),
     enabled: documents.length > 0,
   });

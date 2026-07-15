@@ -28,7 +28,9 @@ describe("CoverageTotalTable", () => {
   it("shows a loading state", () => {
     render(<CoverageTotalTable status="loading" onRetry={vi.fn()} />);
     expect(
-      screen.getByText("보장금 합계를 불러오고 있어요."),
+      screen.getByRole("status", {
+        name: "보장금 합계를 불러오고 있어요.",
+      }),
     ).toBeInTheDocument();
   });
 

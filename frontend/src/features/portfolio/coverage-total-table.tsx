@@ -86,9 +86,32 @@ function LegendItem({
 
 function CoverageSummaryLoading() {
   return (
-    <div role="status" className="space-y-3 px-6 py-7">
+    <div
+      role="status"
+      aria-label="보장금 합계를 불러오고 있어요."
+      className="px-6 py-5"
+    >
       <p className="text-sm text-zinc-500">보장금 합계를 불러오고 있어요.</p>
-      <div className="h-10 animate-pulse rounded-lg bg-zinc-100" />
+      <div className="mt-5 animate-pulse space-y-3" aria-hidden="true">
+        <div className="grid grid-cols-[1fr_7rem_7rem] gap-4 border-b border-zinc-100 pb-3">
+          <div className="h-3 w-16 rounded bg-zinc-100" />
+          <div className="h-3 rounded bg-zinc-100" />
+          <div className="h-3 rounded bg-zinc-100" />
+        </div>
+        {[0, 1, 2].map((row) => (
+          <div
+            key={row}
+            className="grid grid-cols-[1fr_7rem_7rem] items-center gap-4 py-2"
+          >
+            <div className="space-y-2">
+              <div className="h-4 w-40 rounded bg-zinc-100" />
+              <div className="h-3 w-64 max-w-full rounded bg-zinc-100" />
+            </div>
+            <div className="h-4 rounded bg-blue-100" />
+            <div className="h-6 rounded-full bg-zinc-100" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
