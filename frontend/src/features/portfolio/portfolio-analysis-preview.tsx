@@ -21,8 +21,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
       {
         label: "보험료",
         title: "권장보험을 점검해보세요",
-        detail:
-          "98,000원 / 권장 193,000원~386,000원. 보험료가 낮은 이유가 핵심 보장 공백일 수 있어요.",
+        detail: "보험료가 낮은 이유가 핵심 보장 공백일 수 있어요.",
       },
       {
         label: "보장 구성",

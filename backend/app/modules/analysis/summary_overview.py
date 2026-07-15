@@ -203,15 +203,12 @@ def _premium_detail(premium: dict[str, object]) -> str:
     recommended_max = premium.get("recommended_max")
     if not isinstance(total, int):
         return "월 보험료 자료가 부족해 적정성을 판단하기 어려워요."
-    if not isinstance(recommended_min, int) or not isinstance(recommended_max, int):
-        return f"{_format_won(total)}만 현재 자료에서 확인돼요."
-    amount_comparison = (
-        f"{_format_won(total)} / 권장 {_format_won(recommended_min)}~{_format_won(recommended_max)}"
-    )
     guidance = premium.get("guidance")
     if isinstance(guidance, str) and guidance:
-        return f"{amount_comparison}. {guidance}"
-    return amount_comparison
+        return guidance
+    if not isinstance(recommended_min, int) or not isinstance(recommended_max, int):
+        return f"{_format_won(total)}만 현재 자료에서 확인돼요."
+    return f"권장 보험료는 {_format_won(recommended_min)}~{_format_won(recommended_max)}예요."
 
 
 def _next_detail(
