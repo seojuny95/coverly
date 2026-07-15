@@ -116,11 +116,16 @@ describe("PortfolioAnalysisResultView", () => {
   it("shows the monthly premium position against the age-band income guide", () => {
     render(<PortfolioAnalysisResultView result={base} />);
 
-    expect(screen.getByText("내 보험료 위치")).toBeInTheDocument();
-    expect(screen.getByText("30~39세 소득 기준으로 보면")).toBeInTheDocument();
-    expect(screen.getByText("30~39세 평균 소득")).toBeInTheDocument();
-    expect(screen.getByText("3,860,000원")).toBeInTheDocument();
-    expect(screen.getByText("193,000원 ~ 386,000원")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("매달 내는 보험료").length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getByText("내 보험료가 참고 범위 어디쯤인지 볼게요"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("30~39세 평균 소득 기준")).toBeInTheDocument();
+    expect(
+      screen.getByText("참고 범위 193,000원 ~ 386,000원"),
+    ).toBeInTheDocument();
     expect(screen.getByText("참고 범위보다 낮아요")).toBeInTheDocument();
     expect(
       screen.getByText(/KOSIS 국가통계포털 · 성별 연령대별 소득/),
@@ -260,11 +265,10 @@ describe("PortfolioAnalysisResultView", () => {
       />,
     );
 
+    expect(screen.getByText("60세 이상 평균 소득 기준")).toBeInTheDocument();
     expect(
-      screen.getByText("60세 이상 소득 기준으로 보면"),
+      screen.getByText("참고 범위 125,000원 ~ 250,000원"),
     ).toBeInTheDocument();
-    expect(screen.getByText("60세 이상 평균 소득")).toBeInTheDocument();
-    expect(screen.getByText("2,500,000원")).toBeInTheDocument();
   });
 
   it("renders an unknown monthly premium without crashing", () => {

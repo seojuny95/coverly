@@ -212,9 +212,11 @@ function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
     <section className="rounded-2xl border border-zinc-200 p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-blue-700">내 보험료 위치</p>
+          <p className="text-xs font-semibold text-blue-700">
+            매달 내는 보험료
+          </p>
           <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
-            {benchmark.age_band_label} 소득 기준으로 보면
+            내 보험료가 참고 범위 어디쯤인지 볼게요
           </h2>
         </div>
         <p className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600">
@@ -222,48 +224,54 @@ function PremiumPosition({ result }: { result: PortfolioAnalysisResult }) {
         </p>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <Metric label="내 월 보험료" value={formatWon(monthlyPremium)} />
-        <Metric
-          label={`${benchmark.age_band_label} 평균 소득`}
-          value={formatWon(benchmark.average_monthly_income)}
-        />
-        <Metric
-          label="참고 범위"
-          value={`${formatWon(benchmark.suggested_min_premium)} ~ ${formatWon(benchmark.suggested_max_premium)}`}
-        />
+      <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs text-zinc-500">내 월 보험료</p>
+          <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-900">
+            {formatWon(monthlyPremium)}
+          </p>
+        </div>
+        <div className="text-right text-xs leading-5 text-zinc-500">
+          <p>{benchmark.age_band_label} 평균 소득 기준</p>
+          <p className="font-medium text-zinc-700">
+            참고 범위 {formatWon(benchmark.suggested_min_premium)} ~{" "}
+            {formatWon(benchmark.suggested_max_premium)}
+          </p>
+        </div>
       </div>
 
       <div className="mt-7">
-        <div className="relative h-12" style={style}>
-          <div className="absolute inset-x-0 top-5 h-2 rounded-full bg-zinc-100" />
+        <div className="relative h-20" style={style}>
+          <div className="absolute inset-x-0 top-8 h-3 rounded-full bg-zinc-100" />
           <div
-            className="absolute top-5 h-2 rounded-full bg-emerald-200"
+            className="absolute top-8 h-3 rounded-full bg-emerald-200"
             style={rangeStyle}
           />
-          <div className="premium-position-fill absolute top-5 left-0 h-2 rounded-full bg-blue-600" />
+          <div className="premium-position-fill absolute top-8 left-0 h-3 rounded-full bg-blue-600" />
           <div
-            className="absolute top-1 flex -translate-x-1/2 flex-col items-center gap-1"
+            className="absolute top-0 flex -translate-x-1/2 flex-col items-center gap-1"
             style={{ left: `${minPosition}%` }}
           >
             <span className="text-xs font-medium text-zinc-500">5%</span>
-            <span className="h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-zinc-500" />
+            <span className="h-3 w-px bg-zinc-400" />
           </div>
           <div
-            className="absolute top-1 flex -translate-x-1/2 flex-col items-center gap-1"
+            className="absolute top-0 flex -translate-x-1/2 flex-col items-center gap-1"
             style={{ left: `${maxPosition}%` }}
           >
             <span className="text-xs font-medium text-zinc-500">10%</span>
-            <span className="h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-zinc-500" />
+            <span className="h-3 w-px bg-zinc-400" />
           </div>
-          <div className="premium-position-user absolute top-3 flex -translate-x-1/2 flex-col items-center gap-1">
-            <span className="h-4 w-4 rounded-full border-2 border-white bg-blue-600 shadow-sm" />
-            <span className="text-xs font-semibold text-blue-700">나</span>
+          <div className="premium-position-user absolute top-5 flex -translate-x-1/2 flex-col items-center gap-1">
+            <span className="h-5 w-5 rounded-full border-2 border-white bg-blue-600 shadow-sm" />
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+              나
+            </span>
           </div>
-        </div>
-        <div className="mt-1 flex justify-between text-xs text-zinc-400">
-          <span>낮음</span>
-          <span>높음</span>
+          <div className="absolute inset-x-0 top-14 flex justify-between text-xs text-zinc-400">
+            <span>0원</span>
+            <span>{formatWon(Math.round(maxAmount))}</span>
+          </div>
         </div>
       </div>
 
