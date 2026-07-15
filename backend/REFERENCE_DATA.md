@@ -10,7 +10,7 @@
 | 서버 코드 | PDF 파싱, 분류, 담보 매칭, grounding·안전 필터, 집계, 실패·degrade 정책 | 입력을 구조화하고 판단 절차를 결정한다. 데이터 갱신을 코드 배포로 대체하지 않는다. |
 | 프론트엔드 | 서버 응답의 표시와 사용자 상호작용 | 보험 사실이나 LLM 총평을 임의로 만들어내지 않는다. |
 
-`classification_rules`와 `coverage_matching_rules`는 서버 동작을 결정하는 규칙이므로 코드 배포와 함께 버전 관리한다. `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides`는 Supabase `coverly.reference_data`가 단일 원본이다. 서버 코드에는 같은 데이터를 bundled JSON이나 fallback 상수로 보관하지 않는다. DB 조회 실패·스키마 불일치·필수 row 누락은 전체 분석을 실패시키는 참조 데이터 오류로 처리한다. 공식 RAG 인덱싱에 쓰는 데이터 적재/갱신 잡은 현재 RAG 인덱싱 경로에서 계속 호출 가능하지만, 별도 `jobs/` 디렉터리가 있다고 문서화하지 않는다.
+`classification_rules`와 `coverage_matching_rules`는 서버 동작을 결정하는 규칙이므로 코드 배포와 함께 버전 관리한다. `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides`는 Supabase `reference.reference_data`가 단일 원본이다. 서버 코드에는 같은 데이터를 bundled JSON이나 fallback 상수로 보관하지 않는다. DB 조회 실패·스키마 불일치·필수 row 누락은 전체 분석을 실패시키는 참조 데이터 오류로 처리한다. 공식 RAG 인덱싱에 쓰는 데이터 적재/갱신 잡은 현재 RAG 인덱싱 경로에서 계속 호출 가능하지만, 별도 `jobs/` 디렉터리가 있다고 문서화하지 않는다.
 
 LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다. 프론트엔드의 synthetic fallback, 임의 요약, 누락 응답을 대체하는 문구 생성은 금지한다.
 
@@ -21,8 +21,10 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 | `official_rag_chunks` | current | 현재 서버 설정(`RAG_PG_TABLE`)이 읽는 공식 약관·제도 RAG 청크 |
 | `policy_rag_chunks` | current ephemeral | 업로드 세션별 RAG 청크. 만료·삭제를 전제로 한다. |
 | `data_official_rag_chunks` | legacy candidate | 과거 후보 테이블. 현재 서버 설정의 읽기 경로가 아니므로 이전·정리 대상을 식별한다. |
-| `coverly.reference_data` | current | `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides` 운영 참조 데이터의 DB 원본 |
-| `premium_burden_guides` | current | 보험료 부담 가이드의 운영 기준. 스키마·기준일을 함께 관리한다. |
+| `reference.reference_data` | current | `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides` 운영 참조 데이터의 DB 원본 |
+| `reference.sources` | current | 구조화된 참조 테이블이 공유하는 출처 메타데이터 |
+| `reference.premium_burden_guides` | current | 보험료 부담 가이드의 운영 기준. 스키마·기준일을 함께 관리한다. |
+| `coverly.reference_data` | removed | `reference.reference_data`로 이전했다. |
 | `premium_benchmarks` | removed | 현재 계약과 달랐던 기존 보험료 벤치마크 테이블. cleanup migration으로 제거했다. |
 | `policy_change_notes` | removed | 제거된 구 분석 API 전용 제도 변경 메모. cleanup migration으로 제거했다. |
 
@@ -30,7 +32,7 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 
 ## 새 환경 초기 데이터
 
-`coverly.reference_data` migration은 테이블 구조와 이력을 관리한다. `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides`의 실제 payload는 Supabase 운영 데이터로 관리하며, 새 로컬·스테이징 환경도 승인된 DB 작업이나 새 migration으로 같은 row를 준비해야 한다. 서버 repo의 seed 스크립트나 bundled JSON으로 운영 데이터를 복제하지 않는다.
+`reference.reference_data` migration은 테이블 구조와 이력을 관리한다. `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides`의 실제 payload는 Supabase 운영 데이터로 관리하며, 새 로컬·스테이징 환경도 승인된 DB 작업이나 새 migration으로 같은 row를 준비해야 한다. 서버 repo의 seed 스크립트나 bundled JSON으로 운영 데이터를 복제하지 않는다.
 
 ## 출처 등급
 
