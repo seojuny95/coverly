@@ -9,6 +9,7 @@ from app.modules.policy.parsing import (
     PdfPasswordRequiredError,
 )
 from app.modules.policy.pipeline import EmptyTextError, PipelineResult
+from app.modules.reference_data.loader import ReferenceDataUnavailableError
 from app.rag.policy.session_tokens import sign_policy_session_id
 
 
@@ -226,6 +227,26 @@ def test_parse_maps_empty_text_error_to_422(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "PDF_TEXT_EXTRACTION_FAILED"
+
+
+def test_parse_maps_reference_data_failure_to_retryable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.policy import router as policies
+
+    def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        raise ReferenceDataUnavailableError("offline")
+
+    monkeypatch.setattr(policies, "run_pipeline", _raise)
+
+    client = TestClient(app)
+    response = client.post(
+        "/policies/parse",
+        files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "reference_data_unavailable"
 
 
 def test_delete_policy_text_session(monkeypatch: pytest.MonkeyPatch) -> None:
