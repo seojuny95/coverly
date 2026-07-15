@@ -39,6 +39,21 @@ pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
 - **`backend/`** — FastAPI + uv. → [backend/AGENTS.md](backend/AGENTS.md), LLM 프롬프트 가이드 → [backend/PROMPTING.md](backend/PROMPTING.md)
 - **`.github/`** — GitHub Actions CI + PR 템플릿.
 
+## Review Guidelines
+
+리뷰는 "동작하나?"에서 멈추지 않고, 장기적으로 유지 가능한 코드인지 확인한다. 공통으로 아래 순서로 본다.
+
+- **정확성**: 요구사항을 실제로 만족하는지, 실패·빈 값·부분 데이터·중복 입력에서 깨지지 않는지 확인한다.
+- **가독성**: 이름, 함수 크기, 분기 구조만 보고도 흐름이 이해되는지 본다. 설명이 필요한 복잡도는 코드 구조를 먼저 단순화하고, 필요한 경우에만 짧은 주석을 둔다.
+- **아키텍처 경계**: frontend/backend, 런타임/eval, domain/integration, UI/API 경계가 섞이지 않았는지 확인한다. 경계를 넘는 shortcut은 후속 비용이 크므로 리뷰에서 막는다.
+- **하드코딩 경계**: 상품명·보험사명·금액·출처·운영 데이터가 코드에 억지로 박히지 않았는지 본다. 변경 가능한 참조 사실은 Supabase/참조 데이터 경계를 따른다.
+- **프레임워크 관용성**: FastAPI, Next.js, React, react-query, Supabase 등 사용 중인 도구가 권장하는 방향과 맞는지 본다. 프레임워크 기능을 우회한 custom infrastructure는 이유가 명확해야 한다.
+- **근거와 안전성**: 보험 판단·LLM 응답·Q&A가 grounding, PII 마스킹, 판매 권유 금지 원칙을 깨지 않는지 확인한다.
+- **테스트 가능성**: 외부 API, LLM, DB에 직접 묶이지 않고 stub/fixture로 결정적 테스트가 가능한지 본다. 회귀 가능성이 있는 변경은 테스트를 요구한다.
+- **운영 관측성**: 실패가 조용한 fallback으로 숨지 않고 오류, 확인 불가 응답, 로그, 테스트 중 하나로 드러나는지 확인한다.
+
+세부 체크 포인트는 backend/frontend 각 앱의 `AGENTS.md`를 따른다.
+
 ## 문서 유지보수
 
 - 코드 변경으로 이 가이드(`AGENTS.md`/`CLAUDE.md`), `LOGS.md`, `UX_COPY.md` 등이 낡을 때, **곧바로 고치지 말고 먼저 "문서도 수정할까요?"라고 확인한다.** 사용자가 원할 때 코드와 함께 정리하고, 문서만 따로 여러 번 건드리지 않는다.

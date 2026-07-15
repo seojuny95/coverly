@@ -68,6 +68,20 @@ FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별
 
 - **평가와 런타임을 분리한다.** `backend/evals`는 품질 측정 전용이고, `tests/`는 correctness를 검증한다. `app`는 `evals`를 import하지 않는다.
 
+## Review Guidelines
+
+백엔드 리뷰는 FastAPI 앱이 기능별 모듈 경계와 데이터 소유권을 지키는지 우선 확인한다.
+
+- **라우터는 얇은가**: `APIRouter`는 요청/응답 조립만 담당하고, 파싱·분류·집계·LLM 호출·DB 조회 로직은 `modules/`, `rag/`, `integrations/`로 내려가야 한다.
+- **의존성 경계가 맞는가**: `modules`가 외부 시스템 구현에 직접 달라붙지 않고 `integrations`나 명확한 repository/helper 경계를 거치는지 본다. `app`가 `backend/evals`를 import하면 안 된다.
+- **FastAPI 관용 방식인가**: 공유 자원 초기화는 `lifespan`, 기능별 라우팅은 `APIRouter`, 요청 단위 의존성은 필요한 경우 `Depends`로 표현한다. 전역 싱글톤이나 import-time side effect로 우회하지 않는다.
+- **참조 데이터 소유권이 맞는가**: Supabase 소유 데이터(`REFERENCE_DATA.md`)를 코드 상수·bundled JSON·silent fallback으로 복제하지 않는다. 코드 소유 규칙과 DB 소유 사실을 섞지 않는다.
+- **하드코딩이 정당한가**: 보험사/상품 전용 분기, 출처 없는 기준금액, 임의 score/weight/threshold가 들어오면 거절한다. 필요한 운영 데이터는 DB나 명시된 참조 데이터로 옮긴다.
+- **LLM 경계가 안전한가**: 프롬프트, grounding, cite-or-refuse, fallback 정책이 [PROMPTING.md](PROMPTING.md)와 루트 원칙을 따른다. 근거 없는 총평이나 보장 단정은 허용하지 않는다.
+- **실패 정책이 명확한가**: DB, RAG, LLM, 외부 API 실패가 조용히 성공처럼 보이지 않아야 한다. 전체 분석을 실패시켜야 하는 참조 데이터 오류와 확인 불가로 degrade할 수 있는 검색 오류를 구분한다.
+- **타입과 테스트가 회귀를 막는가**: Pydantic schema, mypy, pytest fixture가 실제 응답 계약을 반영하는지 본다. LLM/API/DB는 유닛 테스트에서 stub 가능해야 한다.
+- **성능·비용이 예측 가능한가**: 불필요한 LLM 호출, 반복 DB 조회, 대용량 PDF/RAG 처리의 중복 작업이 없는지 확인한다. 캐시는 소유권과 무효화 기준이 명확해야 한다.
+
 ## Coding Style & Naming Conventions
 
 - 스타일은 **ruff**에 위임하되, ruff format 통과는 최소선이지 목표가 아니다.
