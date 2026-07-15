@@ -518,6 +518,50 @@ def test_essential_indemnity_check_excludes_auto_fine_actual_loss_terms() -> Non
     assert items["indemnity"].matched_coverage_names == []
 
 
+def test_essential_indemnity_check_excludes_property_and_driver_actual_loss_terms() -> None:
+    policy = _policy(
+        "damage",
+        "손해보험",
+        "보험사A",
+        [
+            {
+                "담보명": "12대가전제품고장수리 비용(실손)",
+                "가입금액": "100만원",
+                "지급유형": "실손",
+            },
+            {"담보명": "가족일상생활배상책임(실손)", "가입금액": "1억원", "지급유형": "실손"},
+            {"담보명": "북괴,침강및사태손해(실손)", "가입금액": "1억원", "지급유형": "실손"},
+            {
+                "담보명": "자동차사고변호사선임 비용(특정사고경찰조사 포함)(실손)",
+                "가입금액": "500만원",
+                "지급유형": "실손",
+            },
+            {
+                "담보명": "주택(화재)가재도구재 조달차액지원(실손)",
+                "가입금액": "1천만원",
+                "지급유형": "실손",
+            },
+            {"담보명": "화재(폭발포함)배상책임(실손)", "가입금액": "1억원", "지급유형": "실손"},
+            {
+                "담보명": "화재손해(폐기물 운반 및 매립·소각 등 비용 포함)(실손)",
+                "가입금액": "1억원",
+                "지급유형": "실손",
+            },
+            {"담보명": "고속도로교통상해사망", "가입금액": "1억원", "지급유형": "정액"},
+            {"담보명": "상해사망·후유장해 (20-100%)", "가입금액": "1억원", "지급유형": "정액"},
+        ],
+        tags=["운전자보험", "화재보험"],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    items = {item.kind: item for item in result.essential_coverage_check.items}
+
+    assert result.indemnity_coverages == []
+    assert items["indemnity"].status == "not_found"
+    assert items["indemnity"].coverage_count == 0
+    assert items["indemnity"].matched_coverage_names == []
+
+
 def test_special_policy_analysis_is_returned_only_for_present_policy_types() -> None:
     raw_policies = [
         {
