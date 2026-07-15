@@ -2,7 +2,6 @@
 
 import re
 from collections import defaultdict
-from dataclasses import dataclass
 from enum import Enum
 
 from app.schemas.portfolio import (
@@ -21,6 +20,10 @@ from app.schemas.portfolio import (
     PremiumBenchmark,
     PremiumOverview,
 )
+from app.services.coverage_knowledge.indemnity import (
+    classify_indemnity,
+    has_negated_indemnity_text,
+)
 from app.services.coverage_knowledge.matching import (
     canonicalize_coverage_name,
     choose_display_name,
@@ -29,57 +32,16 @@ from app.services.portfolio.essential_coverage import (
     build_essential_coverage_check,
     build_special_policy_analyses,
 )
+from app.services.portfolio.policy_classification import (
+    damage_insurance_type,
+    damage_insurance_type_rank,
+    is_auto_policy,
+    is_damage_policy,
+)
 from app.services.portfolio.premium import summarize_premiums
 from app.services.qa.claim_channels import claim_channel_block
 from app.services.reference.premium_benchmark import premium_benchmark_for_age
 
-_DAMAGE_CLASSIFICATION = "손해보험"
-_LEGACY_DAMAGE_CLASSIFICATIONS = frozenset(
-    {
-        "자동차",
-        "자동차보험",
-        "운전자보험",
-        "운전자상해보험",
-        "여행자보험",
-        "화재보험",
-        "주택화재보험",
-        "배상책임보험",
-        "보증보험",
-        "배상·화재·기타",
-    }
-)
-_AUTO_TAG_TERMS = ("자동차", "자동차보험")
-_INDEMNITY_NAME_TERMS = ("실손", "실비")
-_INDEMNITY_CATEGORIES = frozenset({"실손", "실손형", "실비", "실비형"})
-_NEGATED_INDEMNITY_PATTERNS = (
-    "비실손",
-    "비실비",
-    "실손제외",
-    "실비제외",
-    "실손미해당",
-    "실비미해당",
-    "실손아님",
-    "실비아님",
-    "실손비대상",
-    "실비비대상",
-    "실손미포함",
-    "실비미포함",
-)
-_FIXED_PAYMENT_TYPES = frozenset({"정액", "정액형", "고정액", "고정액형"})
-_INDEMNITY_PAYMENT_TYPES = frozenset(
-    {
-        "실손",
-        "실손형",
-        "실비",
-        "실비형",
-        "비례",
-        "비례형",
-        "비례보상",
-        "실액",
-        "실액형",
-        "실액보상",
-    }
-)
 _SAFE_FIXED_NAME_TERMS = (
     "진단비",
     "수술비",
@@ -107,23 +69,6 @@ MAJOR_CATEGORY_ORDER = (
     "치료",
     "기타",
 )
-_DAMAGE_INSURANCE_TYPE_ORDER = (
-    "자동차보험",
-    "운전자보험",
-    "여행자보험",
-    "화재보험",
-    "배상책임보험",
-    "보증보험",
-    "손해보험",
-)
-
-
-@dataclass(frozen=True)
-class PortfolioFacts:
-    """Stable facts reusable by analysis and Q&A without introducing RAG."""
-
-    policies: tuple[PolicyInput, ...]
-    coverage_summary: PortfolioCoverageSummary
 
 
 class _PayoutKind(Enum):
@@ -160,43 +105,26 @@ def major_category(name: str) -> str:
     return "기타"
 
 
-def is_damage_policy(policy: PolicyInput) -> bool:
-    """Return whether a policy belongs to the separately handled non-life branch."""
-
-    category = policy.기본정보.보험분류 or ""
-    return category == _DAMAGE_CLASSIFICATION or category in _LEGACY_DAMAGE_CLASSIFICATIONS
-
-
-def is_auto_policy(policy: PolicyInput) -> bool:
-    """Return whether a policy is an auto policy inside the damage branch."""
-
-    return any(term in _damage_insurance_type(policy) for term in _AUTO_TAG_TERMS)
-
-
-def _classify_payout_kind(coverage: CoverageInput) -> _PayoutKind:
+def _classify_payout_kind(policy: PolicyInput, coverage: CoverageInput) -> _PayoutKind:
     """Classify explicit payment evidence before conservative name inference."""
 
-    payment_type = (coverage.지급유형 or "").strip()
-    if payment_type in _INDEMNITY_PAYMENT_TYPES:
-        return _PayoutKind.INDEMNITY
-    if payment_type in _FIXED_PAYMENT_TYPES:
-        return _PayoutKind.FIXED
-    if payment_type:
-        return _PayoutKind.UNKNOWN
-
-    coverage_category = (coverage.보장분류 or "").strip()
-    normalized_name = normalize_coverage_name(coverage.담보명)
-    normalized_category = normalize_coverage_name(coverage_category)
-    has_negated_indemnity = any(
-        pattern in normalized_name or pattern in normalized_category
-        for pattern in _NEGATED_INDEMNITY_PATTERNS
+    classification = classify_indemnity(
+        coverage_name=coverage.담보명,
+        payment_type=coverage.지급유형,
+        coverage_category=coverage.보장분류,
+        coverage_description=coverage.보장내용 or coverage.해설,
+        product_name=policy.기본정보.상품명,
+        policy_classification=policy.기본정보.보험분류,
+        product_tags=policy.기본정보.상품태그,
     )
-    if has_negated_indemnity:
+    if classification.payment_basis == "indemnity":
+        return _PayoutKind.INDEMNITY
+    if classification.payment_basis == "fixed":
+        return _PayoutKind.FIXED
+    if coverage.지급유형 or coverage.보장분류:
         return _PayoutKind.UNKNOWN
-    if coverage_category in _INDEMNITY_CATEGORIES:
-        return _PayoutKind.INDEMNITY
-    if any(term in normalized_name for term in _INDEMNITY_NAME_TERMS):
-        return _PayoutKind.INDEMNITY
+    if has_negated_indemnity_text(coverage.담보명):
+        return _PayoutKind.UNKNOWN
     if any(term in coverage.담보명 for term in _SAFE_FIXED_NAME_TERMS):
         return _PayoutKind.FIXED
 
@@ -230,13 +158,13 @@ def summarize_portfolio_coverages(policies: list[PolicyInput]) -> PortfolioCover
 
     for policy in policies:
         if is_damage_policy(policy):
-            damage_rows[_damage_insurance_type(policy)].append(_damage_policy_group(policy))
+            damage_rows[damage_insurance_type(policy)].append(_damage_policy_group(policy))
             if is_auto_policy(policy):
                 auto_count += 1
             continue
         for coverage in policy.보장목록:
             group_key = canonicalize_coverage_name(coverage.담보명).normalized_key
-            payout_kind = _classify_payout_kind(coverage)
+            payout_kind = _classify_payout_kind(policy, coverage)
             if payout_kind is _PayoutKind.INDEMNITY:
                 indemnity_rows.append((policy, coverage, group_key))
                 continue
@@ -310,15 +238,6 @@ def count_duplicate_indemnity_coverages(summary: PortfolioCoverageSummary) -> in
     return len(duplicated)
 
 
-def build_portfolio_facts(policies: list[PolicyInput]) -> PortfolioFacts:
-    """Build the deterministic common input for summary, analysis, and Q&A."""
-
-    return PortfolioFacts(
-        policies=tuple(policy for policy in policies if not is_damage_policy(policy)),
-        coverage_summary=summarize_portfolio_coverages(policies),
-    )
-
-
 def _claim_channels(
     policies: list[PolicyInput],
     essential_coverage_check: EssentialCoverageCheck,
@@ -363,35 +282,6 @@ def _excluded(policy: PolicyInput, coverage: CoverageInput, reason: str) -> Excl
     )
 
 
-def _damage_insurance_type(policy: PolicyInput) -> str:
-    category = policy.기본정보.보험분류 or ""
-    if category in {"자동차", "자동차보험"}:
-        return "자동차보험"
-    if category in {"운전자보험", "운전자상해보험"}:
-        return "운전자보험"
-    if category == "여행자보험":
-        return "여행자보험"
-    if category in {"화재보험", "주택화재보험"}:
-        return "화재보험"
-    if category == "배상책임보험":
-        return "배상책임보험"
-    if category == "보증보험":
-        return "보증보험"
-
-    tags = policy.기본정보.상품태그
-    for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:
-        if insurance_type in tags:
-            return insurance_type
-
-    product_name = policy.기본정보.상품명 or ""
-    normalized_product = normalize_coverage_name(product_name)
-    for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:
-        if normalize_coverage_name(insurance_type) in normalized_product:
-            return insurance_type
-
-    return "손해보험"
-
-
 def _damage_policy_group(policy: PolicyInput) -> DamagePolicyCoverageGroup:
     return DamagePolicyCoverageGroup(
         policy_id=policy.id,
@@ -419,16 +309,9 @@ def _build_damage_groups(
         )
         for insurance_type, policies in sorted(
             damage_rows.items(),
-            key=lambda item: _damage_insurance_type_rank(item[0]),
+            key=lambda item: damage_insurance_type_rank(item[0]),
         )
     ]
-
-
-def _damage_insurance_type_rank(insurance_type: str) -> tuple[int, str]:
-    try:
-        return (_DAMAGE_INSURANCE_TYPE_ORDER.index(insurance_type), insurance_type)
-    except ValueError:
-        return (len(_DAMAGE_INSURANCE_TYPE_ORDER), insurance_type)
 
 
 def _damage_policy_sort_key(

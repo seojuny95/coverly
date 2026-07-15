@@ -30,6 +30,7 @@ from app.schemas.portfolio import (
     PremiumOverview,
 )
 from app.services.analysis.generation import generate_counselor
+from app.services.coverage_knowledge.indemnity import classify_indemnity
 from app.services.coverage_knowledge.purpose import coverage_purpose
 from app.services.coverage_knowledge.recommendations import (
     recommendation_for_age,
@@ -49,12 +50,9 @@ from app.services.evidence.catalog import (
 )
 from app.services.llm import JsonCompleter
 from app.services.portfolio.demographics import resolve_portfolio_demographics
+from app.services.portfolio.facts import PortfolioFacts, build_portfolio_facts
 from app.services.portfolio.premium import summarize_premiums
-from app.services.portfolio.summary import (
-    PortfolioFacts,
-    build_portfolio_facts,
-    count_duplicate_indemnity_coverages,
-)
+from app.services.portfolio.summary import count_duplicate_indemnity_coverages
 from app.services.rag.official.models import RetrievalHit
 from app.services.rag.official.retrieval import retrieve
 from app.services.reference.policy_change import policy_changes_for_tags
@@ -152,7 +150,7 @@ def analyze_portfolio(
             catalog,
         ),
         coverage_amount_status=_coverage_amount_status(summary, catalog),
-        claim_condition_checks=_claim_condition_checks(summary, catalog),
+        claim_condition_checks=_claim_condition_checks(facts, catalog),
         policy_change_checks=_policy_change_checks(facts, life_stage_check),
         generation=generation,
     )
@@ -255,9 +253,26 @@ def _life_stage_check(demographics: InsuredDemographics, facts: PortfolioFacts) 
     if demographics.age is None:
         return LifeStageCheck(life_stage="미상", held=(), missing=())
     coverage_names = [coverage.담보명 for policy in facts.policies for coverage in policy.보장목록]
-    if facts.coverage_summary.indemnity_coverages:
+    if _has_medical_indemnity_coverage(facts):
         coverage_names.append("실손의료")
     return check_life_stage(demographics.age, coverage_names)
+
+
+def _has_medical_indemnity_coverage(facts: PortfolioFacts) -> bool:
+    return any(
+        classify_indemnity(
+            coverage_name=coverage.담보명,
+            payment_type=coverage.지급유형,
+            coverage_category=coverage.보장분류,
+            coverage_description=coverage.보장내용 or coverage.해설,
+            product_name=policy.기본정보.상품명,
+            policy_classification=policy.기본정보.보험분류,
+            product_tags=policy.기본정보.상품태그,
+        ).medical_indemnity_status
+        == "confirmed"
+        for policy in facts.policies
+        for coverage in policy.보장목록
+    )
 
 
 def _priority_checks(
@@ -379,7 +394,7 @@ def _age_coverage_recommendation(
         )
         if category is not None
     }
-    if facts.coverage_summary.indemnity_coverages:
+    if _has_medical_indemnity_coverage(facts):
         held_categories.add(INDEMNITY)
 
     items: list[AgeCoverageRecommendationItem] = []
@@ -512,10 +527,11 @@ def _coverage_amount_status_item(
 
 
 def _claim_condition_checks(
-    summary: PortfolioCoverageSummary,
+    facts: PortfolioFacts,
     catalog: EvidenceCatalog,
 ) -> list[ClaimConditionCheck]:
     checks: list[ClaimConditionCheck] = []
+    summary = facts.coverage_summary
 
     if summary.totals:
         evidence_ids = [
@@ -536,7 +552,7 @@ def _claim_condition_checks(
             )
         )
 
-    if summary.indemnity_coverages:
+    if _has_medical_indemnity_coverage(facts):
         evidence_ids = [item.id for item in catalog.items if item.id.startswith("indemnity:")][:3]
         checks.append(
             ClaimConditionCheck(
@@ -572,7 +588,7 @@ def _policy_change_checks(
     life_stage_check: LifeStageCheck,
 ) -> list[PolicyChangeCheck]:
     tags: set[str] = set()
-    if facts.coverage_summary.indemnity_coverages:
+    if _has_medical_indemnity_coverage(facts):
         tags.add(INDEMNITY)
     if INDEMNITY in life_stage_check.held or INDEMNITY in life_stage_check.missing:
         tags.add(INDEMNITY)
@@ -593,7 +609,7 @@ def _analysis_notices(facts: PortfolioFacts, demographics: InsuredDemographics) 
     notices: list[str] = []
     if summary.excluded_coverages:
         notices.append("일부 담보는 지급유형 또는 금액을 확인할 수 없어 합계에서 제외했습니다.")
-    if summary.indemnity_coverages:
+    if _has_medical_indemnity_coverage(facts):
         notices.append("실손형 담보는 가입금액 합산 대상이 아니며 보유 건수만 표시합니다.")
     if summary.damage_coverages:
         notices.append(

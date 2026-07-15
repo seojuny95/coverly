@@ -28,11 +28,8 @@ from app.services.evidence.catalog import (
 )
 from app.services.llm import JsonCompleter, TextStreamer
 from app.services.portfolio.demographics import resolve_portfolio_demographics
-from app.services.portfolio.summary import (
-    PortfolioFacts,
-    build_portfolio_facts,
-    is_auto_policy,
-)
+from app.services.portfolio.facts import PortfolioFacts, build_portfolio_facts
+from app.services.portfolio.policy_classification import is_auto_policy
 from app.services.qa.claim_channels import claim_channel_block
 from app.services.qa.generation import (
     QaStreamEvent,

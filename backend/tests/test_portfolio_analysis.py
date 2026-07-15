@@ -131,6 +131,28 @@ def test_analysis_recognizes_indemnity_from_payment_type() -> None:
     assert all(gap.category != "실손의료" for gap in result.coverage_gaps)
 
 
+def test_analysis_does_not_treat_non_medical_indemnity_as_indemnity() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험분류": "화재보험", "보험사": "테스트보험"},
+            "보장목록": [
+                {
+                    "담보명": "가족화재벌금(실손)",
+                    "가입금액": "1,000만원",
+                    "지급유형": "실손",
+                }
+            ],
+        }
+    )
+
+    result = analyze_portfolio([policy], age=35, gender="여성")
+
+    assert "실손의료" not in result.prepared_coverages
+    assert any(gap.category == "실손의료" for gap in result.coverage_gaps)
+    assert all("실손형 담보" not in notice for notice in result.notices)
+
+
 def test_analysis_accepts_only_cited_llm_insights_and_ignores_amount_review() -> None:
     policy = _policy("p1", "질병", "암진단비", "3,000만원")
 

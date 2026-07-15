@@ -2,8 +2,8 @@ import pytest
 
 from app.schemas.portfolio import PolicyInput
 from app.services.analysis.summary_overview import generate_summary_overview
+from app.services.portfolio.facts import build_portfolio_facts
 from app.services.portfolio.summary import (
-    build_portfolio_facts,
     normalize_coverage_name,
     summarize_portfolio_coverages,
 )
@@ -461,6 +461,21 @@ def test_essential_check_flags_narrow_diagnoses_and_multiple_indemnity_contracts
     assert items["cerebrovascular"].status == "not_found"
     assert items["ischemic_heart"].status == "not_found"
     assert items["indemnity"].status == "needs_review"
+
+
+def test_essential_indemnity_check_ignores_non_medical_indemnity_terms() -> None:
+    policy = _policy(
+        "p1",
+        "화재보험",
+        "보험사A",
+        [{"담보명": "가족화재벌금(실손)", "가입금액": "1천만원", "지급유형": "실손"}],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    items = {item.kind: item for item in result.essential_coverage_check.items}
+
+    assert items["indemnity"].status == "not_found"
+    assert items["indemnity"].matched_coverage_names == []
 
 
 def test_essential_indemnity_check_does_not_exclude_auto_policy_rows() -> None:

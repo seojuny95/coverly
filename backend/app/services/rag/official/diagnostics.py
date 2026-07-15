@@ -18,8 +18,6 @@ from app.services.rag.official.loaders import load_official_chunks
 from app.services.rag.official.models import RagChunk, RetrievalHit
 from app.services.rag.official.retrieval import retrieve
 
-_VISIBLE_CONTEXT_CHARS = 900
-
 
 @dataclass(frozen=True)
 class ChunkLengthStats:
@@ -38,7 +36,6 @@ class RetrievalDiagnosticResult:
     query: str
     candidate_rank: int | None
     final_rank: int | None
-    visible_rank: int | None
     top_hits: tuple[RetrievalHit, ...]
 
 
@@ -70,12 +67,6 @@ class RetrievalDiagnosticReport:
     def recall_at_5(self) -> float:
         return _rate(
             result.final_rank is not None and result.final_rank <= 5 for result in self.results
-        )
-
-    @property
-    def visible_recall_at_5(self) -> float:
-        return _rate(
-            result.visible_rank is not None and result.visible_rank <= 5 for result in self.results
         )
 
 
@@ -126,7 +117,6 @@ def render_report(report: RetrievalDiagnosticReport) -> str:
             _metric_line("recall@1", report.recall_at_1, report.results),
             _metric_line("recall@3", report.recall_at_3, report.results),
             _metric_line("recall@5", report.recall_at_5, report.results),
-            _metric_line("visible_recall@5", report.visible_recall_at_5, report.results),
             "",
             "=== CASES ===",
         )
@@ -180,9 +170,8 @@ def _diagnose_case(
     return RetrievalDiagnosticResult(
         case_id=case.id,
         query=case.query,
-        candidate_rank=_first_rank(case, candidate_hits, visible_only=False),
-        final_rank=_first_rank(case, top_hits, visible_only=False),
-        visible_rank=_first_rank(case, top_hits, visible_only=True),
+        candidate_rank=_first_rank(case, candidate_hits),
+        final_rank=_first_rank(case, top_hits),
         top_hits=tuple(top_hits[:5]),
     )
 
@@ -190,8 +179,6 @@ def _diagnose_case(
 def _first_rank(
     case: RetrievalEvalCase,
     hits: list[RetrievalHit],
-    *,
-    visible_only: bool,
 ) -> int | None:
     if case.expected_no_hits:
         return None
@@ -208,7 +195,6 @@ def _case_lines(result: RetrievalDiagnosticResult) -> list[str]:
         f"query {result.query}",
         f"candidate_rank {result.candidate_rank}",
         f"final_rank {result.final_rank}",
-        f"visible_rank {result.visible_rank}",
     ]
     for rank, hit in enumerate(result.top_hits, start=1):
         lines.append(

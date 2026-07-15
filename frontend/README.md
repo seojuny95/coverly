@@ -13,6 +13,7 @@ pnpm dev
 
 ```bash
 pnpm lint
+pnpm dead-code
 pnpm test
 pnpm typecheck
 pnpm format:check

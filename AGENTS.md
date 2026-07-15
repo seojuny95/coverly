@@ -26,11 +26,11 @@ Coverly(Coverly AI)는 보험 증권(PDF)을 업로드하면 AI가 흩어진 보
 ```bash
 # 백엔드 (FastAPI, uv)
 cd backend && uv run uvicorn app.main:app --reload
-uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run pytest
+uv run ruff check . && uv run ruff format --check . && uv run vulture app --min-confidence 80 && uv run mypy . && uv run pytest
 
 # 프론트엔드 (Next.js, pnpm)
 cd frontend && pnpm dev
-pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
+pnpm test && pnpm lint && pnpm dead-code && pnpm typecheck && pnpm format:check && pnpm build
 ```
 
 ## Project Structure

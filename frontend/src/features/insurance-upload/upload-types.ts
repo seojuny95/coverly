@@ -1,6 +1,6 @@
 import type { InsuranceUploadResult } from "./upload-insurance";
 
-export type UploadInsuranceInput = {
+type UploadInsuranceInput = {
   file: File;
   password?: string;
 };

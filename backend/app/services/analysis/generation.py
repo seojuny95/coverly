@@ -26,11 +26,9 @@ from app.services.llm import (
     dump_prompt_json,
     structured_completer,
 )
+from app.services.portfolio.facts import PortfolioFacts
 from app.services.portfolio.premium import summarize_premiums
-from app.services.portfolio.summary import (
-    PortfolioFacts,
-    count_duplicate_indemnity_coverages,
-)
+from app.services.portfolio.summary import count_duplicate_indemnity_coverages
 from app.services.rag.official.models import RetrievalHit
 
 # Strengths cite held coverages; gaps may also cite existing coverages/실손 to

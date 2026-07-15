@@ -7,7 +7,7 @@ from app.schemas.consultation import ConsultationEvidence, InsuredDemographics
 from app.schemas.portfolio import PolicyInput
 from app.schemas.qa import AnswerCitation
 from app.services.coverage_knowledge.taxonomy import classify_coverage
-from app.services.portfolio.summary import PortfolioFacts
+from app.services.portfolio.facts import PortfolioFacts
 from app.services.rag.official.models import RetrievalHit
 from app.services.rag.policy import PolicyRetrievalHit
 

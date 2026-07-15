@@ -2,7 +2,7 @@
 
 from app.schemas.consultation import InsuredDemographics
 from app.schemas.portfolio import PolicyInput
-from app.services.portfolio.summary import is_damage_policy
+from app.services.portfolio.policy_classification import is_damage_policy
 
 
 def resolve_portfolio_demographics(

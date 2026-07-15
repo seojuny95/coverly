@@ -14,6 +14,7 @@ from app.schemas.portfolio import (
     SpecialPolicyAnalysis,
     SpecialPolicyKind,
 )
+from app.services.coverage_knowledge.indemnity import classify_indemnity
 
 _UNITS = {
     "원": 1,
@@ -27,36 +28,6 @@ _UNITS = {
 _CANCER_TERMS = ("암", "악성신생물")
 _CEREBROVASCULAR_TERMS = ("뇌혈관질환",)
 _HEART_TERMS = ("심장질환", "심질환", "허혈성심")
-_INDEMNITY_TERMS = ("실손", "실비")
-_INDEMNITY_TYPES = frozenset(
-    {
-        "실손",
-        "실손형",
-        "실비",
-        "실비형",
-        "비례",
-        "비례형",
-        "비례보상",
-        "실액",
-        "실액형",
-        "실액보상",
-    }
-)
-_NEGATED_INDEMNITY_TERMS = (
-    "비실손",
-    "비실비",
-    "실손제외",
-    "실비제외",
-    "실손미해당",
-    "실비미해당",
-    "실손아님",
-    "실비아님",
-    "실손비대상",
-    "실비비대상",
-    "실손미포함",
-    "실비미포함",
-)
-
 _REFERENCE_AMOUNTS: dict[EssentialCoverageKind, tuple[int, int] | None] = {
     "death": (10_000_000, 20_000_000),
     "cancer": (30_000_000, 50_000_000),
@@ -328,7 +299,7 @@ def _indemnity_item(policies: list[PolicyInput]) -> EssentialCoverageItem:
         (policy, coverage)
         for policy in policies
         for coverage in policy.보장목록
-        if _is_indemnity_coverage(coverage)
+        if _is_indemnity_coverage(policy, coverage)
     ]
     policy_keys = {
         policy.id or policy.기본정보.보험사
@@ -357,20 +328,17 @@ def _indemnity_item(policies: list[PolicyInput]) -> EssentialCoverageItem:
     )
 
 
-def _is_indemnity_coverage(coverage: CoverageInput) -> bool:
-    normalized_name = _normalize(coverage.담보명)
-    normalized_category = _normalize(coverage.보장분류 or "")
-    if any(
-        term in normalized_name or term in normalized_category for term in _NEGATED_INDEMNITY_TERMS
-    ):
-        return False
-    payment_type = (coverage.지급유형 or "").strip()
-    coverage_category = (coverage.보장분류 or "").strip()
-    return (
-        payment_type in _INDEMNITY_TYPES
-        or coverage_category in _INDEMNITY_TYPES
-        or any(term in normalized_name for term in _INDEMNITY_TERMS)
+def _is_indemnity_coverage(policy: PolicyInput, coverage: CoverageInput) -> bool:
+    classification = classify_indemnity(
+        coverage_name=coverage.담보명,
+        payment_type=coverage.지급유형,
+        coverage_category=coverage.보장분류,
+        coverage_description=coverage.보장내용 or coverage.해설,
+        product_name=policy.기본정보.상품명,
+        policy_classification=policy.기본정보.보험분류,
+        product_tags=policy.기본정보.상품태그,
     )
+    return classification.medical_indemnity_status == "confirmed"
 
 
 def _special_policy_kind(policy: PolicyInput) -> SpecialPolicyKind | None:

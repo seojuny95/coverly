@@ -294,7 +294,7 @@ export function prepareChatHistory(history: ChatHistoryItem[]) {
   }));
 }
 
-export type PolicyDemographicsCandidate = {
+type PolicyDemographicsCandidate = {
   age: number;
   gender: string;
   lifeStage?: string;
@@ -302,7 +302,7 @@ export type PolicyDemographicsCandidate = {
 
 // Shared scan over non-damage policies for usable (age, gender) info. Q&A takes
 // the first match as best-effort context; portfolio summary stays deterministic.
-export function collectPolicyDemographicsCandidates(
+function collectPolicyDemographicsCandidates(
   insuranceDocuments: AnalyzedInsurance[],
 ): PolicyDemographicsCandidate[] {
   const candidates: PolicyDemographicsCandidate[] = [];

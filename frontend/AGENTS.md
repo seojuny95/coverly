@@ -15,7 +15,7 @@ Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(
 ```bash
 pnpm install
 pnpm dev
-pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
+pnpm test && pnpm lint && pnpm dead-code && pnpm typecheck && pnpm format:check && pnpm build
 pnpm format
 ```
 
@@ -29,18 +29,20 @@ src/
 │   ├── page.tsx                # 랜딩
 │   ├── upload/page.tsx         # 업로드
 │   ├── analysis/page.tsx       # 분석 결과
+│   ├── preview/analysis/page.tsx # 개발용 분석 화면 미리보기
 │   ├── layout.tsx / globals.css
 │   └── error.tsx / global-error.tsx / not-found.tsx
 ├── components/                 # 공용 UI (coverly-brand, app-error-fallback)
 └── features/
     ├── insurance-upload/       # 업로드 폼 + upload-insurance API
     ├── insurance-analysis/     # 분석 페이지, 보장 목록, 인메모리 데이터 Context, 이탈 경고, 보험사 로고
-    └── portfolio/              # 보장금 합계표, 손해보험 별도 보장, 상담 전 검토 패널, Q&A 챗봇, portfolio API
+    └── portfolio/              # 보장금 합계, 전체 보험 점검, 청구 안내, Q&A, portfolio API
 ```
 
 - 증권·분석 데이터는 `insurance-analysis-store.tsx`의 인메모리 React Context(`InsuranceDataProvider`)가 관리한다(업로드 → 분석 전달). 로그인이 없고 민감정보라 **영속 저장은 하지 않는다** — 새로고침·화면 이탈 시 사라지며, 그 전에 경고한다.
 - 서버 데이터 패칭은 **react-query**로 통일한다(조회는 `useQuery`, 생성/전송은 `useMutation`). 앱 전역 `QueryClientProvider`는 `app/providers.tsx`에 둔다. 캐시는 인메모리 전용(persister 없음)이라 서비스 탭 전환에는 유지되고 새로고침에는 사라진다.
 - 백엔드 호출 함수는 `features/*/*-api.ts`에 모으고, base URL은 `NEXT_PUBLIC_API_BASE_URL`을 쓴다.
+- `portfolio-analysis-panel.tsx`는 상태 분기와 섹션 조합만 담당한다. 전체 총평·권장보험·보험료는 `portfolio-overview.tsx`, 손해보험은 `special-policy-sections.tsx`, 청구 안내는 `portfolio-claim-guide.tsx`, 로딩·빈 상태는 `portfolio-analysis-states.tsx`에 둔다.
 
 ## Coding Style & Naming Conventions
 
@@ -57,7 +59,7 @@ src/
 ## Testing Guidelines
 
 - 테스트는 **Vitest + Testing Library**를 사용한다.
-- 최소 검증은 `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build` 통과다.
+- 최소 검증은 `pnpm test`, `pnpm lint`, `pnpm dead-code`, `pnpm typecheck`, `pnpm format:check`, `pnpm build` 통과다.
 
 ## Configuration
 

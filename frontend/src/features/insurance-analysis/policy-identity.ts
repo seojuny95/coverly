@@ -8,12 +8,6 @@ export function normalizeInsurerName(value: string) {
   return normalizeValue(value).replace(/주식회사|\(주\)|㈜/g, "");
 }
 
-export function getPolicyIdentityKey(
-  insuranceDocument: AnalyzedInsurance,
-): string | null {
-  return getPolicyIdentityKeys(insuranceDocument)[0] ?? null;
-}
-
 export function getPolicyIdentityKeys(
   insuranceDocument: AnalyzedInsurance,
 ): string[] {

@@ -28,6 +28,7 @@ pre-commit install
 cd backend
 uv run ruff check .
 uv run ruff format --check .
+uv run vulture app --min-confidence 80
 uv run mypy .
 uv run pytest
 ```
@@ -36,6 +37,7 @@ uv run pytest
 cd frontend
 pnpm test
 pnpm lint
+pnpm dead-code
 pnpm typecheck
 pnpm format:check
 pnpm build
