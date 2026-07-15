@@ -11,12 +11,20 @@ const OFFICIAL_FUNERAL_SOURCE = {
   reliability: "official" as const,
   caveat: "장례비용은 시기, 지역, 장례 방식에 따라 달라질 수 있어요.",
 };
-const DIAGNOSIS_SOURCE = {
-  label: "시그널플래너 · 3대 진단비 설명",
-  url: "https://blog.signalplanner.co.kr/5344/",
-  published_at: "2022-01-01",
+const BIZWATCH_DIAGNOSIS_SOURCE = {
+  label: "비즈워치 · 암 진단비 평균 범위",
+  url: "https://news.bizwatch.co.kr/article/finance/2024/07/05/0038",
+  published_at: "2024-07-06",
   reliability: "private_guidance" as const,
-  caveat: "진단비 금액은 개인 상황과 상품 조건에 따라 달라질 수 있어요.",
+  caveat:
+    "암 진단비 금액은 소득, 가족 부양, 보험료 부담에 따라 달라질 수 있어요.",
+};
+const BANKSALAD_DIAGNOSIS_SOURCE = {
+  label: "뱅크샐러드 · 3대 진단비 구성 예시",
+  url: "https://www.banksalad.com/articles/%EB%B3%B4%ED%97%98-%EC%A2%85%ED%95%A9%EB%B3%B4%ED%97%98-%EC%A7%88%EB%B3%B4%ED%97%98",
+  published_at: "2026-07-01",
+  reliability: "private_guidance" as const,
+  caveat: "구성 예시는 상품과 개인 상황에 따라 달라질 수 있어요.",
 };
 const INDEMNITY_SOURCE = {
   label: "실손24 · 서비스 안내",
@@ -81,8 +89,12 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         confirmed_amount: 35_000_000,
         reference_min_amount: 30_000_000,
         reference_max_amount: 50_000_000,
-        reference_basis: "3대 진단비 점검용 범위",
-        reference_sources: [DIAGNOSIS_SOURCE],
+        reference_basis:
+          "암 진단비는 치료 중 쉬는 기간의 생활비 성격까지 고려하는 기본 범위",
+        reference_sources: [
+          BIZWATCH_DIAGNOSIS_SOURCE,
+          BANKSALAD_DIAGNOSIS_SOURCE,
+        ],
         coverage_count: 2,
         detail:
           "일반암·유사암·고액암·소액암을 포함해 확인된 암 진단비를 모았어요.",
@@ -93,10 +105,11 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         label: "뇌혈관질환 진단비",
         status: "not_found",
         confirmed_amount: null,
-        reference_min_amount: 30_000_000,
-        reference_max_amount: 30_000_000,
-        reference_basis: "3대 진단비 점검용 범위",
-        reference_sources: [DIAGNOSIS_SOURCE],
+        reference_min_amount: 10_000_000,
+        reference_max_amount: 20_000_000,
+        reference_basis:
+          "뇌혈관질환 진단비는 재활, 간병, 후유장해 가능성을 고려하는 기본 범위",
+        reference_sources: [BANKSALAD_DIAGNOSIS_SOURCE],
         coverage_count: 0,
         detail: "현재 올린 전체 보험에서는 확인하지 못했어요.",
         matched_coverage_names: [],
@@ -106,10 +119,11 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         label: "심장질환 진단비",
         status: "not_found",
         confirmed_amount: null,
-        reference_min_amount: 20_000_000,
-        reference_max_amount: 30_000_000,
-        reference_basis: "3대 진단비 점검용 범위",
-        reference_sources: [DIAGNOSIS_SOURCE],
+        reference_min_amount: 10_000_000,
+        reference_max_amount: 20_000_000,
+        reference_basis:
+          "심장질환 진단비는 시술, 수술, 입원으로 생길 수 있는 소득 공백을 고려하는 기본 범위",
+        reference_sources: [BANKSALAD_DIAGNOSIS_SOURCE],
         coverage_count: 0,
         detail: "현재 올린 전체 보험에서는 확인하지 못했어요.",
         matched_coverage_names: [],
