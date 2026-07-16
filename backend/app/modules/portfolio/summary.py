@@ -15,10 +15,7 @@ from app.modules.coverage.matching import (
     canonicalize_coverage_name,
     choose_display_name,
 )
-from app.modules.portfolio.essential_coverage import (
-    build_essential_coverage_check,
-    build_special_policy_analyses,
-)
+from app.modules.portfolio.essential_coverage import build_essential_coverage_check
 from app.modules.portfolio.premium import summarize_premiums
 from app.modules.portfolio.schemas import (
     ActualLossCoverageItem,
@@ -37,6 +34,7 @@ from app.modules.portfolio.schemas import (
     PremiumBenchmark,
     PremiumOverview,
 )
+from app.modules.portfolio.special_policies import build_special_policy_analyses
 from app.modules.qa.claim_channels import claim_channel_block
 from app.modules.reference_data.premium_benchmark import premium_benchmark_for_age
 
