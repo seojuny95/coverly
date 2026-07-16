@@ -536,6 +536,7 @@ export function InsuranceAnalysisPage({
               }
               deathBenefitContext={deathBenefitContext}
               onDeathBenefitContextChange={setDeathBenefitContext}
+              isDeathBenefitRefreshing={portfolioSummary.isRefreshing}
               eligibleCount={insuranceDocuments.length}
               emptyReason={emptyReasonFor(insuranceDocuments)}
               onRetry={portfolioSummary.retry}

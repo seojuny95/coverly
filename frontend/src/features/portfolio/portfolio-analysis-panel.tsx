@@ -116,6 +116,7 @@ export function PortfolioAnalysisPanel({
   summary,
   deathBenefitContext,
   onDeathBenefitContextChange,
+  isDeathBenefitRefreshing = false,
   eligibleCount,
   emptyReason,
   onRetry,
@@ -124,6 +125,7 @@ export function PortfolioAnalysisPanel({
   summary?: PortfolioSummary;
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
+  isDeathBenefitRefreshing?: boolean;
   eligibleCount: number;
   emptyReason: EmptyReason;
   onRetry: () => void;
@@ -161,6 +163,7 @@ export function PortfolioAnalysisPanel({
         items={items}
         deathBenefitContext={deathBenefitContext}
         onDeathBenefitContextChange={onDeathBenefitContextChange}
+        isDeathBenefitRefreshing={isDeathBenefitRefreshing}
         policyCount={eligibleCount}
         specialAnalyses={specialAnalyses}
         onRetry={onRetry}
@@ -180,6 +183,7 @@ function PortfolioOverview({
   items,
   deathBenefitContext,
   onDeathBenefitContextChange,
+  isDeathBenefitRefreshing,
   policyCount,
   specialAnalyses,
   onRetry,
@@ -188,6 +192,7 @@ function PortfolioOverview({
   items: EssentialCoverageItem[];
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
+  isDeathBenefitRefreshing: boolean;
   policyCount: number;
   specialAnalyses: SpecialPolicyAnalysis[];
   onRetry: () => void;
@@ -234,6 +239,7 @@ function PortfolioOverview({
           items={items}
           deathBenefitContext={deathBenefitContext}
           onDeathBenefitContextChange={onDeathBenefitContextChange}
+          isDeathBenefitRefreshing={isDeathBenefitRefreshing}
         />
         <ActualLossCoverageReview
           coverages={summary?.actual_loss_coverages ?? []}
@@ -313,6 +319,7 @@ function PortfolioOverview({
         items={items}
         deathBenefitContext={deathBenefitContext}
         onDeathBenefitContextChange={onDeathBenefitContextChange}
+        isDeathBenefitRefreshing={isDeathBenefitRefreshing}
       />
       <ActualLossCoverageReview
         coverages={summary?.actual_loss_coverages ?? []}
@@ -325,10 +332,12 @@ function RecommendedInsuranceCards({
   items,
   deathBenefitContext,
   onDeathBenefitContextChange,
+  isDeathBenefitRefreshing,
 }: {
   items: EssentialCoverageItem[];
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
+  isDeathBenefitRefreshing: boolean;
 }) {
   const death = items.find((item) => item.kind === "death");
   const diagnosisItems = items.filter((item) => DIAGNOSIS_KINDS.has(item.kind));
@@ -354,6 +363,7 @@ function RecommendedInsuranceCards({
           copy={RECOMMENDED_INSURANCE_COPY.death}
           deathBenefitContext={deathBenefitContext}
           onDeathBenefitContextChange={onDeathBenefitContextChange}
+          isRefreshing={isDeathBenefitRefreshing}
         />
 
         <RecommendedDiagnosisCard
@@ -424,31 +434,31 @@ function RecommendedSingleCoverageCard({
   copy,
   deathBenefitContext,
   onDeathBenefitContextChange,
+  isRefreshing,
 }: {
   eyebrow: string;
   item: EssentialCoverageItem | undefined;
   copy: typeof RECOMMENDED_INSURANCE_COPY.death;
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
+  isRefreshing: boolean;
 }) {
-  const updateDeathBenefitContext = (
-    key: keyof DeathBenefitGuideInput,
-    checked: boolean,
+  const selectedOption: keyof DeathBenefitGuideInput | "none" =
+    deathBenefitContext.has_dependent_family
+      ? "has_dependent_family"
+      : deathBenefitContext.has_minor_children
+        ? "has_minor_children"
+        : deathBenefitContext.has_major_debt
+          ? "has_major_debt"
+          : "none";
+
+  const selectDeathBenefitContext = (
+    option: keyof DeathBenefitGuideInput | "none",
   ) => {
-    onDeathBenefitContextChange({ ...deathBenefitContext, [key]: checked });
-  };
-
-  const hasNoDependentFamilyOrMajorDebt =
-    !deathBenefitContext.has_dependent_family &&
-    !deathBenefitContext.has_minor_children &&
-    !deathBenefitContext.has_major_debt;
-
-  const selectNoDependentFamilyOrMajorDebt = (checked: boolean) => {
-    if (!checked) return;
     onDeathBenefitContextChange({
-      has_dependent_family: false,
-      has_minor_children: false,
-      has_major_debt: false,
+      has_dependent_family: option === "has_dependent_family",
+      has_minor_children: option === "has_minor_children",
+      has_major_debt: option === "has_major_debt",
     });
   };
 
@@ -471,35 +481,28 @@ function RecommendedSingleCoverageCard({
 
       <div className="mt-5 space-y-4 border-t border-zinc-200 pt-5">
         <fieldset className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
-          <legend className="px-1 text-xs font-semibold text-zinc-500">
-            나의 상황
-          </legend>
-          <div className="mt-1 space-y-2">
-            <DeathBenefitCheckbox
-              checked={hasNoDependentFamilyOrMajorDebt}
+          <legend className="sr-only">나의 상황</legend>
+          <p className="text-xs font-semibold text-zinc-500">나의 상황</p>
+          <div className="mt-3 space-y-2">
+            <DeathBenefitRadio
+              checked={selectedOption === "none"}
               label="부양가족이나 큰 부채가 없어요"
-              onChange={selectNoDependentFamilyOrMajorDebt}
+              onChange={() => selectDeathBenefitContext("none")}
             />
-            <DeathBenefitCheckbox
-              checked={deathBenefitContext.has_dependent_family}
+            <DeathBenefitRadio
+              checked={selectedOption === "has_dependent_family"}
               label="내 소득에 의존하는 가족이 있어요"
-              onChange={(checked) =>
-                updateDeathBenefitContext("has_dependent_family", checked)
-              }
+              onChange={() => selectDeathBenefitContext("has_dependent_family")}
             />
-            <DeathBenefitCheckbox
-              checked={deathBenefitContext.has_minor_children}
+            <DeathBenefitRadio
+              checked={selectedOption === "has_minor_children"}
               label="미성년 자녀가 있어요"
-              onChange={(checked) =>
-                updateDeathBenefitContext("has_minor_children", checked)
-              }
+              onChange={() => selectDeathBenefitContext("has_minor_children")}
             />
-            <DeathBenefitCheckbox
-              checked={deathBenefitContext.has_major_debt}
+            <DeathBenefitRadio
+              checked={selectedOption === "has_major_debt"}
               label="주택담보대출·전세대출 등 큰 부채가 있어요"
-              onChange={(checked) =>
-                updateDeathBenefitContext("has_major_debt", checked)
-              }
+              onChange={() => selectDeathBenefitContext("has_major_debt")}
             />
           </div>
         </fieldset>
@@ -509,6 +512,7 @@ function RecommendedSingleCoverageCard({
             item={item}
             rangeLabel={copy.rangeLabel}
             fallbackNote={item?.guidance_reason ?? copy.rangeNote}
+            isRefreshing={isRefreshing}
           />
 
           {!item?.matched_coverage_names.length ? (
@@ -528,22 +532,23 @@ function RecommendedSingleCoverageCard({
   );
 }
 
-function DeathBenefitCheckbox({
+function DeathBenefitRadio({
   checked,
   label,
   onChange,
 }: {
   checked: boolean;
   label: string;
-  onChange: (checked: boolean) => void;
+  onChange: () => void;
 }) {
   return (
     <label className="flex items-start gap-2 text-sm leading-5 text-zinc-700">
       <input
-        type="checkbox"
+        type="radio"
+        name="death-benefit-context"
         checked={checked}
-        onChange={(event) => onChange(event.currentTarget.checked)}
-        className="mt-0.5 size-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+        onChange={onChange}
+        className="mt-0.5 size-4 border-zinc-300 text-blue-600 focus:ring-blue-500"
       />
       <span>{label}</span>
     </label>
@@ -699,10 +704,12 @@ function CoverageAmountMeter({
   item,
   rangeLabel,
   fallbackNote,
+  isRefreshing = false,
 }: {
   item: EssentialCoverageItem | undefined;
   rangeLabel: string;
   fallbackNote: string;
+  isRefreshing?: boolean;
 }) {
   const currentAmount = item?.confirmed_amount ?? null;
   const minAmount = item?.reference_min_amount ?? null;
@@ -719,6 +726,10 @@ function CoverageAmountMeter({
         <ReferenceSourceList sources={sources} />
       </div>
     );
+  }
+
+  if (isRefreshing) {
+    return <CoverageAmountMeterSkeleton />;
   }
 
   const scaleMax = Math.max(currentAmount ?? 0, maxAmount) * 1.2 || maxAmount;
@@ -790,6 +801,42 @@ function CoverageAmountMeter({
 
       <p className="mt-3 text-xs leading-5 text-zinc-500">{basis}</p>
       <ReferenceSourceList sources={sources} />
+    </div>
+  );
+}
+
+function CoverageAmountMeterSkeleton() {
+  return (
+    <div
+      className="rounded-2xl bg-white p-4 ring-1 ring-blue-200"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-zinc-500">현재 가입금액</p>
+          <div className="mt-2 h-6 w-28 animate-pulse rounded bg-zinc-200" />
+        </div>
+        <div className="text-right">
+          <p className="rounded-full bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-700">
+            안내금액 계산 중
+          </p>
+          <div className="mt-2 ml-auto h-4 w-24 animate-pulse rounded bg-zinc-200" />
+        </div>
+      </div>
+
+      <div className="mt-5 h-24 rounded-xl bg-zinc-50 p-4">
+        <div className="mt-8 h-2 animate-pulse rounded-full bg-zinc-200" />
+        <div className="mt-5 flex justify-between">
+          <div className="h-3 w-10 animate-pulse rounded bg-zinc-200" />
+          <div className="h-3 w-16 animate-pulse rounded bg-zinc-200" />
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <div className="h-3 w-full animate-pulse rounded bg-zinc-200" />
+        <div className="h-3 w-3/4 animate-pulse rounded bg-zinc-200" />
+      </div>
     </div>
   );
 }

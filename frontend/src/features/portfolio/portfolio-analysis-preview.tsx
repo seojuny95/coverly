@@ -429,6 +429,7 @@ export function PortfolioAnalysisPreview() {
           summary={PREVIEW_SUMMARY}
           deathBenefitContext={deathBenefitContext}
           onDeathBenefitContextChange={setDeathBenefitContext}
+          isDeathBenefitRefreshing={false}
           eligibleCount={5}
           emptyReason="no-coverage"
           onRetry={() => undefined}

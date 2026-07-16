@@ -31,11 +31,16 @@ export function usePortfolioSummary(
   documents: AnalyzedInsurance[],
   deathBenefitContext: DeathBenefitGuideInput,
 ) {
+  const currentPortfolioKey = portfolioKey(documents);
   const query = useQuery({
     queryKey: portfolioSummaryQueryKey(documents, deathBenefitContext),
     queryFn: ({ signal }) =>
       requestPortfolioSummary(documents, deathBenefitContext, signal),
     enabled: documents.length > 0,
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[1] === currentPortfolioKey
+        ? previousData
+        : undefined,
   });
 
   const state: SummaryState = query.isSuccess
@@ -47,5 +52,9 @@ export function usePortfolioSummary(
   // No useCallback here: query.refetch is already stable, and wrapping the
   // whole `query` object (which is a fresh reference every render) in
   // useCallback never actually memoized anything.
-  return { state, retry: () => void query.refetch() };
+  return {
+    state,
+    isRefreshing: query.isFetching && query.isSuccess,
+    retry: () => void query.refetch(),
+  };
 }

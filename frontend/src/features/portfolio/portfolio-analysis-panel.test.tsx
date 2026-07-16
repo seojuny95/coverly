@@ -351,7 +351,7 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.getByText("3대 진단보험")).toBeInTheDocument();
   expect(screen.getByText("실손의료보험")).toBeInTheDocument();
   expect(
-    screen.getByRole("checkbox", { name: "부양가족이나 큰 부채가 없어요" }),
+    screen.getByRole("radio", { name: "부양가족이나 큰 부채가 없어요" }),
   ).toBeChecked();
   expect(
     screen.getByText(/피보험자가 사망했을 때 남은 가족에게/),
@@ -413,30 +413,45 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.queryByText("추가 확인")).not.toBeInTheDocument();
 });
 
-test("always keeps a death-benefit situation selected", async () => {
+test("allows only one death-benefit situation at a time", async () => {
   const user = userEvent.setup();
   render(<StatefulPortfolioAnalysisPanel />);
 
-  const noDependents = screen.getByRole("checkbox", {
+  const noDependents = screen.getByRole("radio", {
     name: "부양가족이나 큰 부채가 없어요",
   });
-  const dependentFamily = screen.getByRole("checkbox", {
+  const dependentFamily = screen.getByRole("radio", {
     name: "내 소득에 의존하는 가족이 있어요",
+  });
+  const minorChildren = screen.getByRole("radio", {
+    name: "미성년 자녀가 있어요",
   });
 
   expect(noDependents).toBeChecked();
   expect(dependentFamily).not.toBeChecked();
+  expect(minorChildren).not.toBeChecked();
 
   await user.click(dependentFamily);
   expect(noDependents).not.toBeChecked();
   expect(dependentFamily).toBeChecked();
+  expect(minorChildren).not.toBeChecked();
 
-  await user.click(dependentFamily);
-  expect(noDependents).toBeChecked();
+  await user.click(minorChildren);
+  expect(noDependents).not.toBeChecked();
   expect(dependentFamily).not.toBeChecked();
+  expect(minorChildren).toBeChecked();
 
-  await user.click(noDependents);
-  expect(noDependents).toBeChecked();
+  await user.click(minorChildren);
+  expect(minorChildren).toBeChecked();
+});
+
+test("shows a skeleton for the death benefit amount while refreshing", () => {
+  render(
+    <PortfolioAnalysisPanel {...baseProps()} isDeathBenefitRefreshing={true} />,
+  );
+
+  expect(screen.getByText("안내금액 계산 중")).toBeInTheDocument();
+  expect(screen.queryByText("안내금액 업데이트 중...")).not.toBeInTheDocument();
 });
 
 test("shows the death coverage detail only when no coverage was found", () => {
