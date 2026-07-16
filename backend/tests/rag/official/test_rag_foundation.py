@@ -274,7 +274,7 @@ def test_extraction_eval_fixture_passes_current_official_sources() -> None:
     cases = load_extraction_eval_cases()
     report = evaluate_extraction(cases)
 
-    assert report.total == 110
+    assert report.total == 130
     assert report.pass_rate == 1.0
     assert report.chunk_found_rate == 1.0
     assert report.metadata_match_rate == 1.0
@@ -287,10 +287,10 @@ def test_extraction_eval_fixture_uses_existing_chunks_without_pii() -> None:
     chunks_by_id = {chunk.id: chunk for chunk in load_official_chunks()}
     fixture_text = EXTRACTION_EVAL_FIXTURE.read_text(encoding="utf-8")
 
-    assert len(cases) == 110
+    assert len(cases) == 130
     assert len({case.id for case in cases}) == len(cases)
     assert all(case.chunk_id is None or case.chunk_id in chunks_by_id for case in cases)
-    assert sum(case.case_type == "curated" for case in cases) == 30
+    assert sum(case.case_type == "curated" for case in cases) == 50
     assert sum(case.case_type == "broad_regression" for case in cases) == 80
     assert all(case.chunk_id is None for case in cases if case.case_type == "curated")
     assert all(case.chunk_id is not None for case in cases if case.case_type == "broad_regression")

@@ -1948,5 +1948,345 @@
       "분쟁의 조정을 신청"
     ],
     "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_indemnity_basic_coverage_types",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제1조(보장종목)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제1조(보장종목)"
+    ],
+    "expected_page_start": 203,
+    "expected_page_end": 252,
+    "must_include": [
+      "상해급여형",
+      "질병급여형"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_indemnity_severe_noncovered_types",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제1조(보장종목)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제1조(보장종목)"
+    ],
+    "expected_page_start": 253,
+    "expected_page_end": 282,
+    "must_include": [
+      "상해비급여형",
+      "3대비급여형"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_auto_coverage_components",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제2조(자동차보험의 구성)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제2조(자동차보험의 구성)"
+    ],
+    "expected_page_start": 77,
+    "expected_page_end": 141,
+    "must_include": [
+      "대인배상Ⅰ",
+      "자기차량손해"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_auto_drunk_unlicensed_burden",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제11조(음주운전, 무면허운전, 마약·약물운전 또는 사고발생 시의 조치의무 위반 관련 사고부담금)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제11조(음주운전, 무면허운전, 마약·약물운전 또는 사고발생 시의 조치의무 위반 관련 사고부담금)"
+    ],
+    "expected_page_start": 77,
+    "expected_page_end": 141,
+    "must_include": [
+      "음주운전이나 무면허운전",
+      "대인배상 I"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_auto_own_damage_covered_loss",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제21조(보상하는 손해)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제21조(보상하는 손해)"
+    ],
+    "expected_page_start": 77,
+    "expected_page_end": 141,
+    "must_include": [
+      "직접적으로 생긴 손해",
+      "보험증권에 기재된 보험가입금액"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_auto_own_damage_exclusions",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제23조(보상하지 않는 손해)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제23조(보상하지 않는 손해)"
+    ],
+    "expected_page_start": 77,
+    "expected_page_end": 141,
+    "must_include": [
+      "보상하지 않습니다",
+      "전쟁"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_fire_covered_loss",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제3조(보상하는 손해)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제3조(보상하는 손해)"
+    ],
+    "expected_page_start": 55,
+    "expected_page_end": 76,
+    "must_include": [
+      "화재로 입은",
+      "소방손해"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_fire_excluded_loss",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제4조(보상하지 않는 손해)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제4조(보상하지 않는 손해)"
+    ],
+    "expected_page_start": 55,
+    "expected_page_end": 76,
+    "must_include": [
+      "고의 또는 중대한 과실",
+      "전기적 사고"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_liability_excluded_loss",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제4조(보상하지 않는 손해)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제4조(보상하지 않는 손해)"
+    ],
+    "expected_page_start": 426,
+    "expected_page_end": 447,
+    "must_include": [
+      "배상책임",
+      "전쟁"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_liability_claim_notice",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제5조(손해의 통지 및 조사)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제5조(손해의 통지 및 조사)"
+    ],
+    "expected_page_start": 426,
+    "expected_page_end": 447,
+    "must_include": [
+      "손해배상청구",
+      "소송을 제기"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_indemnity_claim_payment_timing",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제8조(보험금의 지급절차)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제8조(보험금의 지급절차)"
+    ],
+    "expected_page_start": 203,
+    "expected_page_end": 252,
+    "must_include": [
+      "가산이율",
+      "해지권을 행사"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "standard_terms_indemnity_notice_duty_effect",
+    "source_id": "standard_terms_annex_15_2026_06_30",
+    "expected_source_category": "standard_clause",
+    "expected_label": "제14조(알릴 의무 위반의 효과)",
+    "expected_citation_contains": [
+      "보험업감독업무시행세칙 별표15 표준약관",
+      "제14조(알릴 의무 위반의 효과)"
+    ],
+    "expected_page_start": 203,
+    "expected_page_end": 252,
+    "must_include": [
+      "고의 또는 중대한 과실",
+      "계약을 해지"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "knia_auto_product_actual_loss_definition",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "타. 실손 담보(특별약관)* 관련 중요사항",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.10"
+    ],
+    "expected_page_start": 10,
+    "expected_page_end": 10,
+    "must_include": [
+      "실손담보 보험이란",
+      "실제 발생한 손해"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "knia_auto_product_refund_after_termination",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "보험회사는 알릴 의무 위반, 정당한 이유 없이 법령에 따른 자동차검사 미수검, 보험금",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.16"
+    ],
+    "expected_page_start": 16,
+    "expected_page_end": 16,
+    "must_include": [
+      "해약환급금",
+      "단기요율"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "knia_auto_product_quality_parts",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "조건 차량",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.20"
+    ],
+    "expected_page_start": 20,
+    "expected_page_end": 20,
+    "must_include": [
+      "품질인증부품",
+      "자기차량손해"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "knia_auto_product_mandatory_insurance_withdrawal",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "설명서 본문 위치(목차명 또는 해당 페이지) 기재",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.28"
+    ],
+    "expected_page_start": 28,
+    "expected_page_end": 28,
+    "must_include": [
+      "의무보험",
+      "청약을 철회할 수 없습니다"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_change_notice_duty",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.17"
+    ],
+    "expected_page_start": 17,
+    "expected_page_end": 17,
+    "must_include": [
+      "위험변경",
+      "통지의무"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_claim_review_flow",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.19"
+    ],
+    "expected_page_start": 19,
+    "expected_page_end": 19,
+    "must_include": [
+      "보험금 청구(접수)",
+      "보험금 지급 심사"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_liability_exclusions",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.24"
+    ],
+    "expected_page_start": 24,
+    "expected_page_end": 24,
+    "must_include": [
+      "책임보험",
+      "배상책임"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_cooling_off_period",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.28"
+    ],
+    "expected_page_start": 28,
+    "expected_page_end": 28,
+    "must_include": [
+      "보험증권을 받은 날부터 15일",
+      "청약을 철회"
+    ],
+    "case_type": "curated"
   }
 ]
