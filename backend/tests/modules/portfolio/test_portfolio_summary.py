@@ -617,13 +617,15 @@ def test_essential_coverage_check_scans_every_policy_for_core_coverages() -> Non
     items = {item.kind: item for item in result.essential_coverage_check.items}
 
     assert {kind: item.status for kind, item in items.items()} == {
-        "death": "well_prepared",
+        "death": "needs_review",
         "cancer": "well_prepared",
         "cerebrovascular": "well_prepared",
         "ischemic_heart": "well_prepared",
         "medical_indemnity": "well_prepared",
     }
     assert items["death"].matched_coverage_names == ["교통상해사망"]
+    assert items["death"].confirmed_amount is None
+    assert items["death"].coverage_groups[0].label == "제한적인 사망 담보"
     assert "생활비 공백" in (items["death"].reference_basis or "")
     assert items["death"].reference_sources[0].reliability == "private_guidance"
     assert items["cancer"].confirmed_amount == 35_000_000
@@ -659,7 +661,54 @@ def test_death_benefit_guide_changes_with_user_context() -> None:
     assert death.reference_amount_label == "3억~5억 원"
     assert death.guidance_situation == "가족 생활비, 자녀 양육비, 대출 부담을 모두 책임지는 경우"
     assert "대출 상환 부담" in (death.guidance_reason or "")
-    assert death.detail == "사망 담보가 확인돼요."
+    assert death.detail == "기본 사망 보장이 확인돼요."
+
+
+def test_death_coverage_groups_primary_accident_and_limited_coverages() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {"담보명": "질병사망", "가입금액": "1억원", "지급유형": "정액"},
+            {"담보명": "일반상해사망", "가입금액": "2억원", "지급유형": "정액"},
+            {"담보명": "대중교통이용중교통상해사망", "가입금액": "3억원", "지급유형": "정액"},
+            {"담보명": "상해후유장해", "가입금액": "5천만원", "지급유형": "정액"},
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    death = next(item for item in result.essential_coverage_check.items if item.kind == "death")
+    groups = {group.label: group for group in death.coverage_groups}
+
+    assert death.status == "well_prepared"
+    assert death.confirmed_amount == 100_000_000
+    assert death.matched_coverage_names == [
+        "대중교통이용중교통상해사망",
+        "일반상해사망",
+        "질병사망",
+    ]
+    assert "상해후유장해" not in death.matched_coverage_names
+    assert groups["기본 사망 보장"].coverage_names == ["질병사망"]
+    assert groups["상해 중심 사망 담보"].coverage_names == ["일반상해사망"]
+    assert groups["제한적인 사망 담보"].coverage_names == ["대중교통이용중교통상해사망"]
+
+
+def test_death_coverage_needs_review_when_only_accident_death_exists() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [{"담보명": "상해사망·후유장해 (20-100%) / 보통약관", "가입금액": "1억원"}],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    death = next(item for item in result.essential_coverage_check.items if item.kind == "death")
+
+    assert death.status == "needs_review"
+    assert death.confirmed_amount is None
+    assert death.coverage_groups[0].label == "상해 중심 사망 담보"
+    assert "기본 사망보험과는 범위가 달라요" in death.detail
 
 
 def test_essential_check_flags_narrow_diagnoses_and_multiple_medical_contracts() -> None:
