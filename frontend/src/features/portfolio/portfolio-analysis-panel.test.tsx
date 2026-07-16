@@ -75,6 +75,15 @@ const summary: PortfolioSummary = {
         coverage_count: 1,
         detail: "사망 담보가 확인돼요.",
         matched_coverage_names: ["질병사망"],
+        coverage_groups: [
+          {
+            label: "기본 사망 보장",
+            tone: "confirmed",
+            detail:
+              "일반사망·질병사망처럼 가족 생활비 목적의 사망보험 판단에 반영하는 담보예요.",
+            coverage_names: ["질병사망"],
+          },
+        ],
       },
       {
         kind: "cancer",
@@ -360,6 +369,7 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
     screen.queryByText("부양가족이나 큰 부채가 없는 경우"),
   ).not.toBeInTheDocument();
   expect(screen.queryByText("사망 담보가 확인돼요.")).not.toBeInTheDocument();
+  expect(screen.getByText("기본 사망 보장")).toBeInTheDocument();
   expect(screen.getByText("0원~5천만 원")).toBeInTheDocument();
   expect(
     screen.queryByText("업로드한 전체 보험에서 사망 보장이 확인돼요."),
@@ -452,6 +462,54 @@ test("shows a skeleton for the death benefit amount while refreshing", () => {
 
   expect(screen.getByText("안내금액 계산 중")).toBeInTheDocument();
   expect(screen.queryByText("안내금액 업데이트 중...")).not.toBeInTheDocument();
+});
+
+test("groups limited death coverages separately from basic death coverage", () => {
+  const limitedDeathSummary: PortfolioSummary = {
+    ...summary,
+    essential_coverage_check: {
+      items: summary.essential_coverage_check!.items.map((item) =>
+        item.kind === "death"
+          ? {
+              ...item,
+              status: "needs_review",
+              confirmed_amount: null,
+              detail:
+                "제한적인 사망 담보만 보여요. 가족 생활비 목적의 사망보험으로 충분한지는 따로 확인해보세요.",
+              matched_coverage_names: ["대중교통이용중교통상해사망"],
+              coverage_groups: [
+                {
+                  label: "제한적인 사망 담보",
+                  tone: "limited",
+                  detail:
+                    "교통·대중교통·고속도로처럼 특정 사고 조건에 묶인 사망 담보예요.",
+                  coverage_names: ["대중교통이용중교통상해사망"],
+                },
+              ],
+            }
+          : item,
+      ),
+    },
+  };
+
+  render(
+    <PortfolioAnalysisPanel {...baseProps()} summary={limitedDeathSummary} />,
+  );
+
+  const deathCard = screen
+    .getByRole("heading", { name: "사망보험" })
+    .closest("section");
+
+  expect(within(deathCard!).getByText("점검 필요")).toBeInTheDocument();
+  expect(
+    within(deathCard!).getByText("제한적인 사망 담보"),
+  ).toBeInTheDocument();
+  expect(
+    within(deathCard!).getByText("대중교통이용중교통상해사망"),
+  ).toBeInTheDocument();
+  expect(
+    within(deathCard!).queryByText(/확인된 담보:/),
+  ).not.toBeInTheDocument();
 });
 
 test("shows the death coverage detail only when no coverage was found", () => {

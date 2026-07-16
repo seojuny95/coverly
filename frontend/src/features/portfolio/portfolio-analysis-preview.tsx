@@ -111,6 +111,15 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         coverage_count: 1,
         detail: "사망 담보가 확인돼요.",
         matched_coverage_names: ["질병사망"],
+        coverage_groups: [
+          {
+            label: "기본 사망 보장",
+            tone: "confirmed",
+            detail:
+              "일반사망·질병사망처럼 가족 생활비 목적의 사망보험 판단에 반영하는 담보예요.",
+            coverage_names: ["질병사망"],
+          },
+        ],
       },
       {
         kind: "cancer",
