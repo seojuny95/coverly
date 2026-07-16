@@ -347,7 +347,7 @@ function RecommendedInsuranceCards({
         </p>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.05fr_1.25fr_1fr]">
+      <div className="mt-4 space-y-4">
         <RecommendedSingleCoverageCard
           eyebrow="사망 대비"
           item={death}
@@ -540,25 +540,24 @@ function RecommendedDiagnosisCard({
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
           <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
             진단 이후 생활
           </p>
           <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
             {RECOMMENDED_INSURANCE_COPY.diagnosis.title}
           </h4>
+          <p className="mt-2 text-sm leading-6 text-zinc-700">
+            {RECOMMENDED_INSURANCE_COPY.diagnosis.description}
+          </p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200">
           {confirmedCount}/3 확인
         </span>
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-zinc-700">
-        {RECOMMENDED_INSURANCE_COPY.diagnosis.description}
-      </p>
-
-      <ul className="mt-5 space-y-3">
+      <ul className="mt-5 grid gap-3 border-t border-zinc-200 pt-5 lg:grid-cols-3">
         {items.map((item) => (
           <RecommendedDiagnosisItem key={item.kind} item={item} />
         ))}
@@ -613,43 +612,46 @@ function RecommendedMedicalIndemnityCard({
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
           <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
             실제 의료비
           </p>
           <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
             {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.title}
           </h4>
+          <p className="mt-2 text-sm leading-6 text-zinc-700">
+            {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.description}
+          </p>
         </div>
         <CoverageStatusBadge status={item?.status ?? "not_found"} />
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-zinc-700">
-        {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.description}
-      </p>
-
-      <div className="mt-5 rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
-        <p className="text-xs font-semibold text-zinc-500">현재 확인 결과</p>
-        <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-950">
-          {medicalIndemnityHeadline(item)}
-        </p>
-        <p className="mt-2 text-xs leading-5 text-zinc-500">
-          {item?.detail ?? "현재 자료에서 가입 여부를 확인하지 못했어요."}
-        </p>
-      </div>
-
-      {item?.reference_basis ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3">
-          <p className="text-xs font-semibold text-zinc-500">
-            {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.rangeLabel}
+      <div
+        className={`mt-5 grid gap-4 border-t border-zinc-200 pt-5 ${item?.reference_basis ? "lg:grid-cols-2" : ""}`}
+      >
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
+          <p className="text-xs font-semibold text-zinc-500">현재 확인 결과</p>
+          <p className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-zinc-950">
+            {medicalIndemnityHeadline(item)}
           </p>
-          <p className="mt-1 text-sm leading-6 text-zinc-700">
-            {item.reference_basis}
+          <p className="mt-2 text-xs leading-5 text-zinc-500">
+            {item?.detail ?? "현재 자료에서 가입 여부를 확인하지 못했어요."}
           </p>
-          <ReferenceSourceList sources={item.reference_sources} />
         </div>
-      ) : null}
+
+        {item?.reference_basis ? (
+          <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3">
+            <p className="text-xs font-semibold text-zinc-500">
+              {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.rangeLabel}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-zinc-700">
+              {item.reference_basis}
+            </p>
+            <ReferenceSourceList sources={item.reference_sources} />
+          </div>
+        ) : null}
+      </div>
 
       {item?.matched_coverage_names.length ? (
         <p className="mt-4 text-xs leading-5 text-blue-700">
