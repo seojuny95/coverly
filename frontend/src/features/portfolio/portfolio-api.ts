@@ -39,6 +39,7 @@ export type PortfolioSummary = {
       | "auto"
       | "other";
     is_medical_indemnity: boolean;
+    is_damage_policy: boolean;
     duplicate_across_contracts: boolean;
   }>;
   excluded_coverages: Array<{

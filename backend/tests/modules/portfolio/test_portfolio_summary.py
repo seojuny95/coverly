@@ -326,6 +326,30 @@ def test_explicit_indemnity_treatment_benefit_is_never_summed() -> None:
     assert result.excluded_coverages == []
     assert result.actual_loss_coverages[0].coverage_name == "질병치료비"
     assert result.actual_loss_coverages[0].is_medical_indemnity is True
+    assert result.actual_loss_coverages[0].is_damage_policy is False
+
+
+def test_non_medical_actual_loss_is_kept_out_of_individual_review_rows() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {
+                "담보명": "일상생활배상책임",
+                "가입금액": "1억원",
+                "지급유형": "실손",
+            }
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+
+    assert result.totals == []
+    assert result.excluded_coverages == []
+    assert result.actual_loss_coverages[0].coverage_name == "일상생활배상책임"
+    assert result.actual_loss_coverages[0].is_medical_indemnity is False
+    assert result.actual_loss_coverages[0].is_damage_policy is False
 
 
 def test_medical_expense_without_payment_type_is_kept_for_display() -> None:
@@ -531,6 +555,7 @@ def test_legacy_specific_damage_classification_is_excluded_from_totals() -> None
     assert len(result.actual_loss_coverages) == 1
     assert result.actual_loss_coverages[0].coverage_domain == "property_damage"
     assert result.actual_loss_coverages[0].is_medical_indemnity is False
+    assert result.actual_loss_coverages[0].is_damage_policy is True
     assert result.damage_coverages[0].insurance_type == "여행자보험"
 
 
@@ -976,7 +1001,7 @@ def test_premium_summary_includes_auto_policy_premiums() -> None:
     assert result.premium.monthly_policy_count == 2
 
 
-def test_non_medical_indemnity_terms_are_not_listed_as_medical_indemnity() -> None:
+def test_non_medical_actual_loss_is_not_listed_as_medical_indemnity() -> None:
     policy = _policy(
         "p1",
         "건강보험",
@@ -993,8 +1018,10 @@ def test_non_medical_indemnity_terms_are_not_listed_as_medical_indemnity() -> No
     result = summarize_portfolio_coverages([policy])
 
     assert result.totals == []
-    assert not any(item.is_medical_indemnity for item in result.actual_loss_coverages)
-    assert result.excluded_coverages[0].coverage_name == "가족화재벌금(실손)"
+    assert result.excluded_coverages == []
+    assert result.actual_loss_coverages[0].coverage_name == "가족화재벌금(실손)"
+    assert result.actual_loss_coverages[0].is_medical_indemnity is False
+    assert result.actual_loss_coverages[0].is_damage_policy is False
 
 
 def test_medical_indemnity_classifier_does_not_treat_income_benefit_as_medical() -> None:
@@ -1007,8 +1034,9 @@ def test_medical_indemnity_classifier_does_not_treat_income_benefit_as_medical()
 
     result = summarize_portfolio_coverages([policy])
 
-    assert not any(item.is_medical_indemnity for item in result.actual_loss_coverages)
-    assert result.excluded_coverages[0].coverage_name == "운전자보험 휴업급여"
+    assert result.excluded_coverages == []
+    assert result.actual_loss_coverages[0].coverage_name == "운전자보험 휴업급여"
+    assert result.actual_loss_coverages[0].is_medical_indemnity is False
 
 
 def test_name_normalization_does_not_apply_semantic_aliases() -> None:

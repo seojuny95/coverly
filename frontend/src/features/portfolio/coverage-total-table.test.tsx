@@ -103,4 +103,56 @@ describe("CoverageTotalTable", () => {
       screen.queryByText("표시할 보장금액을 찾지 못했어요."),
     ).not.toBeInTheDocument();
   });
+
+  it("renders non-medical actual-loss coverage as coverage total data", () => {
+    render(
+      <CoverageTotalTable
+        status="success"
+        summary={{
+          ...emptySummary,
+          actual_loss_coverages: [
+            {
+              coverage_name: "일상생활배상책임",
+              normalized_name: "일상생활배상책임",
+              coverage_domain: "liability",
+              is_medical_indemnity: false,
+              is_damage_policy: false,
+              duplicate_across_contracts: false,
+            },
+          ],
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("일상생활배상책임")).toBeInTheDocument();
+    expect(screen.getAllByText("실손보장")).toHaveLength(2);
+  });
+
+  it("does not duplicate damage-policy actual-loss coverage in the total", () => {
+    render(
+      <CoverageTotalTable
+        status="success"
+        summary={{
+          ...emptySummary,
+          actual_loss_coverages: [
+            {
+              coverage_name: "자동차사고벌금",
+              normalized_name: "자동차사고벌금",
+              coverage_domain: "legal_cost",
+              is_medical_indemnity: false,
+              is_damage_policy: true,
+              duplicate_across_contracts: false,
+            },
+          ],
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("표시할 보장금액을 찾지 못했어요."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("자동차사고벌금")).not.toBeInTheDocument();
+  });
 });

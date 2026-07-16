@@ -12,8 +12,8 @@ type SummedCoverageRow = {
   composition: PortfolioSummary["totals"][number]["composition"];
 };
 
-type MedicalIndemnityCoverageRow = {
-  kind: "medical-indemnity";
+type ActualLossCoverageRow = {
+  kind: "actual-loss";
   key: string;
   displayName: string;
   originalAmount?: string;
@@ -33,7 +33,7 @@ type IndividualCoverageRow = {
 };
 
 type CoverageRow =
-  SummedCoverageRow | MedicalIndemnityCoverageRow | IndividualCoverageRow;
+  SummedCoverageRow | ActualLossCoverageRow | IndividualCoverageRow;
 
 type CoverageGroup = {
   majorCategory: string;
@@ -112,8 +112,8 @@ export function CoverageSummaryTable({
 
 function CoverageTableRow({ row }: { row: CoverageRow }) {
   if (row.kind === "summed") return <SummedCoverage row={row} />;
-  if (row.kind === "medical-indemnity") {
-    return <MedicalIndemnityCoverage row={row} />;
+  if (row.kind === "actual-loss") {
+    return <ActualLossCoverage row={row} />;
   }
   return <IndividualCoverage row={row} />;
 }
@@ -145,11 +145,7 @@ function SummedCoverage({ row }: { row: SummedCoverageRow }) {
   );
 }
 
-function MedicalIndemnityCoverage({
-  row,
-}: {
-  row: MedicalIndemnityCoverageRow;
-}) {
+function ActualLossCoverage({ row }: { row: ActualLossCoverageRow }) {
   return (
     <tr>
       <th scope="row" className="px-6 py-4 align-top font-medium text-zinc-800">
@@ -174,7 +170,7 @@ function MedicalIndemnityCoverage({
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right align-top">
-        <CoverageBasis tone="medical-indemnity">실손의료비</CoverageBasis>
+        <CoverageBasis tone="actual-loss">실손보장</CoverageBasis>
       </td>
     </tr>
   );
@@ -244,11 +240,11 @@ function CoverageBasis({
   tone,
 }: {
   children: string;
-  tone: "summed" | "medical-indemnity" | "individual";
+  tone: "summed" | "actual-loss" | "individual";
 }) {
   const toneClassName = {
     summed: "bg-blue-50 text-blue-700",
-    "medical-indemnity": "bg-emerald-50 text-emerald-700",
+    "actual-loss": "bg-emerald-50 text-emerald-700",
     individual: "bg-zinc-100 text-zinc-600",
   }[tone];
 
@@ -282,11 +278,11 @@ function buildCoverageGroups(summary: PortfolioSummary): CoverageGroup[] {
   });
 
   summary.actual_loss_coverages
-    .filter((coverage) => coverage.is_medical_indemnity)
+    .filter((coverage) => !coverage.is_damage_policy)
     .forEach((coverage, index) => {
       addRow(coverage.major_category, {
-        kind: "medical-indemnity",
-        key: `medical-indemnity-${coverage.policy_id ?? "policy"}-${coverage.coverage_name}-${index}`,
+        kind: "actual-loss",
+        key: `actual-loss-${coverage.policy_id ?? "policy"}-${coverage.coverage_name}-${index}`,
         displayName: coverage.coverage_name,
         originalAmount: coverage.original_amount,
         insurer: coverage.insurer,

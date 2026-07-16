@@ -46,6 +46,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
       normalized_name: "질병실손의료비",
       coverage_domain: "medical_expense",
       is_medical_indemnity: true,
+      is_damage_policy: false,
       duplicate_across_contracts: true,
     },
     {
@@ -56,6 +57,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
       normalized_name: "질병실손의료비",
       coverage_domain: "medical_expense",
       is_medical_indemnity: true,
+      is_damage_policy: false,
       duplicate_across_contracts: true,
     },
   ],

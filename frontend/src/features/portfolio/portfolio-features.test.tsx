@@ -150,6 +150,7 @@ describe("portfolio features", () => {
                   major_category: "치료",
                   coverage_domain: "medical_expense",
                   is_medical_indemnity: true,
+                  is_damage_policy: false,
                   duplicate_across_contracts: true,
                 },
               ],
@@ -189,7 +190,7 @@ describe("portfolio features", () => {
     ).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("특정치료비")).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("정액보상")).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("실손의료비")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("실손보장")).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("개별 확인")).toBeInTheDocument();
     for (const coverageName of ["암치료비", "질병실손의료비", "특정치료비"]) {
       const disclosure = within(treatmentGroup)

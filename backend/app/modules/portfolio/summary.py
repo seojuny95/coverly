@@ -89,7 +89,6 @@ _SAFE_FIXED_NAME_TERMS = (
 _UNCONFIRMED_PAYMENT_REASON = "지급 방식을 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_AMOUNT_REASON = "가입금액을 숫자로 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_NAME_REASON = "담보명을 분류하지 못해 합계에는 더하지 않았어요."
-_ACTUAL_LOSS_EXCLUSION_REASON = "실손형 담보라 가입금액 합계에는 더하지 않았어요."
 _UNITS = {
     "원": 1,
     "천원": 1_000,
@@ -245,8 +244,6 @@ def summarize_portfolio_coverages(
             group_key = canonicalize_coverage_name(coverage.담보명).normalized_key
             payment_basis = _summary_payment_basis(coverage, classification)
             if payment_basis == "indemnity":
-                if classification.medical_indemnity_status != "confirmed":
-                    excluded.append(_excluded(policy, coverage, _ACTUAL_LOSS_EXCLUSION_REASON))
                 continue
             if payment_basis == "unknown":
                 excluded.append(_excluded(policy, coverage, _UNCONFIRMED_PAYMENT_REASON))
@@ -553,6 +550,7 @@ def _build_actual_loss_items(
                 normalized_name=row.normalized_name,
                 coverage_domain=row.classification.coverage_domain,
                 is_medical_indemnity=(row.classification.medical_indemnity_status == "confirmed"),
+                is_damage_policy=is_damage_policy(row.policy),
                 duplicate_across_contracts=(
                     bool(row.normalized_name) and len(contracts_by_name[row.normalized_name]) >= 2
                 ),

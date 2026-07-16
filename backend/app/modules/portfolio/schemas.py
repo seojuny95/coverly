@@ -119,6 +119,7 @@ class ActualLossCoverageItem(BaseModel):
     normalized_name: str
     coverage_domain: ActualLossCoverageDomain
     is_medical_indemnity: bool
+    is_damage_policy: bool
     duplicate_across_contracts: bool
     original_amount: str = ""
     major_category: str = "기타"

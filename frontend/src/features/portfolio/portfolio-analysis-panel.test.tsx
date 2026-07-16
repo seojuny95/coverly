@@ -443,6 +443,7 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
         normalized_name: "자동차사고벌금",
         coverage_domain: "auto",
         is_medical_indemnity: false,
+        is_damage_policy: true,
         duplicate_across_contracts: true,
       },
       {
@@ -453,6 +454,7 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
         normalized_name: "자동차사고벌금",
         coverage_domain: "auto",
         is_medical_indemnity: false,
+        is_damage_policy: true,
         duplicate_across_contracts: true,
       },
     ],
