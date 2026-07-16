@@ -61,7 +61,7 @@ const RECOMMENDED_INSURANCE_COPY = {
   death: {
     title: "사망보험",
     description:
-      "유가족 생활비가 기본이고 남은 대출 상환·장례비·상속세 재원으로도 쓸 수 있어 먼저 확인해요.",
+      "피보험자가 사망했을 때 남은 가족에게 정해진 보험금을 지급해요. 유가족의 생활비와 자녀 양육비, 남은 대출 상환, 장례비처럼 갑자기 생기는 재정 공백을 메우는 목적이며, 필요한 금액은 부양가족·미성년 자녀·큰 부채 여부에 따라 달라져요.",
     rangeLabel: "안내금액",
     rangeNote:
       "1인 가구 기준으로는 장례비 1,000만~2,000만원 정도부터 보고, 부양가족이 있으면 생활비까지 따로 봐야 해요.",
@@ -438,73 +438,92 @@ function RecommendedSingleCoverageCard({
     onDeathBenefitContextChange({ ...deathBenefitContext, [key]: checked });
   };
 
+  const hasNoDependentFamilyOrMajorDebt =
+    !deathBenefitContext.has_dependent_family &&
+    !deathBenefitContext.has_minor_children &&
+    !deathBenefitContext.has_major_debt;
+
+  const selectNoDependentFamilyOrMajorDebt = (checked: boolean) => {
+    if (!checked) return;
+    onDeathBenefitContextChange({
+      has_dependent_family: false,
+      has_minor_children: false,
+      has_major_debt: false,
+    });
+  };
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
           <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
             {eyebrow}
           </p>
           <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
             {copy.title}
           </h4>
+          <p className="mt-2 text-sm leading-6 text-zinc-700">
+            {copy.description}
+          </p>
         </div>
         <CoverageStatusBadge status={item?.status ?? "not_found"} />
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-zinc-700">{copy.description}</p>
+      <div className="mt-5 space-y-4 border-t border-zinc-200 pt-5">
+        <fieldset className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
+          <legend className="px-1 text-xs font-semibold text-zinc-500">
+            나의 상황
+          </legend>
+          <div className="mt-1 space-y-2">
+            <DeathBenefitCheckbox
+              checked={hasNoDependentFamilyOrMajorDebt}
+              label="부양가족이나 큰 부채가 없어요"
+              onChange={selectNoDependentFamilyOrMajorDebt}
+            />
+            <DeathBenefitCheckbox
+              checked={deathBenefitContext.has_dependent_family}
+              label="내 소득에 의존하는 가족이 있어요"
+              onChange={(checked) =>
+                updateDeathBenefitContext("has_dependent_family", checked)
+              }
+            />
+            <DeathBenefitCheckbox
+              checked={deathBenefitContext.has_minor_children}
+              label="미성년 자녀가 있어요"
+              onChange={(checked) =>
+                updateDeathBenefitContext("has_minor_children", checked)
+              }
+            />
+            <DeathBenefitCheckbox
+              checked={deathBenefitContext.has_major_debt}
+              label="주택담보대출·전세대출 등 큰 부채가 있어요"
+              onChange={(checked) =>
+                updateDeathBenefitContext("has_major_debt", checked)
+              }
+            />
+          </div>
+        </fieldset>
 
-      <div className="mt-4 space-y-2 rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
-        <p className="text-xs font-semibold text-zinc-500">나의 상황</p>
-        <DeathBenefitCheckbox
-          checked={deathBenefitContext.has_dependent_family}
-          label="내 소득에 의존하는 가족이 있어요"
-          onChange={(checked) =>
-            updateDeathBenefitContext("has_dependent_family", checked)
-          }
-        />
-        <DeathBenefitCheckbox
-          checked={deathBenefitContext.has_minor_children}
-          label="미성년 자녀가 있어요"
-          onChange={(checked) =>
-            updateDeathBenefitContext("has_minor_children", checked)
-          }
-        />
-        <DeathBenefitCheckbox
-          checked={deathBenefitContext.has_major_debt}
-          label="주택담보대출·전세대출 등 큰 부채가 있어요"
-          onChange={(checked) =>
-            updateDeathBenefitContext("has_major_debt", checked)
-          }
-        />
-      </div>
+        <div>
+          <CoverageAmountMeter
+            item={item}
+            rangeLabel={copy.rangeLabel}
+            fallbackNote={item?.guidance_reason ?? copy.rangeNote}
+          />
 
-      {item?.guidance_situation ? (
-        <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
-          <p className="text-xs font-semibold text-zinc-500">상황</p>
-          <p className="mt-1 text-sm font-semibold text-zinc-950">
-            {item.guidance_situation}
-          </p>
+          {!item?.matched_coverage_names.length ? (
+            <p className="mt-3 text-xs leading-5 text-zinc-500">
+              {item?.detail ?? "현재 자료에서 가입 여부를 확인하지 못했어요."}
+            </p>
+          ) : null}
+
+          {item?.matched_coverage_names.length ? (
+            <p className="mt-4 text-xs leading-5 text-blue-700">
+              확인된 담보: {item.matched_coverage_names.join(" · ")}
+            </p>
+          ) : null}
         </div>
-      ) : null}
-
-      <div className="mt-5">
-        <CoverageAmountMeter
-          item={item}
-          rangeLabel={copy.rangeLabel}
-          fallbackNote={item?.guidance_reason ?? copy.rangeNote}
-        />
       </div>
-
-      <p className="mt-3 text-xs leading-5 text-zinc-500">
-        {item?.detail ?? "현재 자료에서 가입 여부를 확인하지 못했어요."}
-      </p>
-
-      {item?.matched_coverage_names.length ? (
-        <p className="mt-4 text-xs leading-5 text-blue-700">
-          확인된 담보: {item.matched_coverage_names.join(" · ")}
-        </p>
-      ) : null}
     </section>
   );
 }

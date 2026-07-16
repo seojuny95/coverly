@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
 import { CoverlyLogo, PixelEyebrow } from "../../components/coverly-brand";
 import { PortfolioAnalysisPanel } from "./portfolio-analysis-panel";
-import type { PortfolioSummary } from "./portfolio-api";
+import type { DeathBenefitGuideInput, PortfolioSummary } from "./portfolio-api";
 
 const DEATH_BENEFIT_SOURCE = {
   label: "매일경제 · 가장의 적정 사망보험금은 연소득 3~5배",
@@ -401,6 +403,13 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
 };
 
 export function PortfolioAnalysisPreview() {
+  const [deathBenefitContext, setDeathBenefitContext] =
+    useState<DeathBenefitGuideInput>({
+      has_dependent_family: false,
+      has_minor_children: false,
+      has_major_debt: false,
+    });
+
   return (
     <main className="min-h-dvh bg-white px-5 py-6 text-zinc-950 sm:px-6">
       <div className="mx-auto w-full max-w-6xl">
@@ -418,12 +427,8 @@ export function PortfolioAnalysisPreview() {
         <PortfolioAnalysisPanel
           status="success"
           summary={PREVIEW_SUMMARY}
-          deathBenefitContext={{
-            has_dependent_family: false,
-            has_minor_children: false,
-            has_major_debt: false,
-          }}
-          onDeathBenefitContextChange={() => undefined}
+          deathBenefitContext={deathBenefitContext}
+          onDeathBenefitContextChange={setDeathBenefitContext}
           eligibleCount={5}
           emptyReason="no-coverage"
           onRetry={() => undefined}
