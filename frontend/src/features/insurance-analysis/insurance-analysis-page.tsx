@@ -104,7 +104,7 @@ const TAG_STYLES: Record<string, string> = {
   질병보험: "border-[#0891B2]/10 bg-[#0891B2]/[0.06] text-[#111827]/60",
   상해보험: "border-[#EA580C]/10 bg-[#EA580C]/[0.06] text-[#111827]/60",
   간병보험: "border-[#7C3AED]/10 bg-[#7C3AED]/[0.06] text-[#111827]/60",
-  실손보험: "border-[#2563EB]/10 bg-[#2563EB]/[0.06] text-[#111827]/60",
+  실손의료보험: "border-[#2563EB]/10 bg-[#2563EB]/[0.06] text-[#111827]/60",
   어린이보험: "border-[#DB2777]/10 bg-[#DB2777]/[0.06] text-[#111827]/60",
   자동차보험: "border-[#2563EB]/10 bg-[#2563EB]/[0.06] text-[#111827]/60",
   운전자보험: "border-[#1D4ED8]/10 bg-[#1D4ED8]/[0.06] text-[#111827]/60",
@@ -523,7 +523,7 @@ export function InsuranceAnalysisPage({
                 가입한 보험을 한눈에 확인해요
               </h1>
               <p className="mt-3 text-sm leading-6 text-zinc-500">
-                전체 보험에서 사망·3대 진단비·실손을 확인하고, 보험 종류별
+                전체 보험에서 사망·3대 진단비·실손의료비를 확인하고, 보험 종류별
                 보장도 함께 정리해요.
               </p>
             </div>

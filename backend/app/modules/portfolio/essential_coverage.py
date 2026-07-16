@@ -211,7 +211,7 @@ def build_essential_coverage_check(
                 matches=lambda name: "진단" in name and any(term in name for term in _HEART_TERMS),
                 confirmed_detail="심장질환·심질환 진단비가 확인돼요.",
             ),
-            _indemnity_item(policies, guides["indemnity"]),
+            _medical_indemnity_item(policies, guides["medical_indemnity"]),
         ]
     )
 
@@ -373,22 +373,17 @@ def _death_benefit_context(
     )
 
 
-def _indemnity_item(
+def _medical_indemnity_item(
     policies: list[PolicyInput],
     guide: EssentialCoverageGuide,
 ) -> EssentialCoverageItem:
     coverages = [
-        (policy, coverage)
-        for policy in policies
+        (contract_index, coverage)
+        for contract_index, policy in enumerate(policies)
         for coverage in policy.보장목록
-        if _is_indemnity_coverage(coverage, policy)
+        if _is_medical_indemnity_coverage(coverage, policy)
     ]
-    policy_keys = {
-        policy.id or policy.기본정보.보험사
-        for policy, _coverage in coverages
-        if policy.id or policy.기본정보.보험사
-    }
-    has_multiple_contracts = len(policy_keys) > 1
+    has_multiple_contracts = len({contract_index for contract_index, _ in coverages}) > 1
 
     if coverages and not has_multiple_contracts:
         status: EssentialCoverageStatus = "well_prepared"
@@ -401,18 +396,18 @@ def _indemnity_item(
         detail = "현재 올린 전체 보험에서는 실손의료보험을 확인하지 못했어요."
 
     return EssentialCoverageItem(
-        kind="indemnity",
+        kind="medical_indemnity",
         label="실손의료보험",
         status=status,
         reference_basis=guide.basis,
         reference_sources=list(guide.sources),
         coverage_count=len(coverages),
         detail=detail,
-        matched_coverage_names=sorted({coverage.담보명 for _policy, coverage in coverages}),
+        matched_coverage_names=sorted({coverage.담보명 for _, coverage in coverages}),
     )
 
 
-def _is_indemnity_coverage(coverage: CoverageInput, policy: PolicyInput) -> bool:
+def _is_medical_indemnity_coverage(coverage: CoverageInput, policy: PolicyInput) -> bool:
     return classify_indemnity(coverage, policy=policy).medical_indemnity_status == "confirmed"
 
 

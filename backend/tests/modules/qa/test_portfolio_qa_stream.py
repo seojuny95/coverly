@@ -102,7 +102,7 @@ def test_stream_deterministic_amount_answer_is_single_delta() -> None:
 
 
 def test_stream_claim_howto_carries_clickable_channels_in_end() -> None:
-    events = list(stream_portfolio_answer("실손 어떻게 청구해?", _policies()))
+    events = list(stream_portfolio_answer("실손의료보험 어떻게 청구해?", _policies()))
 
     end = events[-1]
     assert end["type"] == "end"
@@ -179,7 +179,7 @@ def test_stream_channels_resolve_coverage_with_paren_suffix() -> None:
     assert any(c.get("coverage_name") == "암진단비(유사암제외)" for c in citations)
 
 
-def test_stream_indemnity_channel_survives_paren_suffix() -> None:
+def test_stream_medical_indemnity_channel_survives_paren_suffix() -> None:
     """A 실손 coverage whose name carries a "(질병)"-style suffix must still route to
     the medical-indemnity (실손24) claim channel, not lose it to name normalization."""
 
@@ -203,8 +203,96 @@ def test_stream_indemnity_channel_survives_paren_suffix() -> None:
     channels = events[-1]["claim_channels"]
     assert isinstance(channels, dict)
     assert any(insurer["name"] == "삼성화재" for insurer in channels["insurers"])
-    assert channels["indemnity"] is not None
-    assert channels["indemnity"]["name"] == "실손24"
+    assert channels["medical_indemnity"] is not None
+    assert channels["medical_indemnity"]["name"] == "실손24"
+
+
+def test_stream_travel_medical_context_does_not_route_to_medical_indemnity() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "health",
+                "기본정보": {
+                    "보험사": "삼성화재",
+                    "상품명": "건강보험",
+                    "보험분류": "질병",
+                },
+                "보장목록": [{"담보명": "국내질병입원의료비", "지급유형": "실손"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "travel",
+                "기본정보": {
+                    "보험사": "현대해상",
+                    "상품명": "해외여행자보험",
+                    "보험분류": "여행자보험",
+                    "상품태그": ["여행자보험"],
+                },
+                "보장목록": [{"담보명": "국내질병입원의료비", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+    def fake_stream(_system: str, _user: str) -> Iterator[str]:
+        yield "해외여행자보험의 국내질병입원의료비는 현대해상에서 청구하세요."
+
+    events = list(
+        stream_portfolio_answer(
+            "여행 중 병원비는 어떻게 처리해?",
+            policies,
+            stream=fake_stream,
+        )
+    )
+
+    channels = events[-1]["claim_channels"]
+    assert isinstance(channels, dict)
+    assert [insurer["name"] for insurer in channels["insurers"]] == ["현대해상"]
+    assert channels["medical_indemnity"] is None
+
+
+def test_stream_ambiguous_medical_name_does_not_assume_medical_indemnity() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "health",
+                "기본정보": {
+                    "보험사": "삼성화재",
+                    "상품명": "건강보험",
+                    "보험분류": "질병",
+                },
+                "보장목록": [{"담보명": "국내질병입원의료비", "지급유형": "실손"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "travel",
+                "기본정보": {
+                    "보험사": "현대해상",
+                    "상품명": "해외여행자보험",
+                    "보험분류": "여행자보험",
+                    "상품태그": ["여행자보험"],
+                },
+                "보장목록": [{"담보명": "국내질병입원의료비", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+    def fake_stream(_system: str, _user: str) -> Iterator[str]:
+        yield "국내질병입원의료비는 가입한 보험사에서 청구하세요."
+
+    events = list(
+        stream_portfolio_answer(
+            "국내질병입원의료비는 어디에 청구해?",
+            policies,
+            stream=fake_stream,
+        )
+    )
+
+    channels = events[-1]["claim_channels"]
+    assert isinstance(channels, dict)
+    assert {insurer["name"] for insurer in channels["insurers"]} == {"삼성화재", "현대해상"}
+    assert channels["medical_indemnity"] is None
 
 
 def _auto_policy(insurer: str) -> PolicyInput:

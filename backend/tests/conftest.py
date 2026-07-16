@@ -75,9 +75,9 @@ _REFERENCE_DATA_ROWS: dict[str, object] = {
                 "source": "https://www.heungkukfire.co.kr",
             },
         ],
-        "실손": {
+        "실손의료보험": {
             "이름": "실손24",
-            "설명": "실손보험금 청구 공식 서비스",
+            "설명": "실손의료보험금 청구 공식 서비스",
             "콜센터": "1811-3000",
             "채널": [
                 {"이름": "실손24 홈페이지", "링크": "https://www.silson24.or.kr"},
@@ -139,7 +139,8 @@ _REFERENCE_DATA_ROWS: dict[str, object] = {
                 "published_at": "2025-01-01",
                 "reliability": "official",
                 "caveat": (
-                    "실손 청구 가능 범위는 의료기관과 보험회사 시스템에 따라 달라질 수 있어요."
+                    "실손의료비 청구 가능 범위는 의료기관과 보험회사 시스템에 "
+                    "따라 달라질 수 있어요."
                 ),
             },
         ],
@@ -179,10 +180,10 @@ _REFERENCE_DATA_ROWS: dict[str, object] = {
                 "source_ids": ["banksalad_three_diagnosis_2026"],
             },
             {
-                "kind": "indemnity",
+                "kind": "medical_indemnity",
                 "reference_min_amount": None,
                 "reference_max_amount": None,
-                "basis": "실손은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인",
+                "basis": ("실손의료보험은 금액보다 가입 여부, 세대, 자기부담금, 중복 여부를 확인"),
                 "source_ids": ["silson24_official"],
             },
         ],

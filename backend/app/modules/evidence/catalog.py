@@ -234,20 +234,44 @@ def build_evidence_catalog(
         if category:
             category_ids.setdefault(category, []).append(evidence_id)
 
-    for index, indemnity in enumerate(facts.coverage_summary.indemnity_coverages, start=1):
-        evidence_id = f"indemnity:{index}"
+    damage_evidence_keys = {
+        (
+            damage_policy.policy_id,
+            damage_policy.insurer,
+            damage_policy.product_name,
+            coverage.coverage_name,
+        )
+        for group in facts.coverage_summary.damage_coverages
+        for damage_policy in group.policies
+        for coverage in damage_policy.coverages
+    }
+    for index, actual_loss in enumerate(
+        facts.coverage_summary.actual_loss_coverages,
+        start=1,
+    ):
+        evidence_key = (
+            actual_loss.policy_id,
+            actual_loss.insurer,
+            actual_loss.product_name,
+            actual_loss.coverage_name,
+        )
+        if actual_loss.is_damage_policy and evidence_key in damage_evidence_keys:
+            continue
+
+        evidence_id = f"actual-loss:{index}"
+        coverage_type = "실손의료비" if actual_loss.is_medical_indemnity else "실손형"
         items.append(
             ConsultationEvidence(
                 id=evidence_id,
-                fact=f"{indemnity.coverage_name} 실손형 담보 가입 사실 확인",
-                policy_id=indemnity.policy_id,
-                insurer=indemnity.insurer,
-                product_name=indemnity.product_name,
-                coverage_name=indemnity.coverage_name,
+                fact=(f"{actual_loss.coverage_name} 가입 사실 확인 (지급 성격: {coverage_type})"),
+                policy_id=actual_loss.policy_id,
+                insurer=actual_loss.insurer,
+                product_name=actual_loss.product_name,
+                coverage_name=actual_loss.coverage_name,
             )
         )
-        category = classify_coverage(indemnity.coverage_name)
-        if category:
+        category = classify_coverage(actual_loss.coverage_name)
+        if category and actual_loss.is_medical_indemnity:
             category_ids.setdefault(category, []).append(evidence_id)
 
     for index, excluded in enumerate(facts.coverage_summary.excluded_coverages, start=1):

@@ -10,7 +10,9 @@ type Props = {
 export function CoverageTotalTable({ status, summary, onRetry }: Props) {
   const hasCoverages = summary
     ? summary.totals.length > 0 ||
-      summary.indemnity_coverages.length > 0 ||
+      summary.actual_loss_coverages.some(
+        (coverage) => !coverage.is_damage_policy,
+      ) ||
       summary.excluded_coverages.length > 0
     : false;
 
@@ -34,10 +36,10 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
             약속된 보장금액은 보험별로 합산해 봐요
           </LegendItem>
           <LegendItem
-            term="실손의료"
+            term="실손보장"
             termClassName="bg-emerald-50 text-emerald-700"
           >
-            의료비 실손 담보라 중복 합산하지 않아요
+            실제 발생한 손해를 보상하는 담보라 합산하지 않아요
           </LegendItem>
           <LegendItem
             term="개별 확인"

@@ -28,7 +28,7 @@ function stubEmptySummary() {
       new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
         }),
@@ -155,7 +155,7 @@ describe("InsuranceAnalysisPage", () => {
               보험사: "삼성화재",
               상품명: "레거시 건강보험",
               보험분류: "상해·질병·실손",
-              상품태그: ["실손보험"],
+              상품태그: ["실손의료보험"],
             },
           },
         },
@@ -463,7 +463,7 @@ describe("InsuranceAnalysisPage", () => {
       return new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
         }),
@@ -516,7 +516,7 @@ describe("InsuranceAnalysisPage", () => {
       return new Response(
         JSON.stringify({
           totals: [],
-          indemnity_coverages: [],
+          actual_loss_coverages: [],
           excluded_coverages: [],
           excluded_auto_policy_count: 0,
         }),

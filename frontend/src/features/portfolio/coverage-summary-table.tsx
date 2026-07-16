@@ -12,14 +12,14 @@ type SummedCoverageRow = {
   composition: PortfolioSummary["totals"][number]["composition"];
 };
 
-type IndemnityCoverageRow = {
-  kind: "indemnity";
+type ActualLossCoverageRow = {
+  kind: "actual-loss";
   key: string;
   displayName: string;
   originalAmount?: string;
   insurer?: string;
   productName?: string;
-  crossInsurerDuplicate: boolean;
+  duplicateAcrossContracts: boolean;
 };
 
 type IndividualCoverageRow = {
@@ -33,7 +33,7 @@ type IndividualCoverageRow = {
 };
 
 type CoverageRow =
-  SummedCoverageRow | IndemnityCoverageRow | IndividualCoverageRow;
+  SummedCoverageRow | ActualLossCoverageRow | IndividualCoverageRow;
 
 type CoverageGroup = {
   majorCategory: string;
@@ -112,7 +112,9 @@ export function CoverageSummaryTable({
 
 function CoverageTableRow({ row }: { row: CoverageRow }) {
   if (row.kind === "summed") return <SummedCoverage row={row} />;
-  if (row.kind === "indemnity") return <IndemnityCoverage row={row} />;
+  if (row.kind === "actual-loss") {
+    return <ActualLossCoverage row={row} />;
+  }
   return <IndividualCoverage row={row} />;
 }
 
@@ -143,13 +145,13 @@ function SummedCoverage({ row }: { row: SummedCoverageRow }) {
   );
 }
 
-function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
+function ActualLossCoverage({ row }: { row: ActualLossCoverageRow }) {
   return (
     <tr>
       <th scope="row" className="px-6 py-4 align-top font-medium text-zinc-800">
         <CoverageDisclosure
           label={row.displayName}
-          badge={row.crossInsurerDuplicate ? <DuplicateBadge /> : null}
+          badge={row.duplicateAcrossContracts ? <DuplicateBadge /> : null}
         >
           <p className="mt-3 text-xs font-normal break-words text-zinc-500">
             {coverageSourceLabel({
@@ -157,9 +159,9 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
               product_name: row.productName,
             })}
           </p>
-          {row.crossInsurerDuplicate ? (
+          {row.duplicateAcrossContracts ? (
             <p className="mt-1 text-xs font-normal text-amber-700">
-              다른 보험사에도 같은 담보가 있어 중복 여부를 확인해보세요.
+              다른 계약에도 같은 담보가 있어 중복 보상 제한 여부를 확인해보세요.
             </p>
           ) : null}
         </CoverageDisclosure>
@@ -168,7 +170,7 @@ function IndemnityCoverage({ row }: { row: IndemnityCoverageRow }) {
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right align-top">
-        <CoverageBasis tone="indemnity">실손의료</CoverageBasis>
+        <CoverageBasis tone="actual-loss">실손보장</CoverageBasis>
       </td>
     </tr>
   );
@@ -238,11 +240,11 @@ function CoverageBasis({
   tone,
 }: {
   children: string;
-  tone: "summed" | "indemnity" | "individual";
+  tone: "summed" | "actual-loss" | "individual";
 }) {
   const toneClassName = {
     summed: "bg-blue-50 text-blue-700",
-    indemnity: "bg-emerald-50 text-emerald-700",
+    "actual-loss": "bg-emerald-50 text-emerald-700",
     individual: "bg-zinc-100 text-zinc-600",
   }[tone];
 
@@ -275,17 +277,19 @@ function buildCoverageGroups(summary: PortfolioSummary): CoverageGroup[] {
     });
   });
 
-  summary.indemnity_coverages.forEach((coverage, index) => {
-    addRow(coverage.major_category, {
-      kind: "indemnity",
-      key: `indemnity-${coverage.policy_id ?? "policy"}-${coverage.coverage_name}-${index}`,
-      displayName: coverage.coverage_name,
-      originalAmount: coverage.original_amount,
-      insurer: coverage.insurer,
-      productName: coverage.product_name,
-      crossInsurerDuplicate: coverage.cross_insurer_duplicate,
+  summary.actual_loss_coverages
+    .filter((coverage) => !coverage.is_damage_policy)
+    .forEach((coverage, index) => {
+      addRow(coverage.major_category, {
+        kind: "actual-loss",
+        key: `actual-loss-${coverage.policy_id ?? "policy"}-${coverage.coverage_name}-${index}`,
+        displayName: coverage.coverage_name,
+        originalAmount: coverage.original_amount,
+        insurer: coverage.insurer,
+        productName: coverage.product_name,
+        duplicateAcrossContracts: coverage.duplicate_across_contracts,
+      });
     });
-  });
 
   summary.excluded_coverages.forEach((coverage, index) => {
     addRow(coverage.major_category, {

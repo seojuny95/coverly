@@ -60,7 +60,7 @@ describe("analysis-eligibility", () => {
     expect(
       isAutoInsurance(
         makeResult({
-          기본정보: { 보험분류: "제3보험", 상품태그: ["실손보험"] },
+          기본정보: { 보험분류: "제3보험", 상품태그: ["실손의료보험"] },
         }),
       ),
     ).toBe(false);

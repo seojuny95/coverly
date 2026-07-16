@@ -22,14 +22,25 @@ export type CoverageTotal = {
 
 export type PortfolioSummary = {
   totals: CoverageTotal[];
-  indemnity_coverages: Array<{
+  actual_loss_coverages: Array<{
     policy_id?: string;
     insurer?: string;
     product_name?: string;
     coverage_name: string;
+    normalized_name: string;
     original_amount?: string;
     major_category?: string;
-    cross_insurer_duplicate: boolean;
+    coverage_domain:
+      | "medical_expense"
+      | "travel_medical_expense"
+      | "legal_cost"
+      | "property_damage"
+      | "liability"
+      | "auto"
+      | "other";
+    is_medical_indemnity: boolean;
+    is_damage_policy: boolean;
+    duplicate_across_contracts: boolean;
   }>;
   excluded_coverages: Array<{
     policy_id?: string;
@@ -117,7 +128,12 @@ export type DeathBenefitGuideInput = {
 };
 
 export type EssentialCoverageItem = {
-  kind: "death" | "cancer" | "cerebrovascular" | "ischemic_heart" | "indemnity";
+  kind:
+    | "death"
+    | "cancer"
+    | "cerebrovascular"
+    | "ischemic_heart"
+    | "medical_indemnity";
   label: string;
   status: "well_prepared" | "needs_review" | "not_found";
   confirmed_amount: number | null;
@@ -158,7 +174,7 @@ export type ClaimChannelBlock = {
     note?: string | null;
     links: ClaimChannelLink[];
   }>;
-  indemnity?: {
+  medical_indemnity?: {
     name: string;
     description?: string | null;
     call_center?: string | null;

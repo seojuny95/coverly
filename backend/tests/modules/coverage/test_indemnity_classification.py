@@ -31,6 +31,17 @@ def test_indemnity_category_matching_is_normalized() -> None:
     assert result.medical_indemnity_status == "confirmed"
 
 
+def test_legacy_silson_insurance_alias_means_medical_indemnity() -> None:
+    result = classify_indemnity(
+        _coverage(담보명="실손보험"),
+        policy=_policy(category="제3보험"),
+    )
+
+    assert result.payment_basis == "indemnity"
+    assert result.coverage_domain == "medical_expense"
+    assert result.medical_indemnity_status == "confirmed"
+
+
 def test_non_medical_actual_loss_reimbursement_is_excluded() -> None:
     result = classify_indemnity(
         _coverage(담보명="자동차사고벌금(대물, 실손)", 지급유형="실손"),
@@ -61,14 +72,37 @@ def test_non_medical_actual_loss_terms_are_excluded_even_with_health_category() 
         assert result.medical_indemnity_status == "excluded"
 
 
-def test_travel_medical_expense_can_still_be_medical_indemnity() -> None:
+def test_travel_medical_expense_is_not_personal_medical_indemnity() -> None:
     result = classify_indemnity(
         _coverage(담보명="해외의료비(실손)", 지급유형="실손"),
         policy=_policy(category="손해보험", tags=["여행자보험"]),
     )
 
-    assert result.coverage_domain == "medical_expense"
-    assert result.medical_indemnity_status == "confirmed"
+    assert result.coverage_domain == "travel_medical_expense"
+    assert result.medical_indemnity_status == "excluded"
+
+
+def test_domestic_medical_expense_in_travel_policy_is_not_personal_medical_indemnity() -> None:
+    result = classify_indemnity(
+        _coverage(담보명="국내질병입원의료비", 지급유형="실손"),
+        policy=_policy(category="손해보험", tags=["여행자보험"]),
+    )
+
+    assert result.coverage_domain == "travel_medical_expense"
+    assert result.medical_indemnity_status == "excluded"
+
+
+def test_medical_product_tag_does_not_override_travel_coverage_domain() -> None:
+    result = classify_indemnity(
+        _coverage(담보명="휴대품손해(실손)", 지급유형="실손"),
+        policy=_policy(
+            category="손해보험",
+            tags=["여행자보험", "실손의료보험"],
+        ),
+    )
+
+    assert result.coverage_domain == "property_damage"
+    assert result.medical_indemnity_status == "excluded"
 
 
 def test_auto_medical_expense_stays_outside_medical_indemnity() -> None:

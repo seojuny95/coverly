@@ -1390,8 +1390,8 @@
     },
     "evidence": [
       {
-        "id": "indemnity:1",
-        "fact": "실손의료비 실손형 담보 가입 사실 확인"
+        "id": "actual-loss:1",
+        "fact": "실손의료비 가입 사실 확인 (지급 성격: 실손의료비)"
       },
       {
         "id": "session:1",
@@ -1407,7 +1407,7 @@
       "session:1"
     ],
     "forbidden_evidence_ids": [
-      "indemnity:1"
+      "actual-loss:1"
     ],
     "must_include_groups": [
       [
@@ -3249,8 +3249,8 @@
     },
     "evidence": [
       {
-        "id": "indemnity:1",
-        "fact": "상해입원의료비 실손형 담보 가입 사실 확인",
+        "id": "actual-loss:1",
+        "fact": "상해입원의료비 가입 사실 확인 (지급 성격: 실손의료비)",
         "coverage_name": "상해입원의료비"
       },
       {
@@ -3265,11 +3265,11 @@
     "expected_status": "answered",
     "expected_generation": "llm",
     "allowed_evidence_ids": [
-      "indemnity:1",
+      "actual-loss:1",
       "session:1"
     ],
     "required_evidence_ids": [
-      "indemnity:1",
+      "actual-loss:1",
       "session:1"
     ],
     "forbidden_evidence_ids": [

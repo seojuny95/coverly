@@ -318,15 +318,15 @@
     "question": "통원의료비 실손 담보가 두 개라는 사실과 중복 지급 원칙을 같이 설명해줘.",
     "demographics": {"age": 50, "gender": "여성", "source": "policy", "status": "verified_policy"},
     "evidence": [
-      {"id": "indemnity:1", "fact": "질병통원의료비 실손형 담보 가입 사실 확인", "coverage_name": "질병통원의료비"},
-      {"id": "indemnity:2", "fact": "상해통원의료비 실손형 담보 가입 사실 확인", "coverage_name": "상해통원의료비"},
+      {"id": "actual-loss:1", "fact": "질병통원의료비 가입 사실 확인 (지급 성격: 실손의료비)", "coverage_name": "질병통원의료비"},
+      {"id": "actual-loss:2", "fact": "상해통원의료비 가입 사실 확인 (지급 성격: 실손의료비)", "coverage_name": "상해통원의료비"},
       {"id": "session:1", "fact": "업로드 증권 원문 발췌: 다수 실손 계약은 실제 손해액 범위에서 비례보상"},
       {"id": "session:2", "fact": "업로드 증권 원문 발췌: 정액형 입원일당 3만원"}
     ],
     "expected_status": "answered",
     "expected_generation": "llm",
-    "allowed_evidence_ids": ["indemnity:1", "indemnity:2", "session:1"],
-    "required_evidence_ids": ["indemnity:1", "indemnity:2", "session:1"],
+    "allowed_evidence_ids": ["actual-loss:1", "actual-loss:2", "session:1"],
+    "required_evidence_ids": ["actual-loss:1", "actual-loss:2", "session:1"],
     "forbidden_evidence_ids": ["session:2"],
     "must_include_groups": [["질병통원의료비"], ["상해통원의료비"], ["비례보상"]],
     "must_not_include": ["입원일당", "3만원", "두 배"]

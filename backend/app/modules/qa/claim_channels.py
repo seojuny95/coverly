@@ -1,6 +1,6 @@
 """Curated insurer claim-channel directory (verified links/phones — not RAG).
 
-Turns the user's insurers + whether they hold 실손 into a deterministic claim-
+Turns the user's insurers + whether they hold 실손의료보험 into a deterministic claim-
 channel block so answers can point to the right place without an LLM inventing
 URLs. Insurer names live only in the data file, never in this module.
 """
@@ -11,9 +11,9 @@ from typing import Any, cast
 
 from app.modules.qa.schemas import (
     ClaimChannelBlock,
-    ClaimChannelIndemnity,
     ClaimChannelInsurer,
     ClaimChannelLink,
+    ClaimChannelMedicalIndemnity,
 )
 from app.modules.reference_data.loader import load_database_reference_data
 
@@ -35,7 +35,7 @@ class InsurerChannel:
 
 
 @dataclass(frozen=True)
-class IndemnityService:
+class MedicalIndemnityService:
     name: str
     description: str | None
     call_center: str | None
@@ -45,7 +45,7 @@ class IndemnityService:
 @dataclass(frozen=True)
 class ClaimChannelSet:
     insurers: tuple[InsurerChannel, ...]
-    indemnity: IndemnityService | None
+    medical_indemnity: MedicalIndemnityService | None
 
 
 @lru_cache(maxsize=1)
@@ -78,14 +78,14 @@ def _match(insurer: str, entries: list[dict[str, Any]]) -> dict[str, Any] | None
     return None
 
 
-def _indemnity_service(directory: dict[str, Any]) -> IndemnityService:
-    block = directory["실손"]
+def _medical_indemnity_service(directory: dict[str, Any]) -> MedicalIndemnityService:
+    block = directory["실손의료보험"]
     links = tuple(
         ChannelLink(label=channel["이름"], url=channel["링크"])
         for channel in block.get("채널", [])
         if channel.get("링크")
     )
-    return IndemnityService(
+    return MedicalIndemnityService(
         name=block["이름"],
         description=block.get("설명"),
         call_center=block.get("콜센터"),
@@ -93,10 +93,14 @@ def _indemnity_service(directory: dict[str, Any]) -> IndemnityService:
     )
 
 
-def channels_for(insurers: list[str], *, has_indemnity: bool) -> ClaimChannelSet:
+def channels_for(
+    insurers: list[str],
+    *,
+    has_medical_indemnity: bool,
+) -> ClaimChannelSet:
     """Deterministic claim-channel block for the user's insurers.
 
-    `has_indemnity` True → include the 실손24 auto-claim service (서류 없이 청구).
+    `has_medical_indemnity` includes the 실손24 medical-expense claim service.
     Unknown insurers are skipped; duplicates collapse to one entry.
     """
 
@@ -119,14 +123,24 @@ def channels_for(insurers: list[str], *, has_indemnity: bool) -> ClaimChannelSet
             )
         )
 
-    indemnity = _indemnity_service(directory) if has_indemnity else None
-    return ClaimChannelSet(insurers=tuple(matched), indemnity=indemnity)
+    medical_indemnity = _medical_indemnity_service(directory) if has_medical_indemnity else None
+    return ClaimChannelSet(
+        insurers=tuple(matched),
+        medical_indemnity=medical_indemnity,
+    )
 
 
-def claim_channel_block(insurers: list[str], *, has_indemnity: bool) -> ClaimChannelBlock:
+def claim_channel_block(
+    insurers: list[str],
+    *,
+    has_medical_indemnity: bool,
+) -> ClaimChannelBlock:
     """API-shaped claim channels (with clickable links) for the given insurers."""
 
-    channel_set = channels_for(insurers, has_indemnity=has_indemnity)
+    channel_set = channels_for(
+        insurers,
+        has_medical_indemnity=has_medical_indemnity,
+    )
     schema_insurers: list[ClaimChannelInsurer] = []
     for insurer in channel_set.insurers:
         links: list[ClaimChannelLink] = []
@@ -143,13 +157,16 @@ def claim_channel_block(insurers: list[str], *, has_indemnity: bool) -> ClaimCha
             )
         )
 
-    indemnity: ClaimChannelIndemnity | None = None
-    if channel_set.indemnity is not None:
-        source = channel_set.indemnity
-        indemnity = ClaimChannelIndemnity(
+    medical_indemnity: ClaimChannelMedicalIndemnity | None = None
+    if channel_set.medical_indemnity is not None:
+        source = channel_set.medical_indemnity
+        medical_indemnity = ClaimChannelMedicalIndemnity(
             name=source.name,
             description=source.description,
             call_center=source.call_center,
             links=[ClaimChannelLink(label=link.label, url=link.url) for link in source.links],
         )
-    return ClaimChannelBlock(insurers=schema_insurers, indemnity=indemnity)
+    return ClaimChannelBlock(
+        insurers=schema_insurers,
+        medical_indemnity=medical_indemnity,
+    )

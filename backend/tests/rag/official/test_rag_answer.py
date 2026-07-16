@@ -94,7 +94,7 @@ def test_answer_official_question_keeps_missing_context() -> None:
 
 def test_answer_official_question_replaces_generic_missing_context() -> None:
     result = answer_official_question(
-        "내 실손보험에서 도수치료가 보장돼?",
+        "내 실손의료보험에서 도수치료가 보장돼?",
         hits=[_hit(_chunk())],
         complete=lambda _system, _user: {
             "answer": "제공된 공식자료만으로는 도수치료 보장 여부를 확인할 수 없어요.",

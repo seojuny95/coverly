@@ -25,6 +25,7 @@ from app.modules.evidence.catalog import (
 )
 from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.qa.claim_channels import claim_channel_block
+from app.modules.qa.context import ClaimTarget
 from app.modules.qa.contracts import (
     AnswerSection,
     InsuredDemographics,
@@ -66,7 +67,7 @@ def _is_claim_related(question: str, answer: str) -> bool:
 
 
 def _claim_channels_for_answer(
-    question: str, answer: str, claim_targets: list[tuple[str, str, bool]]
+    question: str, answer: str, claim_targets: list[ClaimTarget]
 ) -> dict[str, object] | None:
     """Channels for the insurers whose coverage the answer actually names.
 
@@ -76,17 +77,32 @@ def _claim_channels_for_answer(
     """
 
     haystack = f"{question}\n{answer}"
+    matched_targets = [
+        target
+        for target in claim_targets
+        if query_contains_canonical_name(haystack, target.normalized_name)
+    ]
+    context_matched_targets = [
+        target
+        for target in matched_targets
+        if any(query_contains_canonical_name(haystack, term) for term in target.policy_terms)
+    ]
+    if context_matched_targets:
+        matched_targets = context_matched_targets
+
     insurers: list[str] = []
-    has_indemnity = False
-    for normalized_name, insurer, is_indemnity in claim_targets:
-        if query_contains_canonical_name(haystack, normalized_name):
-            insurers.append(insurer)
-            has_indemnity = has_indemnity or is_indemnity
+    has_medical_indemnity = bool(matched_targets)
+    for target in matched_targets:
+        insurers.append(target.insurer)
+        has_medical_indemnity = has_medical_indemnity and target.is_medical_indemnity
     insurers = list(dict.fromkeys(insurers))
     if not insurers:
         return None
-    block = claim_channel_block(insurers, has_indemnity=has_indemnity)
-    if not block.insurers and block.indemnity is None:
+    block = claim_channel_block(
+        insurers,
+        has_medical_indemnity=has_medical_indemnity,
+    )
+    if not block.insurers and block.medical_indemnity is None:
         return None
     return block.model_dump(mode="json")
 
@@ -308,8 +324,8 @@ def _stream_system_prompt() -> str:
 - "가입하면 좋을 보험·보장이 있어?"를 물으면 "상황마다 다르다/전문가와 상담"으로 미루지 말고,
   review_categories(생애단계 대비 확인되지 않은 보장)를 활용해 "이런 보장은 지금 증권에서
   확인되지 않으니 필요하면 고려해볼 만해요"처럼 구체적으로 알려주세요.
-- "줄일 담보 있어?"를 물으면 evidence에서 여러 증권에 겹치는 담보(특히 실손·비례보상형은
-  중복 가입해도 더 받지 못함)를 짚어 "이건 정리를 고려해볼 만해요"처럼 제안하세요.
+- "줄일 담보 있어?"를 물으면 evidence에서 여러 증권에 겹치는 실손형·비례보상형 담보를
+  짚고, 같은 손해의 중복 보상 제한 여부를 약관에서 확인하도록 안내하세요.
 - 이건 지금 가진 정보 기반의 참고 제안입니다. 특정 상품·보험사를 팔거나 손해 공포로
   압박하지 말고, 정확한 조건과 최종 결정은 약관·보험사에서 확인하도록 함께 안내하세요.
 
@@ -453,7 +469,7 @@ def stream_consultation_answer(
     limitations: list[str],
     suggestions: list[str],
     fallback: PortfolioQuestionResponse,
-    claim_targets: list[tuple[str, str, bool]] | None = None,
+    claim_targets: list[ClaimTarget] | None = None,
     stream: TextStreamer | None = None,
 ) -> Iterator[QaStreamEvent]:
     """Stream the LLM's own grounded prose; fall back if it never produces text."""

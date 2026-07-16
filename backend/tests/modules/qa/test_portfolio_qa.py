@@ -6,6 +6,7 @@ from typing import Any
 from pytest import MonkeyPatch
 
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.context import build_qa_context
 from app.modules.qa.contracts import InsuredDemographics
 from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
 from app.modules.qa.service import answer_portfolio_question
@@ -227,26 +228,58 @@ def test_qa_answers_how_to_claim_with_insurer_channels() -> None:
         raise AssertionError("LLM should not be called for claim-channel questions")
 
     result = answer_portfolio_question(
-        "실손 어떻게 청구해?", _named_insurer_policies("삼성화재"), complete=forbidden
+        "실손의료보험 어떻게 청구해?",
+        _named_insurer_policies("삼성화재"),
+        complete=forbidden,
     )
 
     assert result.status == "answered"
     assert result.claim_channels is not None
     assert any(insurer.name == "삼성화재" for insurer in result.claim_channels.insurers)
-    assert result.claim_channels.indemnity is not None
-    assert result.claim_channels.indemnity.name == "실손24"
+    assert result.claim_channels.medical_indemnity is not None
+    assert result.claim_channels.medical_indemnity.name == "실손24"
     assert any("약관" in limitation for limitation in result.limitations)
 
 
+def test_qa_treats_silson_insurance_alias_as_medical_indemnity() -> None:
+    result = answer_portfolio_question(
+        "실손보험 어떻게 청구해?",
+        _named_insurer_policies("삼성화재"),
+    )
+
+    assert result.claim_channels is not None
+    assert result.claim_channels.medical_indemnity is not None
+    assert result.claim_channels.medical_indemnity.name == "실손24"
+
+
+def test_qa_treats_silson_insurance_alias_as_medical_indemnity_lookup() -> None:
+    result = answer_portfolio_question("실손보험은?", _policies())
+
+    assert result.status == "answered"
+    assert "실손의료보험 관련 담보가 확인돼요" in result.answer
+    assert "실손형은 실제 발생한 손해" not in result.answer
+
+
 def test_qa_claim_channels_include_clickable_links() -> None:
-    result = answer_portfolio_question("실손 어떻게 청구해?", _named_insurer_policies("삼성화재"))
+    result = answer_portfolio_question(
+        "실손의료보험 어떻게 청구해?", _named_insurer_policies("삼성화재")
+    )
 
     assert result.claim_channels is not None
     insurer = result.claim_channels.insurers[0]
     assert insurer.name == "삼성화재"
     assert any(link.url.startswith("http") for link in insurer.links)
-    assert result.claim_channels.indemnity is not None
-    assert any(link.url.startswith("http") for link in result.claim_channels.indemnity.links)
+    assert result.claim_channels.medical_indemnity is not None
+    assert any(
+        link.url.startswith("http") for link in result.claim_channels.medical_indemnity.links
+    )
+
+
+def test_qa_does_not_assume_bare_actual_loss_claim_is_medical() -> None:
+    result = answer_portfolio_question("실손 청구 어떻게 해?", _named_insurer_policies("삼성화재"))
+
+    assert result.claim_channels is not None
+    assert result.claim_channels.medical_indemnity is None
 
 
 def test_qa_answers_coverage_question_with_hedge_instead_of_refusing() -> None:
@@ -299,7 +332,7 @@ def _health_plus_auto() -> list[PolicyInput]:
 
 
 def test_qa_claim_howto_excludes_auto_insurer_for_non_auto_question() -> None:
-    result = answer_portfolio_question("실손 청구 어떻게 해?", _health_plus_auto())
+    result = answer_portfolio_question("실손의료보험 청구 어떻게 해?", _health_plus_auto())
 
     assert result.claim_channels is not None
     names = [insurer.name for insurer in result.claim_channels.insurers]
@@ -313,9 +346,17 @@ def test_qa_claim_howto_includes_auto_insurer_for_car_question() -> None:
     assert result.claim_channels is not None
     names = [insurer.name for insurer in result.claim_channels.insurers]
     assert "현대해상" in names
+    assert result.claim_channels.medical_indemnity is None
 
 
-def test_qa_claim_howto_detects_indemnity_beyond_exact_실손_type() -> None:
+def test_qa_non_medical_claim_does_not_include_medical_indemnity_service() -> None:
+    result = answer_portfolio_question("암진단비 청구 서류 알려줘", _policies())
+
+    assert result.claim_channels is not None
+    assert result.claim_channels.medical_indemnity is None
+
+
+def test_qa_claim_howto_detects_medical_indemnity_payment_type_variant() -> None:
     policies = [
         PolicyInput.model_validate(
             {
@@ -326,11 +367,11 @@ def test_qa_claim_howto_detects_indemnity_beyond_exact_실손_type() -> None:
         )
     ]
 
-    result = answer_portfolio_question("실손 청구 어떻게 해?", policies)
+    result = answer_portfolio_question("실손의료보험 청구 어떻게 해?", policies)
 
     assert result.claim_channels is not None
-    assert result.claim_channels.indemnity is not None
-    assert result.claim_channels.indemnity.name == "실손24"
+    assert result.claim_channels.medical_indemnity is not None
+    assert result.claim_channels.medical_indemnity.name == "실손24"
 
 
 def test_qa_status_counts_auto_policies() -> None:
@@ -633,13 +674,103 @@ def test_qa_answers_amount_lookup_for_non_life_damage_coverage() -> None:
     assert "확인 가능한 가입금액을 찾지 못했어요" not in result.answer
 
 
-def test_qa_answers_missing_indemnity_without_sales_guidance() -> None:
+def test_qa_answers_broad_actual_loss_lookup_without_assuming_medical_coverage() -> None:
     result = answer_portfolio_question("실손은?", _non_life_cancer_policy())
 
     assert result.status == "answered"
-    assert "실손의료보험 담보를 확인하지 못했어요" in result.answer
+    assert "실손형 담보를 확인하지 못했어요" in result.answer
     assert "가입을 고려" not in result.answer
     assert "가입하세요" not in result.answer
+
+
+def test_qa_broad_actual_loss_lookup_keeps_medical_and_auto_domains_separate() -> None:
+    context = build_qa_context("실손은?", _health_plus_auto(), None, None)
+    auto_coverage_evidence = [
+        item for item in context.catalog.items if item.coverage_name == "대물배상"
+    ]
+
+    assert len(auto_coverage_evidence) == 1
+    assert auto_coverage_evidence[0].id.startswith("damage:")
+
+    result = answer_portfolio_question("실손은?", _health_plus_auto())
+
+    assert result.status == "answered"
+    assert "실손의료보험은 그중 의료비 영역" in result.answer
+    assert "실손의료비 (실손의료비)" in result.answer
+    assert "대물배상 (자동차 손해 실손형)" in result.answer
+    assert any(
+        citation.coverage_name == "대물배상" and (citation.evidence_id or "").startswith("damage:")
+        for citation in result.citations
+    )
+
+
+def test_qa_keeps_same_actual_loss_name_in_different_domains_separate() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "health",
+                "기본정보": {
+                    "보험사": "삼성화재",
+                    "상품명": "건강보험",
+                    "보험분류": "제3보험",
+                },
+                "보장목록": [{"담보명": "질병입원의료비", "지급유형": "실손"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "travel",
+                "기본정보": {
+                    "보험사": "현대해상",
+                    "상품명": "여행자보험",
+                    "보험분류": "손해보험",
+                    "상품태그": ["여행자보험"],
+                },
+                "보장목록": [{"담보명": "질병입원의료비", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+    result = answer_portfolio_question("실손은?", policies)
+
+    assert "질병입원의료비 (실손의료비)" in result.answer
+    assert "질병입원의료비 (여행 의료비 실손형)" in result.answer
+    assert "여러 계약에서 확인" not in result.answer
+
+
+def test_qa_answers_missing_medical_indemnity_for_specific_question() -> None:
+    result = answer_portfolio_question("실손의료비는?", _non_life_cancer_policy())
+
+    assert result.status == "answered"
+    assert "실손의료보험 담보를 확인하지 못했어요" in result.answer
+
+
+def test_qa_life_stage_check_reuses_medical_indemnity_classification() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "기본정보": {
+                "보험사": "보험사A",
+                "상품명": "건강보험",
+                "보험분류": "제3보험",
+            },
+            "보장목록": [
+                {
+                    "담보명": "상해입원의료비",
+                    "보장분류": "실손형",
+                }
+            ],
+        }
+    )
+
+    context = build_qa_context(
+        "내 보장을 확인해줘",
+        [policy],
+        InsuredDemographics(age=35, gender="여성", source="user"),
+        None,
+    )
+
+    assert "실손의료비" in context.life_stage_check.held
+    assert "실손의료비" not in context.life_stage_check.missing
 
 
 def test_qa_answers_adequacy_question_from_essential_coverage_check() -> None:
