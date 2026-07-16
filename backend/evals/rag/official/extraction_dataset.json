@@ -1778,5 +1778,175 @@
       "금융상품판매업자는 대통령령으로 각각 정하는 보장성 상품, 투자성"
     ],
     "case_type": "broad_regression"
+  },
+  {
+    "id": "knia_auto_product_driver_age_limit",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "2 운전자 한정 특별약관 가입 관련(Ⅱ)",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.5"
+    ],
+    "expected_page_start": 5,
+    "expected_page_end": 5,
+    "must_include": [
+      "운전자 연령 만26세이상 특별약관",
+      "대인배상Ⅰ은 보상합니다"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "knia_auto_product_property_damage_driver_limit",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "3 운전자 한정 특별약관 가입 관련(Ⅲ)",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.5"
+    ],
+    "expected_page_start": 5,
+    "expected_page_end": 5,
+    "must_include": [
+      "대물배상도 대인배상Ⅰ처럼",
+      "운전자 범위 및 연령 제한"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "knia_auto_product_actual_loss_duplicate",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "교통 법규 위반 또는 사고 시 그 사고 내용, 횟수에 따라 보험료가 바뀔 수 있습니다.",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.6"
+    ],
+    "expected_page_start": 6,
+    "expected_page_end": 6,
+    "must_include": [
+      "실손 담보 중복가입 시 불이익",
+      "발생한 손해액을 초과하여 보험금을 지급하지"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "knia_auto_product_claim_notice",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "2 보험금 지급관련 특히 유의할 사항",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.7"
+    ],
+    "expected_page_start": 7,
+    "expected_page_end": 7,
+    "must_include": [
+      "운전자 연령한정 특별약관",
+      "대인배상Ⅰ은 운전자 연령에 관계 없이 보상"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "knia_auto_product_drunk_unlicensed_burden",
+    "source_id": "knia_auto_insurance_product_explanation_2024_04_01",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "[대인배상 담보: 사망 또는 부상 시]",
+    "expected_citation_contains": [
+      "자동차보험 표준상품설명서",
+      "p.9"
+    ],
+    "expected_page_start": 9,
+    "expected_page_end": 9,
+    "must_include": [
+      "음주운전",
+      "무면허운전"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_insurance_types",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.5"
+    ],
+    "expected_page_start": 5,
+    "expected_page_end": 5,
+    "must_include": [
+      "실손의료비보험",
+      "보장성 보험"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_damage_insurance_types",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.6"
+    ],
+    "expected_page_start": 6,
+    "expected_page_end": 6,
+    "must_include": [
+      "화재보험",
+      "책임보험"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_auto_liability_mandatory",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.13"
+    ],
+    "expected_page_start": 13,
+    "expected_page_end": 13,
+    "must_include": [
+      "자동차보유자는",
+      "책임보험(대인배상Ⅰ)에 가입"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_claim_notice",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.18"
+    ],
+    "expected_page_start": 18,
+    "expected_page_end": 18,
+    "must_include": [
+      "보험사고 발생 통지",
+      "지체없이 보험자에게"
+    ],
+    "case_type": "curated"
+  },
+  {
+    "id": "easylaw_policyholder_dispute_mediation",
+    "source_id": "easylaw_insurance_policyholder_2026_06_15",
+    "expected_source_category": "consumer_guide",
+    "expected_label": "찾기쉬운 생활법령",
+    "expected_citation_contains": [
+      "찾기 쉬운 생활법령정보 보험계약자",
+      "p.35"
+    ],
+    "expected_page_start": 35,
+    "expected_page_end": 35,
+    "must_include": [
+      "금융분쟁조정위원회",
+      "분쟁의 조정을 신청"
+    ],
+    "case_type": "curated"
   }
 ]
