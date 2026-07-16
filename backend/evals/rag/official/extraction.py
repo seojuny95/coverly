@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import cast
 
 from app.rag.official.loaders import load_official_chunks
-from app.rag.official.models import RagChunk
+from app.rag.official.models import RagChunk, chunk_embedding_text
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "extraction_dataset.json"
 
@@ -154,7 +154,9 @@ def _evaluate_case(case: ExtractionEvalCase, chunk: RagChunk | None) -> Extracti
     citation_matched = all(
         _contains_normalized(citation, term) for term in case.expected_citation_contains
     )
-    text_covered = all(_contains_normalized(chunk.text, term) for term in case.must_include)
+    text_covered = all(
+        _contains_normalized(chunk_embedding_text(chunk), term) for term in case.must_include
+    )
     failed_checks = tuple(
         check
         for check, passed in (
