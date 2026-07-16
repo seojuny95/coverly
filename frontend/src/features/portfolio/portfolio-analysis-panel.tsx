@@ -1316,31 +1316,36 @@ function ClaimGuide({
                   <p className="mt-1 text-sm leading-6 text-zinc-600">
                     {step.description}
                   </p>
-                  {index === 2 && claimChannels?.medical_indemnity ? (
+                  {index === 2 &&
+                  (claimChannels?.medical_indemnity ||
+                    claimChannels?.insurers.length) ? (
                     <div className="mt-3 space-y-3">
-                      <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs leading-5 text-zinc-600">
-                        <p className="font-semibold text-zinc-900">
-                          {claimChannels.medical_indemnity.name}
-                        </p>
-                        {claimChannels.medical_indemnity.description ? (
+                      {claimChannels.medical_indemnity ? (
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs leading-5 text-zinc-600">
+                          <p className="font-semibold text-zinc-900">
+                            {claimChannels.medical_indemnity.name}
+                          </p>
+                          {claimChannels.medical_indemnity.description ? (
+                            <p className="mt-1">
+                              {claimChannels.medical_indemnity.description}
+                            </p>
+                          ) : null}
                           <p className="mt-1">
-                            {claimChannels.medical_indemnity.description}
+                            참여 병원이라면 진료비 서류를 전자 전송할 수 있어요.
+                            먼저 연계 병원인지 확인해요.
                           </p>
-                        ) : null}
-                        <p className="mt-1">
-                          참여 병원이라면 진료비 서류를 전자 전송할 수 있어요.
-                          먼저 연계 병원인지 확인해요.
-                        </p>
-                        {claimChannels.medical_indemnity.call_center ? (
-                          <p className="mt-1 text-zinc-500">
-                            콜센터 {claimChannels.medical_indemnity.call_center}
-                          </p>
-                        ) : null}
-                        <ChannelLinkList
-                          links={claimChannels.medical_indemnity.links}
-                          className="mt-2"
-                        />
-                      </div>
+                          {claimChannels.medical_indemnity.call_center ? (
+                            <p className="mt-1 text-zinc-500">
+                              콜센터{" "}
+                              {claimChannels.medical_indemnity.call_center}
+                            </p>
+                          ) : null}
+                          <ChannelLinkList
+                            links={claimChannels.medical_indemnity.links}
+                            className="mt-2"
+                          />
+                        </div>
+                      ) : null}
 
                       {claimChannels.insurers.length ? (
                         <details className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
@@ -1350,8 +1355,8 @@ function ClaimGuide({
                                 가입한 보험사 청구 채널 보기
                               </span>
                               <span className="mt-1 block text-xs text-zinc-500">
-                                실손의료비도 보험사 앱이나 홈페이지에서 직접
-                                청구할 수 있어요.
+                                가입한 보험사의 앱이나 홈페이지에서 직접 청구할
+                                수 있어요.
                               </span>
                             </span>
                             <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-600">

@@ -595,6 +595,33 @@ test("shows a multiple-medical-indemnity review directly in the coverage map", (
   expect(screen.getByText("중복 가능성 확인")).toBeInTheDocument();
 });
 
+test("shows insurer claim channels even without the medical indemnity channel", () => {
+  const insurerOnlyClaimSummary: PortfolioSummary = {
+    ...summary,
+    claim_channels: summary.claim_channels
+      ? {
+          ...summary.claim_channels,
+          medical_indemnity: null,
+        }
+      : null,
+  };
+
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      summary={insurerOnlyClaimSummary}
+    />,
+  );
+
+  expect(screen.queryByText("실손24")).not.toBeInTheDocument();
+  expect(screen.getByText("가입한 보험사 청구 채널 보기")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "가입한 보험사의 앱이나 홈페이지에서 직접 청구할 수 있어요.",
+    ),
+  ).toBeInTheDocument();
+});
+
 test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
   const reviewSummary: PortfolioSummary = {
     ...summary,
