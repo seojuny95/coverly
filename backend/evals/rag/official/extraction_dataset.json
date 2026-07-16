@@ -2,7 +2,6 @@
   {
     "id": "standard_terms_life_purpose",
     "source_id": "standard_terms_annex_15_2026_06_30",
-    "chunk_id": "7c76c76022b2e69c0de5",
     "expected_source_category": "standard_clause",
     "expected_label": "제1조(목적)",
     "expected_citation_contains": [
@@ -14,12 +13,12 @@
     "must_include": [
       "제1조(목적)",
       "보험계약자"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_life_definition",
     "source_id": "standard_terms_annex_15_2026_06_30",
-    "chunk_id": "da1136c8b978849bcadf",
     "expected_source_category": "standard_clause",
     "expected_label": "제2조(용어의 정의)",
     "expected_citation_contains": [
@@ -31,12 +30,12 @@
     "must_include": [
       "제2조(용어의 정의)",
       "보험수익자"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_life_payment_reason",
     "source_id": "standard_terms_annex_15_2026_06_30",
-    "chunk_id": "8da6a82c4c693d03db88",
     "expected_source_category": "standard_clause",
     "expected_label": "제3조(보험금의 지급사유)",
     "expected_citation_contains": [
@@ -48,7 +47,8 @@
     "must_include": [
       "보험금의 지급사유",
       "약정한 보험금"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_life_death_inclusion",
@@ -65,7 +65,8 @@
     "must_include": [
       "실종선고",
       "사망"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_life_contract_invalidity",
@@ -82,12 +83,12 @@
     "must_include": [
       "계약의 무효",
       "계약을 무효"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_life_claim_documents",
     "source_id": "standard_terms_annex_15_2026_06_30",
-    "chunk_id": "cf4bbaaf55a25b0e0ac1",
     "expected_source_category": "standard_clause",
     "expected_label": "제6조(보험금의 청구)",
     "expected_citation_contains": [
@@ -99,12 +100,12 @@
     "must_include": [
       "보험금의 청구",
       "보험금 청구서"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_life_explanation_duty",
     "source_id": "standard_terms_annex_15_2026_06_30",
-    "chunk_id": "44ffae7610bf84b4bcf1",
     "expected_source_category": "standard_clause",
     "expected_label": "제18조(약관교부 및 설명의무 등)",
     "expected_citation_contains": [
@@ -116,7 +117,8 @@
     "must_include": [
       "약관교부 및 설명의무",
       "약관의 중요한 내용"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_life_premium_overdue",
@@ -133,7 +135,8 @@
     "must_include": [
       "납입최고",
       "계약의 해지"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_life_prescription",
@@ -150,7 +153,8 @@
     "must_include": [
       "소멸시효",
       "3년간 행사하지"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_life_deposit_protection",
@@ -167,7 +171,8 @@
     "must_include": [
       "예금보험",
       "지급보장"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_auto_law",
@@ -184,7 +189,8 @@
     "must_include": [
       "자동차보험",
       "준거법"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_auto_notice_after_contract",
@@ -201,7 +207,8 @@
     "must_include": [
       "자동차보험",
       "계약 후 알릴 의무"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_auto_claim",
@@ -218,7 +225,8 @@
     "must_include": [
       "자동차보험",
       "보험금의 청구"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_health_overdue",
@@ -235,12 +243,12 @@
     "must_include": [
       "질병·상해보험",
       "납입최고"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_indemnity_claim",
     "source_id": "standard_terms_annex_15_2026_06_30",
-    "chunk_id": "adce5a17d09de088d839",
     "expected_source_category": "standard_clause",
     "expected_label": "제7조(보험금의 청구)",
     "expected_citation_contains": [
@@ -252,12 +260,12 @@
     "must_include": [
       "기본형 실손의료보험",
       "보험금의 청구"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_indemnity_medical_institution",
     "source_id": "standard_terms_annex_15_2026_06_30",
-    "chunk_id": "57240c091cc6957018c6",
     "expected_source_category": "standard_clause",
     "expected_label": "제3조(의료기관)",
     "expected_citation_contains": [
@@ -269,7 +277,8 @@
     "must_include": [
       "의료기관",
       "종합병원"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_indemnity_coverage_content",
@@ -286,7 +295,8 @@
     "must_include": [
       "보장종목별 보상 내용",
       "비급여"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_travel_indemnity_notice",
@@ -303,12 +313,12 @@
     "must_include": [
       "해외여행 실손의료보험",
       "알릴 의무 위반"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_liability_contribution",
     "source_id": "standard_terms_annex_15_2026_06_30",
-    "chunk_id": "43f2a89b4e74c226006b",
     "expected_source_category": "standard_clause",
     "expected_label": "제10조(보험금의 분담)",
     "expected_citation_contains": [
@@ -320,7 +330,8 @@
     "must_include": [
       "배상책임보험",
       "보험금의 분담"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_guarantee_prescription",
@@ -337,7 +348,8 @@
     "must_include": [
       "채무이행보증보험",
       "3년간 행사하지 아니하면"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "roadmap_chunk_01",
@@ -354,12 +366,12 @@
     "must_include": [
       "보험약관 개선 로드맵",
       "2019. 10."
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "roadmap_chunk_02",
     "source_id": "fsc_policy_terms_roadmap_2019_10_22",
-    "chunk_id": "3d68214bf81dbbbe82fb",
     "expected_source_category": "consumer_guide",
     "expected_label": "Ⅰ 추진배경",
     "expected_citation_contains": [
@@ -371,7 +383,8 @@
     "must_include": [
       "추진배경",
       "복잡하고 어려워"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "roadmap_chunk_03",
@@ -388,7 +401,8 @@
     "must_include": [
       "소비자 친화적으로",
       "약관순화위원회"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "roadmap_chunk_04",
@@ -405,12 +419,12 @@
     "must_include": [
       "약관개선 실무T/F",
       "보험업계"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "roadmap_chunk_05",
     "source_id": "fsc_policy_terms_roadmap_2019_10_22",
-    "chunk_id": "89d9681d461361955c4a",
     "expected_source_category": "consumer_guide",
     "expected_label": "2 약관순화위원회 설치 ※ ‘19.9.5. 제1차 약관순화위원회 개최",
     "expected_citation_contains": [
@@ -422,7 +436,8 @@
     "must_include": [
       "약관순화위원회",
       "전문적인 자문"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "roadmap_chunk_06",
@@ -439,7 +454,8 @@
     "must_include": [
       "좋은 보험약관 만들기 경진대회",
       "아이디어 발굴"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "roadmap_chunk_07",
@@ -456,12 +472,12 @@
     "must_include": [
       "과제별 세부 추진방안",
       "1차 개선과제"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "roadmap_chunk_08",
     "source_id": "fsc_policy_terms_roadmap_2019_10_22",
-    "chunk_id": "83ef319108bcf18809b6",
     "expected_source_category": "consumer_guide",
     "expected_label": "과제2 소비자 오인소지가 있는 상품명 정비",
     "expected_citation_contains": [
@@ -473,7 +489,8 @@
     "must_include": [
       "소비자 오인소지가 있는 상품명",
       "보장내용"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "roadmap_chunk_09",
@@ -490,7 +507,8 @@
     "must_include": [
       "보험상품 특별약관 부가체계",
       "세분화된 많은 특약"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "roadmap_chunk_10",
@@ -507,7 +525,8 @@
     "must_include": [
       "소비자 친화적 보험약관",
       "실제 가입하지 않은 특약"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_purpose",
@@ -524,12 +543,12 @@
     "must_include": [
       "제1조(목적)",
       "보험계약자"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_product_definition",
     "source_id": "insurance_business_act",
-    "chunk_id": "insurance_business_act:2조:1",
     "expected_source_category": "law",
     "expected_label": "제2조(정의)",
     "expected_citation_contains": [
@@ -541,12 +560,12 @@
     "must_include": [
       "보험상품",
       "위험보장을 목적"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "insurance_business_act_permission",
     "source_id": "insurance_business_act",
-    "chunk_id": "insurance_business_act:4조",
     "expected_source_category": "law",
     "expected_label": "제4조(보험업의 허가)",
     "expected_citation_contains": [
@@ -558,7 +577,8 @@
     "must_include": [
       "보험업의 허가",
       "금융위원회"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "insurance_business_act_subsidiary_business",
@@ -575,7 +595,8 @@
     "must_include": [
       "부수업무",
       "보험업에 부수"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_document_view",
@@ -592,12 +613,12 @@
     "must_include": [
       "서류의 비치",
       "열람"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_explanation_duty",
     "source_id": "insurance_business_act",
-    "chunk_id": "insurance_business_act:95조의2",
     "expected_source_category": "law",
     "expected_label": "제95조의2(설명의무 등)",
     "expected_citation_contains": [
@@ -609,7 +630,8 @@
     "must_include": [
       "설명의무",
       "보험금 지급 시까지의 주요 과정"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "insurance_business_act_advertisement_reference",
@@ -626,7 +648,8 @@
     "must_include": [
       "광고 관련 준수사항",
       "금융소비자 보호에 관한 법률"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_document_keep",
@@ -643,12 +666,12 @@
     "must_include": [
       "서류의 비치",
       "일반인이 열람"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_claim_inability",
     "source_id": "insurance_business_act",
-    "chunk_id": "insurance_business_act:131조의2",
     "expected_source_category": "law",
     "expected_label": "제131조의2(보험금 지급불능 등에 대한 조치)",
     "expected_citation_contains": [
@@ -660,7 +683,8 @@
     "must_include": [
       "보험금 지급불능",
       "보험계약자의 이익"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "insurance_business_act_loss_adjuster",
@@ -677,7 +701,8 @@
     "must_include": [
       "손해사정사",
       "금융감독원장"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_purpose",
@@ -694,7 +719,8 @@
     "must_include": [
       "제1조(목적)",
       "금융소비자의 권익"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_definition",
@@ -711,12 +737,12 @@
     "must_include": [
       "제2조(정의)",
       "금융상품"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_product_types",
     "source_id": "financial_consumer_protection_act",
-    "chunk_id": "financial_consumer_protection_act:3조",
     "expected_source_category": "law",
     "expected_label": "제3조(금융상품의 유형)",
     "expected_citation_contains": [
@@ -728,12 +754,12 @@
     "must_include": [
       "금융상품의 유형",
       "보장성 상품"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "financial_consumer_act_duty_faith",
     "source_id": "financial_consumer_protection_act",
-    "chunk_id": "financial_consumer_protection_act:14조",
     "expected_source_category": "law",
     "expected_label": "제14조(신의성실의무 등)",
     "expected_citation_contains": [
@@ -745,7 +771,8 @@
     "must_include": [
       "신의성실",
       "공정히"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "financial_consumer_act_management_responsibility",
@@ -762,12 +789,12 @@
     "must_include": [
       "관리책임",
       "금융상품판매대리"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_explanation_duty",
     "source_id": "financial_consumer_protection_act",
-    "chunk_id": "financial_consumer_protection_act:19조:1",
     "expected_source_category": "law",
     "expected_label": "제19조(설명의무)",
     "expected_citation_contains": [
@@ -779,7 +806,8 @@
     "must_include": [
       "설명의무",
       "일반금융소비자"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "financial_consumer_act_unfair_business",
@@ -796,7 +824,8 @@
     "must_include": [
       "불공정영업행위",
       "금융소비자의 권익"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_dispute_mediation",
@@ -813,12 +842,12 @@
     "must_include": [
       "분쟁의 조정",
       "금융감독원장"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_withdrawal",
     "source_id": "financial_consumer_protection_act",
-    "chunk_id": "financial_consumer_protection_act:46조:1",
     "expected_source_category": "law",
     "expected_label": "제46조(청약의 철회)",
     "expected_citation_contains": [
@@ -830,12 +859,12 @@
     "must_include": [
       "청약의 철회",
       "일반금융소비자"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "financial_consumer_act_illegal_contract_cancel",
     "source_id": "financial_consumer_protection_act",
-    "chunk_id": "financial_consumer_protection_act:47조",
     "expected_source_category": "law",
     "expected_label": "제47조(위법계약의 해지)",
     "expected_citation_contains": [
@@ -847,7 +876,8 @@
     "must_include": [
       "위법계약의 해지",
       "금융소비자"
-    ]
+    ],
+    "case_type": "curated"
   },
   {
     "id": "standard_terms_extra_01",
@@ -864,7 +894,8 @@
     "must_include": [
       "제3조(보험금의 지급사유)",
       "제3호 ‘사망’의 원인 및 ‘사망보험금’ 지급에 영향을 미치지 않"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_02",
@@ -881,7 +912,8 @@
     "must_include": [
       "제6조(보험금의 청구)",
       "에서 정한 서 류를 접수한 때에는 접수증을 교부하고, 그 서류를"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_03",
@@ -898,7 +930,8 @@
     "must_include": [
       "제4조(피보험자)",
       "｢대인배상Ⅰ｣에서 피보험자라 함은 다음 중 어느 하나에 해당하는"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_04",
@@ -915,7 +948,8 @@
     "must_include": [
       "제3조(보험금의 지급사유)",
       "회사는 피보험자에게 다음 중 어느 하나의 사 유가 발생한 경우에는"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_05",
@@ -932,7 +966,8 @@
     "must_include": [
       "제5조(보험가입금액 한도 등)",
       "지원금을 통해 감면 또는 지원(「국민건강보험법」 제50조에 따 른"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_06",
@@ -949,7 +984,8 @@
     "must_include": [
       "제5조(보험가입금액 한도 등)",
       "에서 정한 연간 보험가 입금액의 한도 내에서 다음과 같이 보상합니"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_07",
@@ -966,7 +1002,8 @@
     "must_include": [
       "제 5조(보험가입금액 한도 등)",
       "에서 정한 연간 보험가입금액 의 한도 내에서 보상합니다. 다만,"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_08",
@@ -983,7 +1020,8 @@
     "must_include": [
       "제3조(보장종목별 보상내용)",
       "회사가 이 계약의 보험기간 중 보장종목별 로 각각 보상하는 내용은"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_09",
@@ -1000,7 +1038,8 @@
     "must_include": [
       "제1조(보장종목)",
       "회사가 판매하는 해외여행 실손의료보험 특별약관1 (이하 ‘특별약관"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_10",
@@ -1017,7 +1056,8 @@
     "must_include": [
       "제4조(보상하지 않는 손해)",
       "회사는 아래의 사유로 인한 손해는 보상하여 드리지 않습니다. 1."
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_11",
@@ -1034,7 +1074,8 @@
     "must_include": [
       "제1조(보상하는 손해)",
       "보험회사(이하 ‘회사’라 합니다)는 채무자인 보험계약 자(이하 ‘"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_12",
@@ -1051,7 +1092,8 @@
     "must_include": [
       "제1조(보상하는 손해)",
       "보험회사(이하 ‘회사’라 합니다)는 채무자가 보험증권 에 기재된"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_13",
@@ -1068,7 +1110,8 @@
     "must_include": [
       "제9조(계약후 알릴의무)",
       "이 보험계약을 체결한 후 아래와 같은 사실이 - 480 - 생긴"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_14",
@@ -1085,7 +1128,8 @@
     "must_include": [
       "제3조(보험금의 지급사유)",
       "제4호에서 장해지급률이 재해일 또는 질병 의 진단 확정일부터 18"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_15",
@@ -1102,7 +1146,8 @@
     "must_include": [
       "제3조(보험금의 지급사유)",
       "제3호에서 제5호의 보험 금 지급사유에 대해 합의하지 못할 때는"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_16",
@@ -1119,7 +1164,8 @@
     "must_include": [
       "제3조(의 료기관)",
       "에 규정한 종합병원 소속 전문의 중에서 정하며, 보험금 지급사유"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_17",
@@ -1136,7 +1182,8 @@
     "must_include": [
       "제5조(보험금을 지급하지 않는 사유)",
       "회사는 다음 중 어느 한 가지로 보 험금 지급사유가 발생한 때에는"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_18",
@@ -1153,7 +1200,8 @@
     "must_include": [
       "제3조(보험금의 지급사유)",
       "에서 정한 보험금 지급사유의 발생을 안 때 에는 지체없이 이를 회"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_19",
@@ -1170,7 +1218,8 @@
     "must_include": [
       "제7조(보험금의 청구)",
       "보험수익자는 다음의 서류를 제출하고 보험금을 청구하여야 합니다."
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_20",
@@ -1187,7 +1236,8 @@
     "must_include": [
       "제3조(의료기관)",
       "에서 규정한 국내 의 병원이나 의원 또는 국외의 의료관련법에서 정"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_21",
@@ -1204,7 +1254,8 @@
     "must_include": [
       "제7조(보험금의 청구)",
       "에서 정한 서 류를 접수한 때에는 접수증을 드리고 휴대전화 문자메"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_22",
@@ -1221,7 +1272,8 @@
     "must_include": [
       "제3조(보험금의 지급사유)",
       "제1호 또는 제2호에 해당하는 보험 금의 지급시기가 되면 지급시기"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_23",
@@ -1238,7 +1290,8 @@
     "must_include": [
       "제7조(보험금의 청구)",
       "에서 정한 서류를 접수한 날부터 30영업 일 이내에서 정합니다."
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_24",
@@ -1255,7 +1308,8 @@
     "must_include": [
       "제4조(보험금 지급에 관한 세부규정)",
       "제9항에 따라 보험금 지급사유 에 대해 제3자의 의견에 따르기로"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_25",
@@ -1272,7 +1326,8 @@
     "must_include": [
       "제14조(계약 전 알릴 의무 위반 의 효과)",
       "와 제1항 및 제3항의 보험금 지급사유조사와 관련하여 의료기관,"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_26",
@@ -1289,7 +1344,8 @@
     "must_include": [
       "제9조(보험금 받는 방법의 변경)",
       "계약자(보험금 지급사유 발생 후에 는 보험수익자)는 회사의 사업방"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_27",
@@ -1306,7 +1362,8 @@
     "must_include": [
       "제3조(보험금 의 지급사유)",
       "제3호 및 제4호에 따른 사망보험금이나 장해보험금의 전부 또는 일"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_28",
@@ -1323,7 +1380,8 @@
     "must_include": [
       "제10조(주소변경통지)",
       "계약자(보험수익자가 계약자와 다른 경우 보험 수익자를 포함합니다)"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_29",
@@ -1340,7 +1398,8 @@
     "must_include": [
       "제11조(보험수익자의 지정)",
       "이 계약에서 계약자가 보험수익자를 지정하 지 않은 때에는 보험수익"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "standard_terms_extra_30",
@@ -1357,7 +1416,8 @@
     "must_include": [
       "제3조(보험금의 지급사유)",
       "제1호 및 제2호 - 7 - 의 경우는 계약자로 하고, 같은 조"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_01",
@@ -1374,7 +1434,8 @@
     "must_include": [
       "제2조(정의)",
       "\"자기자본\"이란 납입자본금ㆍ자본잉여금ㆍ이익잉여금, 그 밖에 이에"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_02",
@@ -1391,7 +1452,8 @@
     "must_include": [
       "제8조(상호 또는 명칭)",
       "[전문개정 2010.7.23] ① 보험회사는 그 상호 또는 명칭"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_03",
@@ -1408,7 +1470,8 @@
     "must_include": [
       "제12조(외국보험회사 등의 국내사무소 설치 등)",
       "[전문개정 2010.7.23] ① 외국보험회사, 외국에서 보험대리"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_04",
@@ -1425,7 +1488,8 @@
     "must_include": [
       "제23조(조직 변경 결의 공고 후의 보험계약)",
       "[전문개정 2010.7.23] ① 주식회사는 제22조제1항에 따른"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_05",
@@ -1442,7 +1506,8 @@
     "must_include": [
       "제28조(보험계약자 총회의 결의 등)",
       "[전문개정 2010.7.23] ① 보험계약자 총회는 정관의 변경이"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_06",
@@ -1459,7 +1524,8 @@
     "must_include": [
       "제33조(예탁자산에 대한 우선변제권)",
       "[전문개정 2010.7.23] ① 보험계약자나 보험금을 취득할 자"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_07",
@@ -1476,7 +1542,8 @@
     "must_include": [
       "제38조(입사청약서)",
       "[전문개정 2010.7.23] ① 발기인이 아닌 자가 상호회사의"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_08",
@@ -1493,7 +1560,8 @@
     "must_include": [
       "제43조(발기인에 대한 소송)",
       "상호회사의 발기인에 관하여는 「금융회사의 지배구조에 관한 법률」"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_09",
@@ -1510,7 +1578,8 @@
     "must_include": [
       "제47조(유한책임)",
       "상호회사의 채무에 관한 사원의 책임은 보험료를 한도로 한다."
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_10",
@@ -1527,7 +1596,8 @@
     "must_include": [
       "제52조(사원명부)",
       "상호회사의 사원명부에는 다음 각 호의 사항을 적어야 한다. [전문"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_11",
@@ -1544,7 +1614,8 @@
     "must_include": [
       "제58조(상호회사의 소수사원권의 행사)",
       "상호회사에 관하여는 「금융회사의 지배구조에 관한 법률」 제33조를"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_12",
@@ -1561,7 +1632,8 @@
     "must_include": [
       "제63조(잉여금의 분배)",
       "상호회사의 잉여금은 정관에 특별한 규정이 없으면 각 사업연도 말"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_13",
@@ -1578,7 +1650,8 @@
     "must_include": [
       "제68조(환급기한 및 시효)",
       "[전문개정 2010.7.23] ① 상호회사에서 퇴사한 사원의 권리"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_14",
@@ -1595,7 +1668,8 @@
     "must_include": [
       "제73조(「상법」 등의 준용)",
       "상호회사의 청산에 관하여는 제56조, 제57조, 「금융회사의 지배"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "insurance_business_act_extra_15",
@@ -1612,7 +1686,8 @@
     "must_include": [
       "제78조(등기)",
       "[전문개정 2010.7.23] ① 상호회사인 외국보험회사(이하 \""
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_extra_01",
@@ -1629,7 +1704,8 @@
     "must_include": [
       "제2조(정의)",
       "\"일반금융소비자\"란 전문금융소비자가 아닌 금융소비자를 말한다. 가"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_extra_02",
@@ -1646,7 +1722,8 @@
     "must_include": [
       "제6조(다른 법률과의 관계)",
       "금융소비자 보호에 관하여 다른 법률에서 특별히 정한 경우를 제외하"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_extra_03",
@@ -1663,7 +1740,8 @@
     "must_include": [
       "제10조(금융상품판매업자등의 책무)",
       "금융상품판매업자등은 제7조에 따른 금융소비자의 기본적 권리가 실현"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_extra_04",
@@ -1680,7 +1758,8 @@
     "must_include": [
       "제13조(영업행위 준수사항 해석의 기준)",
       "누구든지 이 장의 영업행위 준수사항에 관한 규정을 해석ㆍ적용하려는"
-    ]
+    ],
+    "case_type": "broad_regression"
   },
   {
     "id": "financial_consumer_act_extra_05",
@@ -1697,6 +1776,7 @@
     "must_include": [
       "제18조(적정성원칙)",
       "금융상품판매업자는 대통령령으로 각각 정하는 보장성 상품, 투자성"
-    ]
+    ],
+    "case_type": "broad_regression"
   }
 ]

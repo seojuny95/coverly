@@ -13,19 +13,21 @@ from argparse import ArgumentParser
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from app.rag.official.loaders import load_official_chunks
 from app.rag.official.models import RagChunk, chunk_embedding_text
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "extraction_dataset.json"
+ExtractionCaseType = Literal["curated", "broad_regression"]
 
 
 @dataclass(frozen=True)
 class ExtractionEvalCase:
     id: str
+    case_type: ExtractionCaseType
     source_id: str
-    chunk_id: str
+    chunk_id: str | None
     expected_source_category: str
     expected_label: str
     expected_citation_contains: tuple[str, ...]
@@ -37,6 +39,7 @@ class ExtractionEvalCase:
 @dataclass(frozen=True)
 class ExtractionEvalResult:
     case_id: str
+    case_type: ExtractionCaseType
     passed: bool
     chunk_found: bool
     metadata_matched: bool
@@ -71,6 +74,14 @@ class ExtractionEvalReport:
     def text_coverage_rate(self) -> float:
         return _rate(result.text_covered for result in self.results)
 
+    @property
+    def curated_pass_rate(self) -> float:
+        return _pass_rate_for_type(self.results, "curated")
+
+    @property
+    def broad_regression_pass_rate(self) -> float:
+        return _pass_rate_for_type(self.results, "broad_regression")
+
 
 def load_extraction_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[ExtractionEvalCase, ...]:
     raw_cases = cast(list[dict[str, object]], json.loads(path.read_text(encoding="utf-8")))
@@ -85,7 +96,10 @@ def evaluate_extraction(
     active_cases = cases if cases is not None else load_extraction_eval_cases()
     active_chunks = chunks if chunks is not None else load_official_chunks()
     chunks_by_id = {chunk.id: chunk for chunk in active_chunks}
-    results = tuple(_evaluate_case(case, chunks_by_id.get(case.chunk_id)) for case in active_cases)
+    results = tuple(
+        _evaluate_case(case, _chunk_for_case(case, active_chunks, chunks_by_id))
+        for case in active_cases
+    )
     return ExtractionEvalReport(
         passed=sum(result.passed for result in results),
         total=len(results),
@@ -101,7 +115,9 @@ def render_report(report: ExtractionEvalReport, *, show_passing: bool = False) -
             f"chunk_found={report.chunk_found_rate:.3f} "
             f"metadata={report.metadata_match_rate:.3f} "
             f"citation={report.citation_match_rate:.3f} "
-            f"text={report.text_coverage_rate:.3f}"
+            f"text={report.text_coverage_rate:.3f} "
+            f"curated={report.curated_pass_rate:.3f} "
+            f"broad={report.broad_regression_pass_rate:.3f}"
         )
     ]
     for result in report.results:
@@ -120,8 +136,9 @@ def render_extraction_report(report: ExtractionEvalReport, *, show_passing: bool
 def _case_from_json(raw: dict[str, object]) -> ExtractionEvalCase:
     return ExtractionEvalCase(
         id=str(raw["id"]),
+        case_type=_case_type(raw.get("case_type", "broad_regression")),
         source_id=str(raw["source_id"]),
-        chunk_id=str(raw["chunk_id"]),
+        chunk_id=str(raw["chunk_id"]) if raw.get("chunk_id") is not None else None,
         expected_source_category=str(raw["expected_source_category"]),
         expected_label=str(raw["expected_label"]),
         expected_citation_contains=_string_tuple(raw["expected_citation_contains"]),
@@ -135,6 +152,7 @@ def _evaluate_case(case: ExtractionEvalCase, chunk: RagChunk | None) -> Extracti
     if chunk is None:
         return ExtractionEvalResult(
             case_id=case.id,
+            case_type=case.case_type,
             passed=False,
             chunk_found=False,
             metadata_matched=False,
@@ -169,6 +187,7 @@ def _evaluate_case(case: ExtractionEvalCase, chunk: RagChunk | None) -> Extracti
 
     return ExtractionEvalResult(
         case_id=case.id,
+        case_type=case.case_type,
         passed=metadata_matched and citation_matched and text_covered,
         chunk_found=True,
         metadata_matched=metadata_matched,
@@ -176,6 +195,30 @@ def _evaluate_case(case: ExtractionEvalCase, chunk: RagChunk | None) -> Extracti
         text_covered=text_covered,
         failed_checks=failed_checks,
     )
+
+
+def _chunk_for_case(
+    case: ExtractionEvalCase,
+    chunks: tuple[RagChunk, ...],
+    chunks_by_id: dict[str, RagChunk],
+) -> RagChunk | None:
+    if case.chunk_id is not None:
+        return chunks_by_id.get(case.chunk_id)
+    matches = [
+        chunk
+        for chunk in chunks
+        if chunk.source_id == case.source_id
+        and chunk.source_category == case.expected_source_category
+        and chunk.label == case.expected_label
+        and case.expected_page_start <= chunk.page_start
+        and chunk.page_end <= case.expected_page_end
+        and all(
+            _contains_normalized(chunk_embedding_text(chunk), term) for term in case.must_include
+        )
+    ]
+    if not matches:
+        return None
+    return matches[0]
 
 
 def _string_tuple(value: object) -> tuple[str, ...]:
@@ -186,6 +229,13 @@ def _int_value(value: object) -> int:
     if not isinstance(value, int):
         raise ValueError(f"expected int value: {value!r}")
     return value
+
+
+def _case_type(value: object) -> ExtractionCaseType:
+    case_type = str(value)
+    if case_type not in {"curated", "broad_regression"}:
+        raise ValueError(f"unknown extraction case_type: {case_type}")
+    return cast(ExtractionCaseType, case_type)
 
 
 def _contains_normalized(text: str, term: str) -> bool:
@@ -199,6 +249,14 @@ def _normalize_text(value: str) -> str:
 def _rate(values: Iterable[bool]) -> float:
     items = tuple(bool(value) for value in values)
     return sum(items) / len(items) if items else 0.0
+
+
+def _pass_rate_for_type(
+    results: tuple[ExtractionEvalResult, ...],
+    case_type: ExtractionCaseType,
+) -> float:
+    typed = tuple(result for result in results if result.case_type == case_type)
+    return _rate(result.passed for result in typed)
 
 
 def main() -> None:

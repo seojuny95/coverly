@@ -287,7 +287,11 @@ def test_extraction_eval_fixture_uses_existing_chunks_without_pii() -> None:
 
     assert len(cases) == 100
     assert len({case.id for case in cases}) == len(cases)
-    assert all(case.chunk_id in chunks_by_id for case in cases)
+    assert all(case.chunk_id is None or case.chunk_id in chunks_by_id for case in cases)
+    assert sum(case.case_type == "curated" for case in cases) == 20
+    assert sum(case.case_type == "broad_regression" for case in cases) == 80
+    assert all(case.chunk_id is None for case in cases if case.case_type == "curated")
+    assert all(case.chunk_id is not None for case in cases if case.case_type == "broad_regression")
     assert re.search(r"\b\d{6}-[1-4]\d{6}\b", fixture_text) is None
     assert re.search(r"\b01[016789]-?\d{3,4}-?\d{4}\b", fixture_text) is None
     assert re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", fixture_text) is None
@@ -309,6 +313,7 @@ def test_extraction_eval_reports_metadata_citation_and_text_failures() -> None:
     cases = (
         ExtractionEvalCase(
             id="case",
+            case_type="broad_regression",
             source_id="source",
             chunk_id="chunk",
             expected_source_category="standard_clause",
