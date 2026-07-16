@@ -73,6 +73,7 @@ _NEGATED_INDEMNITY_PATTERNS = (
 _MEDICAL_TERMS = (
     "실손의료",
     "실손의료비",
+    "실손보험",
     "실비보험",
     "의료비",
     "입원의료비",

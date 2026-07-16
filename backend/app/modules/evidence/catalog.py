@@ -234,10 +234,30 @@ def build_evidence_catalog(
         if category:
             category_ids.setdefault(category, []).append(evidence_id)
 
+    damage_evidence_keys = {
+        (
+            damage_policy.policy_id,
+            damage_policy.insurer,
+            damage_policy.product_name,
+            coverage.coverage_name,
+        )
+        for group in facts.coverage_summary.damage_coverages
+        for damage_policy in group.policies
+        for coverage in damage_policy.coverages
+    }
     for index, actual_loss in enumerate(
         facts.coverage_summary.actual_loss_coverages,
         start=1,
     ):
+        evidence_key = (
+            actual_loss.policy_id,
+            actual_loss.insurer,
+            actual_loss.product_name,
+            actual_loss.coverage_name,
+        )
+        if actual_loss.is_damage_policy and evidence_key in damage_evidence_keys:
+            continue
+
         evidence_id = f"actual-loss:{index}"
         coverage_type = "실손의료비" if actual_loss.is_medical_indemnity else "실손형"
         items.append(

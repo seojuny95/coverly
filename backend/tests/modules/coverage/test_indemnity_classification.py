@@ -31,6 +31,17 @@ def test_indemnity_category_matching_is_normalized() -> None:
     assert result.medical_indemnity_status == "confirmed"
 
 
+def test_legacy_silson_insurance_alias_means_medical_indemnity() -> None:
+    result = classify_indemnity(
+        _coverage(담보명="실손보험"),
+        policy=_policy(category="제3보험"),
+    )
+
+    assert result.payment_basis == "indemnity"
+    assert result.coverage_domain == "medical_expense"
+    assert result.medical_indemnity_status == "confirmed"
+
+
 def test_non_medical_actual_loss_reimbursement_is_excluded() -> None:
     result = classify_indemnity(
         _coverage(담보명="자동차사고벌금(대물, 실손)", 지급유형="실손"),

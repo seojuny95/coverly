@@ -523,10 +523,11 @@ def _build_fixed_totals(
 def _build_actual_loss_items(
     rows: list[_ActualLossRow],
 ) -> list[ActualLossCoverageItem]:
-    contracts_by_name: dict[str, set[int]] = defaultdict(set)
+    contracts_by_identity: dict[tuple[str, str], set[int]] = defaultdict(set)
     for row in rows:
         if row.normalized_name:
-            contracts_by_name[row.normalized_name].add(row.contract_index)
+            identity = (row.normalized_name, row.classification.coverage_domain)
+            contracts_by_identity[identity].add(row.contract_index)
 
     ordered_rows = sorted(
         rows,
@@ -552,7 +553,13 @@ def _build_actual_loss_items(
                 is_medical_indemnity=(row.classification.medical_indemnity_status == "confirmed"),
                 is_damage_policy=is_damage_policy(row.policy),
                 duplicate_across_contracts=(
-                    bool(row.normalized_name) and len(contracts_by_name[row.normalized_name]) >= 2
+                    bool(row.normalized_name)
+                    and len(
+                        contracts_by_identity[
+                            (row.normalized_name, row.classification.coverage_domain)
+                        ]
+                    )
+                    >= 2
                 ),
                 major_category=major_category(row.coverage.담보명),
             )

@@ -241,6 +241,25 @@ def test_qa_answers_how_to_claim_with_insurer_channels() -> None:
     assert any("약관" in limitation for limitation in result.limitations)
 
 
+def test_qa_treats_silson_insurance_alias_as_medical_indemnity() -> None:
+    result = answer_portfolio_question(
+        "실손보험 어떻게 청구해?",
+        _named_insurer_policies("삼성화재"),
+    )
+
+    assert result.claim_channels is not None
+    assert result.claim_channels.medical_indemnity is not None
+    assert result.claim_channels.medical_indemnity.name == "실손24"
+
+
+def test_qa_treats_silson_insurance_alias_as_medical_indemnity_lookup() -> None:
+    result = answer_portfolio_question("실손보험은?", _policies())
+
+    assert result.status == "answered"
+    assert "실손의료보험 관련 담보가 확인돼요" in result.answer
+    assert "실손형은 실제 발생한 손해" not in result.answer
+
+
 def test_qa_claim_channels_include_clickable_links() -> None:
     result = answer_portfolio_question(
         "실손의료보험 어떻게 청구해?", _named_insurer_policies("삼성화재")
@@ -665,12 +684,58 @@ def test_qa_answers_broad_actual_loss_lookup_without_assuming_medical_coverage()
 
 
 def test_qa_broad_actual_loss_lookup_keeps_medical_and_auto_domains_separate() -> None:
+    context = build_qa_context("실손은?", _health_plus_auto(), None, None)
+    auto_coverage_evidence = [
+        item for item in context.catalog.items if item.coverage_name == "대물배상"
+    ]
+
+    assert len(auto_coverage_evidence) == 1
+    assert auto_coverage_evidence[0].id.startswith("damage:")
+
     result = answer_portfolio_question("실손은?", _health_plus_auto())
 
     assert result.status == "answered"
     assert "실손의료보험은 그중 의료비 영역" in result.answer
     assert "실손의료비 (실손의료비)" in result.answer
     assert "대물배상 (자동차 손해 실손형)" in result.answer
+    assert any(
+        citation.coverage_name == "대물배상" and (citation.evidence_id or "").startswith("damage:")
+        for citation in result.citations
+    )
+
+
+def test_qa_keeps_same_actual_loss_name_in_different_domains_separate() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "health",
+                "기본정보": {
+                    "보험사": "삼성화재",
+                    "상품명": "건강보험",
+                    "보험분류": "제3보험",
+                },
+                "보장목록": [{"담보명": "질병입원의료비", "지급유형": "실손"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "travel",
+                "기본정보": {
+                    "보험사": "현대해상",
+                    "상품명": "여행자보험",
+                    "보험분류": "손해보험",
+                    "상품태그": ["여행자보험"],
+                },
+                "보장목록": [{"담보명": "질병입원의료비", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+    result = answer_portfolio_question("실손은?", policies)
+
+    assert "질병입원의료비 (실손의료비)" in result.answer
+    assert "질병입원의료비 (여행 의료비 실손형)" in result.answer
+    assert "여러 계약에서 확인" not in result.answer
 
 
 def test_qa_answers_missing_medical_indemnity_for_specific_question() -> None:

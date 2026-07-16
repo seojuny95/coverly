@@ -1264,6 +1264,33 @@ def test_actual_loss_held_in_one_contract_is_not_counted_as_duplicate() -> None:
     assert duplicate_actual_loss_coverage_names(summary) == []
 
 
+def test_same_actual_loss_name_in_different_domains_is_not_a_duplicate() -> None:
+    policies = [
+        _policy(
+            "health",
+            "제3보험",
+            "보험사A",
+            [{"담보명": "질병입원의료비", "지급유형": "실손"}],
+        ),
+        _policy(
+            "travel",
+            "손해보험",
+            "보험사B",
+            [{"담보명": "질병입원의료비", "지급유형": "실손"}],
+            tags=["여행자보험"],
+        ),
+    ]
+
+    summary = summarize_portfolio_coverages(policies)
+
+    assert {item.coverage_domain for item in summary.actual_loss_coverages} == {
+        "medical_expense",
+        "travel_medical_expense",
+    }
+    assert not any(item.duplicate_across_contracts for item in summary.actual_loss_coverages)
+    assert duplicate_actual_loss_coverage_names(summary) == []
+
+
 def test_actual_loss_duplicate_check_includes_damage_coverages_at_same_insurer() -> None:
     policies = [
         _policy(

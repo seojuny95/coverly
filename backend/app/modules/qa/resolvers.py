@@ -34,6 +34,7 @@ _MEDICAL_INDEMNITY_LOOKUP_TERMS = (
     "실손의료",
     "실손의료보험",
     "실손의료비",
+    "실손보험",
 )
 _ACTUAL_LOSS_LOOKUP_TERMS = ("실손", "실손형", "비례보상")
 _EXPLICIT_ACTUAL_LOSS_LOOKUP_TERMS = ("실손형", "실비형", "비례보상")
@@ -550,13 +551,16 @@ def _answer_actual_loss_lookup(
         content = "현재 업로드된 증권에서는 **실손형 담보를 확인하지 못했어요.**"
         return _fact_response(content, [], catalog, facts)
 
-    coverage_by_name: dict[str, ActualLossCoverageItem] = {}
+    coverage_by_identity: dict[tuple[str, str], ActualLossCoverageItem] = {}
     for coverage in actual_loss_coverages:
-        key = coverage.normalized_name or coverage.coverage_name
-        coverage_by_name.setdefault(key, coverage)
+        key = (
+            coverage.normalized_name or coverage.coverage_name,
+            coverage.coverage_domain,
+        )
+        coverage_by_identity.setdefault(key, coverage)
 
     lines = []
-    for coverage in coverage_by_name.values():
+    for coverage in coverage_by_identity.values():
         domain = _actual_loss_domain_label(coverage.coverage_domain)
         duplicate = " · 여러 계약에서 확인" if coverage.duplicate_across_contracts else ""
         lines.append(f"- {coverage.coverage_name} ({domain}{duplicate})")
@@ -564,8 +568,34 @@ def _answer_actual_loss_lookup(
         "실손형은 실제 발생한 손해를 약관 범위에서 보상하는 지급 방식이에요. "
         "실손의료보험은 그중 의료비 영역이에요.\n\n" + "\n".join(lines)
     )
-    evidence_ids = [item.id for item in catalog.items if item.id.startswith("actual-loss:")]
+    evidence_ids = _actual_loss_evidence_ids(actual_loss_coverages, catalog)
     return _fact_response(content, evidence_ids, catalog, facts)
+
+
+def _actual_loss_evidence_ids(
+    coverages: list[ActualLossCoverageItem],
+    catalog: EvidenceCatalog,
+) -> list[str]:
+    evidence_ids: list[str] = []
+    for coverage in coverages:
+        prefixes = ("damage:", "actual-loss:") if coverage.is_damage_policy else ("actual-loss:",)
+        for prefix in prefixes:
+            evidence = next(
+                (
+                    item
+                    for item in catalog.items
+                    if item.id.startswith(prefix)
+                    and item.policy_id == coverage.policy_id
+                    and item.insurer == coverage.insurer
+                    and item.product_name == coverage.product_name
+                    and item.coverage_name == coverage.coverage_name
+                ),
+                None,
+            )
+            if evidence is not None:
+                evidence_ids.append(evidence.id)
+                break
+    return list(dict.fromkeys(evidence_ids))
 
 
 def _actual_loss_domain_label(domain: str) -> str:
