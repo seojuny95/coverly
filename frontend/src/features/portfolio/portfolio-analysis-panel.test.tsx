@@ -388,6 +388,14 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(
     screen.queryByRole("link", { name: "사망 보장 안내" }),
   ).not.toBeInTheDocument();
+  expect(
+    screen.getByText("확인된 담보: 암진단비 · 유사암진단비"),
+  ).toBeInTheDocument();
+  expect(
+    screen.getAllByText(
+      "현재 업로드된 보험증권에서는 해당 보장이 확인되지 않아요",
+    ).length,
+  ).toBeGreaterThan(0);
   expect(screen.getByText("손해보험 분석")).toBeInTheDocument();
   expect(screen.getByText("자동차보험")).toBeInTheDocument();
   expect(

@@ -70,10 +70,8 @@ const RECOMMENDED_INSURANCE_COPY = {
   diagnosis: {
     title: "3대 진단보험",
     description:
-      "암, 뇌혈관질환, 심장질환처럼 치료와 회복에 시간이 오래 걸리는 질병에 대비해 치료비뿐 아니라 쉬는 동안의 생활비와 간병비까지 준비해주는 보험이에요.",
+      "암, 뇌혈관질환, 심장질환처럼 치료와 회복에 시간이 오래 걸리는 질병에 대비하는 보험이에요. 병원비뿐 아니라 치료 중 쉬는 기간의 생활비, 간병비, 소득 공백까지 함께 보는 보장이어서 금액은 질병별 기본 범위와 가족 부양 부담을 같이 확인해요.",
     rangeLabel: "적정 진단비 감",
-    rangeNote:
-      "3대 진단비는 치료비만을 위한 돈이 아니라, 치료와 회복으로 일을 쉬는 동안의 생활비까지 대비하는 금액이에요. 일반적으로 암 진단비는 3천만~5천만 원, 뇌혈관·심장질환 진단비는 각각 1천만~2천만 원을 기본 범위로 보고, 소득이나 가족 부양 부담이 크다면 더 높게 준비할 수 있어요.",
   },
   medicalIndemnity: {
     title: "실손의료보험",
@@ -88,27 +86,20 @@ const DIAGNOSIS_GUIDE_COPY: Partial<
     EssentialCoverageItem["kind"],
     {
       description: string;
-      rationale: string;
     }
   >
 > = {
   cancer: {
     description:
-      "암으로 진단받았을 때 정해진 보험금을 한 번에 받을 수 있는 보장이에요.",
-    rationale:
-      "암은 건강보험 산정특례로 급여 치료비 부담은 줄어들 수 있지만, 비급여 치료비·생활비·소득감소가 문제예요. 그래서 암 진단비는 단순 병원비보다 치료 중 쉬는 기간의 생활비 성격이 커요.",
+      "암으로 진단받았을 때 정해진 보험금을 한 번에 받을 수 있는 보장이에요. 급여 치료비 부담은 줄어들 수 있어도 비급여 치료, 간병, 소득 감소가 생길 수 있어 치료 중 쉬는 기간의 생활비 성격까지 함께 봐요.",
   },
   cerebrovascular: {
     description:
-      "뇌출혈, 뇌경색 등 뇌혈관질환으로 진단받았을 때 받을 수 있는 보장이에요.",
-    rationale:
-      "뇌혈관질환은 치료 이후 재활, 간병, 후유장해 가능성이 있어요. 보장 범위는 뇌출혈보다 뇌혈관질환이 넓기 때문에 가능하면 뇌혈관질환 진단비 기준으로 보는 게 좋아요.",
+      "뇌출혈, 뇌경색 등 뇌혈관질환으로 진단받았을 때 받을 수 있는 보장이에요. 치료 뒤 재활, 간병, 후유장해 가능성까지 볼 수 있어 뇌출혈처럼 좁은 담보보다 뇌혈관질환 진단비 기준을 우선 확인해요.",
   },
   ischemic_heart: {
     description:
-      "협심증, 급성심근경색 등 심장질환으로 진단받았을 때 받을 수 있는 보장이에요.",
-    rationale:
-      "심장질환은 갑작스럽게 발생하고, 진단 후 시술·수술·입원으로 소득 공백이 생길 수 있어요. 급성심근경색만 보는 것보다 허혈성심장질환처럼 협심증까지 포함하는 넓은 보장을 우선으로 보는 게 좋아요.",
+      "협심증, 급성심근경색 등 심장질환으로 진단받았을 때 받을 수 있는 보장이에요. 시술, 수술, 입원으로 소득 공백이 생길 수 있어 급성심근경색만 보는 것보다 협심증까지 포함하는 넓은 보장을 우선 확인해요.",
   },
 };
 
@@ -642,10 +633,6 @@ function RecommendedDiagnosisCard({
           <RecommendedDiagnosisItem key={item.kind} item={item} />
         ))}
       </ul>
-
-      <p className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3 text-xs leading-5 text-zinc-600">
-        {RECOMMENDED_INSURANCE_COPY.diagnosis.rangeNote}
-      </p>
     </section>
   );
 }
@@ -663,7 +650,6 @@ function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
               {guide.description}
             </p>
           ) : null}
-          <p className="mt-1 text-xs leading-5 text-zinc-500">{item.detail}</p>
         </div>
         <CoverageStatusBadge status={item.status} />
       </div>
@@ -676,11 +662,7 @@ function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
         />
       </div>
 
-      {guide ? (
-        <p className="mt-3 text-xs leading-5 text-zinc-500">
-          {guide.rationale}
-        </p>
-      ) : null}
+      <CoverageNamesNotice names={item.matched_coverage_names} />
     </li>
   );
 }
@@ -733,12 +715,24 @@ function RecommendedMedicalIndemnityCard({
         ) : null}
       </div>
 
-      {item?.matched_coverage_names.length ? (
-        <p className="mt-4 text-xs leading-5 text-blue-700">
-          확인된 담보: {item.matched_coverage_names.join(" · ")}
-        </p>
-      ) : null}
+      <CoverageNamesNotice names={item?.matched_coverage_names ?? []} />
     </section>
+  );
+}
+
+function CoverageNamesNotice({ names }: { names: string[] }) {
+  if (names.length === 0) {
+    return (
+      <p className="mt-4 text-xs leading-5 text-zinc-500">
+        현재 업로드된 보험증권에서는 해당 보장이 확인되지 않아요
+      </p>
+    );
+  }
+
+  return (
+    <p className="mt-4 text-xs leading-5 text-blue-700">
+      확인된 담보: {names.join(" · ")}
+    </p>
   );
 }
 
@@ -995,11 +989,6 @@ function SpecialPolicySections({
               <p className="mt-2 text-xs font-medium text-zinc-500">
                 {analysis.product_names.join(" · ")}
               </p>
-              {analysis.classification_reasons?.length ? (
-                <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  {analysis.classification_reasons.join(" ")}
-                </p>
-              ) : null}
               <p className="mt-3 text-sm leading-6 text-zinc-700">
                 {analysis.overview}
               </p>
@@ -1047,6 +1036,12 @@ function SpecialPolicySections({
                 </li>
               ))}
             </ul>
+
+            {analysis.classification_reasons?.length ? (
+              <p className="border-t border-zinc-100 px-5 py-3 text-xs leading-5 text-zinc-500">
+                {analysis.classification_reasons.join(" ")}
+              </p>
+            ) : null}
           </article>
         ))}
       </div>
