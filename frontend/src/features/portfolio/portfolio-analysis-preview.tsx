@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
 import { CoverlyLogo, PixelEyebrow } from "../../components/coverly-brand";
 import { PortfolioAnalysisPanel } from "./portfolio-analysis-panel";
-import type { PortfolioSummary } from "./portfolio-api";
+import type { DeathBenefitGuideInput, PortfolioSummary } from "./portfolio-api";
 
 const DEATH_BENEFIT_SOURCE = {
   label: "매일경제 · 가장의 적정 사망보험금은 연소득 3~5배",
@@ -109,6 +111,15 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         coverage_count: 1,
         detail: "사망 담보가 확인돼요.",
         matched_coverage_names: ["질병사망"],
+        coverage_groups: [
+          {
+            label: "기본 사망 보장",
+            tone: "confirmed",
+            detail:
+              "일반사망·질병사망처럼 가족 생활비 목적의 사망보험 판단에 반영하는 담보예요.",
+            coverage_names: ["질병사망"],
+          },
+        ],
       },
       {
         kind: "cancer",
@@ -401,6 +412,13 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
 };
 
 export function PortfolioAnalysisPreview() {
+  const [deathBenefitContext, setDeathBenefitContext] =
+    useState<DeathBenefitGuideInput>({
+      has_dependent_family: false,
+      has_minor_children: false,
+      has_major_debt: false,
+    });
+
   return (
     <main className="min-h-dvh bg-white px-5 py-6 text-zinc-950 sm:px-6">
       <div className="mx-auto w-full max-w-6xl">
@@ -418,12 +436,9 @@ export function PortfolioAnalysisPreview() {
         <PortfolioAnalysisPanel
           status="success"
           summary={PREVIEW_SUMMARY}
-          deathBenefitContext={{
-            has_dependent_family: false,
-            has_minor_children: false,
-            has_major_debt: false,
-          }}
-          onDeathBenefitContextChange={() => undefined}
+          deathBenefitContext={deathBenefitContext}
+          onDeathBenefitContextChange={setDeathBenefitContext}
+          isDeathBenefitRefreshing={false}
           eligibleCount={5}
           emptyReason="no-coverage"
           onRetry={() => undefined}

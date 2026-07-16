@@ -3,10 +3,12 @@
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 
 from app.modules.coverage.indemnity import classify_indemnity
 from app.modules.portfolio.death_benefit_guides import (
     DeathBenefitContext,
+    DeathBenefitGuide,
     death_benefit_guide,
 )
 from app.modules.portfolio.essential_guides import (
@@ -14,6 +16,8 @@ from app.modules.portfolio.essential_guides import (
     essential_coverage_guides,
 )
 from app.modules.portfolio.schemas import (
+    CoverageGroup,
+    CoverageGroupTone,
     CoverageInput,
     DeathBenefitGuideInput,
     EssentialCoverageCheck,
@@ -39,6 +43,27 @@ _UNITS = {
 _CANCER_TERMS = ("암", "악성신생물")
 _CEREBROVASCULAR_TERMS = ("뇌혈관질환",)
 _HEART_TERMS = ("심장질환", "심질환", "허혈성심")
+_PRIMARY_DEATH_TERMS = (
+    "일반사망",
+    "질병사망",
+    "사망보험금",
+    "종신사망",
+    "정기사망",
+)
+_ACCIDENT_DEATH_TERMS = ("상해", "재해")
+_LIMITED_DEATH_TERMS = (
+    "교통",
+    "대중교통",
+    "고속도로",
+    "항공",
+    "항공기",
+    "선박",
+    "열차",
+    "전철",
+    "지하철",
+    "택시",
+    "버스",
+)
 _SPECIAL_POLICY_LABELS: dict[SpecialPolicyKind, str] = {
     "auto": "자동차보험",
     "driver": "운전자보험",
@@ -158,6 +183,15 @@ class _SpecialPolicyMatch:
     reason: str
 
 
+DeathCoverageKind = Literal["primary", "accident", "limited"]
+
+
+@dataclass(frozen=True)
+class _DeathCoverageMatch:
+    coverage: CoverageInput
+    kind: DeathCoverageKind
+
+
 def build_essential_coverage_check(
     policies: list[PolicyInput],
     death_benefit_context: DeathBenefitGuideInput | None = None,
@@ -168,20 +202,10 @@ def build_essential_coverage_check(
     death_guide = death_benefit_guide(_death_benefit_context(death_benefit_context))
     return EssentialCoverageCheck(
         items=[
-            _fixed_coverage_item(
+            _death_coverage_item(
                 policies,
                 guide=guides["death"],
-                kind="death",
-                label="사망 보장",
-                matches=lambda name: "사망" in name,
-                confirmed_detail="사망 담보가 확인돼요.",
-                reference_min_amount=death_guide.min_amount,
-                reference_max_amount=death_guide.max_amount,
-                reference_basis=death_guide.reason,
-                reference_sources=list(death_guide.sources),
-                reference_amount_label=death_guide.amount_label,
-                guidance_situation=death_guide.situation,
-                guidance_reason=death_guide.reason,
+                death_guide=death_guide,
             ),
             _fixed_coverage_item(
                 policies,
@@ -305,6 +329,114 @@ def _special_policy_overview(checks: list[SpecialCoverageCheck]) -> str:
         f"{', '.join(confirmed)}은 확인돼요. {', '.join(missing)}은 현재 자료에서 "
         "찾지 못했으며, 이것만으로 미가입이라고 단정할 수는 없어요."
     )
+
+
+def _death_coverage_item(
+    policies: list[PolicyInput],
+    *,
+    guide: EssentialCoverageGuide,
+    death_guide: DeathBenefitGuide,
+) -> EssentialCoverageItem:
+    matches = [
+        _DeathCoverageMatch(coverage=coverage, kind=kind)
+        for policy in policies
+        for coverage in policy.보장목록
+        if (kind := _death_coverage_kind(_normalize(coverage.담보명))) is not None
+    ]
+    primary_coverages = [match.coverage for match in matches if match.kind == "primary"]
+    primary_amounts = [
+        amount for coverage in primary_coverages if (amount := _parse_amount(coverage)) is not None
+    ]
+    primary_amount = sum(primary_amounts) if primary_amounts else None
+    status, detail = _death_coverage_status_detail(matches)
+
+    return EssentialCoverageItem(
+        kind="death",
+        label="사망 보장",
+        status=status,
+        confirmed_amount=primary_amount,
+        reference_min_amount=death_guide.min_amount,
+        reference_max_amount=death_guide.max_amount,
+        reference_basis=death_guide.reason or guide.basis,
+        reference_sources=list(death_guide.sources),
+        reference_amount_label=death_guide.amount_label,
+        guidance_situation=death_guide.situation,
+        guidance_reason=death_guide.reason,
+        coverage_count=len(matches),
+        detail=detail,
+        matched_coverage_names=sorted({match.coverage.담보명 for match in matches}),
+        coverage_groups=_death_coverage_groups(matches),
+    )
+
+
+def _death_coverage_kind(name: str) -> DeathCoverageKind | None:
+    if "사망" not in name:
+        return None
+    if any(term in name for term in _normalized_terms(_LIMITED_DEATH_TERMS)):
+        return "limited"
+    if any(term in name for term in _normalized_terms(_ACCIDENT_DEATH_TERMS)):
+        return "accident"
+    if any(term in name for term in _normalized_terms(_PRIMARY_DEATH_TERMS)):
+        return "primary"
+    return "primary"
+
+
+def _death_coverage_status_detail(
+    matches: list[_DeathCoverageMatch],
+) -> tuple[EssentialCoverageStatus, str]:
+    if not matches:
+        return "not_found", "현재 올린 전체 보험에서는 사망 담보를 확인하지 못했어요."
+    if any(match.kind == "primary" for match in matches):
+        return "well_prepared", "기본 사망 보장이 확인돼요."
+    if any(match.kind == "accident" for match in matches):
+        return (
+            "needs_review",
+            "상해 중심 사망 담보가 보여요. "
+            "질병·일반 사망까지 보는 기본 사망보험과는 범위가 달라요.",
+        )
+    return (
+        "needs_review",
+        "제한적인 사망 담보만 보여요. "
+        "가족 생활비 목적의 사망보험으로 충분한지는 따로 확인해보세요.",
+    )
+
+
+def _death_coverage_groups(matches: list[_DeathCoverageMatch]) -> list[CoverageGroup]:
+    group_specs: tuple[tuple[DeathCoverageKind, str, CoverageGroupTone, str], ...] = (
+        (
+            "primary",
+            "기본 사망 보장",
+            "confirmed",
+            "일반사망·질병사망처럼 가족 생활비 목적의 사망보험 판단에 반영하는 담보예요.",
+        ),
+        (
+            "accident",
+            "상해 중심 사망 담보",
+            "review",
+            "상해나 재해로 인한 사망은 확인되지만, "
+            "질병·일반 사망까지 보는 기본 사망보험과는 범위가 달라요.",
+        ),
+        (
+            "limited",
+            "제한적인 사망 담보",
+            "limited",
+            "교통·대중교통·고속도로처럼 특정 사고 조건에 묶인 사망 담보예요.",
+        ),
+    )
+    groups: list[CoverageGroup] = []
+    for kind, label, tone, detail in group_specs:
+        names = sorted({match.coverage.담보명 for match in matches if match.kind == kind})
+        if not names:
+            continue
+        groups.append(
+            CoverageGroup(
+                label=label,
+                tone=tone,
+                detail=detail,
+                coverage_names=names,
+            )
+        )
+    return groups
 
 
 def _fixed_coverage_item(

@@ -127,6 +127,13 @@ export type DeathBenefitGuideInput = {
   has_major_debt: boolean;
 };
 
+export type CoverageGroup = {
+  label: string;
+  tone: "confirmed" | "review" | "limited";
+  detail: string;
+  coverage_names: string[];
+};
+
 export type EssentialCoverageItem = {
   kind:
     | "death"
@@ -147,6 +154,7 @@ export type EssentialCoverageItem = {
   coverage_count: number;
   detail: string;
   matched_coverage_names: string[];
+  coverage_groups?: CoverageGroup[];
 };
 
 export type SpecialPolicyAnalysis = {

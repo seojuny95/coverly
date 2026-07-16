@@ -161,6 +161,7 @@ EssentialCoverageKind = Literal[
     "medical_indemnity",
 ]
 EssentialCoverageStatus = Literal["well_prepared", "needs_review", "not_found"]
+CoverageGroupTone = Literal["confirmed", "review", "limited"]
 SourceReliability = Literal[
     "official",
     "public_research",
@@ -178,6 +179,13 @@ class ReferenceSource(BaseModel):
     caveat: str
 
 
+class CoverageGroup(BaseModel):
+    label: str
+    tone: CoverageGroupTone
+    detail: str
+    coverage_names: list[str] = Field(default_factory=list)
+
+
 class EssentialCoverageItem(BaseModel):
     kind: EssentialCoverageKind
     label: str
@@ -193,6 +201,7 @@ class EssentialCoverageItem(BaseModel):
     coverage_count: int
     detail: str
     matched_coverage_names: list[str] = Field(default_factory=list)
+    coverage_groups: list[CoverageGroup] = Field(default_factory=list)
 
 
 class EssentialCoverageCheck(BaseModel):

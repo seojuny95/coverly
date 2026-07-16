@@ -1,9 +1,11 @@
+import { useState } from "react";
+
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
 import { PortfolioAnalysisPanel } from "./portfolio-analysis-panel";
-import type { PortfolioSummary } from "./portfolio-api";
+import type { DeathBenefitGuideInput, PortfolioSummary } from "./portfolio-api";
 
 const noop = () => {};
 const deathBenefitSource = {
@@ -73,6 +75,15 @@ const summary: PortfolioSummary = {
         coverage_count: 1,
         detail: "사망 담보가 확인돼요.",
         matched_coverage_names: ["질병사망"],
+        coverage_groups: [
+          {
+            label: "기본 사망 보장",
+            tone: "confirmed",
+            detail:
+              "일반사망·질병사망처럼 가족 생활비 목적의 사망보험 판단에 반영하는 담보예요.",
+            coverage_names: ["질병사망"],
+          },
+        ],
       },
       {
         kind: "cancer",
@@ -298,6 +309,23 @@ function baseProps() {
   };
 }
 
+function StatefulPortfolioAnalysisPanel() {
+  const [deathBenefitContext, setDeathBenefitContext] =
+    useState<DeathBenefitGuideInput>({
+      has_dependent_family: false,
+      has_minor_children: false,
+      has_major_debt: false,
+    });
+
+  return (
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      deathBenefitContext={deathBenefitContext}
+      onDeathBenefitContextChange={setDeathBenefitContext}
+    />
+  );
+}
+
 test("shows an empty state only when there are no insurance documents", () => {
   render(
     <PortfolioAnalysisPanel
@@ -332,8 +360,16 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.getByText("3대 진단보험")).toBeInTheDocument();
   expect(screen.getByText("실손의료보험")).toBeInTheDocument();
   expect(
-    screen.getByText("부양가족이나 큰 부채가 없는 경우"),
+    screen.getByRole("radio", { name: "부양가족이나 큰 부채가 없어요" }),
+  ).toBeChecked();
+  expect(
+    screen.getByText(/피보험자가 사망했을 때 남은 가족에게/),
   ).toBeInTheDocument();
+  expect(
+    screen.queryByText("부양가족이나 큰 부채가 없는 경우"),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("사망 담보가 확인돼요.")).not.toBeInTheDocument();
+  expect(screen.getByText("기본 사망 보장")).toBeInTheDocument();
   expect(screen.getByText("0원~5천만 원")).toBeInTheDocument();
   expect(
     screen.queryByText("업로드한 전체 보험에서 사망 보장이 확인돼요."),
@@ -352,6 +388,14 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(
     screen.queryByRole("link", { name: "사망 보장 안내" }),
   ).not.toBeInTheDocument();
+  expect(
+    screen.getByText("확인된 담보: 암진단비 · 유사암진단비"),
+  ).toBeInTheDocument();
+  expect(
+    screen.getAllByText(
+      "현재 업로드된 보험증권에서는 해당 보장이 확인되지 않아요",
+    ).length,
+  ).toBeGreaterThan(0);
   expect(screen.getByText("손해보험 분석")).toBeInTheDocument();
   expect(screen.getByText("자동차보험")).toBeInTheDocument();
   expect(
@@ -385,6 +429,126 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   );
   expect(screen.queryByText("확인된 보장")).not.toBeInTheDocument();
   expect(screen.queryByText("추가 확인")).not.toBeInTheDocument();
+});
+
+test("allows only one death-benefit situation at a time", async () => {
+  const user = userEvent.setup();
+  render(<StatefulPortfolioAnalysisPanel />);
+
+  const noDependents = screen.getByRole("radio", {
+    name: "부양가족이나 큰 부채가 없어요",
+  });
+  const dependentFamily = screen.getByRole("radio", {
+    name: "내 소득에 의존하는 가족이 있어요",
+  });
+  const minorChildren = screen.getByRole("radio", {
+    name: "미성년 자녀가 있어요",
+  });
+
+  expect(noDependents).toBeChecked();
+  expect(dependentFamily).not.toBeChecked();
+  expect(minorChildren).not.toBeChecked();
+
+  await user.click(dependentFamily);
+  expect(noDependents).not.toBeChecked();
+  expect(dependentFamily).toBeChecked();
+  expect(minorChildren).not.toBeChecked();
+
+  await user.click(minorChildren);
+  expect(noDependents).not.toBeChecked();
+  expect(dependentFamily).not.toBeChecked();
+  expect(minorChildren).toBeChecked();
+
+  await user.click(minorChildren);
+  expect(minorChildren).toBeChecked();
+});
+
+test("shows a skeleton for the death benefit amount while refreshing", () => {
+  render(
+    <PortfolioAnalysisPanel {...baseProps()} isDeathBenefitRefreshing={true} />,
+  );
+
+  expect(screen.getByText("안내금액 계산 중")).toBeInTheDocument();
+  expect(screen.queryByText("안내금액 업데이트 중...")).not.toBeInTheDocument();
+});
+
+test("groups limited death coverages separately from basic death coverage", () => {
+  const limitedDeathSummary: PortfolioSummary = {
+    ...summary,
+    essential_coverage_check: {
+      items: summary.essential_coverage_check!.items.map((item) =>
+        item.kind === "death"
+          ? {
+              ...item,
+              status: "needs_review",
+              confirmed_amount: null,
+              detail:
+                "제한적인 사망 담보만 보여요. 가족 생활비 목적의 사망보험으로 충분한지는 따로 확인해보세요.",
+              matched_coverage_names: ["대중교통이용중교통상해사망"],
+              coverage_groups: [
+                {
+                  label: "제한적인 사망 담보",
+                  tone: "limited",
+                  detail:
+                    "교통·대중교통·고속도로처럼 특정 사고 조건에 묶인 사망 담보예요.",
+                  coverage_names: ["대중교통이용중교통상해사망"],
+                },
+              ],
+            }
+          : item,
+      ),
+    },
+  };
+
+  render(
+    <PortfolioAnalysisPanel {...baseProps()} summary={limitedDeathSummary} />,
+  );
+
+  const deathCard = screen
+    .getByRole("heading", { name: "사망보험" })
+    .closest("section");
+
+  expect(within(deathCard!).getByText("점검 필요")).toBeInTheDocument();
+  expect(
+    within(deathCard!).getByText("제한적인 사망 담보"),
+  ).toBeInTheDocument();
+  expect(
+    within(deathCard!).getByText("대중교통이용중교통상해사망"),
+  ).toBeInTheDocument();
+  expect(
+    within(deathCard!).queryByText(/확인된 담보:/),
+  ).not.toBeInTheDocument();
+});
+
+test("shows the death coverage detail only when no coverage was found", () => {
+  const missingDeathSummary: PortfolioSummary = {
+    ...summary,
+    essential_coverage_check: {
+      items: (summary.essential_coverage_check?.items ?? []).map((item) =>
+        item.kind === "death"
+          ? {
+              ...item,
+              status: "not_found",
+              confirmed_amount: null,
+              coverage_count: 0,
+              detail:
+                "현재 올린 전체 보험에서는 사망 담보를 확인하지 못했어요.",
+              matched_coverage_names: [],
+            }
+          : item,
+      ),
+    },
+  };
+
+  render(
+    <PortfolioAnalysisPanel {...baseProps()} summary={missingDeathSummary} />,
+  );
+
+  expect(
+    screen.getByText(
+      "현재 올린 전체 보험에서는 사망 담보를 확인하지 못했어요.",
+    ),
+  ).toBeInTheDocument();
 });
 
 test("shows an explicit retry state when the LLM overview is missing", async () => {
@@ -429,6 +593,33 @@ test("shows a multiple-medical-indemnity review directly in the coverage map", (
 
   expect(screen.queryByText("한 번 더 볼 항목")).not.toBeInTheDocument();
   expect(screen.getByText("중복 가능성 확인")).toBeInTheDocument();
+});
+
+test("shows insurer claim channels even without the medical indemnity channel", () => {
+  const insurerOnlyClaimSummary: PortfolioSummary = {
+    ...summary,
+    claim_channels: summary.claim_channels
+      ? {
+          ...summary.claim_channels,
+          medical_indemnity: null,
+        }
+      : null,
+  };
+
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      summary={insurerOnlyClaimSummary}
+    />,
+  );
+
+  expect(screen.queryByText("실손24")).not.toBeInTheDocument();
+  expect(screen.getByText("가입한 보험사 청구 채널 보기")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "가입한 보험사의 앱이나 홈페이지에서 직접 청구할 수 있어요.",
+    ),
+  ).toBeInTheDocument();
 });
 
 test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
