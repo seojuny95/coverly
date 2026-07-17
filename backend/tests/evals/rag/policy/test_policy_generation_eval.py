@@ -11,6 +11,7 @@ from evals.rag.policy.generation import (
     evaluate_generation,
     load_generation_eval_cases,
     load_practice_eval_cases,
+    offline_lexical_completer,
     render_report,
 )
 
@@ -167,6 +168,25 @@ def test_policy_generation_eval_scores_contract_checks_with_stub_completer() -> 
     assert report.status_match_rate == 1.0
     assert report.required_evidence_coverage == 1.0
     assert "passed=" in render_report(report)
+
+
+def test_policy_generation_eval_offline_lexical_completer_runs_without_openai_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Settings:
+        openai_api_key = ""
+
+    monkeypatch.setattr(
+        "evals.rag.policy.generation.get_settings",
+        lambda: _Settings(),
+    )
+
+    report = evaluate_generation(
+        load_generation_eval_cases(TEST_FIXTURE)[:1],
+        complete=offline_lexical_completer,
+    )
+
+    assert report.total == 1
 
 
 def test_policy_generation_eval_reports_contract_failures() -> None:

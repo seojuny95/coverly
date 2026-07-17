@@ -8,6 +8,7 @@ retrieval ranking quality and answer-generation quality stay separable.
 from __future__ import annotations
 
 import json
+import re
 from argparse import ArgumentParser
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -148,6 +149,31 @@ def evaluate_generation(
         total=len(results),
         results=results,
     )
+
+
+def offline_lexical_completer(_: str, user: str) -> dict[str, object]:
+    """Select evidence with deterministic lexical overlap for offline checks."""
+
+    payload = json.loads(user)
+    question_terms = set(_lexical_terms(str(payload.get("question", ""))))
+    evidence_items = cast(list[dict[str, object]], payload.get("evidence", []))
+    scored: list[tuple[int, str]] = []
+    for item in evidence_items:
+        evidence_id = str(item.get("id", ""))
+        fact_terms = set(_lexical_terms(str(item.get("fact", ""))))
+        scored.append((len(question_terms & fact_terms), evidence_id))
+
+    max_score = max((score for score, _evidence_id in scored), default=0)
+    evidence_ids = [
+        evidence_id for score, evidence_id in scored if score == max_score and score > 0
+    ][:4]
+    return {
+        "confirmed_fact": "선택한 근거에서 확인되는 내용입니다.",
+        "guidance": None,
+        "evidence_ids": evidence_ids,
+        "suggestions": [],
+        "limitations": [],
+    }
 
 
 def render_report(report: PolicyGenerationEvalReport, *, show_passing: bool = False) -> str:
@@ -351,31 +377,68 @@ def _normalize(text: str) -> str:
     return " ".join(text.split())
 
 
+_LEXICAL_STOPWORDS = {
+    "보험",
+    "보험증권",
+    "증권",
+    "원문",
+    "발췌",
+    "확인",
+    "확인되는",
+    "내용",
+    "알려줘",
+    "뭐야",
+    "무엇",
+    "어떻게",
+    "경우",
+    "현재",
+    "가입",
+    "질문",
+}
+
+
+def _lexical_terms(text: str) -> tuple[str, ...]:
+    return tuple(
+        term
+        for term in re.findall(r"[가-힣A-Za-z0-9]+", text)
+        if len(term) >= 2 and term not in _LEXICAL_STOPWORDS
+    )
+
+
 def _rate(values: Iterable[bool]) -> float:
     items = tuple(bool(value) for value in values)
     return sum(1 for item in items if item) / len(items) if items else 0.0
 
 
-def _parse_args() -> tuple[Path | None, Literal["practice", "test"], bool]:
+def _parse_args() -> tuple[Path | None, Literal["practice", "test"], bool, bool]:
     parser = ArgumentParser(description="Evaluate uploaded-policy RAG generation.")
     parser.add_argument("--path", type=Path)
     parser.add_argument("--set", choices=("practice", "test"), default="practice")
+    parser.add_argument(
+        "--offline-lexical",
+        action="store_true",
+        help="Run a deterministic lexical completer instead of the live LLM completer.",
+    )
     parser.add_argument("--show-passing", action="store_true")
     args = parser.parse_args()
     return (
         cast(Path | None, args.path),
         cast(Literal["practice", "test"], args.set),
+        bool(args.offline_lexical),
         bool(args.show_passing),
     )
 
 
 if __name__ == "__main__":
-    path, dataset, show_passing = _parse_args()
+    path, dataset, use_offline_lexical, show_passing = _parse_args()
     if path is not None:
         cases = load_generation_eval_cases(path)
     elif dataset == "test":
         cases = load_generation_eval_cases(TEST_FIXTURE)
     else:
         cases = load_practice_eval_cases()
-    report = evaluate_generation(cases)
+    report = evaluate_generation(
+        cases,
+        complete=offline_lexical_completer if use_offline_lexical else None,
+    )
     print(render_report(report, show_passing=show_passing))
