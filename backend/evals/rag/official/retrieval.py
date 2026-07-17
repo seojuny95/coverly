@@ -12,13 +12,14 @@ import json
 import math
 import time
 from argparse import ArgumentParser
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
 from app.rag.embeddings import HashingEmbedder
 from app.rag.official.loaders import load_official_chunks
-from app.rag.official.models import RagChunk, RetrievalHit
+from app.rag.official.models import RagChunk, RetrievalHit, chunk_embedding_text
 from app.rag.official.retrieval import retrieve
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "retrieval_dataset.json"
@@ -35,15 +36,27 @@ class RetrievalEvalCase:
     profile: RetrievalProfile
     difficulty: RetrievalDifficulty
     relevant_chunk_ids: tuple[str, ...]
+    accepted_evidence: tuple[AcceptedEvidence, ...] = ()
     expected_no_hits: bool = False
+
+
+@dataclass(frozen=True)
+class AcceptedEvidence:
+    source_ids: tuple[str, ...] = ()
+    source_categories: tuple[str, ...] = ()
+    required_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class RetrievalEvalResult:
     case_id: str
     passed: bool
+    exact_matched: bool
+    accepted_matched: bool
     rank: int | None
+    accepted_rank: int | None
     recall_at_k: float
+    accepted_recall_at_k: float
     precision_at_k: float
     ndcg_at_k: float
     hit_chunk_ids: tuple[str, ...]
@@ -55,12 +68,13 @@ class RetrievalEvalResult:
 class RetrievalEvalReport:
     passed: int
     total: int
+    total_cases: int
     reciprocal_rank_sum: float
     recall_sum: float
     precision_sum: float
     ndcg_sum: float
-    negative_passed: int
-    negative_total: int
+    diagnostic_negative_no_hit_count: int
+    diagnostic_negative_total: int
     elapsed_seconds: float
     results: tuple[RetrievalEvalResult, ...]
 
@@ -70,31 +84,43 @@ class RetrievalEvalReport:
 
     @property
     def recall(self) -> float:
-        positive_total = self.total - self.negative_total
-        return self.recall_sum / positive_total if positive_total else 0.0
+        return self.recall_sum / self.total if self.total else 0.0
+
+    @property
+    def exact_recall(self) -> float:
+        return self.recall
+
+    @property
+    def accepted_recall(self) -> float:
+        positives = tuple(result for result in self.results if not result.expected_no_hits)
+        return _rate(result.accepted_recall_at_k for result in positives)
+
+    @property
+    def accepted_pass_rate(self) -> float:
+        positives = tuple(result for result in self.results if not result.expected_no_hits)
+        return _rate(result.passed for result in positives)
 
     @property
     def mrr(self) -> float:
-        positive_total = self.total - self.negative_total
-        return self.reciprocal_rank_sum / positive_total if positive_total else 0.0
+        return self.reciprocal_rank_sum / self.total if self.total else 0.0
 
     @property
     def precision_at_k(self) -> float:
-        positive_total = self.total - self.negative_total
-        return self.precision_sum / positive_total if positive_total else 0.0
+        return self.precision_sum / self.total if self.total else 0.0
 
     @property
     def ndcg_at_k(self) -> float:
-        positive_total = self.total - self.negative_total
-        return self.ndcg_sum / positive_total if positive_total else 0.0
+        return self.ndcg_sum / self.total if self.total else 0.0
 
     @property
-    def negative_no_hit_rate(self) -> float:
-        return self.negative_passed / self.negative_total if self.negative_total else 0.0
+    def diagnostic_negative_no_hit_rate(self) -> float:
+        if not self.diagnostic_negative_total:
+            return 0.0
+        return self.diagnostic_negative_no_hit_count / self.diagnostic_negative_total
 
     @property
     def average_latency_seconds(self) -> float:
-        return self.elapsed_seconds / self.total if self.total else 0.0
+        return self.elapsed_seconds / self.total_cases if self.total_cases else 0.0
 
 
 def load_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[RetrievalEvalCase, ...]:
@@ -106,6 +132,7 @@ def load_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[RetrievalEvalC
         profile = _profile(raw["profile"])
         difficulty = _difficulty(raw["difficulty"])
         relevant_chunk_ids = _string_tuple(raw["relevant_chunk_ids"])
+        accepted_evidence = _accepted_evidence(raw.get("accepted_evidence", []))
         expected_no_hits = bool(raw.get("expected_no_hits", False))
         questions = _string_tuple(raw["questions"])
         for index, question in enumerate(questions, start=1):
@@ -116,6 +143,7 @@ def load_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[RetrievalEvalC
                     profile=profile,
                     difficulty=difficulty,
                     relevant_chunk_ids=relevant_chunk_ids,
+                    accepted_evidence=accepted_evidence,
                     expected_no_hits=expected_no_hits,
                 )
             )
@@ -137,14 +165,15 @@ def evaluate_retrieval(
     negatives = tuple(result for result in results if result.expected_no_hits)
 
     return RetrievalEvalReport(
-        passed=sum(result.passed for result in results),
-        total=len(results),
+        passed=sum(result.passed for result in positives),
+        total=len(positives),
+        total_cases=len(results),
         reciprocal_rank_sum=sum(1 / result.rank for result in positives if result.rank is not None),
         recall_sum=sum(result.recall_at_k for result in positives),
         precision_sum=sum(result.precision_at_k for result in positives),
         ndcg_sum=sum(result.ndcg_at_k for result in positives),
-        negative_passed=sum(result.passed for result in negatives),
-        negative_total=len(negatives),
+        diagnostic_negative_no_hit_count=sum(result.passed for result in negatives),
+        diagnostic_negative_total=len(negatives),
         elapsed_seconds=elapsed_seconds,
         results=results,
     )
@@ -172,8 +201,12 @@ def _evaluate_case(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> Retriev
         return RetrievalEvalResult(
             case_id=case.id,
             passed=not top_hits,
+            exact_matched=not top_hits,
+            accepted_matched=not top_hits,
             rank=None,
+            accepted_rank=None,
             recall_at_k=0.0,
+            accepted_recall_at_k=0.0,
             precision_at_k=0.0,
             ndcg_at_k=0.0,
             hit_chunk_ids=hit_chunk_ids,
@@ -186,15 +219,21 @@ def _evaluate_case(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> Retriev
         (index for index, chunk_id in enumerate(hit_chunk_ids, start=1) if chunk_id in relevant),
         None,
     )
+    accepted_rank = rank or _accepted_rank(case, top_hits)
     recall_at_k = 1.0 if retrieved_relevant else 0.0
+    accepted_recall_at_k = 1.0 if accepted_rank is not None else 0.0
     precision_at_k = len(retrieved_relevant) / len(top_hits) if top_hits else 0.0
     ndcg_at_k = _ndcg(hit_chunk_ids, relevant)
 
     return RetrievalEvalResult(
         case_id=case.id,
-        passed=rank is not None,
+        passed=accepted_rank is not None,
+        exact_matched=rank is not None,
+        accepted_matched=accepted_rank is not None,
         rank=rank,
+        accepted_rank=accepted_rank,
         recall_at_k=recall_at_k,
+        accepted_recall_at_k=accepted_recall_at_k,
         precision_at_k=precision_at_k,
         ndcg_at_k=ndcg_at_k,
         hit_chunk_ids=hit_chunk_ids,
@@ -218,6 +257,55 @@ def _ndcg(hit_chunk_ids: tuple[str, ...], relevant: set[str]) -> float:
 
 def _string_tuple(value: object) -> tuple[str, ...]:
     return tuple(str(item) for item in cast(list[object], value))
+
+
+def _accepted_evidence(value: object) -> tuple[AcceptedEvidence, ...]:
+    raw_items = cast(list[dict[str, object]], value)
+    return tuple(
+        AcceptedEvidence(
+            source_ids=_string_tuple(raw.get("source_ids", [])),
+            source_categories=_string_tuple(raw.get("source_categories", [])),
+            required_terms=_string_tuple(raw.get("required_terms", [])),
+        )
+        for raw in raw_items
+    )
+
+
+def _accepted_rank(case: RetrievalEvalCase, hits: list[RetrievalHit]) -> int | None:
+    for index, hit in enumerate(hits, start=1):
+        if _accepted_hit(case, hit):
+            return index
+    return None
+
+
+def _accepted_hit(case: RetrievalEvalCase, hit: RetrievalHit) -> bool:
+    if not case.accepted_evidence:
+        return False
+    for accepted in case.accepted_evidence:
+        if accepted.source_ids and hit.chunk.source_id not in accepted.source_ids:
+            continue
+        if (
+            accepted.source_categories
+            and hit.chunk.source_category not in accepted.source_categories
+        ):
+            continue
+        text = chunk_embedding_text(hit.chunk)
+        if all(_contains_normalized(text, term) for term in accepted.required_terms):
+            return True
+    return False
+
+
+def _contains_normalized(text: str, term: str) -> bool:
+    return _normalize_text(term) in _normalize_text(text)
+
+
+def _normalize_text(value: str) -> str:
+    return "".join(value.split()).casefold()
+
+
+def _rate(values: Iterable[float]) -> float:
+    items = tuple(values)
+    return sum(items) / len(items) if items else 0.0
 
 
 def _profile(value: object) -> RetrievalProfile:
@@ -248,17 +336,26 @@ def main() -> None:
     print(
         " ".join(
             [
-                f"passed={report.passed}/{report.total}",
+                f"positive_passed={report.passed}/{report.total}",
+                f"accepted_pass={report.accepted_pass_rate:.3f}",
                 f"recall@{EVAL_K}={report.recall:.3f}",
+                f"accepted_recall@{EVAL_K}={report.accepted_recall:.3f}",
                 f"precision@{EVAL_K}={report.precision_at_k:.3f}",
                 f"mrr={report.mrr:.3f}",
                 f"ndcg@{EVAL_K}={report.ndcg_at_k:.3f}",
-                f"negative_no_hit={report.negative_no_hit_rate:.3f}",
+                f"diagnostic_negative_no_hit={report.diagnostic_negative_no_hit_rate:.3f}",
+                f"total_cases={report.total_cases}",
                 f"avg_latency={report.average_latency_seconds:.3f}s",
             ]
         )
     )
     for result in report.results:
+        if result.expected_no_hits:
+            if not args.show_passing:
+                continue
+            status = "DIAG_NO_HIT" if result.passed else "DIAG_HIT"
+            print(f"{status} {result.case_id} hits={result.hit_chunk_ids}")
+            continue
         if result.passed and not args.show_passing:
             continue
         status = "PASS" if result.passed else "FAIL"

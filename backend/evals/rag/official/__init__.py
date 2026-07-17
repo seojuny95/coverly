@@ -15,6 +15,7 @@ if TYPE_CHECKING:
         GenerationEvalResult,
     )
     from evals.rag.official.retrieval import (
+        AcceptedEvidence,
         RetrievalEvalCase,
         RetrievalEvalReport,
         RetrievalEvalResult,
@@ -27,6 +28,7 @@ __all__ = [
     "GenerationEvalCase",
     "GenerationEvalReport",
     "GenerationEvalResult",
+    "AcceptedEvidence",
     "RetrievalEvalCase",
     "RetrievalEvalReport",
     "RetrievalEvalResult",
@@ -47,6 +49,7 @@ _EXPORT_MODULES = {
     "GenerationEvalCase": "evals.rag.official.generation",
     "GenerationEvalReport": "evals.rag.official.generation",
     "GenerationEvalResult": "evals.rag.official.generation",
+    "AcceptedEvidence": "evals.rag.official.retrieval",
     "RetrievalEvalCase": "evals.rag.official.retrieval",
     "RetrievalEvalReport": "evals.rag.official.retrieval",
     "RetrievalEvalResult": "evals.rag.official.retrieval",

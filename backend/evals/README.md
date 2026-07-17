@@ -24,3 +24,5 @@ uv run python -m evals.rag.policy.generation --set test
 - `app`는 `evals`를 import하지 않는다.
 - `evals`는 API correctness 테스트를 대체하지 않는다.
 - practice와 test 데이터셋은 분리해서 관리한다.
+- retrieval 평가는 답변 가능한 positive 질문의 근거 회수율과 랭킹을 주 품질 지표로 본다.
+- out-of-scope/negative 질문의 답변 거절은 retrieval이 아니라 router/generation/e2e 평가에서 품질 gate로 다룬다.
