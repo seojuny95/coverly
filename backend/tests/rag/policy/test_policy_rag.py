@@ -10,7 +10,7 @@ import pytest
 from app.modules.policy.models import ParsedDocument
 from app.rag.embeddings import HashingEmbedder
 from app.rag.policy.indexing import build_policy_vector_records, index_policy_document
-from app.rag.policy.models import PolicyRetrievalHit, PolicyVectorRecord
+from app.rag.policy.models import PolicyChunk, PolicyRetrievalHit, PolicyVectorRecord
 from app.rag.policy.pii import mask_policy_pii
 from app.rag.policy.retrieval import retrieve_policy_context
 from app.rag.policy.session_tokens import (
@@ -84,6 +84,11 @@ class _MemoryStore:
 class _FailingEmbedder:
     def embed_texts(self, texts: list[str]) -> list[tuple[float, ...]]:
         raise AssertionError("embedder should not be called")
+
+
+class _FixedEmbedder:
+    def embed_texts(self, texts: list[str]) -> list[tuple[float, ...]]:
+        return [(1.0,) for _ in texts]
 
 
 @pytest.fixture(autouse=True)
@@ -164,6 +169,51 @@ def test_policy_index_returns_signed_session_token() -> None:
     assert claims.expires_at == now + timedelta(minutes=15)
     assert claims.max_expires_at == now + timedelta(hours=2)
     assert {record.chunk.session_id for record in store.records} == {claims.session_id}
+
+
+def test_policy_retrieval_reranks_lexical_match_within_vector_candidates() -> None:
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(hours=1)
+    records = (
+        PolicyVectorRecord(
+            chunk=PolicyChunk(
+                id="session-1:1",
+                session_id="session-1",
+                text="보험료 납입 안내와 일반 유의사항입니다.",
+                content_type="text",
+                chunk_index=1,
+                table_index=None,
+                created_at=now,
+                expires_at=expires_at,
+            ),
+            embedding=(1.0,),
+        ),
+        PolicyVectorRecord(
+            chunk=PolicyChunk(
+                id="session-1:2",
+                session_id="session-1",
+                text="암진단비 유사암제외 가입금액은 4,000만원입니다.",
+                content_type="text",
+                chunk_index=2,
+                table_index=None,
+                created_at=now,
+                expires_at=expires_at,
+            ),
+            embedding=(0.5,),
+        ),
+    )
+    token = sign_policy_session_id("session-1", expires_at)
+
+    hits = retrieve_policy_context(
+        [token],
+        "암진단비 유사암제외 가입금액",
+        top_k=1,
+        candidate_k=2,
+        store=_MemoryStore(records),
+        embedder=_FixedEmbedder(),
+    )
+
+    assert hits[0].chunk.id == "session-1:2"
 
 
 def test_policy_session_token_rejects_forgery_and_expiry() -> None:
