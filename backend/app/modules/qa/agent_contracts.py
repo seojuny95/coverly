@@ -66,6 +66,7 @@ class QaAgentDependencies:
     precomputed_responses: dict[str, PortfolioQuestionResponse | None] = field(default_factory=dict)
     grounded_checked: bool = False
     grounded_response: PortfolioQuestionResponse | None = None
+    validated_response: PortfolioQuestionResponse | None = None
 
     def register(
         self,

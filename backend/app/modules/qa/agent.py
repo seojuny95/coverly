@@ -102,7 +102,7 @@ class OpenAiQaAgentRunner:
             ),
         )
         draft = result.final_output_as(AgentCounselorDraft, raise_if_incorrect_type=True)
-        return validated_agent_response(context, draft, dependencies)
+        return _validated_or_cached_response(context, draft, dependencies)
 
     def stream(self, context: QaContext) -> Iterator[QaAgentStreamItem]:
         settings = get_settings()
@@ -124,7 +124,6 @@ class OpenAiQaAgentRunner:
             if isinstance(item, BaseException):
                 raise item
             yield item
-        worker.join(timeout=0)
 
     def _dependencies(self, context: QaContext) -> QaAgentDependencies:
         return QaAgentDependencies(
@@ -171,7 +170,11 @@ def grounded_output_guardrail(
     output: AgentCounselorDraft,
 ) -> GuardrailFunctionOutput:
     try:
-        validated_agent_response(ctx.context.context, output, ctx.context)
+        ctx.context.validated_response = validated_agent_response(
+            ctx.context.context,
+            output,
+            ctx.context,
+        )
     except QaAgentUnavailable as exc:
         return GuardrailFunctionOutput(
             output_info={"valid": False, "reason": str(exc)},
@@ -224,7 +227,18 @@ async def _run_streamed_agent(
     async for _event in result.stream_events():
         pass
     draft = result.final_output_as(AgentCounselorDraft, raise_if_incorrect_type=True)
-    queue.put(QaAgentCompleted(validated_agent_response(context, draft, dependencies)))
+    queue.put(QaAgentCompleted(_validated_or_cached_response(context, draft, dependencies)))
+
+
+def _validated_or_cached_response(
+    context: QaContext,
+    draft: AgentCounselorDraft,
+    dependencies: QaAgentDependencies,
+) -> PortfolioQuestionResponse:
+    if dependencies.validated_response is not None:
+        return dependencies.validated_response
+    dependencies.validated_response = validated_agent_response(context, draft, dependencies)
+    return dependencies.validated_response
 
 
 class _ProgressHooks(RunHooks[QaAgentDependencies]):

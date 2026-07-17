@@ -40,7 +40,8 @@ from app.modules.qa.schemas import (
 _MAX_HISTORY_MESSAGES = 12
 _MAX_SUGGESTIONS = 3
 
-# One event of the /qa/stream Server-Sent-Events protocol: meta → delta* → end.
+# One event of the /qa/stream Server-Sent-Events protocol:
+# optional progress* → meta → delta* → end.
 QaStreamEvent = dict[str, object]
 
 _STREAM_CHUNK_SIZE = 16
