@@ -21,6 +21,7 @@ from app.rag.official.answer import answer_official_question
 from app.rag.policy import generate_policy_answer
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "dataset.json"
+POLICY_FIXTURE = Path(__file__).resolve().parent / "fixture_policies.json"
 EvalRoute = Literal["fast", "agent", "scope"]
 
 _UNIVERSAL_FORBIDDEN = (
@@ -271,55 +272,8 @@ def _evaluate_case(
     )
 
 
-def fixture_policies() -> list[PolicyInput]:
-    rows = [
-        {
-            "id": "health-nh",
-            "기본정보": {
-                "보험사": "NH농협손해보험",
-                "상품명": "가성비건강보험",
-                "보험분류": "질병",
-                "피보험자정보": {"나이": 31, "성별": "남성", "생애단계": "성인"},
-            },
-            "보장목록": [
-                {"담보명": "암진단비(유사암제외)", "가입금액": "2,000만원", "지급유형": "정액"},
-                {"담보명": "유사암진단비", "가입금액": "2,000만원", "지급유형": "정액"},
-                {"담보명": "뇌혈관질환진단비", "가입금액": "1,000만원", "지급유형": "정액"},
-                {"담보명": "허혈성심질환진단비", "가입금액": "1,000만원", "지급유형": "정액"},
-                {"담보명": "5대장기이식수술비", "가입금액": "1,000만원", "지급유형": "정액"},
-            ],
-        },
-        {
-            "id": "health-heungkuk",
-            "기본정보": {"보험사": "흥국화재", "상품명": "자녀사랑건강보험", "보험분류": "질병"},
-            "보장목록": [
-                {"담보명": "암진단비(유사암제외)", "가입금액": "4,000만원", "지급유형": "정액"},
-                {"담보명": "유사암진단비", "가입금액": "1,000만원", "지급유형": "정액"},
-                {"담보명": "뇌혈관질환진단비", "가입금액": "2,000만원", "지급유형": "정액"},
-                {"담보명": "허혈성심질환진단비", "가입금액": "2,000만원", "지급유형": "정액"},
-                {"담보명": "뇌혈관질환수술비", "가입금액": "1,000만원", "지급유형": "정액"},
-            ],
-        },
-        {
-            "id": "auto-hyundai",
-            "기본정보": {"보험사": "현대해상", "상품명": "Hicar 다이렉트", "보험분류": "자동차"},
-            "보장목록": [{"담보명": "대물배상", "지급유형": "실손"}],
-        },
-        {
-            "id": "medical-samsung",
-            "기본정보": {"보험사": "삼성화재", "상품명": "실손의료보험", "보험분류": "질병"},
-            "보장목록": [{"담보명": "실손의료비", "가입금액": "5,000만원", "지급유형": "실손"}],
-        },
-        {
-            "id": "driver-db",
-            "기본정보": {
-                "보험사": "DB손해보험",
-                "상품명": "참좋은운전자보험",
-                "보험분류": "운전자",
-            },
-            "보장목록": [{"담보명": "교통사고처리지원금", "가입금액": "1억원", "지급유형": "실손"}],
-        },
-    ]
+def fixture_policies(path: Path = POLICY_FIXTURE) -> list[PolicyInput]:
+    rows = cast(list[dict[str, object]], json.loads(path.read_text(encoding="utf-8")))
     return [PolicyInput.model_validate(row) for row in rows]
 
 
