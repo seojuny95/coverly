@@ -41,7 +41,7 @@ export function InsuranceChatbot({
     {
       id: 0,
       role: "assistant",
-      text: "궁금한 내용을 물어보세요. AI가 올린 보험증권에서 확인한 사실을 근거로 답할게요. Coverly AI는 보험을 팔지 않아요.",
+      text: "안녕하세요. 올려주신 보험을 같이 살펴볼게요. 궁금한 건 편하게 말씀해 주세요.",
       limitations: [
         "자동차보험과 약관이 필요한 보상 판단은 답변에서 제외해요.",
         ...INITIAL_ONLY_LIMITATIONS,
@@ -130,11 +130,12 @@ export function InsuranceChatbot({
     setStreaming(true);
     try {
       await streamPortfolioQuestion(text, documents, history, {
-        onDelta: (delta) =>
+        onDelta: (delta) => {
           updateMessage(assistantId, (message) => ({
             ...message,
             text: message.text + delta,
-          })),
+          }));
+        },
         onEnd: (end) => finalizeAnswer(assistantId, end),
       });
     } catch {
@@ -172,7 +173,7 @@ export function InsuranceChatbot({
             AI 보험 상담
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
-            증권 근거와 확인 한계를 함께 보여드려요
+            올려주신 증권을 바탕으로 함께 살펴봐요
           </p>
         </div>
         {isFloating ? (

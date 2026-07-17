@@ -2,11 +2,13 @@
 
 import json
 from collections.abc import Callable, Iterator
+from functools import partial
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from app.modules.qa.agent import build_qa_agent_runner
 from app.modules.qa.generation import QaStreamEvent
 from app.modules.qa.schemas import PortfolioQuestionRequest
 from app.modules.qa.service import stream_portfolio_answer
@@ -17,7 +19,7 @@ PortfolioAnswerStreamer = Callable[..., Iterator[QaStreamEvent]]
 
 
 def get_portfolio_answer_streamer() -> PortfolioAnswerStreamer:
-    return stream_portfolio_answer
+    return partial(stream_portfolio_answer, agent_runner=build_qa_agent_runner())
 
 
 PortfolioAnswerStreamerDep = Annotated[

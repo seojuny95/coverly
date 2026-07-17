@@ -222,7 +222,11 @@ def test_policy_session_stream_routes_to_independent_generator(
 
     events = list(stream_portfolio_answer("암진단비 원문을 알려줘", [policy]))
 
-    assert [event["type"] for event in events] == ["meta", "delta", "end"]
+    assert events[0]["type"] == "meta"
+    assert events[-1]["type"] == "end"
+    deltas = [str(event["text"]) for event in events if event["type"] == "delta"]
+    assert len(deltas) > 1
+    assert "증권 원문에서 진단확정 문구" in "".join(deltas)
     assert events[0]["generation"] == "llm"
     citations = events[-1]["citations"]
     assert isinstance(citations, list)

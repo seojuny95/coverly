@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.modules.coverage.taxonomy import classify_coverage
-from app.modules.portfolio.schemas import PolicyInput
+from app.modules.portfolio.schemas import CoverageSourceItem, PolicyInput
 from app.modules.portfolio.summary import PortfolioFacts
 from app.modules.qa.contracts import ConsultationEvidence, InsuredDemographics
 from app.modules.qa.schemas import AnswerCitation
@@ -89,6 +89,14 @@ _PAYOUT_OR_OFFICIAL_CLAIMS = (
     "보험금을 지급",
     "보상받을 수",
     "보상 받을 수",
+    "보장받을 수",
+    "보장 받을 수",
+    "보장받는",
+    "보장받고",
+    "보장돼요",
+    "지급됩니다",
+    "지급돼요",
+    "지원받을 수",
     "면책이 없",
     "면책되지 않",
     "공식 기준",
@@ -102,6 +110,15 @@ _FABRICATED_PERSONAL_FACTS = (
     "자녀가 있어",
     "소득이 높",
     "소득이 낮",
+)
+_UNSUPPORTED_PROMISES = (
+    "안심하셔도",
+    "확실히 갖추",
+    "매우 강력",
+    "추가로 고려",
+    "어떤 상황에서도",
+    "큰 도움이 될",
+    "위험을 다양하게 분산",
 )
 
 
@@ -219,10 +236,15 @@ def build_evidence_catalog(
     for index, total in enumerate(facts.coverage_summary.totals, start=1):
         evidence_id = f"coverage:{index}"
         source = total.composition[0]
+        duplicate_detail = _fixed_coverage_duplicate_detail(total.composition)
         items.append(
             ConsultationEvidence(
                 id=evidence_id,
-                fact=f"{total.display_name} 가입금액 합계 {total.total_amount:,}원 확인",
+                fact=(
+                    f"{total.display_name} 가입금액 합계 {total.total_amount:,}원 확인 "
+                    "(지급 성격: 정액형)"
+                    f"{duplicate_detail}"
+                ),
                 policy_id=source.policy_id if len(total.composition) == 1 else None,
                 insurer=source.insurer if len(total.composition) == 1 else None,
                 product_name=source.product_name if len(total.composition) == 1 else None,
@@ -260,10 +282,18 @@ def build_evidence_catalog(
 
         evidence_id = f"actual-loss:{index}"
         coverage_type = "실손의료비" if actual_loss.is_medical_indemnity else "실손형"
+        duplicate_detail = (
+            ", 여러 계약에서 같은 실손형 담보 확인"
+            if actual_loss.duplicate_across_contracts
+            else ""
+        )
         items.append(
             ConsultationEvidence(
                 id=evidence_id,
-                fact=(f"{actual_loss.coverage_name} 가입 사실 확인 (지급 성격: {coverage_type})"),
+                fact=(
+                    f"{actual_loss.coverage_name} 가입 사실 확인 "
+                    f"(지급 성격: {coverage_type}{duplicate_detail})"
+                ),
                 policy_id=actual_loss.policy_id,
                 insurer=actual_loss.insurer,
                 product_name=actual_loss.product_name,
@@ -335,11 +365,37 @@ def build_evidence_catalog(
             )
         )
 
+    if not any(
+        term in item.fact for item in items for term in ("같은 담보명", "여러 계약에서 같은 실손형")
+    ):
+        items.append(
+            ConsultationEvidence(
+                id="portfolio:no-overlap",
+                fact=(
+                    "업로드된 증권 전체에서 동일하게 정규화된 정액형 담보나 "
+                    "여러 계약의 같은 실손형 담보를 확인하지 못함"
+                ),
+            )
+        )
+
     return EvidenceCatalog(
         items=tuple(items),
         by_id={item.id: item for item in items},
         coverage_ids_by_category={category: tuple(ids) for category, ids in category_ids.items()},
     )
+
+
+def _fixed_coverage_duplicate_detail(composition: list[CoverageSourceItem]) -> str:
+    if len(composition) < 2:
+        return ""
+
+    amount_labels: list[str] = []
+    for source in composition:
+        label = " · ".join(item for item in (source.insurer, source.product_name) if item)
+        amount_label = f"{label} {source.amount:,}원" if label else f"{source.amount:,}원"
+        amount_labels.append(amount_label)
+    source_detail = f" (구성: {', '.join(amount_labels)})"
+    return f", {len(composition)}개 증권에서 같은 담보명 확인{source_detail}"
 
 
 def has_unsupported_conclusion(text: str) -> bool:
@@ -385,6 +441,8 @@ def is_safe_analysis_text(text: str, *, allow_official_claims: bool = False) -> 
     compact = " ".join(cleaned.split())
     blocked_claims = _PAYOUT_CLAIMS if allow_official_claims else _PAYOUT_OR_OFFICIAL_CLAIMS
     if any(term in compact for term in blocked_claims):
+        return False
+    if any(term in compact for term in _UNSUPPORTED_PROMISES):
         return False
     if (
         allow_official_claims

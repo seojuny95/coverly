@@ -3,18 +3,43 @@ from datetime import UTC, datetime, timedelta
 from threading import Barrier
 from typing import Any
 
-from pytest import MonkeyPatch
+from pytest import MonkeyPatch, raises
 
+from app.modules.evidence.catalog import is_safe_analysis_text
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.context import build_qa_context
+from app.modules.qa.agent import (
+    AgentCounselorDraft,
+    QaAgentDependencies,
+    QaAgentUnavailable,
+    _agent_input,
+    _consultation_evidence,
+    _validated_agent_response,
+    _web_search_response,
+)
+from app.modules.qa.context import QaContext, build_qa_context
 from app.modules.qa.contracts import InsuredDemographics
-from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
+from app.modules.qa.schemas import AnswerCitation, ConversationMessage, PortfolioQuestionResponse
 from app.modules.qa.service import answer_portfolio_question
+from app.modules.qa.web_search import (
+    SearchPurpose,
+    WebSearchResult,
+    _contains_unallowed_url,
+    _search_prompt,
+    _validated_source_urls,
+    sanitize_search_query,
+    search_allowed_domains,
+)
 from app.rag.official.answer import RagAnswer, RagCitation
 from app.rag.policy import PolicyChunk, PolicyRetrievalHit
 
 ADULT_BIRTH = "95" + "0524"
 YOUNG_ADULT_BIRTH = "05" + "0524"
+
+
+def test_consultation_safety_rejects_payout_promises_and_sales_nudges() -> None:
+    assert not is_safe_analysis_text("암진단비 3천만원이 지급됩니다.")
+    assert not is_safe_analysis_text("보장이 강력하니 안심하셔도 좋아요.")
+    assert not is_safe_analysis_text("비어 있는 담보는 추가로 고려해보세요.")
 
 
 def _policies() -> list[PolicyInput]:
@@ -105,6 +130,87 @@ def _non_life_cancer_policy() -> list[PolicyInput]:
     ]
 
 
+def _cancer_scenario_policies() -> list[PolicyInput]:
+    rows = (
+        ("p1", "NH농협손해보험", "어린이보험", 20_000_000, 20_000_000),
+        ("p2", "흥국화재", "자녀보험", 40_000_000, 10_000_000),
+    )
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": policy_id,
+                "기본정보": {
+                    "보험사": insurer,
+                    "상품명": product,
+                    "보험분류": "제3보험",
+                },
+                "보장목록": [
+                    {
+                        "담보명": "암진단비(유사암제외)",
+                        "가입금액숫자": cancer_amount,
+                        "지급유형": "정액",
+                    },
+                    {
+                        "담보명": "유사암진단비",
+                        "가입금액숫자": similar_cancer_amount,
+                        "지급유형": "정액",
+                    },
+                ],
+            }
+        )
+        for policy_id, insurer, product, cancer_amount, similar_cancer_amount in rows
+    ]
+
+
+def _five_classification_policies() -> list[PolicyInput]:
+    rows = (
+        ("third-1", "보험사A", "어린이보험", "제3보험", "암진단비", "정액"),
+        ("third-2", "보험사B", "자녀보험", "제3보험", "골절진단비", "정액"),
+        ("damage-1", "보험사C", "운전자보험", "손해보험", "벌금", "실손"),
+        ("damage-2", "보험사D", "화재보험", "손해보험", "화재손해", "실손"),
+        ("auto-1", "보험사E", "자동차보험", "자동차", "대물배상", "실손"),
+    )
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": policy_id,
+                "기본정보": {
+                    "보험사": insurer,
+                    "상품명": product,
+                    "보험분류": classification,
+                },
+                "보장목록": [{"담보명": coverage, "지급유형": payment_type}],
+            }
+        )
+        for policy_id, insurer, product, classification, coverage, payment_type in rows
+    ]
+
+
+def _unused_web_search(
+    query: str,
+    *,
+    purpose: SearchPurpose,
+    allowed_domains: list[str],
+) -> WebSearchResult:
+    del query, purpose, allowed_domains
+    return WebSearchResult(status="unavailable")
+
+
+class _AssertingAllPolicyAgent:
+    def __init__(self) -> None:
+        self.seen_policy_ids: list[str | None] = []
+
+    def run(self, context: QaContext) -> PortfolioQuestionResponse:
+        self.seen_policy_ids = [policy.id for policy in context.policies]
+        return PortfolioQuestionResponse(
+            status="answered",
+            answer="모든 증권을 확인했어요.",
+            citations=[],
+            limitations=[],
+            suggestions=[],
+        )
+
+
 def _official_answer(question: str) -> RagAnswer:
     assert question
     return RagAnswer(
@@ -170,6 +276,128 @@ def test_qa_routes_official_terms_to_rag_even_without_uploaded_policies() -> Non
     assert result.citations[0].source_id == "standard_terms_annex_15_2026_06_30"
     assert result.citations[0].source_page == 10
     assert "보험증권을 먼저 업로드" not in result.answer
+
+
+def test_agent_first_holdings_context_includes_every_policy() -> None:
+    agent = _AssertingAllPolicyAgent()
+    policies = [
+        *_policies(),
+        *_non_life_cancer_policy(),
+        PolicyInput.model_validate(
+            {
+                "id": "auto1",
+                "기본정보": {
+                    "보험사": "자동차보험사",
+                    "상품명": "자동차보험",
+                    "보험분류": "자동차",
+                },
+                "보장목록": [{"담보명": "대물배상", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+    result = answer_portfolio_question(
+        "가입한 보험을 전부 확인해줘",
+        policies,
+        agent_runner=agent,
+    )
+
+    assert result.status == "answered"
+    assert result.answer == "모든 증권을 확인했어요."
+    assert agent.seen_policy_ids == ["p1", "p1", "auto1"]
+
+
+def test_agent_web_search_domains_are_limited_to_official_and_held_insurer() -> None:
+    context = build_qa_context(
+        "삼성화재 최신 보험금 청구 안내 찾아줘",
+        _named_insurer_policies("삼성화재"),
+        None,
+        [],
+    )
+
+    domains = search_allowed_domains(context, "insurer_guidance")
+
+    assert domains == ["samsungfire.com"]
+    assert "law.go.kr" not in domains
+
+
+def test_agent_web_search_law_update_uses_official_source_domains_only() -> None:
+    context = build_qa_context("보험업법 최신 개정 알려줘", [], None, [])
+
+    domains = search_allowed_domains(context, "law_update")
+
+    assert domains == [
+        "law.go.kr",
+        "fsc.go.kr",
+        "korea.kr",
+        "molit.go.kr",
+    ]
+    assert "www.samsungfire.com" not in domains
+
+
+def test_law_search_prompt_requires_explicit_official_nickname_evidence() -> None:
+    prompt = _search_prompt("하준이법이 뭐야?", "law_update")
+
+    assert "공식 페이지 본문에 그 별칭이 직접 등장" in prompt
+    assert "관련 없는 법률을 유추하지 마세요" in prompt
+
+
+def test_web_search_keeps_only_cited_allowed_urls_and_caps_them() -> None:
+    response = {
+        "output": [
+            {
+                "content": [
+                    {
+                        "annotations": [
+                            {"type": "url_citation", "url": "https://www.korea.kr/one"},
+                            {"type": "url_citation", "url": "https://www.molit.go.kr/two"},
+                            {"type": "url_citation", "url": "https://www.law.go.kr/three"},
+                            {"type": "url_citation", "url": "https://www.korea.kr/four"},
+                            {"type": "url_citation", "url": "https://example.com/rejected"},
+                        ]
+                    }
+                ]
+            }
+        ],
+        "web_search_call": {
+            "action": {
+                "sources": [
+                    {"type": "computer_initialize_state", "url": "https://www.law.go.kr/not-cited"}
+                ]
+            }
+        },
+    }
+
+    urls = _validated_source_urls(
+        response,
+        ["www.korea.kr", "www.molit.go.kr", "www.law.go.kr"],
+    )
+
+    assert urls == [
+        "https://www.korea.kr/one",
+        "https://www.molit.go.kr/two",
+        "https://www.law.go.kr/three",
+    ]
+
+
+def test_agent_web_search_query_masks_personal_identifiers() -> None:
+    query = sanitize_search_query("010-1234-5678 test@example.com 계약 전 알릴 의무")
+
+    assert "010-1234-5678" not in query
+    assert "test@example.com" not in query
+    assert "[전화번호]" in query
+    assert "[이메일]" in query
+
+
+def test_agent_web_search_rejects_urls_outside_allowlist() -> None:
+    assert _contains_unallowed_url(
+        "[공식 안내](https://example.com/insurance)",
+        ["www.fsc.go.kr"],
+    )
+    assert not _contains_unallowed_url(
+        "[공식 안내](https://www.fsc.go.kr/insurance)",
+        ["www.fsc.go.kr"],
+    )
 
 
 def test_qa_allows_grounded_official_payment_explanation() -> None:
@@ -301,15 +529,337 @@ def test_qa_answers_coverage_question_with_hedge_instead_of_refusing() -> None:
     assert result.status == "answered"
 
 
+def test_qa_leads_with_held_cancer_benefit_for_colorectal_cancer_diagnosis() -> None:
+    def forbidden_official(_: str) -> RagAnswer:
+        raise AssertionError("held diagnosis benefits must be resolved before Official RAG")
+
+    result = answer_portfolio_question(
+        "대장암 진단 받았는데 보장 받을 수 있나?",
+        _cancer_scenario_policies(),
+        official_answer=forbidden_official,
+    )
+
+    assert result.status == "answered"
+    assert "암진단비(유사암제외)" in result.answer
+    assert "60,000,000원" in result.answer
+    assert "유사암진단비" not in result.answer
+    assert "30,000,000원" not in result.answer
+    assert "가입 사실과 가입금액" in result.answer
+    assert "실제 지급 여부" in result.answer
+    assert {citation.coverage_name for citation in result.citations} == {"암진단비(유사암제외)"}
+
+
+def test_qa_uses_recent_diagnosis_context_for_claim_follow_up() -> None:
+    def forbidden_official(_: str) -> RagAnswer:
+        raise AssertionError("follow-up must use the held diagnosis benefit")
+
+    result = answer_portfolio_question(
+        "내 보험으로 보장 받을 수 있어?",
+        _cancer_scenario_policies(),
+        history=[ConversationMessage(role="user", content="대장암 진단을 받았어")],
+        official_answer=forbidden_official,
+    )
+
+    assert result.status == "answered"
+    assert "암진단비(유사암제외)" in result.answer
+    assert "60,000,000원" in result.answer
+    assert "유사암진단비" not in result.answer
+    assert result.claim_channels is not None
+    assert any(insurer.name == "흥국화재" for insurer in result.claim_channels.insurers)
+
+
 def test_qa_answers_holdings_with_policy_citation() -> None:
     result = answer_portfolio_question("가입한 보험 목록 알려줘", _policies())
 
     assert result.status == "answered"
-    assert "**증권에서 확인된 사실**" in result.answer
+    assert result.answer.startswith("올려주신 증권을 모두 확인해보니")
     assert "1건" in result.answer
-    assert "- 테스트보험 건강보험(질병)" in result.answer
+    assert "- 테스트보험 · 건강보험 (질병)" in result.answer
     assert "건강보험" in result.answer
     assert result.citations[0].policy_id == "p1"
+
+
+def test_qa_holdings_count_all_uploaded_policy_classifications() -> None:
+    policies = _five_classification_policies()
+
+    result = answer_portfolio_question("가입한 보험은 몇개야?", policies)
+
+    assert result.status == "answered"
+    assert "5건" in result.answer
+    for product_name in ("어린이보험", "자녀보험", "운전자보험", "화재보험", "자동차보험"):
+        assert product_name in result.answer
+
+
+def test_agent_cannot_replace_locked_five_policy_answer() -> None:
+    policies = _five_classification_policies()
+    context = build_qa_context("가입한 보험은 몇개야?", policies, None, [])
+    authoritative = answer_portfolio_question(context.question, policies)
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    dependencies.register("grounded", authoritative)
+
+    result = _validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            selected_result_id="grounded:999",
+            answer="업로드된 보험은 3건이에요.",
+        ),
+        dependencies,
+    )
+
+    assert "5건" in result.answer
+    assert "3건" not in result.answer
+    assert result.citations == authoritative.citations
+
+
+def test_agent_may_add_only_non_factual_counselor_framing() -> None:
+    context = build_qa_context("가입한 보험은 몇개야?", _policies(), None, [])
+    authoritative = answer_portfolio_question(context.question, context.policies)
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    registered = dependencies.register("grounded", authoritative)
+    framing = "올려주신 내용을 차근차근 정리해드릴게요."
+
+    result = _validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            selected_result_id=registered.result_id or "",
+            answer=f"{framing}\n\n{authoritative.answer}",
+        ),
+        dependencies,
+    )
+
+    assert result.answer.startswith(framing)
+    assert authoritative.answer in result.answer
+
+
+def test_agent_may_rewrite_grounded_answer_as_natural_counselor_prose() -> None:
+    context = build_qa_context("가입한 보험은 몇개야?", _policies(), None, [])
+    authoritative = answer_portfolio_question(context.question, context.policies)
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    registered = dependencies.register("grounded", authoritative)
+
+    result = _validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            selected_result_id=registered.result_id or "",
+            answer="확인해보니 가입한 보험은 **1건**이고, 건강보험이에요.",
+        ),
+        dependencies,
+    )
+
+    assert result.answer == "확인해보니 가입한 보험은 **1건**이고, 건강보험이에요."
+    assert result.citations == authoritative.citations
+
+
+def test_agent_consultation_uses_only_selected_duplicate_evidence() -> None:
+    context = build_qa_context("겹치는 보장이 있는지 봐줄래요?", _alias_policies(), None, [])
+    duplicate = next(item for item in context.catalog.items if item.id.startswith("coverage:"))
+    assert "지급 성격: 정액형" in duplicate.fact
+    assert "2개 증권에서 같은 담보명 확인" in duplicate.fact
+    assert "보험사A" in duplicate.fact
+    assert "보험사B" in duplicate.fact
+
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    response = PortfolioQuestionResponse(
+        status="answered",
+        answer="질문과 직접 관련된 evidence만 사용하세요.",
+        citations=[],
+        limitations=[],
+    )
+    registered = dependencies.register(
+        "consultation",
+        response,
+        evidence=context.catalog.items,
+    )
+
+    result = _validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            selected_result_id=registered.result_id or "",
+            answer=(
+                "두 증권에서 같은 계열의 허혈성심질환진단비가 확인돼요. "
+                "정액형 담보라 실제 지급은 각 약관의 조건을 따로 확인해야 해요."
+            ),
+            evidence_ids=[duplicate.id],
+        ),
+        dependencies,
+    )
+
+    assert result.answer.startswith("두 증권에서")
+    assert [citation.evidence_id for citation in result.citations] == [duplicate.id]
+    assert "피보험자" not in result.answer
+
+
+def test_overlap_consultation_exposes_only_duplicate_evidence() -> None:
+    context = build_qa_context("겹치는 보장이 있는지 봐줄래요?", _alias_policies(), None, [])
+
+    evidence = _consultation_evidence(context)
+
+    assert len(evidence) == 1
+    assert evidence[0].id.startswith("coverage:")
+    assert "2개 증권에서 같은 담보명 확인" in evidence[0].fact
+
+
+def test_overlap_consultation_exposes_explicit_no_overlap_evidence() -> None:
+    context = build_qa_context("중복 보장이 있어?", _policies(), None, [])
+
+    evidence = _consultation_evidence(context)
+
+    assert [item.id for item in evidence] == ["portfolio:no-overlap"]
+
+
+def test_consultation_exposes_only_question_relevant_coverage_category() -> None:
+    context = build_qa_context("허혈성심질환 보장을 검토해줘", _alias_policies(), None, [])
+
+    evidence = _consultation_evidence(context)
+
+    assert evidence
+    assert all("허혈성심질환" in item.fact for item in evidence)
+
+
+def test_cancer_diagnosis_consultation_does_not_expose_similar_cancer_by_default() -> None:
+    context = build_qa_context(
+        "대장암 진단 받았는데 보장 받을 수 있나?",
+        _cancer_scenario_policies(),
+        None,
+        [],
+    )
+
+    evidence = _consultation_evidence(context)
+
+    assert evidence
+    assert any(item.coverage_name == "암진단비(유사암제외)" for item in evidence)
+    assert all(item.coverage_name != "유사암진단비" for item in evidence)
+
+
+def test_consultation_does_not_expose_portfolio_to_unrelated_fact_question() -> None:
+    context = build_qa_context("하준이법이 뭐야?", _policies(), None, [])
+
+    assert _consultation_evidence(context) == ()
+
+
+def test_agent_consultation_rejects_answer_without_selected_evidence() -> None:
+    context = build_qa_context("하준이법이 뭐야?", _policies(), None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    response = PortfolioQuestionResponse(
+        status="answered",
+        answer="질문과 직접 관련된 evidence만 사용하세요.",
+        citations=[],
+        limitations=[],
+    )
+    registered = dependencies.register(
+        "consultation",
+        response,
+        evidence=context.catalog.items,
+    )
+
+    with raises(QaAgentUnavailable):
+        _validated_agent_response(
+            context,
+            AgentCounselorDraft(
+                selected_result_id=registered.result_id or "",
+                answer="하준이법은 어린이 보호구역 관련 법이에요.",
+                evidence_ids=[],
+            ),
+            dependencies,
+        )
+
+
+def test_agent_cannot_add_claims_when_web_search_has_no_data() -> None:
+    context = build_qa_context("하준이법이 뭐야?", _policies(), None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    no_data = _web_search_response(context, WebSearchResult(status="unavailable"))
+    registered = dependencies.register("web", no_data)
+
+    result = _validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            selected_result_id=registered.result_id or "",
+            answer="하준이법은 어린이 안전을 보호하는 법으로 알려져 있어요.",
+        ),
+        dependencies,
+    )
+
+    assert result.answer == no_data.answer
+    assert "알려져" not in result.answer
+    assert result.suggestions == []
+    assert not any("피보험자" in limitation for limitation in result.limitations)
+
+
+def test_agent_routes_external_law_question_to_official_web_not_portfolio() -> None:
+    context = build_qa_context("하준이법이 뭐야?", _policies(), None, [])
+
+    prompt = _agent_input(context)
+
+    assert "법, 제도, 보험 용어처럼 증권 밖의 사실" in prompt
+    assert "search_official_web" in prompt
+    assert "자녀" not in prompt
+
+
+def test_agent_requires_web_tool_for_latest_official_information() -> None:
+    context = build_qa_context("요즘 보험업법 최신 개정 알려줘", [], None, [])
+    authoritative = PortfolioQuestionResponse(
+        status="answered",
+        answer="기존 공식 RAG 답변",
+        citations=[
+            AnswerCitation(
+                policy_id=None,
+                insurer=None,
+                product_name=None,
+                source_id="old-source",
+            )
+        ],
+        limitations=[],
+    )
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    registered = dependencies.register("grounded", authoritative)
+
+    result = _validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            selected_result_id=registered.result_id or "",
+            answer=authoritative.answer,
+        ),
+        dependencies,
+    )
+
+    assert result.status == "no_data"
+    assert result.citations == []
+    assert "공식 웹사이트 검색 근거" in result.answer
 
 
 def _health_plus_auto() -> list[PolicyInput]:
@@ -405,7 +955,6 @@ def test_qa_uses_confirmed_summary_for_amount_answer() -> None:
     result = answer_portfolio_question("전체 가입금액 합계가 얼마야?", _policies())
 
     assert result.status == "answered"
-    assert "**증권에서 확인된 사실**" in result.answer
     assert "**30,000,000원**" in result.answer
     assert "30,000,000원" in result.answer
     assert "실손형 담보는 가입금액 합계에 포함하지 않았습니다." in result.limitations
@@ -437,6 +986,111 @@ def test_qa_resolves_curated_aliases_to_the_same_coverage_total() -> None:
         assert "허혈성심질환진단비" in result.answer
         assert "30,000,000원" in result.answer
         assert {citation.coverage_name for citation in result.citations} == {"허혈성심질환진단비"}
+
+
+def test_qa_payment_conditions_require_uploaded_policy_terms() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "damage-1",
+                "기본정보": {
+                    "보험사": "테스트손해보험",
+                    "상품명": "건강보험",
+                    "보험분류": "손해보험",
+                },
+                "보장목록": [
+                    {
+                        "담보명": "5대장기이식수술비",
+                        "가입금액": "1,000만원",
+                        "지급유형": "정액",
+                    }
+                ],
+            }
+        )
+    ]
+
+    result = answer_portfolio_question("5대장기이식수술비 지급 조건은 뭐야?", policies)
+
+    assert result.status == "no_data"
+    assert "약관 원문" in result.answer
+    assert "암진단비" not in result.answer
+    assert result.citations[0].coverage_name == "5대장기이식수술비"
+
+
+def test_qa_held_coverage_conditions_use_policy_rag_before_official_rag(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    from app.modules.qa import service as qa_service
+
+    policy = _non_life_cancer_policy()[0]
+    policy.문서세션ID = "session-1"
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    hit = PolicyRetrievalHit(
+        chunk=PolicyChunk(
+            id="chunk-1",
+            session_id="session-1",
+            text="암진단비는 보험기간 중 암으로 진단확정된 경우 보험금을 지급합니다.",
+            content_type="text",
+            chunk_index=1,
+            table_index=None,
+            created_at=now,
+            expires_at=now + timedelta(hours=1),
+        ),
+        score=1.0,
+    )
+    monkeypatch.setattr(qa_service, "retrieve_policy_context", lambda _ids, _query: [hit])
+
+    def forbidden_official(_: str) -> RagAnswer:
+        raise AssertionError("held coverage conditions must use uploaded policy terms first")
+
+    result = answer_portfolio_question(
+        "암진단비 지급사유는 뭐야?",
+        [policy],
+        official_answer=forbidden_official,
+        complete=lambda _system, _user: {
+            "confirmed_fact": "암으로 진단확정된 경우 보험금을 지급합니다.",
+            "guidance": None,
+            "evidence_ids": ["session:1"],
+            "suggestions": [],
+            "limitations": [],
+        },
+    )
+
+    assert result.status == "answered"
+    assert result.citations[0].evidence_id == "session:1"
+    assert "진단확정된 경우" in result.answer
+
+
+def test_web_search_response_refuses_results_without_valid_source_url() -> None:
+    context = build_qa_context("보험업법 최신 개정 알려줘", [], None, [])
+
+    result = _web_search_response(
+        context,
+        WebSearchResult(
+            status="searched",
+            answer="최근 법이 바뀌었습니다.",
+            source_urls=[],
+        ),
+    )
+
+    assert result.status == "no_data"
+    assert result.citations == []
+
+
+def test_web_search_response_keeps_verified_official_source_url() -> None:
+    context = build_qa_context("보험업법 최신 개정 알려줘", [], None, [])
+
+    result = _web_search_response(
+        context,
+        WebSearchResult(
+            status="searched",
+            answer="공식 사이트에 게시된 최신 내용을 확인했어요.",
+            source_urls=["https://www.fsc.go.kr/example"],
+        ),
+    )
+
+    assert result.status == "answered"
+    assert result.citations[0].source_url == "https://www.fsc.go.kr/example"
 
 
 def test_qa_does_not_fall_back_to_total_for_unknown_specific_coverage() -> None:

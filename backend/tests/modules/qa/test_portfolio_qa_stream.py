@@ -2,8 +2,10 @@
 
 from collections.abc import Iterator
 
+from pytest import MonkeyPatch
+
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.schemas import ConversationMessage
+from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
 from app.modules.qa.service import stream_portfolio_answer
 from app.rag.official.answer import RagAnswer, RagCitation
 
@@ -49,7 +51,7 @@ def _official_answer(_: str) -> RagAnswer:
     )
 
 
-def test_stream_routes_official_rag_as_single_delta() -> None:
+def test_stream_routes_official_rag_as_multiple_deltas() -> None:
     events = list(
         stream_portfolio_answer(
             "암 진단비 받을 수 있는지 확인 기준 알려줘",
@@ -59,7 +61,9 @@ def test_stream_routes_official_rag_as_single_delta() -> None:
     )
 
     assert events[0]["type"] == "meta"
-    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    deltas = [str(event["text"]) for event in events if event["type"] == "delta"]
+    text = "".join(deltas)
+    assert len(deltas) > 1
     assert "지급사유" in text
     end = events[-1]
     assert end["type"] == "end"
@@ -85,12 +89,13 @@ def test_stream_llm_answer_yields_deltas_then_end_with_citations() -> None:
     assert any(c.get("coverage_name") == "암진단비" for c in citations)
 
 
-def test_stream_deterministic_amount_answer_is_single_delta() -> None:
+def test_stream_deterministic_amount_answer_is_multiple_deltas() -> None:
     events = list(stream_portfolio_answer("암진단비 가입금액은 얼마야?", _policies()))
 
     assert events[0]["type"] == "meta"
-    text = "".join(str(e["text"]) for e in events if e["type"] == "delta")
-    assert "**증권에서 확인된 사실**" in text
+    deltas = [str(e["text"]) for e in events if e["type"] == "delta"]
+    text = "".join(deltas)
+    assert len(deltas) > 1
     assert "**30,000,000원**" in text
     assert "30,000,000원" in text
     assert events[-1]["type"] == "end"
@@ -99,6 +104,64 @@ def test_stream_deterministic_amount_answer_is_single_delta() -> None:
     assert suggestions
     assert all(suggestion.endswith("?") for suggestion in suggestions)
     assert not any("해 주세요" in suggestion for suggestion in suggestions)
+
+
+def test_stream_uses_agent_first_for_deterministic_question() -> None:
+    class CountingAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(self, _context: object) -> PortfolioQuestionResponse:
+            self.calls += 1
+            return PortfolioQuestionResponse(
+                status="answered",
+                answer="Agent가 가입 목록 도구로 확인했어요.",
+                citations=[],
+                limitations=[],
+                suggestions=[],
+                generation="llm",
+            )
+
+    agent = CountingAgent()
+    events = list(
+        stream_portfolio_answer(
+            "가입한 보험은 몇 개야?",
+            _policies(),
+            agent_runner=agent,
+        )
+    )
+
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert agent.calls == 1
+    assert "Agent가 가입 목록 도구로 확인했어요." in text
+
+
+def test_stream_agent_failure_does_not_call_legacy_consultation_model(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    class FailedAgent:
+        def run(self, _context: object) -> PortfolioQuestionResponse:
+            raise RuntimeError("offline")
+
+    def forbidden_legacy_stream(*_args: object, **_kwargs: object) -> Iterator[object]:
+        raise AssertionError("agent failure must not trigger a second model call")
+        yield {}  # pragma: no cover
+
+    monkeypatch.setattr(
+        "app.modules.qa.service.stream_consultation_answer",
+        forbidden_legacy_stream,
+    )
+
+    events = list(
+        stream_portfolio_answer(
+            "내 보험 강점을 설명해줘",
+            _policies(),
+            agent_runner=FailedAgent(),
+        )
+    )
+
+    assert events[0]["generation"] == "fallback"
+    assert events[-1]["type"] == "end"
 
 
 def test_stream_claim_howto_carries_clickable_channels_in_end() -> None:
@@ -504,7 +567,12 @@ def test_stream_clarifies_ambiguous_reference() -> None:
         )
     )
 
-    assert [event["type"] for event in events] == ["meta", "delta", "end"]
+    assert events[0]["type"] == "meta"
+    assert events[-1]["type"] == "end"
+    assert sum(event["type"] == "delta" for event in events) > 1
     assert events[0]["status"] == "clarify"
-    assert events[1]["text"] == "어떤 담보의 가입금액을 말씀하시는지 알려주세요."
+    assert (
+        "".join(str(event["text"]) for event in events if event["type"] == "delta")
+        == "어떤 담보의 가입금액을 말씀하시는지 알려주세요."
+    )
     assert events[-1]["status"] == "clarify"

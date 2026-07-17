@@ -8,7 +8,7 @@ from app.modules.coverage.matching import (
     canonicalize_coverage_name,
     query_contains_canonical_name,
 )
-from app.modules.coverage.taxonomy import LifeStageCheck
+from app.modules.coverage.taxonomy import CANCER, CEREBRO, HEART, LifeStageCheck, classify_coverage
 from app.modules.evidence.catalog import (
     EvidenceCatalog,
     citation_from_evidence,
@@ -60,6 +60,52 @@ _OFFICIAL_CLAIM_CHECK_TERMS = (
     "받을수",
     "면책",
 )
+_POLICY_TERMS_QUESTION_TERMS = (
+    "지급 조건",
+    "지급조건",
+    "지급사유",
+    "면책",
+    "보상하지 않는",
+    "지급하지 않는",
+    "감액",
+    "대기기간",
+)
+_DIAGNOSIS_CATEGORIES = (CANCER, CEREBRO, HEART)
+_DIAGNOSIS_EVENT_TERMS = (
+    "진단받",
+    "진단 받",
+    "진단을 받",
+    "확진",
+    "판정받",
+    "판정 받",
+    "걸렸",
+    "걸린",
+    "발병",
+)
+_CLAIM_RELEVANCE_TERMS = (
+    "보장",
+    "보험금",
+    "받을 수",
+    "받을수",
+    "나와",
+    "청구",
+    "어떻게",
+    "뭘 해야",
+)
+_SECONDARY_CANCER_COVERAGE_TERMS = ("유사암", "재진단", "전이암", "소액암")
+_EXPLICIT_COVERAGE_QUESTION_TERMS = (
+    "진단비",
+    "수술비",
+    "입원비",
+    "담보",
+    "가입금액",
+    "약관",
+    "원문",
+    "지급조건",
+    "지급 조건",
+    "확인기준",
+    "확인 기준",
+)
 _MAX_SUGGESTIONS = 3
 
 OfficialAnswerer = Callable[[str], RagAnswer]
@@ -87,6 +133,24 @@ def resolve_precomputed_answer(
     retrieve_policy: PolicyContextRetriever,
     generate_policy: PolicyAnswerGenerator,
 ) -> PortfolioQuestionResponse | None:
+    if (
+        _requires_policy_terms(context.question)
+        and not any(term in context.question for term in _AMOUNT_TERMS)
+        and _question_targets_held_coverage(context)
+    ):
+        policy_terms_response = _answer_policy_terms_question(
+            context,
+            complete=complete,
+            pass_complete=pass_complete,
+            retrieve_policy=retrieve_policy,
+            generate_policy=generate_policy,
+        )
+        return with_demographics(policy_terms_response, context.insured)
+
+    diagnosis_response = _answer_diagnosis_scenario(context)
+    if diagnosis_response is not None:
+        return with_demographics(diagnosis_response, context.insured)
+
     if try_official:
         response = _answer_with_official_rag(
             context.question,
@@ -106,11 +170,20 @@ def resolve_precomputed_answer(
     ):
         response = _answer_amount(context.question, context.facts, context.catalog)
         return with_demographics(response, context.insured)
+    if _requires_policy_terms(context.question):
+        response = _answer_policy_terms_question(
+            context,
+            complete=complete,
+            pass_complete=pass_complete,
+            retrieve_policy=retrieve_policy,
+            generate_policy=generate_policy,
+        )
+        return with_demographics(response, context.insured)
     if any(term in context.question for term in _STATUS_TERMS):
         response = _answer_status(context.facts, context.catalog, context.auto_policies)
         return with_demographics(response, context.insured)
     if any(term in context.question for term in _HOLDING_TERMS):
-        response = _answer_holdings(context.facts, context.catalog, context.auto_policies)
+        response = _answer_holdings(context.policies, context.facts, context.catalog)
         return with_demographics(response, context.insured)
     if any(term in context.question for term in _CLAIM_HOWTO_TERMS):
         response = _answer_claim_channels(context.policies, context.facts, context.question)
@@ -138,6 +211,228 @@ def resolve_precomputed_answer(
         result = generate_policy(context.question, policy_catalog.items)
     response = _policy_generation_response(result, policy_catalog, context_fallback(context))
     return with_demographics(response, context.insured)
+
+
+def resolve_fast_answer(context: QaContext) -> PortfolioQuestionResponse | None:
+    """Resolve portfolio facts without retrieval or model calls."""
+
+    diagnosis_response = _answer_diagnosis_scenario(context)
+    if diagnosis_response is not None:
+        return with_demographics(diagnosis_response, context.insured)
+
+    question = context.question
+    is_adequacy = _is_adequacy_question(question)
+    is_amount = (
+        any(term in question for term in _AMOUNT_TERMS)
+        and not is_adequacy
+        and not _is_generic_amount_definition(context)
+    )
+    is_status = any(term in question for term in _STATUS_TERMS)
+    is_holdings = any(term in question for term in _HOLDING_TERMS)
+    is_claim_howto = any(term in question for term in _CLAIM_HOWTO_TERMS)
+
+    if not _has_any_uploaded_policy_data(context):
+        if any((is_adequacy, is_amount, is_status, is_holdings, is_claim_howto)):
+            return with_demographics(_no_uploaded_policies_response(), context.insured)
+        return None
+
+    if is_adequacy:
+        response = _answer_adequacy_lookup(question, context.facts, context.catalog)
+        if response is not None:
+            return with_demographics(response, context.insured)
+    if is_amount:
+        response = _answer_amount(question, context.facts, context.catalog)
+        return with_demographics(response, context.insured)
+    if is_status:
+        response = _answer_status(context.facts, context.catalog, context.auto_policies)
+        return with_demographics(response, context.insured)
+    if is_holdings:
+        response = _answer_holdings(context.policies, context.facts, context.catalog)
+        return with_demographics(response, context.insured)
+    if is_claim_howto:
+        response = _answer_claim_channels(context.policies, context.facts, question)
+        return with_demographics(response, context.insured)
+
+    if _is_actual_loss_rule_question(question):
+        return None
+    response = _answer_coverage_lookup(question, context.facts, context.catalog)
+    if response is not None:
+        return with_demographics(response, context.insured)
+    return None
+
+
+def _answer_diagnosis_scenario(context: QaContext) -> PortfolioQuestionResponse | None:
+    scenario = _diagnosis_scenario(context)
+    if scenario is None:
+        return None
+
+    scenario_text, category = scenario
+    evidence = _diagnosis_evidence(context.catalog, scenario_text, category)
+    if not evidence:
+        return None
+
+    facts = "\n".join(f"- {item.fact}" for item in evidence)
+    content = (
+        "올려주신 증권을 기준으로, 말씀하신 진단과 관련해 먼저 확인할 보장이 있어요.\n\n"
+        f"{facts}\n\n"
+        "여기까지는 증권에서 확인된 가입 사실과 가입금액이에요. 실제 지급 여부는 "
+        "진단서의 진단명·질병코드와 각 담보 약관의 지급사유를 대조해야 확정할 수 있어요. "
+        "수술이나 항암치료를 받게 되면 관련 수술비·치료비 담보는 별도로 확인할 수 있어요."
+    )
+    insurers = _diagnosis_evidence_insurers(context, evidence)
+    return PortfolioQuestionResponse(
+        status="answered",
+        answer=content,
+        sections=[
+            AnswerSection(
+                title="증권에서 확인된 관련 보장",
+                content=content,
+                basis="confirmed_fact",
+            )
+        ],
+        citations=[citation_from_evidence(item) for item in evidence],
+        limitations=standard_limitations(context.facts),
+        suggestions=question_suggestions(
+            "암진단비 지급 조건은 뭐야?" if category == CANCER else "진단비 지급 조건은 뭐야?",
+            "보험금 청구는 어디서 해?",
+        ),
+        claim_channels=(
+            claim_channel_block(insurers, has_medical_indemnity=False) if insurers else None
+        ),
+    )
+
+
+def _diagnosis_scenario(context: QaContext) -> tuple[str, str] | None:
+    category = _diagnosis_category(context.question)
+    if category is not None and _is_diagnosis_claim_turn(context.question):
+        return context.question, category
+
+    if not any(term in context.question for term in _CLAIM_RELEVANCE_TERMS):
+        return None
+    for message in reversed(context.history):
+        if message.role != "user":
+            continue
+        category = _diagnosis_category(message.content)
+        if category is not None and any(term in message.content for term in _DIAGNOSIS_EVENT_TERMS):
+            return f"{message.content}\n{context.question}", category
+        break
+    return None
+
+
+def _diagnosis_category(text: str) -> str | None:
+    if any(term in text for term in _EXPLICIT_COVERAGE_QUESTION_TERMS):
+        return None
+    category = classify_coverage(text)
+    if category in _DIAGNOSIS_CATEGORIES:
+        return category
+    compact = "".join(text.split())
+    if "암" in compact:
+        return CANCER
+    return None
+
+
+def _is_diagnosis_claim_turn(question: str) -> bool:
+    return any(term in question for term in _DIAGNOSIS_EVENT_TERMS) or any(
+        term in question for term in _CLAIM_RELEVANCE_TERMS
+    )
+
+
+def _diagnosis_evidence(
+    catalog: EvidenceCatalog,
+    scenario_text: str,
+    category: str,
+) -> tuple[ConsultationEvidence, ...]:
+    evidence = tuple(
+        catalog.by_id[evidence_id]
+        for evidence_id in catalog.coverage_ids_by_category.get(category, ())
+        if evidence_id in catalog.by_id
+    )
+    if category != CANCER or "유사암" in scenario_text:
+        return evidence
+
+    primary = tuple(
+        item
+        for item in evidence
+        if item.coverage_name is not None
+        and not any(
+            term in _base_coverage_name(item.coverage_name)
+            for term in _SECONDARY_CANCER_COVERAGE_TERMS
+        )
+    )
+    return primary or evidence
+
+
+def _diagnosis_evidence_insurers(
+    context: QaContext,
+    evidence: tuple[ConsultationEvidence, ...],
+) -> list[str]:
+    coverage_names = {item.coverage_name for item in evidence if item.coverage_name is not None}
+    insurers: list[str] = []
+    for total in context.facts.coverage_summary.totals:
+        if total.display_name not in coverage_names:
+            continue
+        insurers.extend(source.insurer for source in total.composition if source.insurer)
+    return list(dict.fromkeys(insurers))
+
+
+def _answer_policy_terms_question(
+    context: QaContext,
+    *,
+    complete: JsonCompleter | None,
+    pass_complete: bool,
+    retrieve_policy: PolicyContextRetriever,
+    generate_policy: PolicyAnswerGenerator,
+) -> PortfolioQuestionResponse:
+    missing_terms = _missing_policy_terms_response(context)
+    policy_catalog = _policy_session_catalog(
+        context.catalog,
+        context.policies,
+        context.question,
+        retrieve_policy,
+    )
+    if policy_catalog is None:
+        return missing_terms
+
+    if pass_complete:
+        result = generate_policy(
+            context.question,
+            policy_catalog.items,
+            complete=complete,
+        )
+    else:
+        result = generate_policy(context.question, policy_catalog.items)
+    return _policy_generation_response(result, policy_catalog, missing_terms)
+
+
+def _missing_policy_terms_response(context: QaContext) -> PortfolioQuestionResponse:
+    matching_evidence = [
+        item
+        for item in context.catalog.items
+        if item.coverage_name is not None
+        and query_contains_canonical_name(
+            context.question,
+            _base_coverage_name(item.coverage_name),
+        )
+    ]
+    if matching_evidence:
+        answer = (
+            "질문하신 담보는 가입된 것으로 확인돼요. 다만 **정확한 지급 조건은 "
+            "지금 자료만으로 확인할 수 없어요.**\n\n"
+            "지급사유·면책·감액 조건은 가입한 상품의 약관 원문을 함께 봐야 해요."
+        )
+    else:
+        answer = (
+            "지금 올려주신 자료에서는 질문한 담보와 약관 근거를 찾지 못했어요.\n\n"
+            "담보명과 가입 상품의 약관 원문이 함께 확인되면 지급 조건을 살펴볼 수 있어요."
+        )
+
+    return PortfolioQuestionResponse(
+        status="no_data",
+        answer=answer,
+        citations=[citation_from_evidence(item) for item in matching_evidence],
+        limitations=standard_limitations(context.facts),
+        suggestions=question_suggestions("가입한 보험과 담보 목록을 다시 보여줘?"),
+    )
 
 
 def context_fallback(context: QaContext) -> PortfolioQuestionResponse:
@@ -271,7 +566,7 @@ def _policy_generation_response(
     )
     return PortfolioQuestionResponse(
         status="answered",
-        answer=_markdown_section("업로드 증권 근거", result.answer),
+        answer=f"가입하신 상품의 약관에서 확인한 내용이에요.\n\n{result.answer.strip()}",
         sections=[section],
         citations=[
             citation_from_evidence(catalog.by_id[item_id]) for item_id in result.evidence_ids
@@ -304,7 +599,7 @@ def _answer_with_official_rag(
     )
     return PortfolioQuestionResponse(
         status="answered",
-        answer=_markdown_section("공식자료 기준 일반 안내", result.answer),
+        answer=f"먼저 일반적인 확인 기준부터 말씀드릴게요.\n\n{result.answer.strip()}",
         sections=[section],
         citations=[_official_citation(citation) for citation in result.citations],
         limitations=list(result.limitations),
@@ -354,29 +649,34 @@ def _official_suggestions(result: RagAnswer) -> list[str]:
 
 
 def _answer_holdings(
+    policies: list[PolicyInput],
     facts: PortfolioFacts,
     catalog: EvidenceCatalog,
-    auto_policies: tuple[PolicyInput, ...] = (),
 ) -> PortfolioQuestionResponse:
     labels: list[str] = []
     evidence_ids: list[str] = []
-    policy_evidence = [item for item in catalog.items if item.id.startswith("policy:")]
-    for policy, evidence in zip(facts.policies, policy_evidence, strict=True):
+    evidence_by_policy_id = {
+        item.policy_id: item.id
+        for item in catalog.items
+        if item.policy_id is not None
+        and (
+            item.id.startswith("policy:")
+            or item.id.startswith("auto:")
+            or item.id.startswith("damage:")
+        )
+    }
+    for policy in policies:
         insurer = policy.기본정보.보험사 or "보험사 미확인"
         product = policy.기본정보.상품명 or "상품명 미확인"
         classification = policy.기본정보.보험분류 or "미분류"
-        labels.append(f"{insurer} {product}({classification})")
-        evidence_ids.append(evidence.id)
-
-    auto_evidence = [item for item in catalog.items if item.id.startswith("auto:")]
-    for policy, evidence in zip(auto_policies, auto_evidence, strict=True):
-        insurer = policy.기본정보.보험사 or "보험사 미확인"
-        product = policy.기본정보.상품명 or "상품명 미확인"
-        labels.append(f"{insurer} {product}(자동차)")
-        evidence_ids.append(evidence.id)
+        labels.append(f"{insurer} · {product} ({classification})")
+        if policy.id is not None:
+            evidence_id = evidence_by_policy_id.get(policy.id)
+            if evidence_id is not None:
+                evidence_ids.append(evidence_id)
 
     items = "\n".join(f"- {label}" for label in labels)
-    content = f"업로드된 보험은 **{len(labels)}건**이에요.\n\n{items}"
+    content = f"올려주신 증권을 모두 확인해보니 보험은 **{len(labels)}건**이에요.\n\n{items}"
     return _fact_response(content, evidence_ids, catalog, facts)
 
 
@@ -391,6 +691,10 @@ def _answer_amount(
             total
             for total in facts.coverage_summary.totals
             if query_contains_canonical_name(question, total.normalized_name)
+            or query_contains_canonical_name(
+                question,
+                canonicalize_coverage_name(_base_coverage_name(total.display_name)).normalized_key,
+            )
         ]
         matches.sort(key=lambda total: len(total.normalized_name), reverse=True)
         if len(matches) > 1:
@@ -527,7 +831,12 @@ def _answer_medical_indemnity_lookup(
             )
             if item.is_medical_indemnity
         ]
-        names = [item.coverage_name for item in medical_coverages]
+        names = [
+            " · ".join(
+                value for value in (item.insurer, item.product_name, item.coverage_name) if value
+            )
+            for item in medical_coverages
+        ]
         content = "실손의료보험 관련 담보가 확인돼요.\n\n" + "\n".join(
             f"- {name}" for name in names
         )
@@ -626,7 +935,9 @@ def _answer_damage_coverage_lookup(
         return None
 
     evidence_ids = [item.id for item in matches]
-    content = "\n".join(f"- {item.fact}" for item in matches)
+    content = "질문하신 담보를 찾아보니 이렇게 확인돼요.\n\n" + "\n".join(
+        f"- {item.fact}" for item in matches
+    )
     return _fact_response(content, evidence_ids, catalog, facts)
 
 
@@ -637,7 +948,7 @@ def _answer_status(
 ) -> PortfolioQuestionResponse:
     summary = facts.coverage_summary
     auto_note = f", 자동차보험 {len(auto_policies)}건" if auto_policies else ""
-    content = "\n".join(
+    content = "지금 올려주신 자료의 분석 상태는 이래요.\n\n" + "\n".join(
         [
             f"- 비자동차 보험: **{len(facts.policies)}건**{auto_note}",
             f"- 정액형 합계: **{len(summary.totals)}종**",
@@ -666,7 +977,7 @@ def _fact_response(
     )
     return PortfolioQuestionResponse(
         status="answered",
-        answer=_markdown_section("증권에서 확인된 사실", content),
+        answer=content.strip(),
         sections=[section],
         citations=[
             citation_from_evidence(catalog.by_id[evidence_id])
@@ -750,6 +1061,13 @@ def _answer_claim_channels(
         question,
         facts.coverage_summary.actual_loss_coverages,
     )
+    if include_medical_indemnity:
+        insurers = [
+            item.insurer
+            for item in facts.coverage_summary.actual_loss_coverages
+            if item.is_medical_indemnity and item.insurer
+        ]
+    insurers = list(dict.fromkeys(insurers))
     block = claim_channel_block(
         insurers,
         has_medical_indemnity=(
@@ -759,8 +1077,14 @@ def _answer_claim_channels(
             )
         ),
     )
+    medical_lead = ""
+    if include_medical_indemnity and insurers:
+        medical_lead = (
+            f"증권에서 확인된 실손의료보험사는 **{', '.join(insurers)}**예요. "
+            "보험사 채널이나 **실손24**에서 청구할 수 있어요.\n\n"
+        )
     lead_in = (
-        "**청구는 아래 채널에서 확인하실 수 있어요.**\n\n"
+        medical_lead + "**청구는 아래 채널에서 확인하실 수 있어요.**\n\n"
         "1. 보험사 앱이나 홈페이지에서 청구 메뉴를 확인하세요.\n"
         "2. 진료비 영수증, 진단서 등 필요한 서류를 준비하세요.\n"
         "3. 실제 보상 가능 여부와 지급액은 보험사 심사로 확정돼요."
@@ -792,7 +1116,10 @@ def _claim_question_targets_medical_indemnity(
         return all(item.is_medical_indemnity for item in named_coverages)
     if any(term in question for term in _EXPLICIT_ACTUAL_LOSS_LOOKUP_TERMS):
         return False
-    return any(term in question for term in _MEDICAL_INDEMNITY_LOOKUP_TERMS)
+    compact = "".join(question.split())
+    return any(term in question for term in _MEDICAL_INDEMNITY_LOOKUP_TERMS) or any(
+        term in compact for term in _MEDICAL_INDEMNITY_LOOKUP_TERMS
+    )
 
 
 def _fact_suggestions(facts: PortfolioFacts) -> list[str]:
@@ -813,6 +1140,37 @@ def _is_overall_amount_question(question: str) -> bool:
 
 def _is_adequacy_question(question: str) -> bool:
     return any(term in question for term in _ADEQUACY_TERMS)
+
+
+def _is_generic_amount_definition(context: QaContext) -> bool:
+    definition_terms = ("뜻", "의미", "무슨 말", "뭐야", "같은 거")
+    if not any(term in context.question for term in definition_terms):
+        return False
+    return not _question_targets_held_coverage(context)
+
+
+def _is_actual_loss_rule_question(question: str) -> bool:
+    if not any(term in question for term in _MEDICAL_INDEMNITY_LOOKUP_TERMS):
+        return False
+    return any(
+        term in question
+        for term in ("여러 개", "여러개", "보험마다", "다 받을", "중복 지급", "비례")
+    )
+
+
+def _requires_policy_terms(question: str) -> bool:
+    return any(term in question for term in _POLICY_TERMS_QUESTION_TERMS)
+
+
+def _question_targets_held_coverage(context: QaContext) -> bool:
+    return any(
+        item.coverage_name is not None
+        and query_contains_canonical_name(
+            context.question,
+            _base_coverage_name(item.coverage_name),
+        )
+        for item in context.catalog.items
+    )
 
 
 def _essential_target_kind(question: str) -> str | None:
