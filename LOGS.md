@@ -1,5 +1,6 @@
 # 작업 로그
 
+- 2026-07-17 — Official RAG generation 평가를 재점검하고 citation label·조문 alias 정규화를 추가. Generation live 평가를 52/60에서 60/60으로 개선하고, false negative를 줄이도록 평가 matcher를 보강.
 - 2026-07-17 — Official RAG retrieval 평가를 positive 근거 검색 품질 중심으로 재정리. `accepted_evidence`로 대체 공식 근거를 인정하고, 한국어 복합어·띄어쓰기 차이를 보강했으며, negative no-hit은 상위 QA router/e2e에서 다룰 진단 지표로 격하.
 - 2026-07-15 — 참조 데이터 소유권·RAG 테이블 현황·migration 정리 경계를 `backend/REFERENCE_DATA.md`에 문서화하고 백엔드 가이드의 핵심 라우트와 서버 총평 생성 정책을 갱신.
 - 2026-07-15 — 보험 분류를 생명보험·제3보험·손해보험·미분류로 정리하고, 화면 태그는 보험 종류로 표시하도록 변경. 보장금 합계는 생명보험/제3보험 중심으로 합산하고 손해보험은 종류별 보장금으로 별도 표시. 자동차보험 표에서 여러 줄 가입금액, 부가 특약, 요율/공지성 문장 제거를 보강.
