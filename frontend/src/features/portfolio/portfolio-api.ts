@@ -261,9 +261,15 @@ export type QaStreamEnd = {
   claim_channels?: ClaimChannelBlock | null;
 };
 
+export type QaStreamProgress = {
+  stage: string;
+  text: string;
+};
+
 type QaStreamHandlers = {
   onMeta?: (meta: { status: QaStreamEnd["status"] }) => void;
-  onDelta: (text: string) => void;
+  onProgress?: (progress: QaStreamProgress) => void;
+  onDelta: (text: string) => void | Promise<void>;
   onEnd: (end: QaStreamEnd) => void;
 };
 
@@ -294,7 +300,7 @@ export async function streamPortfolioQuestion(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  const dispatch = (raw: string) => {
+  const dispatch = async (raw: string) => {
     const line = raw.trim();
     if (!line.startsWith("data:")) return;
     let event: Record<string, unknown>;
@@ -305,8 +311,13 @@ export async function streamPortfolioQuestion(
     }
     if (event.type === "meta") {
       handlers.onMeta?.({ status: event.status as QaStreamEnd["status"] });
+    } else if (event.type === "progress") {
+      handlers.onProgress?.({
+        stage: String(event.stage ?? ""),
+        text: String(event.text ?? ""),
+      });
     } else if (event.type === "delta") {
-      handlers.onDelta(String(event.text ?? ""));
+      await handlers.onDelta(String(event.text ?? ""));
     } else if (event.type === "end") {
       handlers.onEnd(event as unknown as QaStreamEnd);
     }
@@ -318,12 +329,12 @@ export async function streamPortfolioQuestion(
     buffer += decoder.decode(value, { stream: true });
     let boundary = buffer.indexOf("\n\n");
     while (boundary !== -1) {
-      dispatch(buffer.slice(0, boundary));
+      await dispatch(buffer.slice(0, boundary));
       buffer = buffer.slice(boundary + 2);
       boundary = buffer.indexOf("\n\n");
     }
   }
-  if (buffer.trim()) dispatch(buffer);
+  if (buffer.trim()) await dispatch(buffer);
 }
 
 export function normalizeQuestion(question: string) {

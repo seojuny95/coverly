@@ -1,5 +1,6 @@
 """LLM generation and filtering for conversational portfolio Q&A."""
 
+import re
 from collections.abc import Iterator
 
 from pydantic import BaseModel, Field
@@ -39,8 +40,33 @@ from app.modules.qa.schemas import (
 _MAX_HISTORY_MESSAGES = 12
 _MAX_SUGGESTIONS = 3
 
-# One event of the /qa/stream Server-Sent-Events protocol: meta → delta* → end.
+# One event of the /qa/stream Server-Sent-Events protocol:
+# optional progress* → meta → delta* → end.
 QaStreamEvent = dict[str, object]
+
+_STREAM_CHUNK_SIZE = 16
+
+
+def answer_text_chunks(text: str) -> Iterator[str]:
+    """Split completed answers into stable display-sized SSE deltas."""
+
+    buffer = ""
+    for token in re.findall(r"\S+\s*", text):
+        while len(token) > _STREAM_CHUNK_SIZE:
+            if buffer:
+                yield buffer
+                buffer = ""
+            yield token[:_STREAM_CHUNK_SIZE]
+            token = token[_STREAM_CHUNK_SIZE:]
+
+        if buffer and len(buffer) + len(token) > _STREAM_CHUNK_SIZE:
+            yield buffer
+            buffer = ""
+        buffer += token
+
+    if buffer:
+        yield buffer
+
 
 # When a conversational answer is about claiming/receiving a benefit, we attach
 # the deterministic insurer claim channels so the user gets a real link to act on.
@@ -171,9 +197,7 @@ def generate_consultation_answer(
         )
     return PortfolioQuestionResponse(
         status="answered",
-        answer="\n\n".join(
-            _markdown_section(section.title, section.content) for section in sections
-        ),
+        answer="\n\n".join(section.content for section in sections),
         sections=sections,
         citations=[
             citation_from_evidence(catalog.by_id[evidence_id]) for evidence_id in evidence_ids
@@ -379,7 +403,8 @@ def _relevant_citations(answer: str, catalog: EvidenceCatalog) -> list[AnswerCit
 
 def _fallback_stream(fallback: PortfolioQuestionResponse) -> Iterator[QaStreamEvent]:
     yield {"type": "meta", "status": fallback.status, "generation": "fallback"}
-    yield {"type": "delta", "text": fallback.answer}
+    for chunk in answer_text_chunks(fallback.answer):
+        yield {"type": "delta", "text": chunk}
     yield {
         "type": "end",
         "status": fallback.status,

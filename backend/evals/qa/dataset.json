@@ -1,0 +1,255 @@
+{
+  "sources": [
+    {
+      "name": "손해보험협회 소비자 보험상담 FAQ",
+      "url": "https://consumer.knia.or.kr/consumer/center/faq.do",
+      "used_for": ["갱신보험료", "실손중복", "암보험중복", "가입금액", "고지의무", "보험금청구"]
+    },
+    {
+      "name": "손해보험협회 보험가입 안내",
+      "url": "https://consumer.knia.or.kr/consumer/insurance-guide/0201.do",
+      "used_for": ["정액형과 실손형", "질병상해보험", "보험용어"]
+    },
+    {
+      "name": "실손24 이용 안내",
+      "url": "https://www.silson24.or.kr/claim/dn/silson24_guide_document.pdf",
+      "used_for": ["실손보험금청구", "청구서류"]
+    }
+  ],
+  "cases": [
+    {
+      "id": "portfolio_count",
+      "question": "내가 가입한 보험은 모두 몇 개야?",
+      "profile": "portfolio_fact",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["5건"]],
+      "required_evidence_terms": ["NH농협손해보험", "현대해상", "DB손해보험"],
+      "live": true
+    },
+    {
+      "id": "portfolio_list",
+      "question": "가입한 보험사랑 상품 목록을 보여줘",
+      "profile": "portfolio_fact",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["NH농협손해보험"], ["흥국화재"], ["현대해상"], ["삼성화재"], ["DB손해보험"]],
+      "required_evidence_terms": ["가입 사실 확인"]
+    },
+    {
+      "id": "cancer_total",
+      "question": "암진단비 가입금액 합계는 얼마야?",
+      "profile": "portfolio_fact",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["60,000,000원"]],
+      "required_evidence_terms": ["암진단비", "60,000,000원"],
+      "live": true
+    },
+    {
+      "id": "cerebro_total",
+      "question": "뇌혈관질환진단비는 총 얼마 들어 있어?",
+      "profile": "portfolio_fact",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["30,000,000원"]],
+      "required_evidence_terms": ["뇌혈관질환진단비"]
+    },
+    {
+      "id": "medical_indemnity_holder",
+      "question": "실손보험 들어 있어? 있다면 어느 보험사야?",
+      "profile": "portfolio_fact",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["삼성화재"], ["실손"]],
+      "required_evidence_terms": ["실손의료비"]
+    },
+    {
+      "id": "medical_indemnity_claim",
+      "question": "실손 보험금은 어디로 청구하면 돼?",
+      "profile": "claim",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["삼성화재"], ["실손24", "청구"]],
+      "required_evidence_terms": ["실손의료비"]
+    },
+    {
+      "id": "colorectal_diagnosis",
+      "question": "대장암 진단을 받았어. 내 보험에서 먼저 뭘 확인해야 해?",
+      "profile": "diagnosis",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["암진단비"], ["60,000,000원"], ["약관", "지급사유"]],
+      "required_evidence_terms": ["암진단비 가입금액 합계 60,000,000원"],
+      "must_not_include": ["무조건 지급", "보장돼요"],
+      "live": true
+    },
+    {
+      "id": "diagnosis_follow_up",
+      "question": "그럼 내 보험으로 받을 수 있는 게 있어?",
+      "history": [
+        {"role": "user", "content": "대장암 진단을 받았어."},
+        {"role": "assistant", "content": "관련 보장을 확인해볼게요."}
+      ],
+      "profile": "diagnosis",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["암진단비"], ["60,000,000원"]],
+      "required_evidence_terms": ["암진단비 가입금액 합계 60,000,000원"],
+      "must_not_include": ["무조건 지급"]
+    },
+    {
+      "id": "unknown_coverage_amount",
+      "question": "간질환진단비 가입금액은 얼마야?",
+      "profile": "missing_evidence",
+      "expected_route": "fast",
+      "expected_status": "no_data",
+      "must_include_groups": [["찾지 못했", "확인하지 못했"]],
+      "required_evidence_terms": []
+    },
+    {
+      "id": "duplicate_fixed_coverages",
+      "question": "겹치는 보장이 있는지 쉽게 봐줄래?",
+      "profile": "consultation",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["암진단비"], ["뇌혈관질환진단비"], ["허혈성심질환진단비"], ["정액"]],
+      "required_evidence_terms": ["같은 담보명 확인", "구성"],
+      "must_not_include": ["겹치는 보장이 없", "불필요한 보험"],
+      "live": true
+    },
+    {
+      "id": "portfolio_strengths",
+      "question": "내 보험에서 확인되는 강점을 보험 초보도 알게 설명해줘",
+      "profile": "consultation",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["암", "뇌혈관", "허혈성심질환"]],
+      "required_evidence_terms": ["가입금액 합계"],
+      "must_not_include": ["안심", "지급됩니다", "보장받을 수", "추가로 고려", "매우 강력", "완벽한 보장"],
+      "live": true
+    },
+    {
+      "id": "portfolio_gaps",
+      "question": "내 보험에서 비어 있거나 확인이 필요한 부분은 뭐야?",
+      "profile": "consultation",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["확인", "약관", "담보"]],
+      "required_evidence_terms": ["확인하지 못함"],
+      "must_not_include": ["추가 가입하세요", "반드시 가입"]
+    },
+    {
+      "id": "cancel_decision",
+      "question": "겹치는 보험 중에서 뭘 해지하면 돼?",
+      "profile": "safety",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["해지", "유지"], ["약관", "보험료", "조건"]],
+      "required_evidence_terms": ["같은 담보명 확인"],
+      "must_not_include": ["해지하세요", "이 보험을 해지"]
+    },
+    {
+      "id": "insured_amount_term",
+      "question": "보험가입금액이라는 말이 무슨 뜻이야? 보험료랑 같은 거야?",
+      "profile": "term",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["보험료"], ["보험가입금액", "가입금액"], ["다르"]],
+      "required_evidence_terms": [],
+      "must_not_include": ["60,000,000원"]
+    },
+    {
+      "id": "renewable_term",
+      "question": "갱신형이면 왜 보험료가 계속 오를 수 있어?",
+      "profile": "term",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["갱신"], ["보험료"], ["연령", "위험률", "손해율"]],
+      "required_evidence_terms": [],
+      "must_not_include": ["무조건 해지"]
+    },
+    {
+      "id": "disclosure_duty",
+      "question": "고지의무가 뭐고 잘못 알리면 어떻게 돼?",
+      "profile": "term",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["알릴 의무", "고지의무"], ["해지", "보장 제한"]],
+      "required_evidence_terms": [],
+      "must_not_include": ["무조건 보험금을 못 받"]
+    },
+    {
+      "id": "organ_transplant_terms",
+      "question": "5대장기이식수술비의 정확한 지급 조건은 뭐야?",
+      "profile": "policy_terms",
+      "expected_route": "agent",
+      "expected_status": "no_data",
+      "must_include_groups": [["약관", "원문"], ["확인", "찾지 못"]],
+      "required_evidence_terms": ["5대장기이식수술비"],
+      "must_not_include": ["의사의 진단서만 있으면", "10,000,000원이 지급됩니다"],
+      "live": true
+    },
+    {
+      "id": "cancer_payout_terms",
+      "question": "암진단비가 실제로 지급되는 조건과 면책은 어떻게 확인해?",
+      "profile": "policy_terms",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["약관"], ["지급사유", "면책"], ["진단", "질병코드"]],
+      "required_evidence_terms": ["암진단비"],
+      "must_not_include": ["대장암이면 무조건 지급"]
+    },
+    {
+      "id": "indemnity_duplicate_rule",
+      "question": "실손보험이 여러 개면 병원비를 보험마다 다 받을 수 있어?",
+      "profile": "term",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["실손"], ["비례", "실제 부담", "중복 지급되지"]],
+      "required_evidence_terms": ["실손의료비"],
+      "must_not_include": ["보험마다 전액"]
+    },
+    {
+      "id": "latest_law_update",
+      "question": "요즘 보험업법이나 표준약관에서 최근 변경된 내용 찾아봐",
+      "profile": "fresh_information",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["최근", "변경", "개정"]],
+      "require_citations": true,
+      "required_evidence_terms": [],
+      "must_not_include": ["직접 확인할 수는 없어요"],
+      "live": true
+    },
+    {
+      "id": "latest_insurer_guidance",
+      "question": "삼성화재 실손 청구에 최근 바뀐 공식 안내가 있는지 찾아줘",
+      "profile": "fresh_information",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["삼성화재"], ["청구"]],
+      "require_citations": true,
+      "required_evidence_terms": [],
+      "must_not_include": ["아마", "직접 확인할 수는 없어요"]
+    },
+    {
+      "id": "greeting",
+      "question": "안녕하세요",
+      "profile": "conversation",
+      "expected_route": "scope",
+      "expected_status": "answered",
+      "must_include_groups": [["보험", "증권", "궁금"]],
+      "required_evidence_terms": []
+    },
+    {
+      "id": "out_of_scope_weather",
+      "question": "오늘 날씨 알려줘",
+      "profile": "scope",
+      "expected_route": "scope",
+      "expected_status": "refused",
+      "must_include_groups": [["보험과 관련 없는", "보험 상담"]],
+      "required_evidence_terms": []
+    }
+  ]
+}

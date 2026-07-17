@@ -96,11 +96,15 @@ def plan_questions(
     history: list[ConversationMessage],
     *,
     complete: JsonCompleter | None = None,
+    allow_default_completion: bool = True,
 ) -> QuestionPlan | None:
     """Return a grounded turn plan, or None so the existing path can continue."""
 
     if not needs_question_plan(question):
         return None
+
+    if complete is None and not allow_default_completion:
+        return _fallback_scope_plan(question)
 
     payload = {
         "question": question,

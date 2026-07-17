@@ -111,4 +111,18 @@ describe("ChatMessage", () => {
 
     expect(disclosure).toHaveAttribute("open");
   });
+
+  it("keeps answer limitations collapsed until requested", () => {
+    render(
+      <ChatMessage
+        message={assistant({
+          text: "확인한 답변이에요.",
+          limitations: ["약관 원문이 필요한 내용이에요."],
+        })}
+      />,
+    );
+
+    const disclosure = screen.getByText("답변의 확인 범위").closest("details");
+    expect(disclosure).not.toHaveAttribute("open");
+  });
 });

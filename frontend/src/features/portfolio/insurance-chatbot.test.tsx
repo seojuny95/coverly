@@ -70,6 +70,17 @@ describe("InsuranceChatbot", () => {
     expect(await screen.findByRole("status")).toBeInTheDocument();
 
     await act(async () => {
+      handlers?.onProgress?.({
+        stage: "portfolio_facts",
+        text: "올려주신 증권의 가입 담보를 확인하고 있어요.",
+      });
+    });
+
+    expect(
+      await screen.findByText("올려주신 증권의 가입 담보를 확인하고 있어요."),
+    ).toBeInTheDocument();
+
+    await act(async () => {
       handlers?.onDelta("암 진단비는 1,000만원이에요.");
       handlers?.onEnd({
         status: "answered",
@@ -83,6 +94,9 @@ describe("InsuranceChatbot", () => {
     expect(
       await screen.findByText("암 진단비는 1,000만원이에요."),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText("올려주신 증권의 가입 담보를 확인하고 있어요."),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByText("다른 질문 있어요?")).toBeInTheDocument();
   });
