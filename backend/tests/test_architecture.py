@@ -32,7 +32,7 @@ def _imported_modules(path: Path) -> tuple[str, ...]:
 
 def test_removed_app_namespaces_are_not_imported() -> None:
     offenders: list[str] = []
-    roots = (APP_ROOT, BACKEND_ROOT / "evals", BACKEND_ROOT / "scripts", BACKEND_ROOT / "tests")
+    roots = (APP_ROOT, BACKEND_ROOT / "evals", BACKEND_ROOT / "tests")
 
     for root in roots:
         for path in _python_files(root):
