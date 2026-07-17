@@ -130,6 +130,24 @@ def test_policy_records_mask_pii_before_embedding_and_storage() -> None:
     assert mask_policy_pii(f"{RAG_TEST_BIRTH}-{RAG_TEST_SUFFIX}") == "[주민등록번호]"
 
 
+def test_policy_pii_masks_landline_and_representative_phone_numbers() -> None:
+    text = "지역번호 " + "02-" + "2345" + "-" + "6789"
+    text += "\n대표번호 " + "1688-" + "1234"
+
+    masked = mask_policy_pii(text)
+
+    assert "02-" not in masked
+    assert "1688-" not in masked
+    assert masked.count("[전화번호]") == 2
+
+
+def test_policy_pii_keeps_large_amounts() -> None:
+    text = "가입금액은 30,000,000원이고 보상한도는 100,000,000원입니다."
+    text += "\n정액 보장금액은 10000000원입니다."
+
+    assert mask_policy_pii(text) == text
+
+
 def test_policy_index_returns_signed_session_token() -> None:
     now = datetime(2026, 1, 1, tzinfo=UTC)
     store = _MemoryStore(())

@@ -1,0 +1,830 @@
+[
+  {
+    "id": "text_core_contract_terms",
+    "text_lines": [
+      "상품명 합성 더든든 보장보험",
+      "보험기간 2026-01-01부터 2036-01-01까지",
+      "월 보험료 87,000원"
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [
+      ["상품명", "합성 더든든 보장보험"],
+      ["보험기간", "2036-01-01"],
+      ["월 보험료", "87,000원"]
+    ],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_coverage_amounts",
+    "text_lines": [],
+    "tables": [
+      [
+        ["담보명", "가입금액"],
+        ["암진단비", "3천만원"],
+        ["뇌혈관질환진단비", "2천만원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [
+      ["암진단비", "3천만원"],
+      ["뇌혈관질환진단비", "2천만원"]
+    ],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "mixed_text_and_two_tables",
+    "text_lines": [
+      "합성 운전자보험 보장 요약",
+      "자동차사고 처리지원금과 벌금 담보를 포함합니다."
+    ],
+    "tables": [
+      [
+        ["담보명", "가입금액"],
+        ["자동차사고처리지원금", "1억원"]
+      ],
+      [
+        ["담보명", "가입금액"],
+        ["자동차사고벌금", "2천만원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["text", "table"],
+    "expected_table_indexes": [1, 2],
+    "must_include_groups": [
+      ["합성 운전자보험"],
+      ["자동차사고처리지원금", "1억원"],
+      ["자동차사고벌금", "2천만원"]
+    ],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "empty_text_and_empty_table_are_ignored",
+    "text_lines": ["", "   "],
+    "tables": [
+      [
+        [null, null],
+        ["", ""]
+      ],
+      [
+        ["담보명", "가입금액"],
+        ["화재손해", "5천만원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [2],
+    "must_include_groups": [
+      ["화재손해", "5천만원"]
+    ],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "mask_generated_mobile_phone",
+    "text_lines": [
+      "계약자 휴대폰 {mobile_phone}",
+      "알림 수신 연락처가 문서에 표시됩니다."
+    ],
+    "tables": [],
+    "generated_pii": ["mobile_phone"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [
+      ["계약자 휴대폰", "[전화번호]"]
+    ],
+    "expected_mask_tokens": ["[전화번호]"]
+  },
+  {
+    "id": "mask_generated_landline_phone",
+    "text_lines": [
+      "계약 문의 연락처 {landline_phone}",
+      "지역번호가 있는 전화번호도 저장 전 마스킹되어야 합니다."
+    ],
+    "tables": [],
+    "generated_pii": ["landline_phone"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [
+      ["계약 문의 연락처", "[전화번호]"]
+    ],
+    "expected_mask_tokens": ["[전화번호]"]
+  },
+  {
+    "id": "mask_generated_representative_phone",
+    "text_lines": [
+      "보험금 청구 대표번호 {representative_phone}",
+      "대표번호는 사용자 연락처가 아니어도 검색 저장 전 같은 토큰으로 치환합니다."
+    ],
+    "tables": [],
+    "generated_pii": ["representative_phone"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [
+      ["보험금 청구 대표번호", "[전화번호]"]
+    ],
+    "expected_mask_tokens": ["[전화번호]"]
+  },
+  {
+    "id": "mask_generated_email",
+    "text_lines": [
+      "전자문서 수신 이메일 {email}",
+      "이메일 주소는 벡터 저장 전에 제거되어야 합니다."
+    ],
+    "tables": [],
+    "generated_pii": ["email"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [
+      ["전자문서 수신 이메일", "[이메일]"]
+    ],
+    "expected_mask_tokens": ["[이메일]"]
+  },
+  {
+    "id": "mask_generated_rrn",
+    "text_lines": [
+      "피보험자 식별번호 {rrn}",
+      "식별번호는 저장 대상이 아닙니다."
+    ],
+    "tables": [],
+    "generated_pii": ["rrn"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [
+      ["피보험자 식별번호", "[주민등록번호]"]
+    ],
+    "expected_mask_tokens": ["[주민등록번호]"]
+  },
+  {
+    "id": "mask_generated_pii_inside_table",
+    "text_lines": [],
+    "tables": [
+      [
+        ["항목", "값"],
+        ["계약자 휴대폰", "{mobile_phone}"],
+        ["전자문서 이메일", "{email}"]
+      ]
+    ],
+    "generated_pii": ["mobile_phone", "email"],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [
+      ["계약자 휴대폰", "[전화번호]"],
+      ["전자문서 이메일", "[이메일]"]
+    ],
+    "expected_mask_tokens": ["[전화번호]", "[이메일]"]
+  },
+  {
+    "id": "preserve_claim_exclusion_wording",
+    "text_lines": [
+      "보험금 청구 시 사고일로부터 정해진 기간 안에 필요서류를 제출해야 합니다.",
+      "고의 사고와 전쟁, 폭동에 따른 손해는 면책될 수 있습니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [
+      ["보험금 청구", "필요서류"],
+      ["고의 사고", "면책"]
+    ],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "preserve_amounts_without_phone_false_positive",
+    "text_lines": [
+      "암진단비 가입금액은 30,000,000원입니다.",
+      "일상생활배상책임 가입금액은 100,000,000원입니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [
+      ["30,000,000원"],
+      ["100,000,000원"]
+    ],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "core_life_policy_summary",
+    "text_lines": [
+      "보험분류 생명보험",
+      "상품명 합성 종신보장보험",
+      "사망보험금 2억원"
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["생명보험"], ["합성 종신보장보험"], ["사망보험금", "2억원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "core_nonlife_policy_summary",
+    "text_lines": [
+      "보험분류 손해보험",
+      "상품명 합성 가족생활 보장보험",
+      "주요 담보는 배상책임과 화재손해입니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["손해보험"], ["배상책임"], ["화재손해"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "core_auto_policy_summary",
+    "text_lines": [
+      "보험분류 자동차보험",
+      "대인배상, 대물배상, 자기차량손해 항목이 표시됩니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["자동차보험"], ["대인배상"], ["자기차량손해"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_premium_schedule",
+    "text_lines": [],
+    "tables": [
+      [
+        ["납입회차", "보험료", "납입상태"],
+        ["1회", "85,000원", "정상"],
+        ["2회", "85,000원", "정상"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["납입회차", "보험료"], ["85,000원", "정상"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_deductible_and_limit",
+    "text_lines": [],
+    "tables": [
+      [
+        ["담보명", "자기부담금", "보상한도"],
+        ["실손의료비", "1만원", "급여 80%"],
+        ["비급여도수치료", "3만원", "연 350만원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["실손의료비", "급여 80%"], ["비급여도수치료", "연 350만원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_fire_property_coverages",
+    "text_lines": [],
+    "tables": [
+      [
+        ["보장영역", "담보명", "가입금액"],
+        ["화재", "건물화재손해", "1억원"],
+        ["배상", "화재배상책임", "5천만원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["건물화재손해", "1억원"], ["화재배상책임", "5천만원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_driver_coverages",
+    "text_lines": [],
+    "tables": [
+      [
+        ["담보명", "보장내용", "가입금액"],
+        ["교통사고처리지원금", "형사합의 비용", "1억원"],
+        ["변호사선임비용", "방어 비용", "5천만원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["교통사고처리지원금", "형사합의"], ["변호사선임비용", "5천만원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_claim_documents",
+    "text_lines": [
+      "보험금 청구에는 진단서, 진료비 영수증, 보험금 청구서가 필요합니다.",
+      "서류가 부족하면 추가 확인이 필요할 수 있습니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["진단서"], ["진료비 영수증"], ["보험금 청구서"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_notice_duty",
+    "text_lines": [
+      "계약 전 알릴 의무 위반이 확인되면 계약 해지 또는 보험금 지급 제한이 생길 수 있습니다.",
+      "직업, 운전 여부, 병력 변경은 고지 대상이 될 수 있습니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["알릴 의무"], ["계약 해지"], ["지급 제한"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_cancellation_refund",
+    "text_lines": [
+      "해지환급금은 납입보험료보다 적거나 없을 수 있습니다.",
+      "중도 해지 시점과 상품 구조에 따라 환급률이 달라집니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["해지환급금"], ["납입보험료"], ["환급률"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_waiting_period",
+    "text_lines": [
+      "암 진단비는 계약일부터 일정 기간 면책기간 또는 감액기간이 적용될 수 있습니다.",
+      "감액기간에는 가입금액의 일부만 지급될 수 있습니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["암 진단비"], ["면책기간"], ["감액기간"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "mask_all_generated_pii_in_text",
+    "text_lines": [
+      "계약자 휴대폰 {mobile_phone}",
+      "상담 연락처 {landline_phone}",
+      "대표번호 {representative_phone}",
+      "전자문서 이메일 {email}",
+      "식별번호 {rrn}"
+    ],
+    "tables": [],
+    "generated_pii": ["mobile_phone", "landline_phone", "representative_phone", "email", "rrn"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["[전화번호]"], ["[이메일]"], ["[주민등록번호]"]],
+    "expected_mask_tokens": ["[전화번호]", "[이메일]", "[주민등록번호]"]
+  },
+  {
+    "id": "mask_landline_without_hyphen",
+    "text_lines": ["지역 연락처 {landline_phone_no_hyphen}"],
+    "tables": [],
+    "generated_pii": ["landline_phone_no_hyphen"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["지역 연락처", "[전화번호]"]],
+    "expected_mask_tokens": ["[전화번호]"]
+  },
+  {
+    "id": "mask_representative_without_hyphen",
+    "text_lines": ["대표 상담 번호 {representative_phone_no_hyphen}"],
+    "tables": [],
+    "generated_pii": ["representative_phone_no_hyphen"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["대표 상담 번호", "[전화번호]"]],
+    "expected_mask_tokens": ["[전화번호]"]
+  },
+  {
+    "id": "mask_email_in_table_cell",
+    "text_lines": [],
+    "tables": [
+      [
+        ["구분", "값"],
+        ["전자문서 수신처", "{email}"]
+      ]
+    ],
+    "generated_pii": ["email"],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["전자문서 수신처", "[이메일]"]],
+    "expected_mask_tokens": ["[이메일]"]
+  },
+  {
+    "id": "mask_rrn_in_table_cell",
+    "text_lines": [],
+    "tables": [
+      [
+        ["구분", "값"],
+        ["피보험자 식별번호", "{rrn}"]
+      ]
+    ],
+    "generated_pii": ["rrn"],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["피보험자 식별번호", "[주민등록번호]"]],
+    "expected_mask_tokens": ["[주민등록번호]"]
+  },
+  {
+    "id": "two_tables_skip_empty_middle_table",
+    "text_lines": ["보장 요약"],
+    "tables": [
+      [["담보명", "가입금액"], ["입원일당", "3만원"]],
+      [[null, ""], ["", null]],
+      [["담보명", "가입금액"], ["수술비", "50만원"]]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["text", "table", "table"],
+    "expected_table_indexes": [1, 3],
+    "must_include_groups": [["보장 요약"], ["입원일당", "3만원"], ["수술비", "50만원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_with_blank_cells_preserves_neighbors",
+    "text_lines": [],
+    "tables": [
+      [
+        ["담보명", "가입금액", "비고"],
+        ["질병입원일당", "2만원", null],
+        ["상해입원일당", "", "갱신형"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["질병입원일당", "2만원"], ["상해입원일당", "갱신형"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_unicode_spacing_normalization",
+    "text_lines": [
+      "암　진단비　가입금액은　5천만원입니다.",
+      "유사암　진단비는　1천만원입니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["암 진단비", "5천만원"], ["유사암 진단비", "1천만원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_multiline_endorsement",
+    "text_lines": [
+      "특약명: 가족일상생활배상책임",
+      "보장내용: 우연한 사고로 타인에게 입힌 손해를 보상합니다.",
+      "한도: 1억원"
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["가족일상생활배상책임"], ["타인에게 입힌 손해"], ["1억원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_auto_deductible_wording",
+    "text_lines": [
+      "자기차량손해는 사고 유형에 따라 자기부담금이 적용됩니다.",
+      "단독사고와 침수 사고는 약관상 조건을 확인해야 합니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["자기차량손해"], ["자기부담금"], ["침수 사고"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_medical_expense_wording",
+    "text_lines": [
+      "실손의료비는 실제 부담한 의료비를 약관상 한도와 공제금액에 따라 보상합니다.",
+      "입원, 통원, 처방조제 항목이 구분될 수 있습니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["실손의료비"], ["공제금액"], ["처방조제"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_no_medical_confusion_driver_fine",
+    "text_lines": [
+      "자동차사고벌금 대물 실손 담보는 벌금액을 한도로 지급합니다.",
+      "이 문구의 실손은 실손의료비가 아닙니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["자동차사고벌금"], ["대물 실손"], ["실손의료비가 아닙니다"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "false_positive_dates_are_preserved",
+    "text_lines": [
+      "보험기간은 2026-07-17부터 2036-07-17까지입니다.",
+      "납입기간은 20년입니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["2026-07-17"], ["2036-07-17"], ["20년"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "false_positive_business_registration_like_number",
+    "text_lines": [
+      "사업자등록번호 형식의 숫자는 합성 문서에서 계약 식별자로 쓰지 않습니다.",
+      "표시 예시는 세 자리-두 자리-다섯 자리 형태입니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["사업자등록번호"], ["세 자리", "다섯 자리"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "false_positive_plain_large_digits",
+    "text_lines": [
+      "가입금액 30000000원과 정액 보장금액 10000000원은 그대로 유지합니다.",
+      "보상한도 100000000원도 그대로 유지합니다.",
+      "숫자 금액은 전화번호 토큰으로 바뀌면 안 됩니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["30000000원"], ["10000000원"], ["100000000원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "mixed_claim_contact_and_documents",
+    "text_lines": [
+      "보험금 청구 문의 {representative_phone}",
+      "필요서류는 보험금 청구서와 진료비 세부내역서입니다."
+    ],
+    "tables": [],
+    "generated_pii": ["representative_phone"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["보험금 청구 문의", "[전화번호]"], ["진료비 세부내역서"]],
+    "expected_mask_tokens": ["[전화번호]"]
+  },
+  {
+    "id": "mixed_table_contact_and_coverages",
+    "text_lines": ["계약 요약 표"],
+    "tables": [
+      [
+        ["항목", "값"],
+        ["상담 연락처", "{landline_phone}"],
+        ["암진단비", "4천만원"]
+      ]
+    ],
+    "generated_pii": ["landline_phone"],
+    "expected_content_types": ["text", "table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["계약 요약 표"], ["상담 연락처", "[전화번호]"], ["암진단비", "4천만원"]],
+    "expected_mask_tokens": ["[전화번호]"]
+  },
+  {
+    "id": "mixed_multiple_table_indexes",
+    "text_lines": ["전체 보장표"],
+    "tables": [
+      [["구분", "담보명"], ["진단", "암진단비"]],
+      [["구분", "담보명"], ["수술", "질병수술비"]],
+      [["구분", "담보명"], ["입원", "상해입원일당"]]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["text", "table", "table", "table"],
+    "expected_table_indexes": [1, 2, 3],
+    "must_include_groups": [["전체 보장표"], ["암진단비"], ["질병수술비"], ["상해입원일당"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_long_rider_names",
+    "text_lines": [],
+    "tables": [
+      [
+        ["담보명", "가입금액"],
+        ["중대한특정상해수술비특별약관", "300만원"],
+        ["특정감염병진단비특별약관", "100만원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["중대한특정상해수술비특별약관"], ["특정감염병진단비특별약관"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_parentheses_and_symbols",
+    "text_lines": [],
+    "tables": [
+      [
+        ["담보명", "가입금액"],
+        ["암진단비(유사암제외)", "5,000만원"],
+        ["상해후유장해(3~100%)", "1억원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["암진단비", "유사암제외"], ["상해후유장해", "1억원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_installment_and_renewal",
+    "text_lines": [
+      "보험료는 월납이며 갱신형 담보는 갱신 시 보험료가 변동될 수 있습니다.",
+      "비갱신형 담보는 납입기간 동안 동일한 보험료 구조를 가집니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["월납"], ["갱신형"], ["비갱신형"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_lapse_and_reinstatement",
+    "text_lines": [
+      "보험료 미납 시 계약이 실효될 수 있습니다.",
+      "부활 청약은 회사의 승낙과 연체 보험료 납입이 필요할 수 있습니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["실효"], ["부활 청약"], ["연체 보험료"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_beneficiary_and_insured_roles",
+    "text_lines": [
+      "계약자, 피보험자, 보험수익자는 서로 다를 수 있습니다.",
+      "보험금 지급은 담보별 보험수익자 지정에 따릅니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["계약자"], ["피보험자"], ["보험수익자"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "text_disease_specific_diagnosis",
+    "text_lines": [
+      "뇌혈관질환 진단비와 허혈성심장질환 진단비는 각각 별도 담보입니다.",
+      "진단 확정 기준은 약관상 진단 코드와 검사 결과를 따릅니다."
+    ],
+    "tables": [],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["뇌혈관질환"], ["허혈성심장질환"], ["진단 코드"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_medical_expense_split",
+    "text_lines": [],
+    "tables": [
+      [
+        ["구분", "보장항목", "한도"],
+        ["입원", "급여 의료비", "연 5천만원"],
+        ["통원", "외래 의료비", "회당 20만원"],
+        ["처방", "처방조제비", "회당 10만원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["입원", "급여 의료비"], ["통원", "외래 의료비"], ["처방조제비"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_auto_liability_split",
+    "text_lines": [],
+    "tables": [
+      [
+        ["담보", "보상한도"],
+        ["대인배상Ⅰ", "자동차손해배상보장법 한도"],
+        ["대인배상Ⅱ", "무한"],
+        ["대물배상", "10억원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["대인배상Ⅰ"], ["대인배상Ⅱ", "무한"], ["대물배상", "10억원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_refund_schedule",
+    "text_lines": [],
+    "tables": [
+      [
+        ["경과기간", "납입보험료", "해지환급금"],
+        ["1년", "1,020,000원", "120,000원"],
+        ["3년", "3,060,000원", "1,800,000원"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["해지환급금"], ["1,020,000원"], ["1,800,000원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "table_special_terms_limits",
+    "text_lines": [],
+    "tables": [
+      [
+        ["특별약관", "지급제한"],
+        ["비급여주사료", "연 250만원 한도"],
+        ["도수치료", "연 50회 한도"]
+      ]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["비급여주사료", "250만원"], ["도수치료", "50회"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "mixed_empty_text_with_valid_table",
+    "text_lines": ["", " "],
+    "tables": [
+      [["담보명", "가입금액"], ["골절진단비", "30만원"]]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["골절진단비", "30만원"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "mixed_valid_text_with_empty_tables",
+    "text_lines": ["보장분석 대상 문서입니다."],
+    "tables": [
+      [[null, null]],
+      [["", ""]]
+    ],
+    "generated_pii": [],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["보장분석 대상 문서"]],
+    "expected_mask_tokens": []
+  },
+  {
+    "id": "mask_multiple_same_kind_values",
+    "text_lines": [
+      "계약자 연락처 {mobile_phone}",
+      "피보험자 연락처 {mobile_phone}"
+    ],
+    "tables": [],
+    "generated_pii": ["mobile_phone"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["계약자 연락처", "[전화번호]"], ["피보험자 연락처", "[전화번호]"]],
+    "expected_mask_tokens": ["[전화번호]"]
+  },
+  {
+    "id": "mask_pii_with_surrounding_punctuation",
+    "text_lines": [
+      "연락처({mobile_phone}), 이메일<{email}> 형식으로 표시됩니다."
+    ],
+    "tables": [],
+    "generated_pii": ["mobile_phone", "email"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["연락처", "[전화번호]"], ["이메일", "[이메일]"]],
+    "expected_mask_tokens": ["[전화번호]", "[이메일]"]
+  },
+  {
+    "id": "table_pii_with_surrounding_labels",
+    "text_lines": [],
+    "tables": [
+      [
+        ["항목", "값"],
+        ["대표번호", "문의: {representative_phone}"],
+        ["식별번호", "번호: {rrn}"]
+      ]
+    ],
+    "generated_pii": ["representative_phone", "rrn"],
+    "expected_content_types": ["table"],
+    "expected_table_indexes": [1],
+    "must_include_groups": [["대표번호", "[전화번호]"], ["식별번호", "[주민등록번호]"]],
+    "expected_mask_tokens": ["[전화번호]", "[주민등록번호]"]
+  }
+]

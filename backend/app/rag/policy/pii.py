@@ -2,7 +2,9 @@
 
 import re
 
-_PHONE_RE = re.compile(r"01[016789]-?\d{3,4}-?\d{4}")
+_PHONE_RE = re.compile(
+    r"(?<!\d)(?:(?:01[016789]|02|0[3-6][1-5])-?\d{3,4}-?\d{4}|1[568]\d{2}-?\d{4})(?!\d)"
+)
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _RRN_RE = re.compile(r"\b\d{6}-?[1-4]\d{6}\b")
 
