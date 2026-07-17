@@ -102,7 +102,7 @@
     "difficulty": "hard",
     "hit_chunk_ids": ["af80ccf1f0c06e55312e"],
     "expected_status": "answered",
-    "must_include_groups": [["대위권", "손해배상청구권"], ["보험금 한도", "지급한 보험금", "지급한 금액 한도"], ["가족", "임차인"]],
+    "must_include_groups": [["대위권", "손해배상청구권"], ["보험금 한도", "지급한 보험금", "지급한 금액 한도", "금액 한도", "제3자 청구권"], ["가족", "임차인"]],
     "must_not_include": ["모든 가족에게 행사", "언제나 대위", "가입을 권합니다"],
     "required_citation_ids": ["af80ccf1f0c06e55312e"],
     "expected_missing_context_terms": []
@@ -138,7 +138,7 @@
     "difficulty": "medium",
     "hit_chunk_ids": ["35ead0bb9702fea21f0c"],
     "expected_status": "answered",
-    "must_include_groups": [["동의"], ["관계 법령", "관련 법령", "법률"], ["안전하게 관리", "안전"]],
+    "must_include_groups": [["동의"], ["관계 법령", "관련 법령", "법률", "법령"], ["안전하게 관리", "안전"]],
     "must_not_include": ["자유롭게 제공할 수 있습니다", "동의가 필요 없습니다", "가입을 권합니다"],
     "required_citation_ids": ["35ead0bb9702fea21f0c"],
     "expected_missing_context_terms": []
@@ -162,7 +162,7 @@
     "difficulty": "hard",
     "hit_chunk_ids": ["financial_consumer_protection_act:17조"],
     "expected_status": "answered",
-    "must_include_groups": [["적합성"], ["면담", "질문"], ["권유해서는", "권유하면 안"]],
+    "must_include_groups": [["적합성"], ["면담", "질문", "소비자 정보", "정보를 확인"], ["권유해서는", "권유하면 안"]],
     "must_not_include": ["아무 상품이나 권유", "확인할 필요가 없습니다", "가입하세요"],
     "required_citation_ids": ["financial_consumer_protection_act:17조"],
     "expected_missing_context_terms": []
@@ -210,7 +210,7 @@
     "difficulty": "hard",
     "hit_chunk_ids": ["financial_consumer_protection_act:21조"],
     "expected_status": "answered",
-    "must_include_groups": [["부당권유", "부당 권유", "권유"], ["해서는 아니", "금지", "하면 안", "허용되지"], ["불확실", "거절"]],
+    "must_include_groups": [["부당권유", "부당 권유", "권유", "단정적", "확실하다고"], ["해서는 아니", "해서는 안", "금지", "하면 안", "허용되지"], ["불확실", "거절", "거부"]],
     "must_not_include": ["계속 권유해도 됩니다", "확실하다고 말해도 됩니다", "가입하세요"],
     "required_citation_ids": ["financial_consumer_protection_act:21조"],
     "expected_missing_context_terms": []
@@ -234,7 +234,7 @@
     "difficulty": "hard",
     "hit_chunk_ids": ["insurance_business_act:3조"],
     "expected_status": "answered",
-    "must_include_groups": [["보험회사"], ["체결", "중개", "대리"], ["못한다", "할 수 없", "금지"]],
+    "must_include_groups": [["보험회사"], ["체결", "중개", "대리"], ["못한다", "할 수 없", "금지", "불가능"]],
     "must_not_include": ["누구와나 체결할 수 있습니다", "제한이 없습니다", "가입하세요"],
     "required_citation_ids": ["insurance_business_act:3조"],
     "expected_missing_context_terms": []

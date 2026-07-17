@@ -10,6 +10,7 @@ The answer flow stays intentionally small:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -36,6 +37,7 @@ RagAnswerStatus = Literal["answered", "no_evidence", "filtered"]
 
 _MAX_CONTEXT_CHARS = 900
 _PROMPT_PATH = Path(__file__).with_name("rag_answer_prompt.md")
+_ARTICLE_LABEL_RE = re.compile(r"^(제[^()]+)")
 _GENERIC_MISSING_CONTEXT = (
     "개별 판단에 추가로 필요한 정보",
     "개별 판단에 필요한 정보",
@@ -175,12 +177,36 @@ def _user_prompt(question: str, hits: list[RetrievalHit]) -> str:
 
 
 def _valid_citation_ids(ids: list[str], hits: list[RetrievalHit]) -> list[str]:
-    available = {hit.chunk.id for hit in hits}
+    aliases: dict[str, str] = {}
+    for hit in hits:
+        for alias in _citation_aliases(hit.chunk):
+            aliases.setdefault(_normalize_citation_id(alias), hit.chunk.id)
+
     valid: list[str] = []
     for citation_id in ids:
-        if citation_id in available and citation_id not in valid:
-            valid.append(citation_id)
+        canonical = aliases.get(_normalize_citation_id(citation_id))
+        if canonical is not None and canonical not in valid:
+            valid.append(canonical)
     return valid
+
+
+def _normalize_citation_id(value: str) -> str:
+    return "".join(value.split()).casefold()
+
+
+def _citation_aliases(chunk: RagChunk) -> tuple[str, ...]:
+    aliases = [chunk.id]
+    if chunk.label:
+        aliases.append(chunk.label)
+        aliases.append(f"{chunk.source_title} {chunk.label}")
+        match = _ARTICLE_LABEL_RE.match(chunk.label)
+        if match:
+            article = match.group(1)
+            aliases.append(article)
+            aliases.append(f"{chunk.source_title} {article}")
+    if chunk.citation_label:
+        aliases.append(chunk.citation_label)
+    return tuple(dict.fromkeys(alias for alias in aliases if alias))
 
 
 def _missing_context(items: list[str]) -> tuple[str, ...]:

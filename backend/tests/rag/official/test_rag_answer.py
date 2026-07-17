@@ -66,6 +66,36 @@ def test_answer_official_question_returns_cited_term_explanation() -> None:
     assert "공식자료" in result.limitations[0]
 
 
+def test_answer_official_question_accepts_citation_label_as_alias() -> None:
+    result = answer_official_question(
+        "계약 전 알릴 의무가 뭐야?",
+        hits=[_hit(_chunk())],
+        complete=lambda _system, _user: {
+            "answer": "계약 전 알릴 의무는 가입 전에 중요한 사항을 알려야 한다는 뜻이에요.",
+            "citation_ids": ["표준약관 제2조(계약 전 알릴 의무)"],
+            "missing_context": [],
+        },
+    )
+
+    assert result.status == "answered"
+    assert result.citations[0].chunk_id == "chunk-1"
+
+
+def test_answer_official_question_accepts_article_label_alias() -> None:
+    result = answer_official_question(
+        "계약 전 알릴 의무가 뭐야?",
+        hits=[_hit(_chunk())],
+        complete=lambda _system, _user: {
+            "answer": "계약 전 알릴 의무는 가입 전에 중요한 사항을 알려야 한다는 뜻이에요.",
+            "citation_ids": ["제2조"],
+            "missing_context": [],
+        },
+    )
+
+    assert result.status == "answered"
+    assert result.citations[0].chunk_id == "chunk-1"
+
+
 def test_answer_official_question_keeps_missing_context() -> None:
     result = answer_official_question(
         "암 진단비 받을 수 있어?",
