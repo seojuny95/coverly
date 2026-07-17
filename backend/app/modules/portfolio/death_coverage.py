@@ -141,15 +141,20 @@ def _death_coverage_groups(matches: list[_DeathCoverageMatch]) -> list[CoverageG
     )
     groups: list[CoverageGroup] = []
     for kind, label, tone, detail in group_specs:
-        names = sorted({match.coverage.담보명 for match in matches if match.kind == kind})
+        coverages = [match.coverage for match in matches if match.kind == kind]
+        names = sorted({coverage.담보명 for coverage in coverages})
         if not names:
             continue
+        amounts = [
+            amount for coverage in coverages if (amount := parse_amount(coverage)) is not None
+        ]
         groups.append(
             CoverageGroup(
                 label=label,
                 tone=tone,
                 detail=detail,
                 coverage_names=names,
+                total_amount=sum(amounts) if amounts else None,
             )
         )
     return groups

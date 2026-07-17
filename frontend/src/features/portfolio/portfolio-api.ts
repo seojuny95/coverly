@@ -132,6 +132,7 @@ export type CoverageGroup = {
   tone: "confirmed" | "review" | "limited";
   detail: string;
   coverage_names: string[];
+  total_amount?: number | null;
 };
 
 export type EssentialCoverageItem = {

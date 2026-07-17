@@ -14,6 +14,8 @@ from app.modules.portfolio.essential_guides import (
     essential_coverage_guides,
 )
 from app.modules.portfolio.schemas import (
+    CoverageGroup,
+    CoverageGroupTone,
     CoverageInput,
     DeathBenefitGuideInput,
     EssentialCoverageCheck,
@@ -25,6 +27,26 @@ from app.modules.portfolio.schemas import (
 )
 
 _CANCER_TERMS = ("암", "악성신생물")
+_SPECIAL_CANCER_GROUPS = (
+    (
+        "similar",
+        "유사암 진단비",
+        "유사암 진단비가 가입되어 있어요.",
+        ("유사암", "갑상선암", "기타피부암", "제자리암", "경계성종양"),
+    ),
+    (
+        "high_value",
+        "고액암 진단비",
+        "고액암 진단비가 가입되어 있어요.",
+        ("고액암", "고액치료비암", "특정고액암"),
+    ),
+    (
+        "small",
+        "소액암 진단비",
+        "소액암 진단비가 가입되어 있어요.",
+        ("소액암", "소액치료비암"),
+    ),
+)
 _CEREBROVASCULAR_TERMS = ("뇌혈관질환",)
 _HEART_TERMS = ("심장질환", "심질환", "허혈성심")
 
@@ -49,10 +71,12 @@ def build_essential_coverage_check(
                 guide=guides["cancer"],
                 kind="cancer",
                 label="암 진단비",
-                matches=lambda name: "진단" in name and any(term in name for term in _CANCER_TERMS),
-                confirmed_detail=(
-                    "일반암·유사암·고액암·소액암을 포함해 확인된 암 진단비를 모았어요."
-                ),
+                matches=_is_primary_cancer_diagnosis,
+                confirmed_detail="암 진단비가 확인돼요.",
+                coverage_groups=_cancer_coverage_groups(policies),
+                # Keep every cancer group visible while comparing only primary cancer amounts.
+                coverage_count_override=_cancer_coverage_count(policies),
+                matched_coverage_names_override=_cancer_coverage_names(policies),
             ),
             _fixed_coverage_item(
                 policies,
@@ -92,6 +116,9 @@ def _fixed_coverage_item(
     reference_amount_label: str | None = None,
     guidance_situation: str | None = None,
     guidance_reason: str | None = None,
+    coverage_groups: list[CoverageGroup] | None = None,
+    coverage_count_override: int | None = None,
+    matched_coverage_names_override: list[str] | None = None,
 ) -> EssentialCoverageItem:
     matched = [
         coverage
@@ -125,9 +152,116 @@ def _fixed_coverage_item(
         reference_amount_label=reference_amount_label,
         guidance_situation=guidance_situation,
         guidance_reason=guidance_reason,
-        coverage_count=len(matched),
+        coverage_count=len(matched) if coverage_count_override is None else coverage_count_override,
         detail=detail,
-        matched_coverage_names=sorted({coverage.담보명 for coverage in matched}),
+        matched_coverage_names=(
+            sorted({coverage.담보명 for coverage in matched})
+            if matched_coverage_names_override is None
+            else matched_coverage_names_override
+        ),
+        coverage_groups=coverage_groups or [],
+    )
+
+
+def _is_cancer_diagnosis(name: str) -> bool:
+    if "진단" not in name:
+        return False
+    if any(term in name for term in _CANCER_TERMS):
+        return True
+    return any(
+        _has_group_term_before_diagnosis(name, terms)
+        for _key, _label, _detail, terms in _SPECIAL_CANCER_GROUPS
+    )
+
+
+def _special_cancer_group_key(name: str) -> str | None:
+    if not _is_cancer_diagnosis(name):
+        return None
+    for key, _label, _detail, terms in _SPECIAL_CANCER_GROUPS:
+        if _has_group_term_before_diagnosis(name, terms):
+            return key
+    return None
+
+
+def _has_group_term_before_diagnosis(name: str, terms: tuple[str, ...]) -> bool:
+    diagnosis_prefix = name.partition("진단")[0]
+    return any(term in diagnosis_prefix and f"{term}제외" not in diagnosis_prefix for term in terms)
+
+
+def _is_primary_cancer_diagnosis(name: str) -> bool:
+    return _is_cancer_diagnosis(name) and _special_cancer_group_key(name) is None
+
+
+def _cancer_coverages(policies: list[PolicyInput]) -> list[CoverageInput]:
+    return [
+        coverage
+        for policy in policies
+        for coverage in policy.보장목록
+        if _is_cancer_diagnosis(normalize(coverage.담보명))
+    ]
+
+
+def _cancer_coverage_names(policies: list[PolicyInput]) -> list[str]:
+    return sorted({coverage.담보명 for coverage in _cancer_coverages(policies)})
+
+
+def _cancer_coverage_count(policies: list[PolicyInput]) -> int:
+    return len(_cancer_coverages(policies))
+
+
+def _cancer_coverage_groups(policies: list[PolicyInput]) -> list[CoverageGroup]:
+    coverages = _cancer_coverages(policies)
+    groups: list[CoverageGroup] = []
+
+    primary_coverages = [
+        coverage
+        for coverage in coverages
+        if _special_cancer_group_key(normalize(coverage.담보명)) is None
+    ]
+    if primary_coverages:
+        groups.append(
+            _coverage_group(
+                label="암 진단비",
+                tone="confirmed",
+                detail="현재 가입금액 기준에 반영하는 일반 암 진단비예요.",
+                coverages=primary_coverages,
+            )
+        )
+
+    for key, label, detail, _terms in _SPECIAL_CANCER_GROUPS:
+        group_coverages = [
+            coverage
+            for coverage in coverages
+            if _special_cancer_group_key(normalize(coverage.담보명)) == key
+        ]
+        if not group_coverages:
+            continue
+        groups.append(
+            _coverage_group(
+                label=label,
+                tone="review",
+                detail=detail,
+                coverages=group_coverages,
+            )
+        )
+
+    return groups
+
+
+def _coverage_group(
+    *,
+    label: str,
+    tone: CoverageGroupTone,
+    detail: str,
+    coverages: list[CoverageInput],
+) -> CoverageGroup:
+    amounts = [amount for coverage in coverages if (amount := parse_amount(coverage)) is not None]
+    return CoverageGroup(
+        label=label,
+        tone=tone,
+        detail=detail,
+        coverage_names=sorted({coverage.담보명 for coverage in coverages}),
+        total_amount=sum(amounts) if amounts else None,
     )
 
 

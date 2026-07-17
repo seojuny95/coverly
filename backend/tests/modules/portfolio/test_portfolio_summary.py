@@ -628,14 +628,85 @@ def test_essential_coverage_check_scans_every_policy_for_core_coverages() -> Non
     assert items["death"].coverage_groups[0].label == "제한적인 사망 담보"
     assert "생활비 공백" in (items["death"].reference_basis or "")
     assert items["death"].reference_sources[0].reliability == "private_guidance"
-    assert items["cancer"].confirmed_amount == 35_000_000
+    assert items["death"].coverage_groups[0].total_amount == 100_000_000
+    assert items["cancer"].confirmed_amount == 30_000_000
     assert items["cancer"].reference_sources[0].reliability == "private_guidance"
     assert items["medical_indemnity"].reference_sources[0].label == "실손24 · 서비스 안내"
     assert items["cancer"].matched_coverage_names == ["유사암진단비", "일반암진단비"]
+    cancer_groups = {group.label: group for group in items["cancer"].coverage_groups}
+    assert cancer_groups["암 진단비"].total_amount == 30_000_000
+    assert cancer_groups["유사암 진단비"].total_amount == 5_000_000
     assert items["cerebrovascular"].reference_min_amount == 10_000_000
     assert items["cerebrovascular"].reference_max_amount == 20_000_000
     assert items["ischemic_heart"].reference_min_amount == 10_000_000
     assert items["ischemic_heart"].reference_max_amount == 20_000_000
+
+
+def test_cancer_check_counts_only_primary_cancer_in_confirmed_amount() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {"담보명": "암진단비(유사암제외)", "가입금액": "3천만원", "지급유형": "정액"},
+            {"담보명": "유사암진단비", "가입금액": "5백만원", "지급유형": "정액"},
+            {"담보명": "고액암진단비", "가입금액": "1천만원", "지급유형": "정액"},
+            {"담보명": "소액암진단비", "가입금액": "2백만원", "지급유형": "정액"},
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    cancer = next(item for item in result.essential_coverage_check.items if item.kind == "cancer")
+    groups = {group.label: group for group in cancer.coverage_groups}
+
+    assert cancer.confirmed_amount == 30_000_000
+    assert cancer.matched_coverage_names == [
+        "고액암진단비",
+        "소액암진단비",
+        "암진단비(유사암제외)",
+        "유사암진단비",
+    ]
+    assert groups["암 진단비"].coverage_names == ["암진단비(유사암제외)"]
+    assert groups["암 진단비"].total_amount == 30_000_000
+    assert groups["유사암 진단비"].total_amount == 5_000_000
+    assert groups["고액암 진단비"].total_amount == 10_000_000
+    assert groups["소액암 진단비"].total_amount == 2_000_000
+
+
+def test_cancer_check_groups_named_similar_cancers_and_ignores_exclusions() -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [
+            {"담보명": "일반암진단비", "가입금액": "3천만원", "지급유형": "정액"},
+            {"담보명": "무배당 유사암 진단비", "가입금액": "5백만원", "지급유형": "정액"},
+            {"담보명": "갑상선암진단비", "가입금액": "4백만원", "지급유형": "정액"},
+            {"담보명": "기타피부암진단비", "가입금액": "3백만원", "지급유형": "정액"},
+            {"담보명": "제자리암진단비", "가입금액": "2백만원", "지급유형": "정액"},
+            {"담보명": "경계성종양진단비", "가입금액": "1백만원", "지급유형": "정액"},
+            {
+                "담보명": "암(유사암제외)진단비",
+                "가입금액": "2천만원",
+                "지급유형": "정액",
+            },
+        ],
+    )
+
+    result = summarize_portfolio_coverages([policy])
+    cancer = next(item for item in result.essential_coverage_check.items if item.kind == "cancer")
+    groups = {group.label: group for group in cancer.coverage_groups}
+
+    assert cancer.confirmed_amount == 50_000_000
+    assert groups["암 진단비"].coverage_names == ["암(유사암제외)진단비", "일반암진단비"]
+    assert groups["유사암 진단비"].coverage_names == [
+        "갑상선암진단비",
+        "경계성종양진단비",
+        "기타피부암진단비",
+        "무배당 유사암 진단비",
+        "제자리암진단비",
+    ]
+    assert groups["유사암 진단비"].total_amount == 15_000_000
 
 
 def test_death_benefit_guide_changes_with_user_context() -> None:
@@ -690,8 +761,11 @@ def test_death_coverage_groups_primary_accident_and_limited_coverages() -> None:
     ]
     assert "상해후유장해" not in death.matched_coverage_names
     assert groups["기본 사망 보장"].coverage_names == ["질병사망"]
+    assert groups["기본 사망 보장"].total_amount == 100_000_000
     assert groups["상해 중심 사망 담보"].coverage_names == ["일반상해사망"]
+    assert groups["상해 중심 사망 담보"].total_amount == 200_000_000
     assert groups["제한적인 사망 담보"].coverage_names == ["대중교통이용중교통상해사망"]
+    assert groups["제한적인 사망 담보"].total_amount == 300_000_000
 
 
 def test_death_coverage_needs_review_when_only_accident_death_exists() -> None:

@@ -8,6 +8,7 @@ import {
   CoverageStatusBadge,
   ReferenceSourceList,
 } from "./portfolio-analysis-shared";
+import { formatKoreanWon } from "./money-format";
 
 const DIAGNOSIS_KINDS = new Set<EssentialCoverageItem["kind"]>([
   "cancer",
@@ -228,12 +229,19 @@ function RecommendedSingleCoverageCard({
 function CoverageGroupList({
   groups,
   fallbackNames,
+  emptyNotice,
 }: {
   groups: CoverageGroup[];
   fallbackNames: string[];
+  emptyNotice?: string;
 }) {
   if (groups.length === 0) {
-    if (fallbackNames.length === 0) return null;
+    if (fallbackNames.length === 0) {
+      if (!emptyNotice) return null;
+      return (
+        <p className="mt-4 text-xs leading-5 text-zinc-500">{emptyNotice}</p>
+      );
+    }
     return (
       <p className="mt-4 text-xs leading-5 text-blue-700">
         확인된 담보: {fallbackNames.join(" · ")}
@@ -251,7 +259,11 @@ function CoverageGroupList({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-semibold">{group.label}</p>
-            <span>{group.coverage_names.length}개</span>
+            <span>
+              {typeof group.total_amount === "number"
+                ? `합계 ${formatKoreanWon(group.total_amount)}`
+                : `${group.coverage_names.length}개`}
+            </span>
           </div>
           <p className="mt-1">{group.coverage_names.join(" · ")}</p>
           <p className="mt-1 opacity-80">{group.detail}</p>
@@ -355,7 +367,11 @@ function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
         />
       </div>
 
-      <CoverageNamesNotice names={item.matched_coverage_names} />
+      <CoverageGroupList
+        groups={item.coverage_groups ?? []}
+        fallbackNames={item.matched_coverage_names}
+        emptyNotice="현재 업로드된 보험증권에서는 해당 보장이 확인되지 않아요"
+      />
     </li>
   );
 }

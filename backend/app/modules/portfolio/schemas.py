@@ -184,6 +184,7 @@ class CoverageGroup(BaseModel):
     tone: CoverageGroupTone
     detail: str
     coverage_names: list[str] = Field(default_factory=list)
+    total_amount: int | None = None
 
 
 class EssentialCoverageItem(BaseModel):

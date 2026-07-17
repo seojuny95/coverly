@@ -118,6 +118,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
             detail:
               "일반사망·질병사망처럼 가족 생활비 목적의 사망보험 판단에 반영하는 담보예요.",
             coverage_names: ["질병사망"],
+            total_amount: 100_000_000,
           },
         ],
       },
@@ -125,7 +126,7 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         kind: "cancer",
         label: "암 진단비",
         status: "well_prepared",
-        confirmed_amount: 35_000_000,
+        confirmed_amount: 30_000_000,
         reference_min_amount: 30_000_000,
         reference_max_amount: 50_000_000,
         reference_basis:
@@ -138,6 +139,29 @@ const PREVIEW_SUMMARY: PortfolioSummary = {
         detail:
           "일반암·유사암·고액암·소액암을 포함해 확인된 암 진단비를 모았어요.",
         matched_coverage_names: ["암진단비", "유사암진단비"],
+        coverage_groups: [
+          {
+            label: "암 진단비",
+            tone: "confirmed",
+            detail: "현재 가입금액 기준에 반영하는 일반 암 진단비예요.",
+            coverage_names: ["암진단비"],
+            total_amount: 30_000_000,
+          },
+          {
+            label: "유사암 진단비",
+            tone: "review",
+            detail: "유사암 진단비가 가입되어 있어요.",
+            coverage_names: ["유사암진단비"],
+            total_amount: 5_000_000,
+          },
+          {
+            label: "고액암 진단비",
+            tone: "review",
+            detail: "고액암 진단비가 가입되어 있어요.",
+            coverage_names: ["고액암진단비"],
+            total_amount: 10_000_000,
+          },
+        ],
       },
       {
         kind: "cerebrovascular",
