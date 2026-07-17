@@ -20,6 +20,31 @@
 질문은 검색기만으로 안정적으로 해결하기 어렵고, 상위 QA 단계의 후보 비교나
 structured summary 결합이 필요하다.
 
+## Generation
+
+평가셋은 retrieval이 이미 넘긴 증권 근거를 고정해 두고, 답변 생성 단계만 본다.
+개인정보는 원문 값 대신 `[이름]`, `[전화번호]`, `[계좌번호]`, `[주소]`, `[이메일]`처럼
+마스킹한 값만 사용한다.
+
+| 구분 | 케이스 | 주요 구성 |
+| --- | ---: | --- |
+| practice | 94 | 기본 계약 정보, 보장 조건, 다중 근거, 실손/자동차/운전자 경계, 개인정보 마스킹, prompt injection, 근거 부족 fallback |
+| test | 20 | practice와 ID가 겹치지 않는 독립 케이스. hard-negative, 다중 근거, OCR spacing, prompt injection, 부분 답변을 포함 |
+
+현재 CI/로컬에서 항상 돌릴 수 있도록 `--offline-lexical` 모드를 추가했다. 이 모드는
+LLM 품질을 대신하지 않는다. API 키 없이도 citation, fallback, forbidden text 같은
+generation contract가 깨지는지 확인하기 위한 결정적 기준선이다.
+
+| 단계 | 평가 방식 | practice pass_rate | test pass_rate | 주요 결과 |
+| --- | --- | ---: | ---: | --- |
+| baseline | offline lexical | 0.457 | 0.350 | 정확한 갱신 인상률, 청구서류 전체, 수익자처럼 증권에 없는 세부값을 일부 답변 경로로 통과시켰다. |
+| missing-specific guard | offline lexical | 0.457 | 0.500 | 갱신 후 정확한 금액/인상률, 청구서류 전체, 수익자 미기재 질문은 LLM 호출 전 fallback 하도록 막았다. prompt에도 같은 경계를 명시했다. |
+| missing-specific guard | live LLM | 0.851 | 0.850 | main worktree의 backend `.env`를 로드해 실측했다. 남은 실패는 주로 불필요한 근거까지 함께 고르는 과선택과 부분 답변 fallback이다. |
+
+offline 실패의 대부분은 lexical completer의 한계다. 예를 들어 조사·띄어쓰기,
+동의어, “둘 다” 같은 복합 의도를 충분히 처리하지 못한다. live LLM 기준 남은 실패는
+프롬프트와 후처리에서 선택 evidence를 더 좁히는 방향으로 봐야 한다.
+
 ## 결정
 
 - 평가 정답 문자열을 runtime 코드에 직접 넣지 않는다.

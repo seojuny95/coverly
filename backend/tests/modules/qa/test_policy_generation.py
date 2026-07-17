@@ -148,6 +148,78 @@ def test_policy_generator_falls_back_for_actual_incident_verdict(question: str) 
     assert result.generation == "fallback"
 
 
+@pytest.mark.parametrize(
+    ("question", "evidence"),
+    (
+        (
+            "다음 갱신 때 보험료가 몇 퍼센트 오르는지 정확히 알려줘.",
+            (
+                ConsultationEvidence(
+                    id="session:1", fact="업로드 증권 원문 발췌: 현재 월 보험료 68,000원"
+                ),
+                ConsultationEvidence(
+                    id="session:2",
+                    fact="업로드 증권 원문 발췌: 갱신 시 연령과 위험률에 따라 보험료 변동 가능",
+                ),
+            ),
+        ),
+        (
+            "치아보철치료비 청구 서류를 빠짐없이 알려줘.",
+            (
+                ConsultationEvidence(
+                    id="session:1", fact="업로드 증권 원문 발췌: 치아보철치료비 담보 가입 사실"
+                ),
+                ConsultationEvidence(
+                    id="session:2", fact="업로드 증권 원문 발췌: 보험금 청구는 회사 절차에 따름"
+                ),
+            ),
+        ),
+        (
+            "만기생존보험금 수익자가 누구인지 적혀 있어?",
+            (
+                ConsultationEvidence(id="session:1", fact="업로드 증권 원문 발췌: 계약자 [이름]"),
+                ConsultationEvidence(
+                    id="session:2", fact="업로드 증권 원문 발췌: 만기생존보험금 200만원"
+                ),
+            ),
+        ),
+    ),
+)
+def test_policy_generator_falls_back_for_missing_policy_specifics(
+    question: str,
+    evidence: tuple[ConsultationEvidence, ...],
+) -> None:
+    def forbidden(_: str, __: str) -> dict[str, object]:
+        raise AssertionError("LLM should not fill missing policy-specific facts")
+
+    result = generate_policy_answer(question, evidence, complete=forbidden)
+
+    assert result.generation == "fallback"
+
+
+def test_policy_generator_keeps_partial_available_fact_when_requested() -> None:
+    evidence = (
+        ConsultationEvidence(id="session:1", fact="업로드 증권 원문 발췌: 계약자 [이름]"),
+        ConsultationEvidence(id="coverage:1", fact="상해사망 가입금액 합계 1억원 확인"),
+        ConsultationEvidence(id="session:2", fact="업로드 증권 원문 발췌: 보험기간 20년"),
+    )
+
+    result = generate_policy_answer(
+        "상해사망 금액과 수익자를 알려줘. 확인되는 것만 답해줘.",
+        evidence,
+        complete=lambda _system, _user: {
+            "confirmed_fact": "상해사망 가입금액을 확인했어요.",
+            "guidance": None,
+            "evidence_ids": ["coverage:1"],
+            "suggestions": [],
+            "limitations": [],
+        },
+    )
+
+    assert result.generation == "llm"
+    assert result.evidence_ids == ("coverage:1",)
+
+
 def test_policy_generator_rejects_personal_payout_verdict_in_draft() -> None:
     evidence = (
         ConsultationEvidence(

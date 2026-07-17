@@ -233,11 +233,13 @@ def _requires_unavailable_policy_context(
     evidence_text = " ".join(item.fact for item in evidence)
     if _asks_personal_adequacy(question):
         return True
-    if "갱신" in question and "정확히" in question and "얼마" in question:
+    if _asks_exact_renewal_value(question):
         return True
     if _asks_actual_incident_verdict(question):
         return True
     if _asks_complete_claim_documents(question) and "서류" not in evidence_text:
+        return True
+    if _asks_missing_beneficiary(question, evidence_text):
         return True
     return _asks_missing_exclusion_confirmation(question, evidence_text)
 
@@ -246,6 +248,14 @@ def _asks_personal_adequacy(question: str) -> bool:
     return any(term in question for term in ("부족", "충분")) and any(
         term in question for term in ("가족력", "소득", "부양", "자녀", "내 상황")
     )
+
+
+def _asks_exact_renewal_value(question: str) -> bool:
+    if "갱신" not in question:
+        return False
+    asks_exact_amount = "정확히" in question and "얼마" in question
+    asks_exact_rate = any(term in question for term in ("몇 퍼센트", "몇%", "인상률", "오르는지"))
+    return asks_exact_amount or asks_exact_rate
 
 
 def _asks_actual_incident_verdict(question: str) -> bool:
@@ -262,7 +272,17 @@ def _asks_actual_incident_verdict(question: str) -> bool:
 
 
 def _asks_complete_claim_documents(question: str) -> bool:
-    return "서류" in question and any(term in question for term in ("정확히", "전부", "모두"))
+    return "서류" in question and any(
+        term in question for term in ("정확히", "전부", "모두", "빠짐없이")
+    )
+
+
+def _asks_missing_beneficiary(question: str, evidence_text: str) -> bool:
+    if any(term in question for term in ("확인되는 것만", "확인된 것만")):
+        return False
+    if not any(term in question for term in ("수익자", "누가 받", "누구에게 지급")):
+        return False
+    return "수익자" not in evidence_text
 
 
 def _asks_missing_exclusion_confirmation(question: str, evidence_text: str) -> bool:
@@ -369,6 +389,8 @@ def _system_prompt() -> str:
 - 질문의 실제 답이 evidence에 없으면 evidence_ids를 빈 배열로 두세요.
 - 관련 담보의 가입 사실만으로 미래 보험료, 면책·대기기간, 특정 치료의 제외 여부,
   수익자, 실제 사고 지급 여부, 정확한 청구서류를 추정하지 마세요.
+- 정확한 갱신 후 보험료나 인상률, 청구서류 전체 목록, 수익자는 해당 evidence에
+  직접 적혀 있을 때만 답하세요.
 - 가입금액만으로 개인 상황에 따른 충분·부족 여부를 판단하지 마세요.
 - 부정 표현과 질문 범위를 그대로 읽으세요.
 
