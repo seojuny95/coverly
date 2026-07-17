@@ -1,12 +1,20 @@
+from functools import partial
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.modules.qa.router import get_portfolio_answer_streamer
 from app.modules.qa.router import router as qa_router
+from app.modules.qa.service import stream_portfolio_answer
 
 
 def _client() -> TestClient:
     app = FastAPI()
     app.include_router(qa_router)
+    app.dependency_overrides[get_portfolio_answer_streamer] = lambda: partial(
+        stream_portfolio_answer,
+        agent_runner=None,
+    )
     return TestClient(app)
 
 
