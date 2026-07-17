@@ -130,9 +130,16 @@ export function InsuranceChatbot({
     setStreaming(true);
     try {
       await streamPortfolioQuestion(text, documents, history, {
+        onProgress: (progress) => {
+          updateMessage(assistantId, (message) => ({
+            ...message,
+            progress: message.text.trim() ? message.progress : progress.text,
+          }));
+        },
         onDelta: (delta) => {
           updateMessage(assistantId, (message) => ({
             ...message,
+            progress: undefined,
             text: message.text + delta,
           }));
         },

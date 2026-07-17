@@ -261,8 +261,14 @@ export type QaStreamEnd = {
   claim_channels?: ClaimChannelBlock | null;
 };
 
+export type QaStreamProgress = {
+  stage: string;
+  text: string;
+};
+
 type QaStreamHandlers = {
   onMeta?: (meta: { status: QaStreamEnd["status"] }) => void;
+  onProgress?: (progress: QaStreamProgress) => void;
   onDelta: (text: string) => void | Promise<void>;
   onEnd: (end: QaStreamEnd) => void;
 };
@@ -305,6 +311,11 @@ export async function streamPortfolioQuestion(
     }
     if (event.type === "meta") {
       handlers.onMeta?.({ status: event.status as QaStreamEnd["status"] });
+    } else if (event.type === "progress") {
+      handlers.onProgress?.({
+        stage: String(event.stage ?? ""),
+        text: String(event.text ?? ""),
+      });
     } else if (event.type === "delta") {
       await handlers.onDelta(String(event.text ?? ""));
     } else if (event.type === "end") {

@@ -6,7 +6,12 @@ from dataclasses import dataclass
 
 from app.integrations.openai.client import JsonCompleter, TextStreamer
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.agent_contracts import QaAgentRunner, QaAgentUnavailable
+from app.modules.qa.agent_contracts import (
+    QaAgentCompleted,
+    QaAgentProgress,
+    QaAgentRunner,
+    QaAgentUnavailable,
+)
 from app.modules.qa.agent_validation import requires_official_web
 from app.modules.qa.context import (
     QaContext,
@@ -169,11 +174,7 @@ def stream_portfolio_answer(
         context = _build_qa_context(turn.question, policies, demographics, turn.history)
 
     if stream is None and agent_runner is not None:
-        agent_response = _answer_with_agent(context, agent_runner)
-        if agent_response is not None:
-            yield from _stream_response(agent_response)
-            return
-        yield from _stream_response(_agent_fallback(context))
+        yield from _stream_with_agent(context, agent_runner)
         return
 
     if not requires_official_web(context.question):
@@ -249,6 +250,35 @@ def _answer_with_agent(
             type(exc).__name__,
         )
         return None
+
+
+def _stream_with_agent(
+    context: QaContext,
+    agent_runner: QaAgentRunner,
+) -> Iterator[QaStreamEvent]:
+    try:
+        stream_agent = getattr(agent_runner, "stream", None)
+        if callable(stream_agent):
+            for item in stream_agent(context):
+                if isinstance(item, QaAgentProgress):
+                    yield {"type": "progress", "stage": item.stage, "text": item.text}
+                    continue
+                if isinstance(item, QaAgentCompleted):
+                    yield from _stream_response(item.response)
+                    return
+            yield from _stream_response(_agent_fallback(context))
+            return
+
+        agent_response = agent_runner.run(context)
+        yield from _stream_response(agent_response)
+    except QaAgentUnavailable:
+        yield from _stream_response(_agent_fallback(context))
+    except Exception as exc:
+        logger.warning(
+            "QA agent stream failed with %s; using grounded fallback",
+            type(exc).__name__,
+        )
+        yield from _stream_response(_agent_fallback(context))
 
 
 def _agent_fallback(context: QaContext) -> PortfolioQuestionResponse:

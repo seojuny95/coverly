@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from pytest import MonkeyPatch
 
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.agent_contracts import QaAgentCompleted, QaAgentProgress
 from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
 from app.modules.qa.service import stream_portfolio_answer
 from app.rag.official.answer import RagAnswer, RagCitation
@@ -134,6 +135,45 @@ def test_stream_uses_agent_first_for_deterministic_question() -> None:
     text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
     assert agent.calls == 1
     assert "Agent가 가입 목록 도구로 확인했어요." in text
+
+
+def test_stream_emits_agent_progress_before_validated_answer() -> None:
+    class StreamingAgent:
+        def run(self, _context: object) -> PortfolioQuestionResponse:
+            raise AssertionError("stream path should not call run")
+
+        def stream(self, _context: object) -> Iterator[QaAgentProgress | QaAgentCompleted]:
+            yield QaAgentProgress(
+                stage="portfolio_facts",
+                text="올려주신 증권의 가입 담보를 확인하고 있어요.",
+            )
+            yield QaAgentCompleted(
+                PortfolioQuestionResponse(
+                    status="answered",
+                    answer="Agent가 검증한 답변이에요.",
+                    citations=[],
+                    limitations=[],
+                    suggestions=[],
+                    generation="llm",
+                )
+            )
+
+    events = list(
+        stream_portfolio_answer(
+            "가입한 보험은 몇 개야?",
+            _policies(),
+            agent_runner=StreamingAgent(),
+        )
+    )
+
+    assert events[0] == {
+        "type": "progress",
+        "stage": "portfolio_facts",
+        "text": "올려주신 증권의 가입 담보를 확인하고 있어요.",
+    }
+    assert events[1]["type"] == "meta"
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert text == "Agent가 검증한 답변이에요."
 
 
 def test_stream_agent_failure_does_not_call_legacy_consultation_model(

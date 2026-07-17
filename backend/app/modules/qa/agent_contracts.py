@@ -22,6 +22,20 @@ class QaAgentRunner(Protocol):
 
 
 @dataclass(frozen=True)
+class QaAgentProgress:
+    stage: str
+    text: str
+
+
+@dataclass(frozen=True)
+class QaAgentCompleted:
+    response: PortfolioQuestionResponse
+
+
+type QaAgentStreamItem = QaAgentProgress | QaAgentCompleted
+
+
+@dataclass(frozen=True)
 class RegisteredToolResult:
     kind: str
     response: PortfolioQuestionResponse

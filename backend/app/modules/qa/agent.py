@@ -1,6 +1,21 @@
 """Agent SDK orchestration for grounded portfolio Q&A."""
 
-from agents import Agent, ModelSettings, RunConfig, Runner
+import asyncio
+from collections.abc import Iterator
+from queue import Queue
+from threading import Thread
+from typing import Any
+
+from agents import (
+    Agent,
+    GuardrailFunctionOutput,
+    ModelSettings,
+    RunConfig,
+    RunContextWrapper,
+    RunHooks,
+    Runner,
+    output_guardrail,
+)
 from agents.models.openai_provider import OpenAIProvider
 
 from app.core.config import get_settings
@@ -8,8 +23,11 @@ from app.integrations.openai.client import JsonCompleter
 from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.qa.agent_contracts import (
     AgentCounselorDraft,
+    QaAgentCompleted,
     QaAgentDependencies,
+    QaAgentProgress,
     QaAgentRunner,
+    QaAgentStreamItem,
     QaAgentUnavailable,
 )
 from app.modules.qa.agent_tools import (
@@ -31,6 +49,8 @@ from app.modules.qa.web_search import (
     OfficialWebSearcher,
     default_official_web_search,
 )
+
+type _QueuedAgentStreamItem = QaAgentStreamItem | BaseException | None
 
 
 def build_qa_agent_runner(
@@ -65,12 +85,7 @@ class OpenAiQaAgentRunner:
         if not settings.openai_api_key:
             raise QaAgentUnavailable("OPENAI_API_KEY is not configured")
 
-        dependencies = QaAgentDependencies(
-            context=context,
-            complete=self._complete,
-            official_answer=self._official_answer,
-            web_search=self._web_search,
-        )
+        dependencies = self._dependencies(context)
         result = Runner.run_sync(
             _agent(
                 settings.openai_model,
@@ -88,6 +103,36 @@ class OpenAiQaAgentRunner:
         )
         draft = result.final_output_as(AgentCounselorDraft, raise_if_incorrect_type=True)
         return validated_agent_response(context, draft, dependencies)
+
+    def stream(self, context: QaContext) -> Iterator[QaAgentStreamItem]:
+        settings = get_settings()
+        if not settings.openai_api_key:
+            raise QaAgentUnavailable("OPENAI_API_KEY is not configured")
+
+        dependencies = self._dependencies(context)
+        queue: Queue[_QueuedAgentStreamItem] = Queue()
+        worker = Thread(
+            target=_run_streamed_worker,
+            args=(context, dependencies, settings.openai_model, settings.openai_api_key, queue),
+            daemon=True,
+        )
+        worker.start()
+        while True:
+            item = queue.get()
+            if item is None:
+                break
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+        worker.join(timeout=0)
+
+    def _dependencies(self, context: QaContext) -> QaAgentDependencies:
+        return QaAgentDependencies(
+            context=context,
+            complete=self._complete,
+            official_answer=self._official_answer,
+            web_search=self._web_search,
+        )
 
 
 def _agent(
@@ -111,11 +156,115 @@ def _agent(
             search_official_web,
         ],
         output_type=AgentCounselorDraft,
+        output_guardrails=[grounded_output_guardrail],
         model_settings=ModelSettings(
             tool_choice=required_first_tool,
             parallel_tool_calls=False,
         ),
     )
+
+
+@output_guardrail(name="coverly_grounded_output")
+def grounded_output_guardrail(
+    ctx: RunContextWrapper[QaAgentDependencies],
+    _agent: Agent[QaAgentDependencies],
+    output: AgentCounselorDraft,
+) -> GuardrailFunctionOutput:
+    try:
+        validated_agent_response(ctx.context.context, output, ctx.context)
+    except QaAgentUnavailable as exc:
+        return GuardrailFunctionOutput(
+            output_info={"valid": False, "reason": str(exc)},
+            tripwire_triggered=True,
+        )
+    return GuardrailFunctionOutput(
+        output_info={"valid": True},
+        tripwire_triggered=False,
+    )
+
+
+def _run_streamed_worker(
+    context: QaContext,
+    dependencies: QaAgentDependencies,
+    model: str,
+    api_key: str,
+    queue: Queue[_QueuedAgentStreamItem],
+) -> None:
+    try:
+        asyncio.run(_run_streamed_agent(context, dependencies, model, api_key, queue))
+    except Exception as exc:
+        queue.put(exc)
+    finally:
+        queue.put(None)
+
+
+async def _run_streamed_agent(
+    context: QaContext,
+    dependencies: QaAgentDependencies,
+    model: str,
+    api_key: str,
+    queue: Queue[_QueuedAgentStreamItem],
+) -> None:
+    result = Runner.run_streamed(
+        _agent(
+            model,
+            required_first_tool=required_first_tool(context),
+        ),
+        input=build_agent_input(context),
+        context=dependencies,
+        max_turns=5,
+        hooks=_ProgressHooks(queue),
+        run_config=RunConfig(
+            model_provider=OpenAIProvider(api_key=api_key),
+            tracing_disabled=True,
+            trace_include_sensitive_data=False,
+            workflow_name="Coverly grounded QA",
+        ),
+    )
+    async for _event in result.stream_events():
+        pass
+    draft = result.final_output_as(AgentCounselorDraft, raise_if_incorrect_type=True)
+    queue.put(QaAgentCompleted(validated_agent_response(context, draft, dependencies)))
+
+
+class _ProgressHooks(RunHooks[QaAgentDependencies]):
+    def __init__(self, queue: Queue[_QueuedAgentStreamItem]) -> None:
+        self._queue = queue
+        self._emitted: set[str] = set()
+
+    async def on_agent_start(self, _context: Any, _agent: Any) -> None:
+        self._emit("routing", "질문에 맞는 확인 경로를 고르고 있어요.")
+
+    async def on_tool_start(self, _context: Any, _agent: Any, tool: Any) -> None:
+        tool_name = str(getattr(tool, "name", ""))
+        stage, text = _tool_progress(tool_name)
+        self._emit(stage, text)
+
+    async def on_agent_end(self, _context: Any, _agent: Any, _output: Any) -> None:
+        self._emit("validating", "확인한 근거와 답변을 검토하고 있어요.")
+
+    def _emit(self, stage: str, text: str) -> None:
+        if stage in self._emitted:
+            return
+        self._emitted.add(stage)
+        self._queue.put(QaAgentProgress(stage=stage, text=text))
+
+
+def _tool_progress(tool_name: str) -> tuple[str, str]:
+    if tool_name == "search_official_web":
+        return "official_web", "공식 자료에서 최신 정보를 확인하고 있어요."
+    if tool_name == "retrieve_policy_terms":
+        return "policy_terms", "증권 원문과 약관 근거를 찾고 있어요."
+    if tool_name == "get_claim_channels":
+        return "claim_channels", "청구에 필요한 보험사 안내를 확인하고 있어요."
+    if tool_name in {
+        "list_policies",
+        "find_coverages",
+        "calculate_coverage_total",
+        "find_overlapping_coverages",
+    }:
+        return "portfolio_facts", "올려주신 증권의 가입 담보를 확인하고 있어요."
+    return "grounding", "확인한 근거로 답변을 정리하고 있어요."
 
 
 def build_agent_input(context: QaContext) -> str:

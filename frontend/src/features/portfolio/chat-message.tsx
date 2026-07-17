@@ -19,15 +19,16 @@ const THINKING_PHRASES = [
   "답변을 정리하는 중",
 ];
 
-function ThinkingIndicator() {
+function ThinkingIndicator({ progress }: { progress?: string }) {
   const [phraseIndex, setPhraseIndex] = useState(0);
 
   useEffect(() => {
+    if (progress) return;
     const timer = setInterval(() => {
       setPhraseIndex((index) => (index + 1) % THINKING_PHRASES.length);
     }, 1600);
     return () => clearInterval(timer);
-  }, []);
+  }, [progress]);
 
   return (
     <span
@@ -35,7 +36,7 @@ function ThinkingIndicator() {
       aria-label="답변 준비 중"
       className="flex items-center gap-2 text-zinc-500"
     >
-      <span>{THINKING_PHRASES[phraseIndex]}</span>
+      <span>{progress || THINKING_PHRASES[phraseIndex]}</span>
       <span className="flex gap-1" aria-hidden>
         {[0, 150, 300].map((delay) => (
           <span
@@ -74,6 +75,7 @@ export type ChatMessageData = {
   id: number;
   role: "user" | "assistant";
   text: string;
+  progress?: string;
   sources?: ChatSource[];
   limitations?: string[];
   claimChannels?: ClaimChannelBlock | null;
@@ -92,7 +94,7 @@ function ChatMessageComponent({ message }: { message: ChatMessageData }) {
       {isUser ? (
         <p className="whitespace-pre-line">{message.text}</p>
       ) : message.text.trim() === "" ? (
-        <ThinkingIndicator />
+        <ThinkingIndicator progress={message.progress} />
       ) : (
         <div className="[word-break:break-word]">
           <ReactMarkdown components={markdownComponents}>
