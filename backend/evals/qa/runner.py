@@ -12,7 +12,9 @@ from typing import Literal, cast
 
 from app.modules.evidence.catalog import citation_from_evidence
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.agent import QaAgentRunner, _consultation_evidence, build_qa_agent_runner
+from app.modules.qa.agent import build_qa_agent_runner
+from app.modules.qa.agent_contracts import QaAgentRunner
+from app.modules.qa.agent_evidence import consultation_evidence
 from app.modules.qa.context import QaContext
 from app.modules.qa.resolvers import context_fallback, resolve_precomputed_answer
 from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
@@ -104,7 +106,7 @@ class _ProbeAgent:
         if deterministic is not None:
             return deterministic
 
-        evidence = _consultation_evidence(context)
+        evidence = consultation_evidence(context)
         citations = [citation_from_evidence(item) for item in evidence[:3]]
         if not citations:
             return context_fallback(context)
@@ -232,7 +234,7 @@ def _evaluate_case(
 
     evidence_text = ""
     if probe.last_context is not None:
-        evidence_text = "\n".join(item.fact for item in _consultation_evidence(probe.last_context))
+        evidence_text = "\n".join(item.fact for item in consultation_evidence(probe.last_context))
     evidence_passed = all(term in evidence_text for term in case.required_evidence_terms)
     if case.expected_route != "agent":
         evidence_passed = True

@@ -7,15 +7,15 @@ from pytest import MonkeyPatch, raises
 
 from app.modules.evidence.catalog import is_safe_analysis_text
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.agent import (
+from app.modules.qa.agent import build_agent_input
+from app.modules.qa.agent_contracts import (
     AgentCounselorDraft,
     QaAgentDependencies,
     QaAgentUnavailable,
-    _agent_input,
-    _consultation_evidence,
-    _validated_agent_response,
-    _web_search_response,
 )
+from app.modules.qa.agent_evidence import consultation_evidence
+from app.modules.qa.agent_tools import web_search_response
+from app.modules.qa.agent_validation import validated_agent_response
 from app.modules.qa.context import QaContext, build_qa_context
 from app.modules.qa.contracts import InsuredDemographics
 from app.modules.qa.schemas import AnswerCitation, ConversationMessage, PortfolioQuestionResponse
@@ -602,7 +602,7 @@ def test_agent_cannot_replace_locked_five_policy_answer() -> None:
     )
     dependencies.register("grounded", authoritative)
 
-    result = _validated_agent_response(
+    result = validated_agent_response(
         context,
         AgentCounselorDraft(
             selected_result_id="grounded:999",
@@ -628,7 +628,7 @@ def test_agent_may_add_only_non_factual_counselor_framing() -> None:
     registered = dependencies.register("grounded", authoritative)
     framing = "올려주신 내용을 차근차근 정리해드릴게요."
 
-    result = _validated_agent_response(
+    result = validated_agent_response(
         context,
         AgentCounselorDraft(
             selected_result_id=registered.result_id or "",
@@ -652,7 +652,7 @@ def test_agent_may_rewrite_grounded_answer_as_natural_counselor_prose() -> None:
     )
     registered = dependencies.register("grounded", authoritative)
 
-    result = _validated_agent_response(
+    result = validated_agent_response(
         context,
         AgentCounselorDraft(
             selected_result_id=registered.result_id or "",
@@ -691,7 +691,7 @@ def test_agent_consultation_uses_only_selected_duplicate_evidence() -> None:
         evidence=context.catalog.items,
     )
 
-    result = _validated_agent_response(
+    result = validated_agent_response(
         context,
         AgentCounselorDraft(
             selected_result_id=registered.result_id or "",
@@ -712,7 +712,7 @@ def test_agent_consultation_uses_only_selected_duplicate_evidence() -> None:
 def test_overlap_consultation_exposes_only_duplicate_evidence() -> None:
     context = build_qa_context("겹치는 보장이 있는지 봐줄래요?", _alias_policies(), None, [])
 
-    evidence = _consultation_evidence(context)
+    evidence = consultation_evidence(context)
 
     assert len(evidence) == 1
     assert evidence[0].id.startswith("coverage:")
@@ -722,7 +722,7 @@ def test_overlap_consultation_exposes_only_duplicate_evidence() -> None:
 def test_overlap_consultation_exposes_explicit_no_overlap_evidence() -> None:
     context = build_qa_context("중복 보장이 있어?", _policies(), None, [])
 
-    evidence = _consultation_evidence(context)
+    evidence = consultation_evidence(context)
 
     assert [item.id for item in evidence] == ["portfolio:no-overlap"]
 
@@ -730,7 +730,7 @@ def test_overlap_consultation_exposes_explicit_no_overlap_evidence() -> None:
 def test_consultation_exposes_only_question_relevant_coverage_category() -> None:
     context = build_qa_context("허혈성심질환 보장을 검토해줘", _alias_policies(), None, [])
 
-    evidence = _consultation_evidence(context)
+    evidence = consultation_evidence(context)
 
     assert evidence
     assert all("허혈성심질환" in item.fact for item in evidence)
@@ -744,7 +744,7 @@ def test_cancer_diagnosis_consultation_does_not_expose_similar_cancer_by_default
         [],
     )
 
-    evidence = _consultation_evidence(context)
+    evidence = consultation_evidence(context)
 
     assert evidence
     assert any(item.coverage_name == "암진단비(유사암제외)" for item in evidence)
@@ -754,7 +754,7 @@ def test_cancer_diagnosis_consultation_does_not_expose_similar_cancer_by_default
 def test_consultation_does_not_expose_portfolio_to_unrelated_fact_question() -> None:
     context = build_qa_context("하준이법이 뭐야?", _policies(), None, [])
 
-    assert _consultation_evidence(context) == ()
+    assert consultation_evidence(context) == ()
 
 
 def test_agent_consultation_rejects_answer_without_selected_evidence() -> None:
@@ -778,7 +778,7 @@ def test_agent_consultation_rejects_answer_without_selected_evidence() -> None:
     )
 
     with raises(QaAgentUnavailable):
-        _validated_agent_response(
+        validated_agent_response(
             context,
             AgentCounselorDraft(
                 selected_result_id=registered.result_id or "",
@@ -797,10 +797,10 @@ def test_agent_cannot_add_claims_when_web_search_has_no_data() -> None:
         official_answer=None,
         web_search=_unused_web_search,
     )
-    no_data = _web_search_response(context, WebSearchResult(status="unavailable"))
+    no_data = web_search_response(WebSearchResult(status="unavailable"))
     registered = dependencies.register("web", no_data)
 
-    result = _validated_agent_response(
+    result = validated_agent_response(
         context,
         AgentCounselorDraft(
             selected_result_id=registered.result_id or "",
@@ -818,7 +818,7 @@ def test_agent_cannot_add_claims_when_web_search_has_no_data() -> None:
 def test_agent_routes_external_law_question_to_official_web_not_portfolio() -> None:
     context = build_qa_context("하준이법이 뭐야?", _policies(), None, [])
 
-    prompt = _agent_input(context)
+    prompt = build_agent_input(context)
 
     assert "법, 제도, 보험 용어처럼 증권 밖의 사실" in prompt
     assert "search_official_web" in prompt
@@ -848,7 +848,7 @@ def test_agent_requires_web_tool_for_latest_official_information() -> None:
     )
     registered = dependencies.register("grounded", authoritative)
 
-    result = _validated_agent_response(
+    result = validated_agent_response(
         context,
         AgentCounselorDraft(
             selected_result_id=registered.result_id or "",
@@ -1061,11 +1061,8 @@ def test_qa_held_coverage_conditions_use_policy_rag_before_official_rag(
     assert "진단확정된 경우" in result.answer
 
 
-def test_web_search_response_refuses_results_without_valid_source_url() -> None:
-    context = build_qa_context("보험업법 최신 개정 알려줘", [], None, [])
-
-    result = _web_search_response(
-        context,
+def testweb_search_response_refuses_results_without_valid_source_url() -> None:
+    result = web_search_response(
         WebSearchResult(
             status="searched",
             answer="최근 법이 바뀌었습니다.",
@@ -1077,11 +1074,8 @@ def test_web_search_response_refuses_results_without_valid_source_url() -> None:
     assert result.citations == []
 
 
-def test_web_search_response_keeps_verified_official_source_url() -> None:
-    context = build_qa_context("보험업법 최신 개정 알려줘", [], None, [])
-
-    result = _web_search_response(
-        context,
+def testweb_search_response_keeps_verified_official_source_url() -> None:
+    result = web_search_response(
         WebSearchResult(
             status="searched",
             answer="공식 사이트에 게시된 최신 내용을 확인했어요.",

@@ -6,11 +6,8 @@ from dataclasses import dataclass
 
 from app.integrations.openai.client import JsonCompleter, TextStreamer
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.agent import (
-    QaAgentRunner,
-    QaAgentUnavailable,
-    requires_official_web,
-)
+from app.modules.qa.agent_contracts import QaAgentRunner, QaAgentUnavailable
+from app.modules.qa.agent_validation import requires_official_web
 from app.modules.qa.context import (
     QaContext,
     build_qa_context,
