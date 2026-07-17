@@ -4,6 +4,11 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from evals.rag.policy.extraction import (
+        PolicyExtractionEvalCase,
+        PolicyExtractionEvalReport,
+        PolicyExtractionEvalResult,
+    )
     from evals.rag.policy.generation import (
         PolicyGenerationEvalCase,
         PolicyGenerationEvalReport,
@@ -19,11 +24,16 @@ __all__ = [
     "PolicyEvalCase",
     "PolicyEvalCaseResult",
     "PolicyEvalReport",
+    "PolicyExtractionEvalCase",
+    "PolicyExtractionEvalReport",
+    "PolicyExtractionEvalResult",
     "PolicyGenerationEvalCase",
     "PolicyGenerationEvalReport",
     "PolicyGenerationEvalResult",
+    "evaluate_policy_extraction",
     "evaluate_generation",
     "evaluate_policy_retrieval",
+    "load_extraction_eval_cases",
     "load_generation_eval_cases",
     "load_practice_eval_cases",
     "render_report",
@@ -33,11 +43,16 @@ _EXPORT_MODULES = {
     "PolicyEvalCase": "evals.rag.policy.retrieval",
     "PolicyEvalCaseResult": "evals.rag.policy.retrieval",
     "PolicyEvalReport": "evals.rag.policy.retrieval",
+    "PolicyExtractionEvalCase": "evals.rag.policy.extraction",
+    "PolicyExtractionEvalReport": "evals.rag.policy.extraction",
+    "PolicyExtractionEvalResult": "evals.rag.policy.extraction",
     "PolicyGenerationEvalCase": "evals.rag.policy.generation",
     "PolicyGenerationEvalReport": "evals.rag.policy.generation",
     "PolicyGenerationEvalResult": "evals.rag.policy.generation",
+    "evaluate_policy_extraction": "evals.rag.policy.extraction",
     "evaluate_generation": "evals.rag.policy.generation",
     "evaluate_policy_retrieval": "evals.rag.policy.retrieval",
+    "load_extraction_eval_cases": "evals.rag.policy.extraction",
     "load_generation_eval_cases": "evals.rag.policy.generation",
     "load_practice_eval_cases": "evals.rag.policy.generation",
     "render_report": "evals.rag.policy.generation",
