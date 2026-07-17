@@ -175,7 +175,22 @@ def _records_from_chunks(
 
 
 def _tokens(text: str) -> tuple[str, ...]:
-    return tuple(token.casefold() for token in _TOKEN_RE.findall(text) if token.strip())
+    tokens = [token.casefold() for token in _TOKEN_RE.findall(text) if token.strip()]
+    for token in tuple(tokens):
+        if any("가" <= char <= "힣" for char in token):
+            tokens.extend(_char_ngrams(token))
+    return tuple(dict.fromkeys(tokens))
+
+
+def _char_ngrams(text: str) -> tuple[str, ...]:
+    if len(text) < 2:
+        return ()
+    ngrams: list[str] = []
+    for size in (2, 3, 4):
+        if len(text) < size:
+            continue
+        ngrams.extend(text[index : index + size] for index in range(len(text) - size + 1))
+    return tuple(ngrams)
 
 
 def _rerank_with_rrf(

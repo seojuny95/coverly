@@ -1,196 +1,653 @@
 [
   {
     "id": "standard_disclosure_violation",
-    "questions": ["건강 관련 질문에 사실과 다르게 답하면 계약에 어떤 영향이 있어?", "가입할 때 중요한 내용을 숨긴 경우 회사가 할 수 있는 조치는 뭐야?"],
+    "questions": [
+      "건강 관련 질문에 사실과 다르게 답하면 계약에 어떤 영향이 있어?",
+      "가입할 때 중요한 내용을 숨긴 경우 회사가 할 수 있는 조치는 뭐야?"
+    ],
     "profile": "claim_check",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["ad2b8650965ee6783e8c"]
+    "relevant_chunk_ids": [
+      "ad2b8650965ee6783e8c"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause"
+        ],
+        "required_terms": [
+          "알릴 의무",
+          "계약을 해지"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_exclusion_reasons",
-    "questions": ["질병·상해보험에서 보험금을 주지 않는 대표적인 경우를 알고 싶어", "고의 사고나 전쟁 때문에 보험금이 제한되는 내용은 어디에 있어?"],
+    "questions": [
+      "질병·상해보험에서 보험금을 주지 않는 대표적인 경우를 알고 싶어",
+      "고의 사고나 전쟁 때문에 보험금이 제한되는 내용은 어디에 있어?"
+    ],
     "profile": "claim_check",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["d8f7cfd7cfab2b59c510"]
+    "relevant_chunk_ids": [
+      "d8f7cfd7cfab2b59c510"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "consumer_guide"
+        ],
+        "required_terms": [
+          "보상하지",
+          "전쟁"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_cooling_off",
-    "questions": ["보험증권을 받은 뒤 청약을 취소할 수 있는 기간과 주요 예외를 알려줘", "청약 철회 기한과 건강진단·단기보험에 적용되는 제한이 궁금해"],
+    "questions": [
+      "보험증권을 받은 뒤 청약을 취소할 수 있는 기간과 주요 예외를 알려줘",
+      "청약 철회 기한과 건강진단·단기보험에 적용되는 제한이 궁금해"
+    ],
     "profile": "claim_check",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["95ef00cf0aa40a564195"]
+    "relevant_chunk_ids": [
+      "95ef00cf0aa40a564195"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "consumer_guide"
+        ],
+        "required_terms": [
+          "청약",
+          "철회",
+          "15일"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_contract_invalidity",
-    "questions": ["서면 동의나 나이 조건 때문에 계약이 무효가 되는 경우와 보험료 처리를 알려줘", "생명보험 계약의 동의·나이 요건을 어기면 효력과 납입 보험료는 어떻게 돼?"],
+    "questions": [
+      "서면 동의나 나이 조건 때문에 계약이 무효가 되는 경우와 보험료 처리를 알려줘",
+      "생명보험 계약의 동의·나이 요건을 어기면 효력과 납입 보험료는 어떻게 돼?"
+    ],
     "profile": "claim_check",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["8009af7b4dfd73883f39", "305437a0016863dd76a0"]
+    "relevant_chunk_ids": [
+      "8009af7b4dfd73883f39",
+      "305437a0016863dd76a0"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "consumer_guide"
+        ],
+        "required_terms": [
+          "계약",
+          "무효",
+          "보험료"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_late_premium",
-    "questions": ["두 번째 이후 보험료를 제때 못 내면 바로 계약이 끝나?", "보험료가 밀렸을 때 회사가 독촉하는 기간과 해지 시점이 궁금해"],
+    "questions": [
+      "두 번째 이후 보험료를 제때 못 내면 바로 계약이 끝나?",
+      "보험료가 밀렸을 때 회사가 독촉하는 기간과 해지 시점이 궁금해"
+    ],
     "profile": "claim_check",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["c100968d1611201038b9"]
+    "relevant_chunk_ids": [
+      "c100968d1611201038b9"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "consumer_guide"
+        ],
+        "required_terms": [
+          "보험료",
+          "납입",
+          "해지"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_dispute_mediation",
-    "questions": ["보험금 분쟁을 금융감독원에 조정 신청하고 회사 자료도 열람할 수 있어?", "보험 분쟁 조정 절차와 그 과정에서 자료를 확인할 권리를 알려줘"],
+    "questions": [
+      "보험금 분쟁을 금융감독원에 조정 신청하고 회사 자료도 열람할 수 있어?",
+      "보험 분쟁 조정 절차와 그 과정에서 자료를 확인할 권리를 알려줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["1b2536b586eb06af6b91", "de4d5d0bdfad9de56b83", "3235a9a01dce0794197b", "7f90aed704a99b6bf892", "d0ef8741e66ea87f3885"]
+    "relevant_chunk_ids": [
+      "1b2536b586eb06af6b91",
+      "de4d5d0bdfad9de56b83",
+      "3235a9a01dce0794197b",
+      "7f90aed704a99b6bf892",
+      "d0ef8741e66ea87f3885"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "law",
+          "consumer_guide"
+        ],
+        "required_terms": [
+          "분쟁",
+          "조정"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_fire_benefit_calculation",
-    "questions": ["화재 손해액과 가입금액이 다를 때 지급액은 어떤 기준으로 정해져?", "보험가액의 80퍼센트보다 적게 가입한 화재보험 계산식이 궁금해"],
+    "questions": [
+      "화재 손해액과 가입금액이 다를 때 지급액은 어떤 기준으로 정해져?",
+      "보험가액의 80퍼센트보다 적게 가입한 화재보험 계산식이 궁금해"
+    ],
     "profile": "claim_check",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["cdc50216ad22732d4fb2"]
+    "relevant_chunk_ids": [
+      "cdc50216ad22732d4fb2"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause"
+        ],
+        "required_terms": [
+          "보험가액",
+          "80"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_fraudulent_contract",
-    "questions": ["진단서를 위조해 가입한 사실이 확인되면 회사가 언제까지 취소할 수 있어?", "대리진단으로 성립한 생명보험 계약은 어떻게 처리돼?"],
+    "questions": [
+      "진단서를 위조해 가입한 사실이 확인되면 회사가 언제까지 취소할 수 있어?",
+      "대리진단으로 성립한 생명보험 계약은 어떻게 처리돼?"
+    ],
     "profile": "claim_check",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["78bb32778190efd13376"]
+    "relevant_chunk_ids": [
+      "78bb32778190efd13376"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "consumer_guide"
+        ],
+        "required_terms": [
+          "계약",
+          "취소"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_subrogation",
-    "questions": ["화재보험 대위권의 뜻과 가족·임차인에게 적용되는 예외를 알려줘", "보험금을 지급한 회사의 제3자 청구권은 가족이나 임차인에게도 항상 적용돼?"],
+    "questions": [
+      "화재보험 대위권의 뜻과 가족·임차인에게 적용되는 예외를 알려줘",
+      "보험금을 지급한 회사의 제3자 청구권은 가족이나 임차인에게도 항상 적용돼?"
+    ],
     "profile": "term_explain",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["af80ccf1f0c06e55312e", "0df83e2753ba027439f7"]
+    "relevant_chunk_ids": [
+      "af80ccf1f0c06e55312e",
+      "0df83e2753ba027439f7"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "consumer_guide"
+        ],
+        "required_terms": [
+          "대위",
+          "제3자"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_limitation_period",
-    "questions": ["생명보험금 청구를 오래 하지 않으면 권리가 언제 없어져?", "해약환급금이나 배당금 청구권의 시효 기간은 몇 년이야?"],
+    "questions": [
+      "생명보험금 청구를 오래 하지 않으면 권리가 언제 없어져?",
+      "해약환급금이나 배당금 청구권의 시효 기간은 몇 년이야?"
+    ],
     "profile": "claim_check",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["c3107aaf39aa62a993d7"]
+    "relevant_chunk_ids": [
+      "c3107aaf39aa62a993d7"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "consumer_guide"
+        ],
+        "required_terms": [
+          "소멸시효",
+          "3년"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_insurance_age",
-    "questions": ["보험나이의 6개월 반올림 방법과 매년 나이가 늘어나는 기준일을 알려줘", "실손 약관에서 보험나이를 계산하는 끝수 기준과 연령 증가일은 언제야?"],
+    "questions": [
+      "보험나이의 6개월 반올림 방법과 매년 나이가 늘어나는 기준일을 알려줘",
+      "실손 약관에서 보험나이를 계산하는 끝수 기준과 연령 증가일은 언제야?"
+    ],
     "profile": "term_explain",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["a543550aeb9d081e8b50"]
+    "relevant_chunk_ids": [
+      "a543550aeb9d081e8b50"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause"
+        ],
+        "required_terms": [
+          "보험나이",
+          "6개월"
+        ]
+      }
+    ]
   },
   {
     "id": "standard_personal_data_protection",
-    "questions": ["보험회사가 개인정보를 이용할 때 필요한 동의와 안전관리 의무를 알려줘", "보험사의 고객정보 수집·제공 동의와 안전한 관리에 관한 약관 근거가 있어?"],
+    "questions": [
+      "보험회사가 개인정보를 이용할 때 필요한 동의와 안전관리 의무를 알려줘",
+      "보험사의 고객정보 수집·제공 동의와 안전한 관리에 관한 약관 근거가 있어?"
+    ],
     "profile": "consumer_protection",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["35ead0bb9702fea21f0c", "6299ba99ef63c7a604e6", "e17e7fed3b89a7f076c0", "466d2f30fbd21e3956af"]
+    "relevant_chunk_ids": [
+      "35ead0bb9702fea21f0c",
+      "6299ba99ef63c7a604e6",
+      "e17e7fed3b89a7f076c0",
+      "466d2f30fbd21e3956af"
+    ],
+    "accepted_evidence": [
+      {
+        "source_categories": [
+          "standard_clause",
+          "law"
+        ],
+        "required_terms": [
+          "개인정보",
+          "동의"
+        ]
+      }
+    ]
   },
   {
     "id": "law_consumer_basic_rights",
-    "questions": ["금융상품을 고를 때 정보 제공과 피해 보상을 받을 소비자 권리를 알려줘", "금융소비자의 기본 권리 중 정보와 공정한 보상에 관한 내용을 찾아줘"],
+    "questions": [
+      "금융상품을 고를 때 정보 제공과 피해 보상을 받을 소비자 권리를 알려줘",
+      "금융소비자의 기본 권리 중 정보와 공정한 보상에 관한 내용을 찾아줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["financial_consumer_protection_act:7조"]
+    "relevant_chunk_ids": [
+      "financial_consumer_protection_act:7조"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "financial_consumer_protection_act"
+        ],
+        "required_terms": [
+          "금융소비자",
+          "권리"
+        ]
+      }
+    ]
   },
   {
     "id": "law_suitability_principle",
-    "questions": ["판매자가 권유 전에 소비자 정보를 확인하고 맞지 않는 상품은 권하지 말아야 하는 원칙이 뭐야?", "금융상품 권유 전 면담·질문과 부적합 상품 권유 금지 기준을 알려줘"],
+    "questions": [
+      "판매자가 권유 전에 소비자 정보를 확인하고 맞지 않는 상품은 권하지 말아야 하는 원칙이 뭐야?",
+      "금융상품 권유 전 면담·질문과 부적합 상품 권유 금지 기준을 알려줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["financial_consumer_protection_act:17조"]
+    "relevant_chunk_ids": [
+      "financial_consumer_protection_act:17조"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "financial_consumer_protection_act"
+        ],
+        "required_terms": [
+          "적합성원칙",
+          "소비자"
+        ]
+      }
+    ]
   },
   {
     "id": "law_adequacy_principle",
-    "questions": ["권유 없이 금융상품을 사려는 경우 적정성을 어떻게 확인하고 부적정하면 무엇을 알려야 해?", "소비자가 직접 계약하려 할 때도 정보를 확인하고 부적정 사실을 알려야 하는 원칙이 뭐야?"],
+    "questions": [
+      "권유 없이 금융상품을 사려는 경우 적정성을 어떻게 확인하고 부적정하면 무엇을 알려야 해?",
+      "소비자가 직접 계약하려 할 때도 정보를 확인하고 부적정 사실을 알려야 하는 원칙이 뭐야?"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["financial_consumer_protection_act:18조"]
+    "relevant_chunk_ids": [
+      "financial_consumer_protection_act:18조"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "financial_consumer_protection_act"
+        ],
+        "required_terms": [
+          "적정성원칙",
+          "소비자"
+        ]
+      }
+    ]
   },
   {
     "id": "law_explanation_duty",
-    "questions": ["금융상품의 중요한 내용을 설명하고 설명서를 제공해 이해를 확인할 의무가 뭐야?", "판매자가 중요 사항을 설명한 뒤 설명서와 이해 확인을 해야 한다는 근거를 찾아줘"],
+    "questions": [
+      "금융상품의 중요한 내용을 설명하고 설명서를 제공해 이해를 확인할 의무가 뭐야?",
+      "판매자가 중요 사항을 설명한 뒤 설명서와 이해 확인을 해야 한다는 근거를 찾아줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["financial_consumer_protection_act:19조:1"]
+    "relevant_chunk_ids": [
+      "financial_consumer_protection_act:19조:1"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "financial_consumer_protection_act"
+        ],
+        "required_terms": [
+          "설명의무",
+          "설명서"
+        ]
+      }
+    ]
   },
   {
     "id": "law_unfair_sales_practices",
-    "questions": ["대출 조건으로 다른 상품 가입을 강요하거나 부당한 담보·보증을 요구해도 돼?", "우월적 지위로 추가 상품과 담보나 보증을 강요하는 행위를 규제하는 조항이 있어?"],
+    "questions": [
+      "대출 조건으로 다른 상품 가입을 강요하거나 부당한 담보·보증을 요구해도 돼?",
+      "우월적 지위로 추가 상품과 담보나 보증을 강요하는 행위를 규제하는 조항이 있어?"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["financial_consumer_protection_act:20조"]
+    "relevant_chunk_ids": [
+      "financial_consumer_protection_act:20조"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "financial_consumer_protection_act"
+        ],
+        "required_terms": [
+          "불공정영업행위",
+          "우월적 지위"
+        ]
+      }
+    ]
   },
   {
     "id": "law_improper_solicitation",
-    "questions": ["불확실한 금융상품을 확실한 것처럼 말하며 권유해도 돼?", "소비자가 거절했는데도 전화 권유를 계속하는 행위는 어떤 규정에 걸려?"],
+    "questions": [
+      "불확실한 금융상품을 확실한 것처럼 말하며 권유해도 돼?",
+      "소비자가 거절했는데도 전화 권유를 계속하는 행위는 어떤 규정에 걸려?"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["financial_consumer_protection_act:21조"]
+    "relevant_chunk_ids": [
+      "financial_consumer_protection_act:21조"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "financial_consumer_protection_act"
+        ],
+        "required_terms": [
+          "부당권유행위",
+          "오인"
+        ]
+      }
+    ]
   },
   {
     "id": "law_contract_documents",
-    "questions": ["금융상품 계약서류는 언제 받아야 하고 제공 여부 분쟁은 누가 증명해?", "계약서류 제공 시점과 제공 사실의 증명 책임을 함께 알려줘"],
+    "questions": [
+      "금융상품 계약서류는 언제 받아야 하고 제공 여부 분쟁은 누가 증명해?",
+      "계약서류 제공 시점과 제공 사실의 증명 책임을 함께 알려줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["financial_consumer_protection_act:23조"]
+    "relevant_chunk_ids": [
+      "financial_consumer_protection_act:23조"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "financial_consumer_protection_act"
+        ],
+        "required_terms": [
+          "계약서류",
+          "제공"
+        ]
+      }
+    ]
   },
   {
     "id": "insurance_law_contract_counterparty",
-    "questions": ["보험회사가 아닌 곳과 보험계약을 맺거나 중개하는 것이 원칙적으로 가능한가?", "보험계약을 체결하거나 대리할 수 있는 주체를 제한하는 법 조항을 찾아줘"],
+    "questions": [
+      "보험회사가 아닌 곳과 보험계약을 맺거나 중개하는 것이 원칙적으로 가능한가?",
+      "보험계약을 체결하거나 대리할 수 있는 주체를 제한하는 법 조항을 찾아줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["insurance_business_act:3조"]
+    "relevant_chunk_ids": [
+      "insurance_business_act:3조"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "insurance_business_act"
+        ],
+        "required_terms": [
+          "보험계약",
+          "체결"
+        ]
+      }
+    ]
   },
   {
     "id": "insurance_law_claim_explanation",
-    "questions": ["보험금 요청 뒤 지급절차와 내역, 감액하거나 주지 않는 이유까지 설명해야 해?", "보험회사의 지급절차·지급내역 설명과 부지급 사유 안내 의무를 알려줘"],
+    "questions": [
+      "보험금 요청 뒤 지급절차와 내역, 감액하거나 주지 않는 이유까지 설명해야 해?",
+      "보험회사의 지급절차·지급내역 설명과 부지급 사유 안내 의무를 알려줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["insurance_business_act:95조의2"]
+    "relevant_chunk_ids": [
+      "insurance_business_act:95조의2"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "insurance_business_act"
+        ],
+        "required_terms": [
+          "보험금",
+          "설명"
+        ]
+      }
+    ]
   },
   {
     "id": "insurance_law_special_benefits",
-    "questions": ["보험 가입 대가로 보험료를 대신 내주는 혜택을 약속해도 돼?", "모집인이 계약자에게 금품 같은 특별한 이익을 제공하면 안 된다는 근거가 있어?"],
+    "questions": [
+      "보험 가입 대가로 보험료를 대신 내주는 혜택을 약속해도 돼?",
+      "모집인이 계약자에게 금품 같은 특별한 이익을 제공하면 안 된다는 근거가 있어?"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["insurance_business_act:98조"]
+    "relevant_chunk_ids": [
+      "insurance_business_act:98조"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "insurance_business_act"
+        ],
+        "required_terms": [
+          "특별이익",
+          "제공"
+        ]
+      }
+    ]
   },
   {
     "id": "insurance_law_duplicate_contract_check",
-    "questions": ["같은 위험을 보장하는 계약이 이미 있는지 모집 전에 확인해야 해?", "중복 보장 계약을 확인할 때 계약하려는 사람의 동의가 필요한가?"],
+    "questions": [
+      "같은 위험을 보장하는 계약이 이미 있는지 모집 전에 확인해야 해?",
+      "중복 보장 계약을 확인할 때 계약하려는 사람의 동의가 필요한가?"
+    ],
     "profile": "consumer_protection",
     "difficulty": "medium",
-    "relevant_chunk_ids": ["insurance_business_act:95조의5"]
+    "relevant_chunk_ids": [
+      "insurance_business_act:95조의5"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "insurance_business_act"
+        ],
+        "required_terms": [
+          "중복계약",
+          "동의"
+        ]
+      }
+    ]
   },
   {
     "id": "insurance_law_frontline_worker_protection",
-    "questions": ["폭언을 겪은 고객응대직원의 분리·담당자 교체와 치료·상담 지원 의무를 알려줘", "보험회사가 상담 직원을 보호하기 위해 업무 교체와 상담 지원 등 어떤 조치를 해야 해?"],
+    "questions": [
+      "폭언을 겪은 고객응대직원의 분리·담당자 교체와 치료·상담 지원 의무를 알려줘",
+      "보험회사가 상담 직원을 보호하기 위해 업무 교체와 상담 지원 등 어떤 조치를 해야 해?"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["insurance_business_act:85조의4"]
+    "relevant_chunk_ids": [
+      "insurance_business_act:85조의4"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "insurance_business_act"
+        ],
+        "required_terms": [
+          "고객응대직원",
+          "보호"
+        ]
+      }
+    ]
   },
   {
     "id": "roadmap_product_names",
-    "questions": ["보장 내용을 과장하는 보험 이름을 정비하려던 이유가 뭐야?", "상품명에 갱신형 여부나 보험 종류를 드러내려는 정책 방향을 찾아줘"],
+    "questions": [
+      "보장 내용을 과장하는 보험 이름을 정비하려던 이유가 뭐야?",
+      "상품명에 갱신형 여부나 보험 종류를 드러내려는 정책 방향을 찾아줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["83ef319108bcf18809b6"]
+    "relevant_chunk_ids": [
+      "83ef319108bcf18809b6"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "fsc_policy_terms_roadmap_2019_10_22"
+        ],
+        "required_terms": [
+          "상품명",
+          "갱신형"
+        ]
+      }
+    ]
   },
   {
     "id": "roadmap_legal_medical_review",
-    "questions": ["새 보험상품을 만들 때 법률·의료 전문가가 사전 검증하는 이유와 방법을 알려줘", "상품 개발 단계의 법률 검토와 보험금 기준의 의료리스크 검증 정책이 궁금해"],
+    "questions": [
+      "새 보험상품을 만들 때 법률·의료 전문가가 사전 검증하는 이유와 방법을 알려줘",
+      "상품 개발 단계의 법률 검토와 보험금 기준의 의료리스크 검증 정책이 궁금해"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["75fdbd6118e702aa4e01"]
+    "relevant_chunk_ids": [
+      "75fdbd6118e702aa4e01"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "fsc_policy_terms_roadmap_2019_10_22"
+        ],
+        "required_terms": [
+          "법률",
+          "의료리스크"
+        ]
+      }
+    ]
   },
   {
     "id": "roadmap_understandability_review",
-    "questions": ["약관 이해도 평가에서 소비자 비중·특약 범위·민원 지표를 어떻게 개선하려 했어?", "일반소비자 참여를 50%로 늘리고 특약과 민원도 평가하려는 방안을 알려줘"],
+    "questions": [
+      "약관 이해도 평가에서 소비자 비중·특약 범위·민원 지표를 어떻게 개선하려 했어?",
+      "일반소비자 참여를 50%로 늘리고 특약과 민원도 평가하려는 방안을 알려줘"
+    ],
     "profile": "consumer_protection",
     "difficulty": "hard",
-    "relevant_chunk_ids": ["c17704601bf8aa4de319"]
+    "relevant_chunk_ids": [
+      "c17704601bf8aa4de319"
+    ],
+    "accepted_evidence": [
+      {
+        "source_ids": [
+          "fsc_policy_terms_roadmap_2019_10_22"
+        ],
+        "required_terms": [
+          "약관 이해도",
+          "일반소비자"
+        ]
+      }
+    ]
   },
   {
     "id": "negative_weather",
-    "questions": ["이번 주말 서울에 비가 올까?", "내일 아침 기온과 미세먼지를 알려줘"],
+    "questions": [
+      "이번 주말 서울에 비가 올까?",
+      "내일 아침 기온과 미세먼지를 알려줘"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],
@@ -198,7 +655,10 @@
   },
   {
     "id": "negative_device_support",
-    "questions": ["노트북 배터리가 충전되지 않을 때 어떻게 고쳐?", "휴대전화 화면이 멈췄는데 재부팅 방법을 알려줘"],
+    "questions": [
+      "노트북 배터리가 충전되지 않을 때 어떻게 고쳐?",
+      "휴대전화 화면이 멈췄는데 재부팅 방법을 알려줘"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],
@@ -206,7 +666,10 @@
   },
   {
     "id": "negative_unavailable_personal_fact",
-    "questions": ["내 보험료가 지난달에 정확히 얼마였는지 알려줘", "내가 가입한 계약의 증권번호를 찾아줘"],
+    "questions": [
+      "내 보험료가 지난달에 정확히 얼마였는지 알려줘",
+      "내가 가입한 계약의 증권번호를 찾아줘"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],
@@ -214,7 +677,10 @@
   },
   {
     "id": "negative_news",
-    "questions": ["오늘 주요 경제 뉴스를 요약해줘", "방금 발표된 보험업계 최신 뉴스를 알려줘"],
+    "questions": [
+      "오늘 주요 경제 뉴스를 요약해줘",
+      "방금 발표된 보험업계 최신 뉴스를 알려줘"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],
@@ -222,7 +688,10 @@
   },
   {
     "id": "negative_stock_price",
-    "questions": ["지금 보험회사 주가가 얼마인지 알려줘", "오늘 코스피와 보험주 시세를 비교해줘"],
+    "questions": [
+      "지금 보험회사 주가가 얼마인지 알려줘",
+      "오늘 코스피와 보험주 시세를 비교해줘"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],
@@ -230,7 +699,10 @@
   },
   {
     "id": "negative_hospital_booking",
-    "questions": ["근처 병원 진료 예약을 잡아줘", "오늘 오후에 갈 수 있는 정형외과 예약 가능 시간을 찾아줘"],
+    "questions": [
+      "근처 병원 진료 예약을 잡아줘",
+      "오늘 오후에 갈 수 있는 정형외과 예약 가능 시간을 찾아줘"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],
@@ -238,7 +710,10 @@
   },
   {
     "id": "negative_app_account",
-    "questions": ["앱 계정 비밀번호를 재설정하는 방법을 알려줘", "로그인이 안 될 때 인증번호를 다시 받는 절차가 궁금해"],
+    "questions": [
+      "앱 계정 비밀번호를 재설정하는 방법을 알려줘",
+      "로그인이 안 될 때 인증번호를 다시 받는 절차가 궁금해"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],
@@ -246,7 +721,10 @@
   },
   {
     "id": "negative_personal_coverage_amount",
-    "questions": ["내가 가입한 암 진단비 보장금액이 얼마인지 알려줘", "내 실손의료보험의 자기부담금이 정확히 얼마인지 확인해줘"],
+    "questions": [
+      "내가 가입한 암 진단비 보장금액이 얼마인지 알려줘",
+      "내 실손의료보험의 자기부담금이 정확히 얼마인지 확인해줘"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],
@@ -254,7 +732,10 @@
   },
   {
     "id": "negative_realtime_information",
-    "questions": ["지금 가장 가까운 약국이 열려 있는지 알려줘", "현재 교통 상황을 보고 병원까지 걸리는 시간을 계산해줘"],
+    "questions": [
+      "지금 가장 가까운 약국이 열려 있는지 알려줘",
+      "현재 교통 상황을 보고 병원까지 걸리는 시간을 계산해줘"
+    ],
     "profile": "out_of_scope",
     "difficulty": "hard",
     "relevant_chunk_ids": [],

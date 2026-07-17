@@ -11,6 +11,7 @@ from app.rag.official.models import RagChunk, RetrievalHit
 from app.rag.official.retrieval import retrieve, transform_query
 from app.rag.official.sources import OfficialSource, rag_sources, verify_downloaded_sources
 from evals.rag.official import (
+    AcceptedEvidence,
     ExtractionEvalCase,
     RetrievalEvalCase,
     evaluate_extraction,
@@ -234,23 +235,24 @@ def test_retrieve_requires_an_explicit_embedder_for_in_memory_chunks() -> None:
         retrieve("지급사유", chunks=chunks)
 
 
-def test_transform_query_only_normalizes_whitespace() -> None:
+def test_transform_query_normalizes_whitespace_and_adds_korean_ngrams() -> None:
     plan = transform_query("암 진단비 받을 수 있어?")
 
     assert plan.search_query == "암 진단비 받을 수 있어?"
-    assert plan.terms == ("암", "진단비", "받을", "수", "있어")
+    assert plan.terms == ("암", "진단비", "받을", "수", "있어", "진단", "단비")
 
 
 def test_retrieval_eval_fixture_passes_current_small_corpus() -> None:
     cases = load_retrieval_eval_cases()
     report = evaluate_retrieval(cases)
 
-    assert report.total == 72
+    assert report.total_cases == 72
+    assert report.total == 54
     assert report.recall >= 0.3, report.results
     assert 0.0 <= report.mrr <= 1.0
     assert 0.0 <= report.precision_at_k <= 1.0
     assert 0.0 <= report.ndcg_at_k <= 1.0
-    assert report.negative_total == 18
+    assert report.diagnostic_negative_total == 18
     assert report.average_latency_seconds >= 0.0
 
 
@@ -265,6 +267,8 @@ def test_retrieval_eval_fixture_uses_exact_existing_chunks_without_pii() -> None
         case.expected_no_hits or set(case.relevant_chunk_ids).issubset(chunk_ids) for case in cases
     )
     assert all(case.relevant_chunk_ids or case.expected_no_hits for case in cases)
+    assert all(case.accepted_evidence or case.expected_no_hits for case in cases)
+    assert all(not case.accepted_evidence or not case.expected_no_hits for case in cases)
     assert re.search(r"\b\d{6}-[1-4]\d{6}\b", fixture_text) is None
     assert re.search(r"\b01[016789]-?\d{3,4}-?\d{4}\b", fixture_text) is None
     assert re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", fixture_text) is None
@@ -462,6 +466,119 @@ def test_retrieval_eval_uses_exact_relevant_chunk_ids(
 
     assert report.results[0].passed is True
     assert report.results[0].rank == 1
+
+
+def test_retrieval_eval_accepts_semantic_official_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hits = [
+        RetrievalHit(
+            chunk=RagChunk(
+                id="alternative",
+                source_id="consumer_guide",
+                source_title="소비자 안내",
+                source_category="consumer_guide",
+                publisher="테스트",
+                text="보험증권을 받은 날부터 15일 이내에 청약을 철회할 수 있습니다.",
+                page_start=1,
+                page_end=1,
+                label="청약 철회",
+                citation_label="소비자 안내 p.1",
+            ),
+            score=0.9,
+            keyword_score=0.0,
+            vector_score=0.9,
+        ),
+    ]
+
+    def _fake_retrieve(
+        *,
+        query: str,
+        chunks: tuple[RagChunk, ...] | None = None,
+        embedder: object | None = None,
+        final_k: int = 5,
+    ) -> list[RetrievalHit]:
+        return hits
+
+    monkeypatch.setattr("evals.rag.official.retrieval.retrieve", _fake_retrieve)
+    cases = (
+        RetrievalEvalCase(
+            id="case",
+            query="질문",
+            profile="claim_check",
+            difficulty="medium",
+            relevant_chunk_ids=("exact",),
+            accepted_evidence=(
+                AcceptedEvidence(
+                    source_categories=("consumer_guide",),
+                    required_terms=("청약", "철회", "15일"),
+                ),
+            ),
+        ),
+    )
+
+    report = evaluate_retrieval(cases, production=True)
+
+    assert report.results[0].exact_matched is False
+    assert report.results[0].accepted_matched is True
+    assert report.results[0].accepted_rank == 1
+    assert report.accepted_recall == 1.0
+
+
+def test_retrieval_eval_negative_cases_are_diagnostic_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hit = RetrievalHit(
+        chunk=RagChunk(
+            id="some-hit",
+            source_id="source",
+            source_title="공식 문서",
+            source_category="consumer_guide",
+            publisher="테스트",
+            text="검색 결과",
+            page_start=1,
+            page_end=1,
+        ),
+        score=0.9,
+        keyword_score=0.0,
+        vector_score=0.9,
+    )
+
+    def _fake_retrieve(
+        *,
+        query: str,
+        chunks: tuple[RagChunk, ...] | None = None,
+        embedder: object | None = None,
+        final_k: int = 5,
+    ) -> list[RetrievalHit]:
+        return [hit]
+
+    monkeypatch.setattr("evals.rag.official.retrieval.retrieve", _fake_retrieve)
+    cases = (
+        RetrievalEvalCase(
+            id="positive",
+            query="보험 질문",
+            profile="term_explain",
+            difficulty="medium",
+            relevant_chunk_ids=("some-hit",),
+        ),
+        RetrievalEvalCase(
+            id="negative",
+            query="오늘 날씨 알려줘",
+            profile="out_of_scope",
+            difficulty="hard",
+            relevant_chunk_ids=(),
+            expected_no_hits=True,
+        ),
+    )
+
+    report = evaluate_retrieval(cases, production=True)
+
+    assert report.passed == 1
+    assert report.total == 1
+    assert report.total_cases == 2
+    assert report.pass_rate == 1.0
+    assert report.diagnostic_negative_no_hit_rate == 0.0
 
 
 def test_law_snapshots_are_loaded_as_rag_chunks() -> None:
