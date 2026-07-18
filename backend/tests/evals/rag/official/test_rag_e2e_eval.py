@@ -70,6 +70,7 @@ def test_official_rag_e2e_scores_retrieval_then_generation(
     assert report.passed == 1
     assert report.pass_rate == 1.0
     assert report.retrieval_required_citation_rate == 1.0
+    assert report.failure_buckets == {"passed": 1}
     assert "passed=1/1" in render_report(report)
 
 

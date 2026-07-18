@@ -116,6 +116,38 @@ QA router, planner, 사용자 업로드 증권은 거치지 않는다.
 | RAG E2E broad baseline | 21/60, pass_rate 0.350 | generation 전체 시나리오로 확장했다. 실패는 필요한 chunk가 top-5에 없거나, 검색은 됐지만 추출형 답변이 필수 표현을 담지 못한 경우, negative/out-of-scope가 answered로 흐르는 경우다. |
 | RAG E2E reliable baseline | 47/150, pass_rate 0.313 | generation 전체, retrieval 전체, extra negative를 합쳐 150개로 확장했다. negative/out-of-scope 거절과 retrieval miss가 더 명확히 드러난다. |
 
+### 실패 분해
+
+`47/150` baseline의 실패는 다음 세 묶음이다.
+
+| 실패군 | 건수 | 의미 |
+|---|---:|---|
+| answerability_status_mismatch | 42 | negative/out-of-scope 질문인데 offline extractive completer가 검색된 발췌문을 그대로 답변으로 만들어 `answered`가 된다. Retrieval 튜닝으로 해결할 문제가 아니다. |
+| retrieval_miss | 37 | 필요한 핵심 citation chunk가 top-5 안에 없다. Chunking, ranking, rerank, corpus 품질을 봐야 한다. |
+| answer_missing_required_content | 24 | 필요한 chunk는 검색됐지만 답변에 필수 내용이 빠진다. Context packing, prompt, citation coverage, 또는 offline completer 한계를 봐야 한다. |
+
+키워드/단어 기반 scope gate는 사용하지 않는다.
+Official RAG 개선은 검색 근거 품질, context 구성, citation grounding을 기준으로 한다.
+
+### 폐기한 개선 실험
+
+| 실험 | 결과 | 판단 |
+|---|---:|---|
+| RRF 상수 20 → 10 | E2E 47/150 → 53/150 | 수치는 조금 올랐지만 개선 폭이 작고 근본 병목을 해결하지 못해 폐기했다. |
+| top-k 5 → 8, citation capacity 6 → 8 | retrieval_miss 37 → 29, E2E 47/150 유지 | 필요한 근거는 더 들어오지만 answer_missing이 24 → 32로 늘었다. Context noise가 늘어 폐기했다. |
+| score cutoff | 미적용 | positive와 negative의 keyword/vector score 분포가 겹쳐 과차단 위험이 컸다. |
+
+### 다음 개선 방향
+
+1. `retrieval_miss`는 정답 chunk rank를 보고 나눈다.
+   37건 중 15건은 정답 chunk가 6~10위에 있어 rerank/context selection 후보이고,
+   나머지는 query-corpus mismatch나 chunking 문제를 봐야 한다.
+2. `answer_missing_required_content`는 top-k를 무작정 늘리지 말고 context packing을 고쳐야 한다.
+   필요한 조항의 뒤쪽 문장이 잘리지 않도록 chunk 내부 excerpt 선택 또는 section-aware packing을 검토한다.
+3. `answerability_status_mismatch`는 retrieval 튜닝으로 해결하지 않는다.
+   offline extractive completer가 negative에도 발췌문을 복사하는 한계가 있으므로,
+   live generation 또는 별도 context sufficiency 평가로 분리해서 본다.
+
 ## 현재 상태 요약
 
 | 영역 | 최신 결과 | 상태 |

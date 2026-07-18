@@ -13,7 +13,7 @@ from argparse import ArgumentParser
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter, compact_prompt_text
@@ -35,6 +35,15 @@ from evals.rag.official.retrieval import RetrievalEvalCase, load_retrieval_eval_
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "e2e_dataset.json"
 _OFFLINE_ANSWER_CHARS = 850
+FailureBucket = Literal[
+    "passed",
+    "retrieval_miss",
+    "answerability_status_mismatch",
+    "citation_not_used",
+    "answer_missing_required_content",
+    "forbidden_content",
+    "other",
+]
 
 
 @dataclass(frozen=True)
@@ -55,6 +64,14 @@ class OfficialRagE2EReport:
     def answer_contract_rate(self) -> float:
         return _rate(result.answer_contract_passed for result in self.results)
 
+    @property
+    def failure_buckets(self) -> dict[FailureBucket, int]:
+        buckets: dict[FailureBucket, int] = {}
+        for result in self.results:
+            bucket = result.failure_bucket
+            buckets[bucket] = buckets.get(bucket, 0) + 1
+        return buckets
+
 
 @dataclass(frozen=True)
 class OfficialRagE2EResult:
@@ -72,6 +89,22 @@ class OfficialRagE2EResult:
     answer_status: str
     citation_ids: tuple[str, ...]
     notes: tuple[str, ...]
+
+    @property
+    def failure_bucket(self) -> FailureBucket:
+        if self.passed:
+            return "passed"
+        if not self.required_citations_retrieved:
+            return "retrieval_miss"
+        if not self.status_matched:
+            return "answerability_status_mismatch"
+        if not self.required_citation_covered:
+            return "citation_not_used"
+        if not self.must_include_covered:
+            return "answer_missing_required_content"
+        if not self.must_not_include_clean:
+            return "forbidden_content"
+        return "other"
 
 
 def load_e2e_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[GenerationEvalCase, ...]:
@@ -158,6 +191,16 @@ def render_report(report: OfficialRagE2EReport, *, show_passing: bool = False) -
             f"answer_contract={report.answer_contract_rate:.3f}"
         )
     ]
+    failed_buckets = {
+        bucket: count
+        for bucket, count in report.failure_buckets.items()
+        if bucket != "passed" and count
+    }
+    if failed_buckets:
+        lines.append(
+            "failure_buckets="
+            + ", ".join(f"{bucket}:{count}" for bucket, count in failed_buckets.items())
+        )
 
     for result in report.results:
         if result.passed and not show_passing:
@@ -165,6 +208,7 @@ def render_report(report: OfficialRagE2EReport, *, show_passing: bool = False) -
         status = "PASS" if result.passed else "FAIL"
         lines.append(
             f"{status} {result.case_id} "
+            f"bucket={result.failure_bucket} "
             f"retrieved_required={result.required_citations_retrieved} "
             f"status={result.answer_status}"
         )
