@@ -16,7 +16,7 @@ from app.modules.policy.coverage.service import extract_coverages
 from app.modules.policy.models import Coverage, ParsedDocument, PolicySummary
 from app.modules.policy.parsing import parse_document
 from app.modules.policy.summary.service import extract_policy_summary
-from app.rag.policy import index_policy_document
+from app.rag.policy.indexing import index_policy_document
 
 
 class PipelineResult(TypedDict):
@@ -55,9 +55,25 @@ def run_pipeline(
         "문자수": len(doc.text),
     }
     try:
-        session_id = index(doc)
+        session_id = (
+            index_policy_document(doc, sensitive_values=policy_sensitive_values(summary))
+            if index is index_policy_document
+            else index(doc)
+        )
     except Exception:
         session_id = None
     if session_id:
         result["문서세션ID"] = session_id
     return result
+
+
+def policy_sensitive_values(summary: PolicySummary) -> tuple[str, ...]:
+    values = [
+        summary.get("증권번호"),
+        summary.get("계약자"),
+        summary.get("피보험자"),
+    ]
+    vehicle = summary.get("차량정보")
+    if vehicle is not None:
+        values.append(vehicle.get("차량번호"))
+    return tuple(value for value in values if value)

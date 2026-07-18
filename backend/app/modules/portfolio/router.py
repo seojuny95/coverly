@@ -10,9 +10,14 @@ from app.modules.analysis.summary_overview import (
     attach_summary_overview,
 )
 from app.modules.portfolio.schemas import (
+    DeathBenefitGuideInput,
+    PolicyInput,
     PortfolioCoverageSummary,
     PortfolioSummaryRequest,
 )
+from app.modules.portfolio.session.analysis import analyze_portfolio_snapshot
+from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
+from app.modules.portfolio.session.http import resolve_portfolio_snapshot
 from app.modules.portfolio.summary import summarize_portfolio_coverages
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
 
@@ -20,11 +25,12 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 
 class PortfolioSummaryService:
-    def __call__(self, request: PortfolioSummaryRequest) -> PortfolioCoverageSummary:
-        summary = summarize_portfolio_coverages(
-            request.policies,
-            request.death_benefit_context,
-        )
+    def __call__(
+        self,
+        policies: list[PolicyInput],
+        death_benefit_context: DeathBenefitGuideInput,
+    ) -> PortfolioCoverageSummary:
+        summary = summarize_portfolio_coverages(policies, death_benefit_context)
         return attach_summary_overview(summary)
 
 
@@ -42,9 +48,16 @@ PortfolioSummaryServiceDep = Annotated[
 def coverage_summary(
     request: PortfolioSummaryRequest,
     summarize: PortfolioSummaryServiceDep,
+    sessions: PortfolioSessionServiceDep,
 ) -> PortfolioCoverageSummary:
     try:
-        return summarize(request)
+        snapshot = resolve_portfolio_snapshot(sessions, request)
+        return analyze_portfolio_snapshot(
+            sessions,
+            snapshot,
+            request,
+            summarize,
+        )
     except ReferenceDataUnavailableError as exc:
         raise ApiError(
             status_code=503,

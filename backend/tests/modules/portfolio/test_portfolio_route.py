@@ -6,8 +6,16 @@ from app.core.errors import ApiError, api_error_handler
 from app.modules.analysis.summary_overview import SummaryOverviewUnavailableError
 from app.modules.portfolio import router as portfolio
 from app.modules.portfolio import summary as portfolio_summary
-from app.modules.portfolio.schemas import PortfolioCoverageSummary, PortfolioOverview
+from app.modules.portfolio.schemas import PolicyInput, PortfolioCoverageSummary, PortfolioOverview
+from app.modules.portfolio.session.dependencies import get_portfolio_session_service
+from app.modules.portfolio.session.models import (
+    CachedPortfolioAnalysis,
+    PortfolioSessionSnapshot,
+)
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
+
+DOCUMENT_1 = "00000000-0000-0000-0000-000000000001"
+DOCUMENT_2 = "00000000-0000-0000-0000-000000000002"
 
 
 def _attach_test_overview(summary: PortfolioCoverageSummary) -> PortfolioCoverageSummary:
@@ -23,36 +31,84 @@ def _attach_test_overview(summary: PortfolioCoverageSummary) -> PortfolioCoverag
     )
 
 
-def _client(monkeypatch: MonkeyPatch) -> TestClient:
-    monkeypatch.setattr(portfolio, "attach_summary_overview", _attach_test_overview)
+def _client(
+    monkeypatch: MonkeyPatch,
+    policies: list[dict[str, object] | PolicyInput],
+    *,
+    stub_overview: bool = True,
+) -> TestClient:
+    parsed_policies = tuple(
+        policy if isinstance(policy, PolicyInput) else PolicyInput.model_validate(policy)
+        for policy in policies
+    )
+
+    class _Sessions:
+        def snapshot(
+            self,
+            token: str,
+            *,
+            policy_ids: list[str] | None = None,
+        ) -> PortfolioSessionSnapshot:
+            assert token == "portfolio-token"
+            return PortfolioSessionSnapshot(
+                session_id="portfolio-1",
+                version=1,
+                policies=parsed_policies,
+                rag_session_ids=(),
+            )
+
+        def load_cached_analysis(
+            self,
+            snapshot: PortfolioSessionSnapshot,
+            *,
+            context_hash: str,
+        ) -> None:
+            return None
+
+        def save_cached_analysis(
+            self,
+            snapshot: PortfolioSessionSnapshot,
+            analysis: CachedPortfolioAnalysis,
+        ) -> None:
+            return None
+
+    if stub_overview:
+        monkeypatch.setattr(portfolio, "attach_summary_overview", _attach_test_overview)
     app = FastAPI()
     app.add_exception_handler(ApiError, api_error_handler)
     app.include_router(portfolio.router)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
     return TestClient(app)
+
+
+def _request(*policy_ids: str) -> dict[str, object]:
+    return {
+        "portfolioSessionToken": "portfolio-token",
+        "policyIds": list(policy_ids or (DOCUMENT_1,)),
+    }
 
 
 def test_coverage_summary_route_accepts_parse_result_shape(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    response = _client(monkeypatch).post(
-        "/portfolio/summary",
-        json={
-            "policies": [
+    policies: list[dict[str, object] | PolicyInput] = [
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "보험사A", "보험분류": "건강보험"},
+            "보장목록": [
                 {
-                    "id": "p1",
-                    "기본정보": {"보험사": "보험사A", "보험분류": "건강보험"},
-                    "보장목록": [
-                        {
-                            "담보명": "암진단비",
-                            "가입금액": "1천만원",
-                            "보장내용": None,
-                            "해설": None,
-                        }
-                    ],
-                    "분석상태": "완료",
+                    "담보명": "암진단비",
+                    "가입금액": "1천만원",
+                    "보장내용": None,
+                    "해설": None,
                 }
-            ]
-        },
+            ],
+            "분석상태": "완료",
+        }
+    ]
+    response = _client(monkeypatch, policies).post(
+        "/portfolio/summary",
+        json=_request(),
     )
 
     assert response.status_code == 200
@@ -65,10 +121,93 @@ def test_coverage_summary_route_accepts_parse_result_shape(
     assert body["overview"]["generation"] == "llm"
 
 
+def test_coverage_summary_loads_structured_policies_from_session(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": DOCUMENT_1,
+            "기본정보": {"보험사": "보험사A", "보험분류": "건강보험"},
+            "보장목록": [
+                {
+                    "담보명": "암진단비",
+                    "가입금액": "1천만원",
+                    "보장내용": None,
+                    "해설": None,
+                }
+            ],
+        }
+    )
+    saved: list[CachedPortfolioAnalysis] = []
+
+    class _Sessions:
+        def snapshot(
+            self,
+            token: str,
+            *,
+            policy_ids: list[str] | None = None,
+        ) -> PortfolioSessionSnapshot:
+            assert token == "portfolio-token"
+            assert policy_ids == [DOCUMENT_1.replace("-", "")]
+            return PortfolioSessionSnapshot(
+                session_id="portfolio-1",
+                version=1,
+                policies=(policy,),
+                rag_session_ids=(),
+            )
+
+        def load_cached_analysis(
+            self,
+            snapshot: PortfolioSessionSnapshot,
+            *,
+            context_hash: str,
+        ) -> None:
+            return None
+
+        def save_cached_analysis(
+            self,
+            snapshot: PortfolioSessionSnapshot,
+            analysis: CachedPortfolioAnalysis,
+        ) -> None:
+            saved.append(analysis)
+
+    monkeypatch.setattr(portfolio, "attach_summary_overview", _attach_test_overview)
+    app = FastAPI()
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.include_router(portfolio.router)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+
+    response = TestClient(app).post(
+        "/portfolio/summary",
+        json={
+            "portfolioSessionToken": "portfolio-token",
+            "policyIds": [DOCUMENT_1],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["totals"][0]["totalAmount"] == 10_000_000
+    assert saved[0].version == 1
+
+
+def test_coverage_summary_rejects_non_uuid_policy_ids(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    response = _client(monkeypatch, []).post(
+        "/portfolio/summary",
+        json={
+            "portfolioSessionToken": "portfolio-token",
+            "policyIds": ["not-a-document-id"],
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_coverage_summary_route_serializes_curated_alias_group(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    policies = [
+    policies: list[dict[str, object] | PolicyInput] = [
         {
             "id": "p1",
             "기본정보": {"보험사": "보험사A", "보험분류": "건강보험"},
@@ -93,7 +232,10 @@ def test_coverage_summary_route_serializes_curated_alias_group(
         },
     ]
 
-    response = _client(monkeypatch).post("/portfolio/summary", json={"policies": policies})
+    response = _client(monkeypatch, policies).post(
+        "/portfolio/summary",
+        json=_request(DOCUMENT_1, DOCUMENT_2),
+    )
 
     assert response.status_code == 200
     total = response.json()["totals"][0]
@@ -110,26 +252,25 @@ def test_coverage_summary_route_includes_monthly_premium_without_inventing_bench
     monkeypatch: MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(portfolio_summary, "premium_benchmark_for_age", lambda _age: None)
-    response = _client(monkeypatch).post(
+    policies: list[dict[str, object] | PolicyInput] = [
+        {
+            "id": "p1",
+            "기본정보": {
+                "보험사": "보험사A",
+                "보험분류": "건강보험",
+                "피보험자정보": {
+                    "나이": 32,
+                    "성별": "남성",
+                    "생애단계": "성인",
+                },
+                "보험료": {"금액": 90000, "납입주기": "월납"},
+            },
+            "보장목록": [],
+        }
+    ]
+    response = _client(monkeypatch, policies).post(
         "/portfolio/summary",
-        json={
-            "policies": [
-                {
-                    "id": "p1",
-                    "기본정보": {
-                        "보험사": "보험사A",
-                        "보험분류": "건강보험",
-                        "피보험자정보": {
-                            "나이": 32,
-                            "성별": "남성",
-                            "생애단계": "성인",
-                        },
-                        "보험료": {"금액": 90000, "납입주기": "월납"},
-                    },
-                    "보장목록": [],
-                }
-            ]
-        },
+        json=_request(),
     )
 
     assert response.status_code == 200
@@ -146,11 +287,10 @@ def test_summary_route_returns_retryable_error_when_llm_overview_fails(
         raise SummaryOverviewUnavailableError("offline")
 
     monkeypatch.setattr(portfolio, "attach_summary_overview", fail)
-    app = FastAPI()
-    app.add_exception_handler(ApiError, api_error_handler)
-    app.include_router(portfolio.router)
-
-    response = TestClient(app).post("/portfolio/summary", json={"policies": []})
+    response = _client(monkeypatch, [], stub_overview=False).post(
+        "/portfolio/summary",
+        json=_request(),
+    )
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "portfolio_overview_unavailable"
@@ -163,11 +303,7 @@ def test_summary_route_returns_retryable_error_when_reference_data_fails(
         raise ReferenceDataUnavailableError("offline")
 
     monkeypatch.setattr(portfolio, "summarize_portfolio_coverages", fail)
-    app = FastAPI()
-    app.add_exception_handler(ApiError, api_error_handler)
-    app.include_router(portfolio.router)
-
-    response = TestClient(app).post("/portfolio/summary", json={"policies": []})
+    response = _client(monkeypatch, []).post("/portfolio/summary", json=_request())
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "reference_data_unavailable"

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,12 +9,15 @@ from app.modules.policy.parsing import (
     PdfPasswordRequiredError,
 )
 from app.modules.policy.pipeline import EmptyTextError, PipelineResult
+from app.modules.portfolio.session.dependencies import get_portfolio_session_service
+from app.modules.portfolio.session.service import RegisteredPolicyDocument
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
-from app.rag.policy.session_tokens import sign_policy_session_id
+
+PORTFOLIO_TOKEN = "test-portfolio-token"
 
 
 @pytest.fixture(autouse=True)
-def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     from app.rag.policy import session_tokens
 
     class _Settings:
@@ -23,6 +26,19 @@ def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 
+    class _Sessions:
+        def add_pipeline_result(
+            self,
+            token: str,
+            result: PipelineResult,
+        ) -> RegisteredPolicyDocument:
+            assert token == PORTFOLIO_TOKEN
+            return RegisteredPolicyDocument(id="document-1")
+
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+    yield
+    app.dependency_overrides.pop(get_portfolio_session_service, None)
+
 
 def test_parse_rejects_non_pdf_upload() -> None:
     client = TestClient(app)
@@ -30,6 +46,7 @@ def test_parse_rejects_non_pdf_upload() -> None:
     response = client.post(
         "/policies/parse",
         files={"file": ("note.txt", b"not a pdf", "text/plain")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 400
@@ -49,6 +66,7 @@ def test_parse_rejects_pdf_larger_than_limit() -> None:
     response = client.post(
         "/policies/parse",
         files={"file": ("large.pdf", payload, "application/pdf")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 413
@@ -65,6 +83,7 @@ def test_parse_rejects_unreadable_pdf_body() -> None:
     response = client.post(
         "/policies/parse",
         files={"file": ("broken.pdf", b"%PDF-1.7\nbroken", "application/pdf")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 422
@@ -103,11 +122,56 @@ def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) ->
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload == {"status": "accepted", **result}
+    assert payload == {"status": "accepted", "documentId": "document-1", **result}
+
+
+def test_parse_registers_result_under_portfolio_session_without_exposing_rag_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.policy import router as policies
+
+    result: PipelineResult = {
+        "기본정보": {"보험사": "보험사A", "상품명": "건강보험"},
+        "보장목록": [],
+        "분석상태": "완료",
+        "문자수": 42,
+        "문서세션ID": "internal-rag-token",
+    }
+    seen: dict[str, object] = {}
+
+    def _run(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        return result
+
+    class _Sessions:
+        def add_pipeline_result(
+            self,
+            token: str,
+            pipeline_result: PipelineResult,
+        ) -> RegisteredPolicyDocument:
+            seen["token"] = token
+            seen["result"] = pipeline_result
+            return RegisteredPolicyDocument(id="document-1")
+
+    monkeypatch.setattr(policies, "run_pipeline", _run)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+    try:
+        response = TestClient(app).post(
+            "/policies/parse",
+            files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+            data={"portfolioSessionToken": "portfolio-token"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_portfolio_session_service, None)
+
+    assert response.status_code == 200
+    assert response.json()["documentId"] == "document-1"
+    assert "문서세션ID" not in response.json()
+    assert seen == {"token": "portfolio-token", "result": result}
 
 
 def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -131,7 +195,7 @@ def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) 
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"password": "900101"},
+        data={"password": "900101", "portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 200
@@ -152,6 +216,7 @@ def test_parse_maps_missing_pdf_password_to_422(
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 422
@@ -173,7 +238,7 @@ def test_parse_maps_wrong_pdf_password_to_422(
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"password": "wrong"},
+        data={"password": "wrong", "portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 422
@@ -202,6 +267,7 @@ def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.Monk
     response = client.post(
         "/policies/parse",
         files={"file": ("auto.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 200
@@ -223,6 +289,7 @@ def test_parse_maps_empty_text_error_to_422(monkeypatch: pytest.MonkeyPatch) -> 
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 422
@@ -243,102 +310,8 @@ def test_parse_maps_reference_data_failure_to_retryable_error(
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
     )
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "reference_data_unavailable"
-
-
-def test_delete_policy_text_session(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.policy import router as policies
-
-    deleted: list[str] = []
-    monkeypatch.setattr(policies, "delete_policy_session", deleted.append)
-
-    client = TestClient(app)
-    response = client.post(
-        "/policies/sessions/delete",
-        json={"문서세션ID": "session-1"},
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "deleted"}
-    assert deleted == ["session-1"]
-
-
-def test_delete_policy_text_session_rejects_invalid_token() -> None:
-    client = TestClient(app)
-
-    response = client.post(
-        "/policies/sessions/delete",
-        json={"문서세션ID": "not-a-server-issued-token"},
-    )
-
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "INVALID_POLICY_SESSION"
-
-
-def test_delete_policy_text_session_deletes_verified_session(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from app.rag.policy import sessions
-
-    deleted: list[str] = []
-
-    class _Store:
-        def delete(self, session_id: str) -> None:
-            deleted.append(session_id)
-
-    monkeypatch.setattr(sessions, "shared_policy_store", lambda: _Store())
-    token = sign_policy_session_id("session-1", datetime(2030, 1, 1, tzinfo=UTC))
-
-    client = TestClient(app)
-    response = client.post(
-        "/policies/sessions/delete",
-        json={"문서세션ID": token},
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "deleted"}
-    assert deleted == ["session-1"]
-
-
-def test_refresh_policy_text_session_returns_new_token(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from app.rag.policy import sessions
-
-    extended: list[tuple[str, datetime]] = []
-
-    class _Store:
-        def extend(self, session_id: str, expires_at: datetime) -> bool:
-            extended.append((session_id, expires_at))
-            return True
-
-    monkeypatch.setattr(sessions, "shared_policy_store", lambda: _Store())
-    token = sign_policy_session_id(
-        "session-1",
-        datetime(2030, 1, 1, 0, 0, tzinfo=UTC),
-        max_expires_at=datetime(2030, 1, 1, 1, 0, tzinfo=UTC),
-    )
-
-    client = TestClient(app)
-    response = client.post("/policies/sessions/refresh", json={"문서세션ID": token})
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["문서세션ID"] != token
-    assert payload["expiresAt"]
-    assert extended[0][0] == "session-1"
-
-
-def test_refresh_policy_text_session_rejects_invalid_token() -> None:
-    client = TestClient(app)
-
-    response = client.post(
-        "/policies/sessions/refresh",
-        json={"문서세션ID": "not-a-server-issued-token"},
-    )
-
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "INVALID_POLICY_SESSION"

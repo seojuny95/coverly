@@ -1,6 +1,7 @@
 """Typed contracts for deterministic portfolio calculations."""
 
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -66,7 +67,6 @@ class PolicyInput(BaseModel):
     기본정보: PolicyInfoInput
     보장목록: list[CoverageInput] = Field(default_factory=list)
     분석상태: str | None = None
-    문서세션ID: str | None = None
 
 
 class DeathBenefitGuideInput(BaseModel):
@@ -75,8 +75,23 @@ class DeathBenefitGuideInput(BaseModel):
     has_major_debt: bool = False
 
 
-class PortfolioSummaryRequest(BaseModel):
-    policies: list[PolicyInput] = Field(default_factory=list)
+class PortfolioSelectionInput(BaseModel):
+    portfolio_session_token: str = Field(
+        alias="portfolioSessionToken",
+        min_length=1,
+        max_length=512,
+    )
+    policy_ids: list[UUID] = Field(
+        alias="policyIds",
+        min_length=1,
+        max_length=50,
+    )
+
+    def policy_id_strings(self) -> list[str]:
+        return [value.hex for value in self.policy_ids]
+
+
+class PortfolioSummaryRequest(PortfolioSelectionInput):
     death_benefit_context: DeathBenefitGuideInput = Field(default_factory=DeathBenefitGuideInput)
 
 

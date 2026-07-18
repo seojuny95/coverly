@@ -105,6 +105,14 @@ class PgVectorPolicyStore:
         with psycopg.connect(self._database_url) as connection:
             connection.execute(statement, (session_id,))
 
+    def delete_expired(self, now: datetime) -> int:
+        statement = sql.SQL("DELETE FROM {} WHERE expires_at <= %s").format(
+            sql.Identifier(self._table_name)
+        )
+        with psycopg.connect(self._database_url) as connection:
+            cursor = connection.execute(statement, (now,))
+            return cursor.rowcount
+
     def extend(self, session_id: str, expires_at: datetime) -> bool:
         statement = sql.SQL(
             """UPDATE {}

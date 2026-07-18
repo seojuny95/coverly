@@ -4,12 +4,17 @@ from functools import partial
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.modules.portfolio.schemas import PolicyInput
+from app.modules.portfolio.session.dependencies import get_portfolio_session_service
+from app.modules.portfolio.session.models import PortfolioSessionSnapshot
 from app.modules.qa.agent.contracts import QaAgentCompleted, QaAgentProgress, QaAgentUnavailable
 from app.modules.qa.agent.service import stream_answer_with_agent
 from app.modules.qa.context import QaContext
 from app.modules.qa.router import get_portfolio_answer_streamer
 from app.modules.qa.router import router as qa_router
 from app.modules.qa.schemas import PortfolioQuestionResponse
+
+DOCUMENT_ID = "00000000-0000-0000-0000-000000000001"
 
 
 class _NoDataAgent:
@@ -44,12 +49,27 @@ class _FailingAgent:
 
 
 def _client() -> TestClient:
+    class _Sessions:
+        def snapshot(
+            self,
+            token: str,
+            *,
+            policy_ids: list[str] | None = None,
+        ) -> PortfolioSessionSnapshot:
+            return PortfolioSessionSnapshot(
+                session_id="portfolio-1",
+                version=1,
+                policies=(),
+                rag_session_ids=(),
+            )
+
     app = FastAPI()
     app.include_router(qa_router)
     app.dependency_overrides[get_portfolio_answer_streamer] = lambda: partial(
         stream_answer_with_agent,
         agent_runner=_NoDataAgent(),
     )
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
     return TestClient(app)
 
 
@@ -58,7 +78,8 @@ def test_qa_stream_route_contract() -> None:
         "/qa/stream",
         json={
             "question": "보험 목록 알려줘",
-            "policies": [],
+            "portfolioSessionToken": "portfolio-token",
+            "policyIds": [DOCUMENT_ID],
             "demographics": {"age": 35, "gender": "여성", "source": "policy"},
             "history": [{"role": "user", "content": "안녕"}],
         },
@@ -72,9 +93,74 @@ def test_qa_stream_route_contract() -> None:
 
 
 def test_qa_stream_route_validates_blank_question() -> None:
-    response = _client().post("/qa/stream", json={"question": "", "policies": []})
+    response = _client().post(
+        "/qa/stream",
+        json={
+            "question": "",
+            "portfolioSessionToken": "portfolio-token",
+            "policyIds": [DOCUMENT_ID],
+        },
+    )
 
     assert response.status_code == 422
+
+
+def test_qa_stream_loads_policies_and_rag_ids_from_portfolio_session() -> None:
+    seen: dict[str, object] = {}
+    policy = PolicyInput.model_validate(
+        {
+            "id": DOCUMENT_ID,
+            "기본정보": {"보험사": "보험사A"},
+            "보장목록": [],
+        }
+    )
+
+    class _Sessions:
+        def snapshot(
+            self,
+            token: str,
+            *,
+            policy_ids: list[str] | None = None,
+        ) -> PortfolioSessionSnapshot:
+            seen["token"] = token
+            seen["policy_ids"] = policy_ids
+            return PortfolioSessionSnapshot(
+                session_id="portfolio-1",
+                version=1,
+                policies=(policy,),
+                rag_session_ids=("rag-document-1",),
+            )
+
+    def _stream(
+        question: str,
+        policies: list[PolicyInput],
+        **kwargs: object,
+    ) -> Iterator[dict[str, object]]:
+        seen["question"] = question
+        seen["policies"] = policies
+        seen["rag_session_ids"] = kwargs["policy_rag_session_ids"]
+        yield {"type": "meta", "status": "answered"}
+        yield {"type": "end", "status": "answered"}
+
+    app = FastAPI()
+    app.include_router(qa_router)
+    app.dependency_overrides[get_portfolio_answer_streamer] = lambda: _stream
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+
+    response = TestClient(app).post(
+        "/qa/stream",
+        json={
+            "question": "내 보험 알려줘",
+            "portfolioSessionToken": "portfolio-token",
+            "policyIds": [DOCUMENT_ID],
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen["token"] == "portfolio-token"
+    assert seen["policy_ids"] == [DOCUMENT_ID.replace("-", "")]
+    assert seen["policies"] == [policy]
+    assert seen["rag_session_ids"] == ("rag-document-1",)
 
 
 def test_agent_service_streams_progress_before_the_answer() -> None:

@@ -9,16 +9,12 @@ import { useDialogA11y } from "./use-dialog-a11y";
 export function LeaveGuardLink({
   href,
   enabled,
-  onLeave,
   children,
   className,
   ariaLabel,
 }: {
   href: string;
   enabled: boolean;
-  // Called right before navigating away when the user confirms leaving
-  // (e.g. to discard in-memory data so the warning copy stays accurate).
-  onLeave?: () => void;
   children: ReactNode;
   className?: string;
   ariaLabel?: string;
@@ -32,11 +28,6 @@ export function LeaveGuardLink({
   });
 
   const go = () => router.push(href);
-
-  const confirmLeave = () => {
-    onLeave?.();
-    go();
-  };
 
   return (
     <>
@@ -80,7 +71,7 @@ export function LeaveGuardLink({
               <button
                 type="button"
                 className="rounded-xl bg-blue-600 px-4 py-2 text-sm text-white"
-                onClick={confirmLeave}
+                onClick={go}
               >
                 나가기
               </button>

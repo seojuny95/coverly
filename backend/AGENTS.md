@@ -6,7 +6,7 @@ FastAPI + uv 백엔드. 전체 프로젝트 가이드: [../AGENTS.md](../AGENTS.
 
 ## 프로젝트 소개
 
-Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 분류·상담·Q&A 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 증권 파싱(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 Q&A(`POST /qa/stream`)다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터의 소유권과 운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
+Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 분류·상담·Q&A 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 증권 파싱·세션 추가(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 Q&A(`POST /qa/stream`)다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
 
 ## Development Commands
 
@@ -26,7 +26,8 @@ app/
 ├── core/                    # config, lifespan, errors, middleware, 공유 pure helper
 ├── modules/
 │   ├── policy/              # 증권 파싱·분류·요약·담보 해설
-│   ├── portfolio/           # 다건 증권 집계와 총평 입력 준비
+│   ├── portfolio/           # 다건 증권 집계, 총평 입력 준비, 단일 토큰 세션
+│   │   └── session/         # 세션 토큰, 구조화 증권 저장, 분석 캐시
 │   ├── analysis/            # 포트폴리오 총평 생성
 │   ├── qa/                  # 근거 기반 Q&A
 │   ├── coverage/            # 담보 분류·매칭·설명
@@ -56,7 +57,7 @@ FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별
 
 의존 방향은 대체로 `modules -> core/integrations/rag`, `rag -> integrations/core`, `integrations -> 외부 시스템`이다. `analysis`와 `qa`는 서버 응답을 생성하는 계층이고, `coverage`, `evidence`, `reference_data`는 여러 기능이 공유하는 순수/조회 로직을 담는다. `app`는 평가 코드를 참조하지 않는다.
 
-참조 데이터와 RAG 테이블 경계, Supabase migration을 포함한 DB 원본 정의는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다.
+참조 데이터, 임시 포트폴리오 세션, RAG 테이블 경계와 Supabase migration을 포함한 DB 원본 정의는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다. 분석과 Q&A는 프론트엔드가 증권 전체를 다시 보내는 방식보다 세션 토큰과 선택 문서 ID로 서버 저장 사실을 조회하는 방식을 우선한다.
 
 전역 원칙(내 편·판매원 아님, grounding)은 [../AGENTS.md](../AGENTS.md)에 있고, 아래는 백엔드에서 그걸 강제하는 규칙이다.
 

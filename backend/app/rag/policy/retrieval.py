@@ -27,11 +27,32 @@ def retrieve_policy_context(
     store: PolicyRagStore | None = None,
     embedder: Embedder | None = None,
 ) -> list[PolicyRetrievalHit]:
-    normalized = _normalize_query(query)
-    if not session_tokens or not normalized or top_k <= 0:
+    if not session_tokens:
         return []
     session_ids = verified_policy_session_ids(session_tokens)
-    if not session_ids:
+    return retrieve_policy_context_by_session_ids(
+        session_ids,
+        query,
+        top_k=top_k,
+        candidate_k=candidate_k,
+        store=store,
+        embedder=embedder,
+    )
+
+
+def retrieve_policy_context_by_session_ids(
+    session_ids: list[str],
+    query: str,
+    *,
+    top_k: int = 4,
+    candidate_k: int = 48,
+    store: PolicyRagStore | None = None,
+    embedder: Embedder | None = None,
+) -> list[PolicyRetrievalHit]:
+    """Retrieve with server-resolved document ids, never client-supplied ids."""
+
+    normalized = _normalize_query(query)
+    if not session_ids or not normalized or top_k <= 0:
         return []
     active_embedder = embedder or openai_embedder_from_settings()
     query_embedding = active_embedder.embed_texts([normalized])[0]

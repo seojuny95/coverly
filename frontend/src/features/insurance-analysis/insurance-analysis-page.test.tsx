@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { renderWithProviders } from "../../test-utils/render-with-providers";
 import { InsuranceAnalysisPage } from "./insurance-analysis-page";
 import type { InsuranceAnalysis } from "./insurance-analysis-store";
-import { POLICY_SESSION_REFRESH_INTERVAL_MS } from "./use-policy-session-refresh";
+import { PORTFOLIO_SESSION_REFRESH_FALLBACK_MS } from "./use-portfolio-session-refresh";
 import type { UploadInsurance } from "../insurance-upload/insurance-upload-form";
 
 // The upload modal renders InsuranceUploadForm, which calls useRouter even
@@ -56,6 +56,8 @@ describe("InsuranceAnalysisPage", () => {
   test("shows insurance counts by classification", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       selectedName: "테스트고객",
       insuranceDocuments: [
         {
@@ -149,6 +151,8 @@ describe("InsuranceAnalysisPage", () => {
   test("normalizes legacy classification values into current sections", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       selectedName: "테스트고객",
       insuranceDocuments: [
         {
@@ -203,6 +207,8 @@ describe("InsuranceAnalysisPage", () => {
   test("expands a insurance row to show detail fields", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       insuranceDocuments: [
         {
           id: "insurance-1",
@@ -256,6 +262,8 @@ describe("InsuranceAnalysisPage", () => {
   test("renders every display field and insurer logo when an insurance document has full data", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       selectedName: "테스트고객A",
       insuranceDocuments: [
         {
@@ -327,6 +335,8 @@ describe("InsuranceAnalysisPage", () => {
   test("shows vehicle info and separates rider rows for an auto policy", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       selectedName: "테스트고객",
       insuranceDocuments: [
         {
@@ -389,6 +399,8 @@ describe("InsuranceAnalysisPage", () => {
   test("renders DB insurer name and logo for a parsed driver insurance document", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       selectedName: "테스트고객A",
       insuranceDocuments: [
         {
@@ -455,13 +467,14 @@ describe("InsuranceAnalysisPage", () => {
     ).toHaveAttribute("href", "/upload");
   });
 
-  test("refreshes document session tokens while the analysis page is open", async () => {
+  test("refreshes the portfolio session token while the analysis page is open", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).endsWith("/policies/sessions/refresh")) {
+      if (String(input).endsWith("/portfolio/sessions/refresh")) {
         return new Response(
           JSON.stringify({
-            문서세션ID: "new-session-token",
+            portfolioSessionToken: "new-session-token",
+            portfolioSessionExpiresAt: "invalid",
             expiresAt: "2026-07-14T00:15:00+00:00",
           }),
         );
@@ -479,6 +492,8 @@ describe("InsuranceAnalysisPage", () => {
 
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "old-session-token",
+      portfolioSessionExpiresAt: "invalid",
       insuranceDocuments: [
         {
           id: "insurance-1",
@@ -486,7 +501,6 @@ describe("InsuranceAnalysisPage", () => {
           result: {
             status: "accepted",
             문자수: 100,
-            문서세션ID: "old-session-token",
           },
         },
       ],
@@ -495,7 +509,7 @@ describe("InsuranceAnalysisPage", () => {
     renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
 
     act(() => {
-      vi.advanceTimersByTime(POLICY_SESSION_REFRESH_INTERVAL_MS);
+      vi.advanceTimersByTime(PORTFOLIO_SESSION_REFRESH_FALLBACK_MS);
     });
     await act(async () => {
       await Promise.resolve();
@@ -503,9 +517,9 @@ describe("InsuranceAnalysisPage", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/policies/sessions/refresh",
+      "http://localhost:8000/portfolio/sessions/refresh",
       expect.objectContaining({
-        body: JSON.stringify({ 문서세션ID: "old-session-token" }),
+        body: JSON.stringify({ portfolioSessionToken: "old-session-token" }),
       }),
     );
   });
@@ -513,9 +527,9 @@ describe("InsuranceAnalysisPage", () => {
   test("shows a session expiration notice when refresh is rejected", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).endsWith("/policies/sessions/refresh")) {
+      if (String(input).endsWith("/portfolio/sessions/refresh")) {
         return new Response(
-          JSON.stringify({ error: { code: "INVALID_POLICY_SESSION" } }),
+          JSON.stringify({ error: { code: "INVALID_PORTFOLIO_SESSION" } }),
           { status: 403 },
         );
       }
@@ -532,6 +546,8 @@ describe("InsuranceAnalysisPage", () => {
 
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "expired-session-token",
+      portfolioSessionExpiresAt: "invalid",
       insuranceDocuments: [
         {
           id: "insurance-1",
@@ -539,7 +555,6 @@ describe("InsuranceAnalysisPage", () => {
           result: {
             status: "accepted",
             문자수: 100,
-            문서세션ID: "expired-session-token",
           },
         },
       ],
@@ -548,7 +563,7 @@ describe("InsuranceAnalysisPage", () => {
     renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
 
     act(() => {
-      vi.advanceTimersByTime(POLICY_SESSION_REFRESH_INTERVAL_MS);
+      vi.advanceTimersByTime(PORTFOLIO_SESSION_REFRESH_FALLBACK_MS);
     });
     await act(async () => {
       await Promise.resolve();
@@ -570,6 +585,7 @@ describe("InsuranceAnalysisPage", () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
+      documentId: "new-document-id",
       문자수: 80,
       기본정보: {
         보험사: "현대해상화재보험",
@@ -582,6 +598,8 @@ describe("InsuranceAnalysisPage", () => {
 
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       selectedName: "테스트고객",
       insuranceDocuments: [
         {
@@ -625,7 +643,10 @@ describe("InsuranceAnalysisPage", () => {
 
     await waitFor(() => {
       expect(uploadInsurance).toHaveBeenCalledWith(
-        { file: insuranceFile },
+        {
+          file: insuranceFile,
+          portfolioSessionToken: "test-portfolio-token",
+        },
         expect.anything(),
       );
     });
@@ -642,6 +663,7 @@ describe("InsuranceAnalysisPage", () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
+      documentId: "duplicate-document-id",
       문자수: 80,
       기본정보: {
         보험사: "삼성화재",
@@ -655,6 +677,8 @@ describe("InsuranceAnalysisPage", () => {
 
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       selectedName: "테스트고객",
       insuranceDocuments: [
         {

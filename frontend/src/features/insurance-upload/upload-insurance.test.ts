@@ -16,6 +16,7 @@ describe("uploadInsurance", () => {
       new Response(
         JSON.stringify({
           status: "accepted",
+          documentId: "test-document-id",
           문자수: 32,
           기본정보: {
             보험사: "삼성화재",
@@ -40,7 +41,10 @@ describe("uploadInsurance", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await uploadInsurance({ file: insuranceFile });
+    const result = await uploadInsurance({
+      file: insuranceFile,
+      portfolioSessionToken: "portfolio-token",
+    });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/policies/parse",
@@ -61,11 +65,38 @@ describe("uploadInsurance", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await uploadInsurance({ file: insuranceFile, password: "900101" });
+    await uploadInsurance({
+      file: insuranceFile,
+      password: "900101",
+      portfolioSessionToken: "portfolio-token",
+    });
 
     const body = fetchMock.mock.calls[0]?.[1]?.body;
     expect(body).toBeInstanceOf(FormData);
     expect((body as FormData).get("password")).toBe("900101");
+  });
+
+  test("includes one portfolio session token when provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: "accepted",
+          documentId: "document-1",
+          문자수: 32,
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await uploadInsurance({
+      file: insuranceFile,
+      portfolioSessionToken: "portfolio-token",
+    });
+
+    const body = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+    expect(body.get("portfolioSessionToken")).toBe("portfolio-token");
+    expect(result.documentId).toBe("document-1");
   });
 
   test("throws a typed user-facing error when the parse endpoint rejects the file", async () => {
@@ -88,7 +119,10 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({ file: insuranceFile }),
+      uploadInsurance({
+        file: insuranceFile,
+        portfolioSessionToken: "portfolio-token",
+      }),
     ).rejects.toMatchObject({
       code: "POLICY_PARSE_FAILED",
       requestId: "req_123",
@@ -112,7 +146,10 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({ file: insuranceFile }),
+      uploadInsurance({
+        file: insuranceFile,
+        portfolioSessionToken: "portfolio-token",
+      }),
     ).rejects.toMatchObject({
       code: "UPLOAD_FAILED",
       status: 500,
@@ -139,7 +176,10 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({ file: insuranceFile }),
+      uploadInsurance({
+        file: insuranceFile,
+        portfolioSessionToken: "portfolio-token",
+      }),
     ).rejects.toMatchObject({
       code: "PDF_PARSE_CRASHED",
       requestId: "req_500",
@@ -159,9 +199,10 @@ describe("uploadInsurance", () => {
         ),
     );
 
-    const error = await uploadInsurance({ file: insuranceFile }).catch(
-      (err: unknown) => err,
-    );
+    const error = await uploadInsurance({
+      file: insuranceFile,
+      portfolioSessionToken: "portfolio-token",
+    }).catch((err: unknown) => err);
 
     expect(error).toBeInstanceOf(UploadInsuranceError);
     expect(error).toMatchObject({
@@ -178,7 +219,10 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({ file: insuranceFile }),
+      uploadInsurance({
+        file: insuranceFile,
+        portfolioSessionToken: "portfolio-token",
+      }),
     ).rejects.toMatchObject({
       code: "UPLOAD_NETWORK_ERROR",
       userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",

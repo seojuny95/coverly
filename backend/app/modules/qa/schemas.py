@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.modules.portfolio.schemas import PolicyInput
+from app.modules.portfolio.schemas import PortfolioSelectionInput
 from app.modules.qa.contracts import (
     AnswerSection,
     GenerationMode,
@@ -17,9 +17,8 @@ class ConversationMessage(BaseModel):
     content: str = Field(min_length=1, max_length=1_000)
 
 
-class PortfolioQuestionRequest(BaseModel):
+class PortfolioQuestionRequest(PortfolioSelectionInput):
     question: str = Field(min_length=1, max_length=500)
-    policies: list[PolicyInput] = Field(default_factory=list)
     demographics: InsuredDemographics = Field(default_factory=InsuredDemographics)
     history: list[ConversationMessage] = Field(default_factory=list, max_length=30)
 

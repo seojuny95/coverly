@@ -7,6 +7,10 @@ import type {
 } from "../insurance-analysis/insurance-analysis-store";
 import { uploadInsurance as uploadInsuranceRequest } from "./upload-insurance";
 import {
+  createPortfolioSession,
+  type PortfolioSessionResult,
+} from "../insurance-analysis/portfolio-session-api";
+import {
   primaryButtonClassName,
   secondaryButtonClassName,
 } from "../../components/coverly-brand";
@@ -28,10 +32,11 @@ type InsuranceUploadFormProps = {
   fixedSelectedName?: string;
   existingDocuments?: AnalyzedInsurance[];
   surface?: "page" | "modal";
+  createSession?: () => Promise<PortfolioSessionResult>;
 };
 
 export function InsuranceUploadForm({
-  uploadInsurance = uploadInsuranceRequest,
+  uploadInsurance,
   onAnalysisComplete,
   // Intentionally a no-op default: navigation now happens inside the default
   // onAnalysisComplete (via router.push), not through this callback. Callers
@@ -40,7 +45,9 @@ export function InsuranceUploadForm({
   fixedSelectedName,
   existingDocuments = [],
   surface = "page",
+  createSession = createPortfolioSession,
 }: InsuranceUploadFormProps) {
+  const activeUploadInsurance = uploadInsurance ?? uploadInsuranceRequest;
   const {
     selectedUploadFiles,
     isAnalyzing,
@@ -56,11 +63,12 @@ export function InsuranceUploadForm({
     handleSubmit,
     handleNameSelectionSubmit,
   } = useUploadOrchestration({
-    uploadInsurance,
+    uploadInsurance: activeUploadInsurance,
     onAnalysisComplete,
     navigateToAnalysis,
     fixedSelectedName,
     existingDocuments,
+    createSession,
   });
 
   // Drag-hover styling is purely presentational, so it stays local; the drop

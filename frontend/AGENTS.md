@@ -34,11 +34,12 @@ src/
 ├── components/                 # 공용 UI (coverly-brand, app-error-fallback)
 └── features/
     ├── insurance-upload/       # 업로드 폼 + upload-insurance API
-    ├── insurance-analysis/     # 분석 페이지, 보장 목록, 인메모리 데이터 Context, 이탈 경고, 보험사 로고
+    ├── insurance-analysis/     # 분석 페이지, 보장 목록, 단일 세션 토큰, 인메모리 화면 상태, 이탈 경고
     └── portfolio/              # 보장금 합계표, 손해보험 별도 보장, 상담 전 검토 패널, Q&A 챗봇, portfolio API
 ```
 
-- 증권·분석 데이터는 `insurance-analysis-store.tsx`의 인메모리 React Context(`InsuranceDataProvider`)가 관리한다(업로드 → 분석 전달). 로그인이 없고 민감정보라 **영속 저장은 하지 않는다** — 새로고침·화면 이탈 시 사라지며, 그 전에 경고한다.
+- 화면에 표시하는 증권·분석 데이터와 `portfolioSessionToken`은 `insurance-analysis-store.tsx`의 인메모리 React Context(`InsuranceDataProvider`)가 관리한다(업로드 → 분석 전달). 브라우저의 localStorage, sessionStorage, IndexedDB에는 저장하지 않으므로 새로고침·화면 이탈 시 사라지며, 그 전에 경고한다.
+- 업로드가 시작되면 프론트엔드는 포트폴리오 세션 토큰 하나를 만들고 이후 업로드·분석·Q&A에 재사용한다. 분석과 Q&A 요청에는 모든 증권을 반복 전송하지 않고 토큰과 필요한 문서 ID만 보낸다. PII를 최소화한 구조화 증권과 분석 캐시는 서버가 Supabase `private` 스키마에 만료 시각까지 임시 저장하며, 토큰 삭제 시 함께 정리한다.
 - 서버 데이터 패칭은 **react-query**로 통일한다(조회는 `useQuery`, 생성/전송은 `useMutation`). 앱 전역 `QueryClientProvider`는 `app/providers.tsx`에 둔다. 캐시는 인메모리 전용(persister 없음)이라 서비스 탭 전환에는 유지되고 새로고침에는 사라진다.
 - 백엔드 호출 함수는 `features/*/*-api.ts`에 모으고, base URL은 `NEXT_PUBLIC_API_BASE_URL`을 쓴다.
 
@@ -51,7 +52,7 @@ src/
 - **Next.js/React 관용 방식인가**: 기본은 Server Components이고, 상호작용·브라우저 API·client state가 필요한 파일에만 `"use client"`를 둔다. 불필요한 client boundary를 만들지 않는다.
 - **react-query 사용이 일관적인가**: 서버 조회는 `useQuery`, 생성·전송은 `useMutation`을 사용한다. 임의 fetch state, 중복 캐시, 영속 저장으로 민감정보를 남기지 않는다.
 - **API 계약이 타입으로 드러나는가**: backend 응답 shape 변경은 `*-api.ts` 타입, fixture, 화면 테스트에 함께 반영한다. `any`나 optional 남발로 계약 깨짐을 숨기지 않는다.
-- **민감정보를 저장하지 않는가**: 보험증권 원문, 분석 결과, 피보험자 정보, 계약번호, 상담 내용은 localStorage/sessionStorage/IndexedDB/persisted query cache에 저장하지 않는다. 인메모리 상태를 기본으로 하고, 로그·analytics·error reporting에도 원문 데이터를 보내지 않는다.
+- **민감정보를 저장하지 않는가**: 보험증권 원문, 분석 결과, 피보험자 정보, 계약번호, 상담 내용은 localStorage/sessionStorage/IndexedDB/persisted query cache에 저장하지 않는다. 브라우저는 인메모리 상태와 짧은 세션 토큰만 유지하고, 로그·analytics·error reporting에도 원문 데이터를 보내지 않는다. 서버의 임시 저장 범위와 마스킹·만료 규칙은 [../backend/REFERENCE_DATA.md](../backend/REFERENCE_DATA.md)를 따른다.
 - **클라이언트 노출 경계가 안전한가**: 브라우저 번들에는 `NEXT_PUBLIC_*`로 공개해도 되는 값만 들어가야 한다. API key, service role key, DB URL, 내부 endpoint는 프론트 코드·테스트 fixture·환경 예시에 넣지 않는다.
 - **UX 카피 원칙을 지키는가**: 공포·판매 압박·가입 권유 카피를 넣지 않는다. 사용자 대상 문구는 [UX_COPY.md](UX_COPY.md)를 따른다.
 - **하드코딩이 정당한가**: 출처, 기준금액, 보험 판단, 보험사별 분기를 UI 코드에 박지 않는다. 표시용 label·정적 설명은 가능하지만 서버 데이터와 충돌하면 서버를 우선한다.

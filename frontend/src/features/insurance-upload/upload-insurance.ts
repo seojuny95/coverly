@@ -47,12 +47,14 @@ export type InsuranceCoverage = {
 
 export type InsuranceUploadResult = {
   status: "accepted";
+  documentId: string;
   문자수: number;
-  문서세션ID?: string;
   기본정보?: InsuranceBasicInfo;
   보장목록?: InsuranceCoverage[];
   분석상태?: "완료" | "부분";
 };
+
+export type InsurancePolicyResult = Omit<InsuranceUploadResult, "documentId">;
 
 type ApiErrorResponse = {
   error?: {
@@ -99,15 +101,18 @@ export class UploadInsuranceError extends Error {
 export async function uploadInsurance({
   file,
   password,
+  portfolioSessionToken,
 }: {
   file: File;
   password?: string;
+  portfolioSessionToken: string;
 }): Promise<InsuranceUploadResult> {
   const formData = new FormData();
   formData.append("file", file);
   if (password) {
     formData.append("password", password);
   }
+  formData.append("portfolioSessionToken", portfolioSessionToken);
 
   let response: Response;
   try {

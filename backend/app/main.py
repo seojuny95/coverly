@@ -6,6 +6,7 @@ from app.core.lifespan import lifespan
 from app.core.middleware import request_id_middleware
 from app.modules.policy.router import router as policies_router
 from app.modules.portfolio.router import router as portfolio_router
+from app.modules.portfolio.session.router import router as portfolio_sessions_router
 from app.modules.qa.router import router as qa_router
 
 
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
     app.middleware("http")(request_id_middleware)
     app.add_exception_handler(ApiError, api_error_handler)
     app.include_router(policies_router)
+    app.include_router(portfolio_sessions_router)
     app.include_router(portfolio_router)
     app.include_router(qa_router)
     app.add_api_route("/health", health, methods=["GET"])

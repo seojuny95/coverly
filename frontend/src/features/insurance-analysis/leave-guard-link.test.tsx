@@ -32,34 +32,4 @@ describe("LeaveGuardLink", () => {
     await user.click(screen.getByText("업로드로"));
     expect(push).toHaveBeenCalledWith("/upload");
   });
-
-  it("calls onLeave before navigating when confirmed", async () => {
-    const user = userEvent.setup();
-    const calls: string[] = [];
-    const onLeave = vi.fn(() => calls.push("onLeave"));
-    push.mockImplementation(() => calls.push("push"));
-    render(
-      <LeaveGuardLink href="/upload" enabled onLeave={onLeave}>
-        업로드로
-      </LeaveGuardLink>,
-    );
-    await user.click(screen.getByText("업로드로"));
-    await user.click(screen.getByRole("button", { name: "나가기" }));
-    expect(onLeave).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith("/upload");
-    expect(calls).toEqual(["onLeave", "push"]);
-  });
-
-  it("does not call onLeave when navigating directly (not enabled)", async () => {
-    const user = userEvent.setup();
-    const onLeave = vi.fn();
-    render(
-      <LeaveGuardLink href="/upload" enabled={false} onLeave={onLeave}>
-        업로드로
-      </LeaveGuardLink>,
-    );
-    await user.click(screen.getByText("업로드로"));
-    expect(push).toHaveBeenCalledWith("/upload");
-    expect(onLeave).not.toHaveBeenCalled();
-  });
 });

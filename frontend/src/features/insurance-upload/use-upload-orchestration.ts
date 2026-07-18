@@ -9,6 +9,7 @@ import {
   getInsuredPersonName,
   useInsuranceData,
 } from "../insurance-analysis/insurance-analysis-store";
+import type { PortfolioSessionResult } from "../insurance-analysis/portfolio-session-api";
 import {
   findByteIdenticalDuplicateIndexes,
   findDuplicatePolicyDocuments,
@@ -83,16 +84,21 @@ export function useUploadOrchestration({
   navigateToAnalysis,
   fixedSelectedName,
   existingDocuments,
+  createSession,
 }: {
   uploadInsurance: UploadInsurance;
   onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
   navigateToAnalysis: () => void;
   fixedSelectedName?: string;
   existingDocuments: AnalyzedInsurance[];
+  createSession: () => Promise<PortfolioSessionResult>;
 }) {
-  const { setAnalysis } = useInsuranceData();
+  const { analysis: currentAnalysis, setAnalysis } = useInsuranceData();
   const router = useRouter();
   const uploadMutation = useMutation({ mutationFn: uploadInsurance });
+  const sessionMutation = useMutation({
+    mutationFn: createSession,
+  });
 
   // This route is reached programmatically after a long-running upload, so it
   // does not get Link's automatic prefetch. Prepare it while the user selects
@@ -318,13 +324,25 @@ export function useUploadOrchestration({
         return;
       }
 
+      const portfolioSession = currentAnalysis
+        ? {
+            portfolioSessionToken: currentAnalysis.portfolioSessionToken,
+            expiresAt: currentAnalysis.portfolioSessionExpiresAt,
+          }
+        : await sessionMutation.mutateAsync();
+
       const uploadResults = await Promise.all(
         selectedUploadFiles.map(async (selectedFile, index) => {
           try {
-            const uploadInput = selectedFile.password
-              ? { file: selectedFile.file, password: selectedFile.password }
-              : { file: selectedFile.file };
+            const uploadInput = {
+              file: selectedFile.file,
+              ...(selectedFile.password
+                ? { password: selectedFile.password }
+                : {}),
+              portfolioSessionToken: portfolioSession.portfolioSessionToken,
+            };
             const result = await uploadMutation.mutateAsync(uploadInput);
+            const { documentId, ...policyResult } = result;
             setAnalysisProgress((current) => ({
               ...current,
               completed: current.completed + 1,
@@ -340,10 +358,10 @@ export function useUploadOrchestration({
               status: "fulfilled" as const,
               selectedFileId: selectedFile.id,
               document: {
-                id: `${Date.now()}-${index}-${selectedFile.file.name}`,
+                id: documentId,
                 fileName: selectedFile.file.name,
                 fileFingerprint: fileFingerprints[index],
-                result,
+                result: policyResult,
               },
             };
           } catch (err) {
@@ -410,6 +428,8 @@ export function useUploadOrchestration({
       );
       const analysis = {
         generatedAt: new Date().toISOString(),
+        portfolioSessionToken: portfolioSession.portfolioSessionToken,
+        portfolioSessionExpiresAt: portfolioSession.expiresAt,
         insuranceDocuments,
       };
       shouldKeepProgress = continueWithNameValidation(

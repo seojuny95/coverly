@@ -11,22 +11,20 @@ __all__ = [
     "PolicyChunk",
     "PolicyGenerationResult",
     "PolicyRetrievalHit",
-    "delete_policy_session",
     "index_policy_document",
     "generate_policy_answer",
-    "refresh_policy_session",
     "retrieve_policy_context",
+    "retrieve_policy_context_by_session_ids",
 ]
 
 _EXPORT_MODULES = {
     "PolicyChunk": "app.rag.policy.models",
     "PolicyGenerationResult": "app.rag.policy.generation",
     "PolicyRetrievalHit": "app.rag.policy.models",
-    "delete_policy_session": "app.rag.policy.sessions",
     "generate_policy_answer": "app.rag.policy.generation",
     "index_policy_document": "app.rag.policy.indexing",
-    "refresh_policy_session": "app.rag.policy.sessions",
     "retrieve_policy_context": "app.rag.policy.retrieval",
+    "retrieve_policy_context_by_session_ids": "app.rag.policy.retrieval",
 }
 
 
