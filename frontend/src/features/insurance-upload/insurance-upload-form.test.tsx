@@ -54,6 +54,10 @@ const encryptedInsuranceFile = new File(
     type: "application/pdf",
   },
 );
+const createSession = vi.fn(async () => ({
+  portfolioSessionToken: "test-portfolio-token",
+  expiresAt: "2030-01-01T00:00:00.000Z",
+}));
 
 function renderForm({
   uploadInsurance = vi.fn(),
@@ -72,6 +76,7 @@ function renderForm({
       onAnalysisComplete={onAnalysisComplete}
       navigateToAnalysis={navigateToAnalysis}
       existingDocuments={existingDocuments}
+      createSession={createSession}
     />,
   );
   return { uploadInsurance, onAnalysisComplete, navigateToAnalysis };
@@ -80,6 +85,7 @@ function renderForm({
 beforeEach(() => {
   routerPush.mockClear();
   routerPrefetch.mockClear();
+  createSession.mockClear();
 });
 
 describe("InsuranceUploadForm", () => {
@@ -269,6 +275,7 @@ describe("InsuranceUploadForm", () => {
       .fn<UploadInsurance>()
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 32,
         기본정보: {
           보험사: "삼성화재",
@@ -292,6 +299,7 @@ describe("InsuranceUploadForm", () => {
       })
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 20,
         기본정보: {
           보험사: "현대해상화재보험",
@@ -313,11 +321,17 @@ describe("InsuranceUploadForm", () => {
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(uploadInsurance).toHaveBeenCalledWith(
-      { file: insuranceFile },
+      {
+        file: insuranceFile,
+        portfolioSessionToken: "test-portfolio-token",
+      },
       expect.anything(),
     );
     expect(uploadInsurance).toHaveBeenCalledWith(
-      { file: secondInsuranceFile },
+      {
+        file: secondInsuranceFile,
+        portfolioSessionToken: "test-portfolio-token",
+      },
       expect.anything(),
     );
     expect(onAnalysisComplete).toHaveBeenCalledWith(
@@ -353,6 +367,7 @@ describe("InsuranceUploadForm", () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
+      documentId: "test-document-id",
       문자수: 20,
       기본정보: {
         보험사: "삼성화재",
@@ -385,6 +400,7 @@ describe("InsuranceUploadForm", () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
+      documentId: "test-document-id",
       문자수: 20,
       기본정보: {
         보험사: "삼성화재",
@@ -415,6 +431,7 @@ describe("InsuranceUploadForm", () => {
       .fn<UploadInsurance>()
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 32,
         기본정보: {
           보험사: "삼성화재",
@@ -427,6 +444,7 @@ describe("InsuranceUploadForm", () => {
       })
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 20,
         기본정보: {
           보험사: "현대해상화재보험",
@@ -503,6 +521,7 @@ describe("InsuranceUploadForm", () => {
       )
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 20,
         기본정보: {
           보험사: "현대해상화재보험",
@@ -514,6 +533,7 @@ describe("InsuranceUploadForm", () => {
       })
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 20,
         기본정보: {
           보험사: "현대해상화재보험",
@@ -577,6 +597,7 @@ describe("InsuranceUploadForm", () => {
       )
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 20,
         기본정보: {
           보험사: "삼성화재",
@@ -617,6 +638,7 @@ describe("InsuranceUploadForm", () => {
         {
           file: insuranceFile,
           password: "900101",
+          portfolioSessionToken: "test-portfolio-token",
         },
         expect.anything(),
       );
@@ -653,6 +675,7 @@ describe("InsuranceUploadForm", () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
+      documentId: "test-document-id",
       문자수: 20,
       기본정보: {
         보험사: "삼성화재",
@@ -693,6 +716,7 @@ describe("InsuranceUploadForm", () => {
       .fn<UploadInsurance>()
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 20,
         기본정보: {
           보험사: "삼성화재",
@@ -705,6 +729,7 @@ describe("InsuranceUploadForm", () => {
       })
       .mockResolvedValueOnce({
         status: "accepted",
+        documentId: "test-document-id",
         문자수: 20,
         기본정보: {
           보험사: "현대해상화재보험",
@@ -760,6 +785,7 @@ describe("InsuranceUploadForm", () => {
     });
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
+      documentId: "test-document-id",
       문자수: 20,
       기본정보: {
         피보험자: "테스트고객",
@@ -837,6 +863,7 @@ describe("InsuranceUploadForm", () => {
             () =>
               resolve({
                 status: "accepted",
+                documentId: "test-document-id",
                 문자수: 32,
                 기본정보: {
                   보험사: "삼성화재",
@@ -875,6 +902,7 @@ describe("InsuranceUploadForm", () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
       status: "accepted",
+      documentId: "test-document-id",
       문자수: 20,
       기본정보: {
         보험사: "삼성화재",
@@ -894,7 +922,10 @@ describe("InsuranceUploadForm", () => {
 
     renderWithProviders(
       <>
-        <InsuranceUploadForm uploadInsurance={uploadInsurance} />
+        <InsuranceUploadForm
+          uploadInsurance={uploadInsurance}
+          createSession={createSession}
+        />
         <InsuranceDataProbe />
       </>,
     );
@@ -935,6 +966,7 @@ describe("InsuranceUploadForm", () => {
             resolveFirstUpload = () =>
               resolve({
                 status: "accepted",
+                documentId: "test-document-id",
                 문자수: 32,
                 기본정보: {
                   보험사: "삼성화재",

@@ -24,7 +24,7 @@ describe("usePortfolioSummary", () => {
     } as unknown as api.PortfolioSummary);
     const client = makeTestQueryClient();
     const { result } = renderHook(
-      () => usePortfolioSummary(docs, deathBenefitContext),
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
       {
         wrapper: ({ children }) => (
           <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -44,7 +44,7 @@ describe("usePortfolioSummary", () => {
       .mockReturnValueOnce(nextRequest);
     const client = makeTestQueryClient();
     const { result, rerender } = renderHook(
-      ({ context }) => usePortfolioSummary(docs, context),
+      ({ context }) => usePortfolioSummary(docs, context, "portfolio-token"),
       {
         initialProps: { context: deathBenefitContext },
         wrapper: ({ children }) => (
@@ -78,7 +78,8 @@ describe("usePortfolioSummary", () => {
       .mockReturnValueOnce(nextRequest);
     const client = makeTestQueryClient();
     const { result, rerender } = renderHook(
-      ({ documents }) => usePortfolioSummary(documents, deathBenefitContext),
+      ({ documents }) =>
+        usePortfolioSummary(documents, deathBenefitContext, "portfolio-token"),
       {
         initialProps: { documents: docs },
         wrapper: ({ children }) => (

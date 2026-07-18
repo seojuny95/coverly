@@ -374,6 +374,11 @@ class _InMemoryPolicyStore:
             record for record in self._records if record.chunk.session_id != session_id
         ]
 
+    def delete_expired(self, now: datetime) -> int:
+        original_count = len(self._records)
+        self._records = [record for record in self._records if record.chunk.expires_at > now]
+        return original_count - len(self._records)
+
 
 def _case_from_json(raw: dict[str, object]) -> PolicyEvalCase:
     session_ids = cast(list[object], raw["session_ids"])

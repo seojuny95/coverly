@@ -8,7 +8,10 @@ from app.modules.qa.contracts import AnswerSection
 from app.modules.qa.response_support import question_suggestions, with_demographics
 from app.modules.qa.schemas import AnswerCitation, PortfolioQuestionResponse
 from app.rag.official.answer import RagAnswer, RagCitation, answer_official_question
-from app.rag.policy import generate_policy_answer, retrieve_policy_context
+from app.rag.policy import (
+    generate_policy_answer,
+    retrieve_policy_context_by_session_ids,
+)
 
 
 @function_tool
@@ -51,17 +54,17 @@ def retrieve_policy_terms(
 
     dependencies = wrapper.context
     context = dependencies.context
-    session_tokens = [
-        policy.문서세션ID for policy in context.policies if policy.문서세션ID is not None
-    ]
-    if not session_tokens:
+    if not context.policy_rag_session_ids:
         return dependencies.unmatched(
             "policy_terms",
             "No uploaded policy-text session exists.",
         )
 
     try:
-        hits = retrieve_policy_context(session_tokens, query)
+        hits = retrieve_policy_context_by_session_ids(
+            list(context.policy_rag_session_ids),
+            query,
+        )
     except Exception:
         return dependencies.unmatched("policy_terms", "Uploaded policy retrieval failed.")
     if not hits:

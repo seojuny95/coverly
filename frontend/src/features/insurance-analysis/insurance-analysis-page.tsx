@@ -28,7 +28,7 @@ import {
   useInsuranceData,
 } from "./insurance-analysis-store";
 import { LeaveGuardLink } from "./leave-guard-link";
-import { usePolicySessionRefresh } from "./use-policy-session-refresh";
+import { usePortfolioSessionRefresh } from "./use-portfolio-session-refresh";
 import { useBeforeUnloadGuard } from "./use-leave-guard";
 import type { UploadInsurance } from "../insurance-upload/insurance-upload-form";
 import { CoverageTotalTable } from "../portfolio/coverage-total-table";
@@ -95,9 +95,8 @@ export function InsuranceAnalysisPage({
     hasData,
     sessionExpired,
     mergeDocuments,
-    replaceDocumentSessionTokens,
+    replacePortfolioSession,
     expireSession,
-    clear,
   } = useInsuranceData();
   useBeforeUnloadGuard(hasData);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -169,10 +168,20 @@ export function InsuranceAnalysisPage({
     () => analysis?.insuranceDocuments ?? [],
     [analysis],
   );
-  usePolicySessionRefresh({
-    documents: insuranceDocuments,
+  const portfolioSession = useMemo(
+    () =>
+      analysis
+        ? {
+            portfolioSessionToken: analysis.portfolioSessionToken,
+            expiresAt: analysis.portfolioSessionExpiresAt,
+          }
+        : undefined,
+    [analysis],
+  );
+  usePortfolioSessionRefresh({
+    session: portfolioSession,
     enabled: hasData && !sessionExpired,
-    onTokensRefreshed: replaceDocumentSessionTokens,
+    onRefreshed: replacePortfolioSession,
     onExpired: expireSession,
   });
   const groupedInsuranceDocuments = useMemo(
@@ -183,6 +192,7 @@ export function InsuranceAnalysisPage({
   const portfolioSummary = usePortfolioSummary(
     insuranceDocuments,
     deathBenefitContext,
+    analysis?.portfolioSessionToken,
   );
 
   const toggleInsurance = (policyId: string) => {
@@ -236,7 +246,6 @@ export function InsuranceAnalysisPage({
         <LeaveGuardLink
           href="/"
           enabled={hasData}
-          onLeave={clear}
           className={coverlyLogoLinkClassName}
           ariaLabel="Coverly AI 홈"
         >
@@ -526,6 +535,7 @@ export function InsuranceAnalysisPage({
 
         <InsuranceChatbot
           documents={insuranceDocuments}
+          portfolioSessionToken={analysis.portfolioSessionToken}
           sessionExpired={sessionExpired}
           mode={activeTab === "chat" ? "full" : "floating"}
           onExpand={() => setActiveTab("chat")}

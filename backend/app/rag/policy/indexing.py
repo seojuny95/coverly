@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import get_settings
@@ -25,9 +26,13 @@ def build_policy_vector_records(
     created_at: datetime,
     expires_at: datetime,
     embedder: Embedder,
+    sensitive_values: Iterable[str] = (),
 ) -> tuple[PolicyVectorRecord, ...]:
     source_chunks = build_policy_source_chunks(doc)
-    masked_texts = [mask_policy_pii(chunk.text).strip() for chunk in source_chunks]
+    masked_texts = [
+        mask_policy_pii(chunk.text, sensitive_values=sensitive_values).strip()
+        for chunk in source_chunks
+    ]
     nonempty = [
         (source, text) for source, text in zip(source_chunks, masked_texts, strict=True) if text
     ]
@@ -63,6 +68,7 @@ def index_policy_document(
     store: PolicyRagStore | None = None,
     embedder: Embedder | None = None,
     now: datetime | None = None,
+    sensitive_values: Iterable[str] = (),
 ) -> str | None:
     ensure_policy_session_secret_configured()
     created_at = now or datetime.now(UTC)
@@ -76,6 +82,7 @@ def index_policy_document(
         created_at=created_at,
         expires_at=expires_at,
         embedder=embedder or openai_embedder_from_settings(),
+        sensitive_values=sensitive_values,
     )
     if not records:
         return None

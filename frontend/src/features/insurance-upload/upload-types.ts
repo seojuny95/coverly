@@ -3,6 +3,7 @@ import type { InsuranceUploadResult } from "./upload-insurance";
 export type UploadInsuranceInput = {
   file: File;
   password?: string;
+  portfolioSessionToken: string;
 };
 
 export type UploadInsurance = (

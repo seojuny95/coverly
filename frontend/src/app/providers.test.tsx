@@ -27,6 +27,8 @@ function InsuranceDataProbe() {
         onClick={() =>
           setAnalysis({
             generatedAt: "2026-07-12T00:00:00.000Z",
+            portfolioSessionToken: "test-portfolio-token",
+            portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
             insuranceDocuments: [
               {
                 id: "policy-1",
@@ -34,7 +36,6 @@ function InsuranceDataProbe() {
                 result: {
                   status: "accepted",
                   문자수: 1,
-                  문서세션ID: "session-token",
                 },
               },
             ],

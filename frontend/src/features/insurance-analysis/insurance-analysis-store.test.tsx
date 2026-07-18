@@ -10,6 +10,8 @@ import {
 function makeAnalysis(id: string): InsuranceAnalysis {
   return {
     generatedAt: "2026-07-12T00:00:00.000Z",
+    portfolioSessionToken: "test-portfolio-token",
+    portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
     insuranceDocuments: [
       { id, fileName: `${id}.pdf`, result: { status: "accepted", 문자수: 1 } },
     ],
@@ -41,6 +43,8 @@ describe("InsuranceDataProvider", () => {
   it("does not add another document with the same policy identity", () => {
     const current: InsuranceAnalysis = {
       generatedAt: "2026-07-12T00:00:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       insuranceDocuments: [
         {
           id: "a",
@@ -58,6 +62,8 @@ describe("InsuranceDataProvider", () => {
     };
     const next: InsuranceAnalysis = {
       generatedAt: "2026-07-12T01:00:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       insuranceDocuments: [
         {
           id: "b",
@@ -82,6 +88,8 @@ describe("InsuranceDataProvider", () => {
   it("does not add another document with the same file fingerprint", () => {
     const current: InsuranceAnalysis = {
       generatedAt: "2026-07-12T00:00:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       insuranceDocuments: [
         {
           id: "a",
@@ -99,6 +107,8 @@ describe("InsuranceDataProvider", () => {
     };
     const next: InsuranceAnalysis = {
       generatedAt: "2026-07-12T01:00:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       insuranceDocuments: [
         {
           id: "b",
@@ -124,6 +134,8 @@ describe("InsuranceDataProvider", () => {
     const current = makeAnalysis("a");
     const next: InsuranceAnalysis = {
       generatedAt: "2026-07-12T01:00:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       insuranceDocuments: [
         {
           id: "a",
@@ -149,47 +161,29 @@ describe("InsuranceDataProvider", () => {
     expect(result.current.analysis).toBeNull();
   });
 
-  it("replaces multiple policy session tokens in one state update", () => {
+  it("replaces the portfolio session token", () => {
     const { result } = renderHook(() => useInsuranceData(), {
       wrapper: InsuranceDataProvider,
     });
     act(() =>
       result.current.setAnalysis({
         generatedAt: "2026-07-12T00:00:00.000Z",
-        insuranceDocuments: [
-          {
-            id: "a",
-            fileName: "a.pdf",
-            result: {
-              status: "accepted",
-              문자수: 1,
-              문서세션ID: "old-token-a",
-            },
-          },
-          {
-            id: "b",
-            fileName: "b.pdf",
-            result: {
-              status: "accepted",
-              문자수: 1,
-              문서세션ID: "old-token-b",
-            },
-          },
-        ],
+        portfolioSessionToken: "old-token",
+        portfolioSessionExpiresAt: "invalid",
+        insuranceDocuments: [],
       }),
     );
 
     act(() =>
-      result.current.replaceDocumentSessionTokens([
-        { currentToken: "old-token-a", nextToken: "new-token-a" },
-        { currentToken: "old-token-b", nextToken: "new-token-b" },
-      ]),
+      result.current.replacePortfolioSession({
+        portfolioSessionToken: "new-token",
+        expiresAt: "2030-01-01T00:15:00.000Z",
+      }),
     );
 
-    expect(
-      result.current.analysis?.insuranceDocuments.map(
-        (document) => document.result.문서세션ID,
-      ),
-    ).toEqual(["new-token-a", "new-token-b"]);
+    expect(result.current.analysis?.portfolioSessionToken).toBe("new-token");
+    expect(result.current.analysis?.portfolioSessionExpiresAt).toBe(
+      "2030-01-01T00:15:00.000Z",
+    );
   });
 });

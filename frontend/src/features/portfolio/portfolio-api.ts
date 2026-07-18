@@ -228,29 +228,27 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal) {
   return (await response.json()) as T;
 }
 
-function toPolicies(insuranceDocuments: AnalyzedInsurance[]) {
-  return insuranceDocuments.map(({ id, result }) => ({
-    id,
-    기본정보: result.기본정보,
-    보장목록: result.보장목록,
-    분석상태: result.분석상태,
-    문서세션ID: result.문서세션ID,
-  }));
+function portfolioSelection(
+  insuranceDocuments: AnalyzedInsurance[],
+  portfolioSessionToken: string,
+) {
+  return {
+    portfolioSessionToken,
+    policyIds: insuranceDocuments.map((document) => document.id),
+  };
 }
 
 export function requestPortfolioSummary(
   insuranceDocuments: AnalyzedInsurance[],
   deathBenefitContext: DeathBenefitGuideInput,
+  portfolioSessionToken: string,
   signal?: AbortSignal,
 ) {
-  return post<PortfolioSummary>(
-    "/portfolio/summary",
-    {
-      policies: toPolicies(insuranceDocuments),
-      death_benefit_context: deathBenefitContext,
-    },
-    signal,
-  );
+  const body = {
+    ...portfolioSelection(insuranceDocuments, portfolioSessionToken),
+    death_benefit_context: deathBenefitContext,
+  };
+  return post<PortfolioSummary>("/portfolio/summary", body, signal);
 }
 
 export type QaStreamEnd = {
@@ -279,6 +277,7 @@ export async function streamPortfolioQuestion(
   insuranceDocuments: AnalyzedInsurance[],
   history: ChatHistoryItem[],
   handlers: QaStreamHandlers,
+  portfolioSessionToken: string,
   signal?: AbortSignal,
 ): Promise<void> {
   const demographics = getPolicyDemographics(insuranceDocuments);
@@ -287,7 +286,7 @@ export async function streamPortfolioQuestion(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       question: normalizeQuestion(question),
-      policies: toPolicies(insuranceDocuments),
+      ...portfolioSelection(insuranceDocuments, portfolioSessionToken),
       demographics,
       history: prepareChatHistory(history),
     }),

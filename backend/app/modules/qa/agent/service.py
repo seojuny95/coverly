@@ -26,8 +26,15 @@ def stream_answer_with_agent(
     agent_runner: QaAgentRunner,
     demographics: InsuredDemographics | None = None,
     history: list[ConversationMessage] | None = None,
+    policy_rag_session_ids: tuple[str, ...] = (),
 ) -> Iterator[QaStreamEvent]:
-    context = build_qa_context(question, policies, demographics, history)
+    context = build_qa_context(
+        question,
+        policies,
+        demographics,
+        history,
+        policy_rag_session_ids=policy_rag_session_ids,
+    )
     try:
         stream_agent = getattr(agent_runner, "stream", None)
         if callable(stream_agent):

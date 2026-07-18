@@ -7,19 +7,25 @@ import {
   useMemo,
   useState,
 } from "react";
-import type { InsuranceUploadResult } from "../insurance-upload/upload-insurance";
+import type { InsurancePolicyResult } from "../insurance-upload/upload-insurance";
 import { getPolicyIdentityKeys } from "./policy-identity";
+import {
+  deletePortfolioSession,
+  type PortfolioSessionResult,
+} from "./portfolio-session-api";
 
 export type AnalyzedInsurance = {
   id: string;
   fileName: string;
   fileFingerprint?: string;
-  result: InsuranceUploadResult;
+  result: InsurancePolicyResult;
 };
 
 export type InsuranceAnalysis = {
   generatedAt: string;
   selectedName?: string;
+  portfolioSessionToken: string;
+  portfolioSessionExpiresAt: string;
   insuranceDocuments: AnalyzedInsurance[];
 };
 
@@ -56,6 +62,8 @@ export function mergeInsuranceAnalysis(
   return {
     generatedAt: next.generatedAt,
     selectedName: next.selectedName ?? current.selectedName,
+    portfolioSessionToken: next.portfolioSessionToken,
+    portfolioSessionExpiresAt: next.portfolioSessionExpiresAt,
     insuranceDocuments: [...byId.values()],
   };
 }
@@ -72,16 +80,9 @@ type InsuranceDataValue = {
   sessionExpired: boolean;
   setAnalysis: (next: InsuranceAnalysis) => void;
   mergeDocuments: (next: InsuranceAnalysis) => void;
-  replaceDocumentSessionTokens: (
-    replacements: readonly PolicySessionTokenReplacement[],
-  ) => void;
+  replacePortfolioSession: (session: PortfolioSessionResult) => void;
   expireSession: () => void;
   clear: () => void;
-};
-
-export type PolicySessionTokenReplacement = {
-  currentToken: string;
-  nextToken: string;
 };
 
 const InsuranceDataContext = createContext<InsuranceDataValue | null>(null);
@@ -111,34 +112,17 @@ export function InsuranceDataProvider({
     );
   }, []);
 
-  const replaceDocumentSessionTokens = useCallback(
-    (replacements: readonly PolicySessionTokenReplacement[]) => {
-      if (!replacements.length) return;
-      const nextTokensByCurrent = new Map(
-        replacements.map(({ currentToken, nextToken }) => [
-          currentToken,
-          nextToken,
-        ]),
+  const replacePortfolioSession = useCallback(
+    (session: PortfolioSessionResult) => {
+      setAnalysisState((current) =>
+        current
+          ? {
+              ...current,
+              portfolioSessionToken: session.portfolioSessionToken,
+              portfolioSessionExpiresAt: session.expiresAt,
+            }
+          : current,
       );
-      setAnalysisState((current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          insuranceDocuments: current.insuranceDocuments.map((document) => {
-            const currentToken = document.result.문서세션ID;
-            if (!currentToken) return document;
-            const nextToken = nextTokensByCurrent.get(currentToken);
-            if (!nextToken) return document;
-            return {
-              ...document,
-              result: {
-                ...document.result,
-                문서세션ID: nextToken,
-              },
-            };
-          }),
-        };
-      });
     },
     [],
   );
@@ -149,10 +133,14 @@ export function InsuranceDataProvider({
 
   // Discard the in-memory analysis. Called when the user leaves the analysis
   // screen so the "data disappears when you leave" warning stays true.
+  const portfolioSessionToken = analysis?.portfolioSessionToken;
   const clear = useCallback(() => {
+    if (portfolioSessionToken) {
+      void deletePortfolioSession(portfolioSessionToken).catch(() => undefined);
+    }
     setSessionExpired(false);
     setAnalysisState(null);
-  }, []);
+  }, [portfolioSessionToken]);
 
   const value = useMemo<InsuranceDataValue>(
     () => ({
@@ -161,7 +149,7 @@ export function InsuranceDataProvider({
       sessionExpired,
       setAnalysis,
       mergeDocuments,
-      replaceDocumentSessionTokens,
+      replacePortfolioSession,
       expireSession,
       clear,
     }),
@@ -170,7 +158,7 @@ export function InsuranceDataProvider({
       sessionExpired,
       setAnalysis,
       mergeDocuments,
-      replaceDocumentSessionTokens,
+      replacePortfolioSession,
       expireSession,
       clear,
     ],

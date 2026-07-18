@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
-import type { InsuranceUploadResult } from "../insurance-upload/upload-insurance";
+import type { InsurancePolicyResult } from "../insurance-upload/upload-insurance";
 import {
   emptyReasonFor,
   hasAnalyzableCoverage,
@@ -10,12 +10,12 @@ import {
 } from "./analysis-eligibility";
 
 function makeResult(
-  overrides: Partial<InsuranceUploadResult> = {},
-): InsuranceUploadResult {
+  overrides: Partial<InsurancePolicyResult> = {},
+): InsurancePolicyResult {
   return { status: "accepted", 문자수: 100, ...overrides };
 }
 
-function makeDoc(result: InsuranceUploadResult, id = "1"): AnalyzedInsurance {
+function makeDoc(result: InsurancePolicyResult, id = "1"): AnalyzedInsurance {
   return { id, fileName: `${id}.pdf`, result };
 }
 

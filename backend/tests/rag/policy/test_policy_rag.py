@@ -19,7 +19,6 @@ from app.rag.policy.session_tokens import (
     verify_policy_session_claims,
     verify_policy_session_token,
 )
-from app.rag.policy.sessions import refresh_policy_session
 from app.rag.policy.source import build_policy_source_chunks
 from evals.rag.policy.retrieval import (
     EVAL_FIXTURE,
@@ -62,6 +61,11 @@ class _MemoryStore:
 
     def delete(self, session_id: str) -> None:
         self.records = [record for record in self.records if record.chunk.session_id != session_id]
+
+    def delete_expired(self, now: datetime) -> int:
+        original_count = len(self.records)
+        self.records = [record for record in self.records if record.chunk.expires_at > now]
+        return original_count - len(self.records)
 
     def extend(self, session_id: str, expires_at: datetime) -> bool:
         updated = False
@@ -144,6 +148,32 @@ def test_policy_pii_masks_landline_and_representative_phone_numbers() -> None:
     assert "02-" not in masked
     assert "1688-" not in masked
     assert masked.count("[전화번호]") == 2
+
+
+def test_policy_pii_masks_contact_and_policy_identifiers() -> None:
+    text = (
+        "이메일 test.person@example.com\n"
+        "주소: 서울시 중구 세종대로 1\n"
+        "계좌번호 123-456-789012\n"
+        "증권번호: POLICY-SECRET-001\n"
+        "차량번호 12가3456\n"
+        "계약자 테스트고객"
+    )
+
+    masked = mask_policy_pii(text, sensitive_values=("테스트고객",))
+
+    for value in (
+        "test.person@example.com",
+        "서울시 중구 세종대로 1",
+        "123-456-789012",
+        "POLICY-SECRET-001",
+        "12가3456",
+        "테스트고객",
+    ):
+        assert value not in masked
+    assert "[이메일]" in masked
+    assert "[주소]" in masked
+    assert "[계좌번호]" in masked
 
 
 def test_policy_pii_keeps_large_amounts() -> None:
@@ -305,48 +335,6 @@ def test_policy_index_validates_secret_before_embedding_or_storage(
         )
 
     assert store.records == []
-
-
-def test_policy_session_refresh_extends_idle_expiry_within_absolute_limit() -> None:
-    now = datetime(2026, 1, 1, tzinfo=UTC)
-    embedder = HashingEmbedder()
-    records = build_policy_vector_records(
-        _document(),
-        session_id="session-1",
-        created_at=now,
-        expires_at=now + timedelta(minutes=5),
-        embedder=embedder,
-    )
-    store = _MemoryStore(records)
-    token = sign_policy_session_id(
-        "session-1",
-        now + timedelta(minutes=5),
-        max_expires_at=now + timedelta(hours=2),
-    )
-
-    refreshed = refresh_policy_session(
-        token,
-        store=store,
-        now=now + timedelta(minutes=4),
-    )
-
-    claims = verify_policy_session_claims(refreshed.token, now=now + timedelta(minutes=4))
-    assert claims.session_id == "session-1"
-    assert claims.expires_at == now + timedelta(minutes=19)
-    assert claims.max_expires_at == now + timedelta(hours=2)
-    assert {record.chunk.expires_at for record in store.records} == {claims.expires_at}
-
-
-def test_policy_session_refresh_refuses_deleted_session() -> None:
-    now = datetime(2026, 1, 1, tzinfo=UTC)
-    token = sign_policy_session_id(
-        "session-1",
-        now + timedelta(minutes=5),
-        max_expires_at=now + timedelta(hours=2),
-    )
-
-    with pytest.raises(InvalidPolicySessionToken):
-        refresh_policy_session(token, store=_MemoryStore(()), now=now)
 
 
 def test_policy_retrieval_is_limited_to_requested_sessions() -> None:

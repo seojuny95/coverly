@@ -23,6 +23,7 @@ class QaContext:
     auto_policies: tuple[PolicyInput, ...]
     life_stage_check: LifeStageCheck
     catalog: EvidenceCatalog
+    policy_rag_session_ids: tuple[str, ...] = ()
 
 
 def build_qa_context(
@@ -30,6 +31,8 @@ def build_qa_context(
     policies: list[PolicyInput],
     demographics: InsuredDemographics | None,
     history: list[ConversationMessage] | None,
+    *,
+    policy_rag_session_ids: tuple[str, ...] = (),
 ) -> QaContext:
     insured = resolve_portfolio_demographics(policies, demographics)
     facts = build_portfolio_facts(policies)
@@ -46,6 +49,7 @@ def build_qa_context(
         auto_policies=auto_policies,
         life_stage_check=life_stage_check,
         catalog=catalog,
+        policy_rag_session_ids=policy_rag_session_ids,
     )
 
 

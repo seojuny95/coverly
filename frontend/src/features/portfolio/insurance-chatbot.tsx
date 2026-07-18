@@ -26,11 +26,13 @@ const INITIAL_ONLY_LIMITATIONS = [
 
 export function InsuranceChatbot({
   documents,
+  portfolioSessionToken,
   sessionExpired = false,
   mode = "floating",
   onExpand,
 }: {
   documents: AnalyzedInsurance[];
+  portfolioSessionToken: string;
   sessionExpired?: boolean;
   mode?: "floating" | "full";
   onExpand?: () => void;
@@ -129,22 +131,28 @@ export function InsuranceChatbot({
     ]);
     setStreaming(true);
     try {
-      await streamPortfolioQuestion(text, documents, history, {
-        onProgress: (progress) => {
-          updateMessage(assistantId, (message) => ({
-            ...message,
-            progress: message.text.trim() ? message.progress : progress.text,
-          }));
+      await streamPortfolioQuestion(
+        text,
+        documents,
+        history,
+        {
+          onProgress: (progress) => {
+            updateMessage(assistantId, (message) => ({
+              ...message,
+              progress: message.text.trim() ? message.progress : progress.text,
+            }));
+          },
+          onDelta: (delta) => {
+            updateMessage(assistantId, (message) => ({
+              ...message,
+              progress: undefined,
+              text: message.text + delta,
+            }));
+          },
+          onEnd: (end) => finalizeAnswer(assistantId, end),
         },
-        onDelta: (delta) => {
-          updateMessage(assistantId, (message) => ({
-            ...message,
-            progress: undefined,
-            text: message.text + delta,
-          }));
-        },
-        onEnd: (end) => finalizeAnswer(assistantId, end),
-      });
+        portfolioSessionToken,
+      );
     } catch {
       updateMessage(assistantId, (message) => ({
         ...message,

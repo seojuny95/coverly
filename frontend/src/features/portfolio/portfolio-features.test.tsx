@@ -16,6 +16,8 @@ import { CoverageSummaryTable } from "./coverage-summary-table";
 function fixture(): InsuranceAnalysis {
   return {
     generatedAt: "2026-07-11T00:00:00.000Z",
+    portfolioSessionToken: "test-portfolio-token",
+    portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
     insuranceDocuments: [
       {
         id: "health-1",
@@ -84,7 +86,9 @@ describe("portfolio features", () => {
     expect(screen.getByText("1,000만원")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/portfolio/summary"),
-      expect.objectContaining({ body: expect.stringContaining('"policies"') }),
+      expect.objectContaining({
+        body: expect.stringContaining('"policyIds":["health-1"]'),
+      }),
     );
   });
 

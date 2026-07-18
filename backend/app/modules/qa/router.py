@@ -8,6 +8,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
+from app.modules.portfolio.session.http import resolve_portfolio_snapshot
 from app.modules.qa.agent.runtime import build_qa_agent_runner
 from app.modules.qa.agent.service import stream_answer_with_agent
 from app.modules.qa.schemas import PortfolioQuestionRequest
@@ -32,15 +34,19 @@ PortfolioAnswerStreamerDep = Annotated[
 def ask_portfolio_question_stream(
     request: PortfolioQuestionRequest,
     stream_answer: PortfolioAnswerStreamerDep,
+    sessions: PortfolioSessionServiceDep,
 ) -> StreamingResponse:
     """Stream the answer as Server-Sent Events: progress* → meta → delta* → end."""
+
+    snapshot = resolve_portfolio_snapshot(sessions, request)
 
     def events() -> Iterator[str]:
         for event in stream_answer(
             request.question,
-            request.policies,
+            list(snapshot.policies),
             demographics=request.demographics,
             history=request.history,
+            policy_rag_session_ids=snapshot.rag_session_ids,
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 

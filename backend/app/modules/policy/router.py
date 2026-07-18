@@ -11,13 +11,12 @@ from app.modules.policy.parsing import (
     PdfPasswordRequiredError,
 )
 from app.modules.policy.pipeline import EmptyTextError, PipelineResult, run_pipeline
-from app.modules.policy.schemas import (
-    PolicySessionRefreshResponse,
-    PolicySessionRequest,
+from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
+from app.modules.portfolio.session.service import (
+    InvalidPortfolioSessionToken,
+    PortfolioSessionDocumentLimitExceeded,
 )
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
-from app.rag.policy import delete_policy_session, refresh_policy_session
-from app.rag.policy.session_tokens import InvalidPolicySessionToken
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
@@ -59,7 +58,13 @@ async def _read_pdf(file: UploadFile) -> bytes:
 async def parse_policy(
     file: UploadFile,
     pipeline: PolicyPipelineDep,
+    sessions: PortfolioSessionServiceDep,
     password: str | None = Form(default=None),
+    portfolio_session_token: str = Form(
+        alias="portfolioSessionToken",
+        min_length=1,
+        max_length=512,
+    ),
 ) -> dict[str, object]:
     data = await _read_pdf(file)
     pdf_password = password if password else None
@@ -89,35 +94,29 @@ async def parse_policy(
             code="reference_data_unavailable",
             message="분석 기준 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
         ) from exc
-    return {"status": "accepted", **result}
-
-
-@router.post("/sessions/delete")
-def delete_policy_text_session(request: PolicySessionRequest) -> dict[str, str]:
     try:
-        delete_policy_session(request.문서세션ID)
-    except InvalidPolicySessionToken:
+        document = await asyncio.to_thread(
+            sessions.add_pipeline_result,
+            portfolio_session_token,
+            result,
+        )
+    except InvalidPortfolioSessionToken:
         raise ApiError(
             status_code=403,
-            code="INVALID_POLICY_SESSION",
-            message="분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.",
+            code="INVALID_PORTFOLIO_SESSION",
+            message="분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
         ) from None
-    return {"status": "deleted"}
-
-
-@router.post("/sessions/refresh", response_model=PolicySessionRefreshResponse)
-def refresh_policy_text_session(
-    request: PolicySessionRequest,
-) -> PolicySessionRefreshResponse:
-    try:
-        refreshed = refresh_policy_session(request.문서세션ID)
-    except InvalidPolicySessionToken:
+    except PortfolioSessionDocumentLimitExceeded:
         raise ApiError(
-            status_code=403,
-            code="INVALID_POLICY_SESSION",
-            message="분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.",
+            status_code=422,
+            code="PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
+            message="한 번에 분석할 수 있는 보험증권 수를 초과했어요.",
         ) from None
-    return PolicySessionRefreshResponse(
-        문서세션ID=refreshed.token,
-        expiresAt=refreshed.expires_at.isoformat(),
-    )
+
+    client_result = dict(result)
+    client_result.pop("문서세션ID", None)
+    return {
+        "status": "accepted",
+        "documentId": document.id,
+        **client_result,
+    }

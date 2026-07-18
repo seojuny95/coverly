@@ -1,14 +1,14 @@
 import type { AnalyzedInsurance } from "../insurance-analysis/insurance-analysis-store";
-import type { InsuranceUploadResult } from "../insurance-upload/upload-insurance";
+import type { InsurancePolicyResult } from "../insurance-upload/upload-insurance";
 
 // A document is analyzable when it carries at least one real 담보 row.
 // "부가" rows are name-only rider/rate lines and are not analyzable content.
-export function hasAnalyzableCoverage(result: InsuranceUploadResult): boolean {
+export function hasAnalyzableCoverage(result: InsurancePolicyResult): boolean {
   const coverages = result.보장목록 ?? [];
   return coverages.some((coverage) => coverage.유형 !== "부가");
 }
 
-export function isDamageInsurance(result: InsuranceUploadResult): boolean {
+export function isDamageInsurance(result: InsurancePolicyResult): boolean {
   const classification = result.기본정보?.보험분류;
   return (
     classification === "손해보험" ||
@@ -25,7 +25,7 @@ export function isDamageInsurance(result: InsuranceUploadResult): boolean {
   );
 }
 
-export function isAutoInsurance(result: InsuranceUploadResult): boolean {
+export function isAutoInsurance(result: InsurancePolicyResult): boolean {
   const classification = result.기본정보?.보험분류;
   return (
     classification === "자동차" ||

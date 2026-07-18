@@ -30,13 +30,23 @@ function portfolioSummaryQueryKey(
 export function usePortfolioSummary(
   documents: AnalyzedInsurance[],
   deathBenefitContext: DeathBenefitGuideInput,
+  portfolioSessionToken?: string,
 ) {
   const currentPortfolioKey = portfolioKey(documents);
   const query = useQuery({
     queryKey: portfolioSummaryQueryKey(documents, deathBenefitContext),
-    queryFn: ({ signal }) =>
-      requestPortfolioSummary(documents, deathBenefitContext, signal),
-    enabled: documents.length > 0,
+    queryFn: ({ signal }) => {
+      if (!portfolioSessionToken) {
+        throw new Error("Portfolio session is unavailable");
+      }
+      return requestPortfolioSummary(
+        documents,
+        deathBenefitContext,
+        portfolioSessionToken,
+        signal,
+      );
+    },
+    enabled: documents.length > 0 && Boolean(portfolioSessionToken),
     placeholderData: (previousData, previousQuery) =>
       previousQuery?.queryKey[1] === currentPortfolioKey
         ? previousData

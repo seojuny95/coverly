@@ -15,7 +15,12 @@ const docs: AnalyzedInsurance[] = [
 
 async function openChat() {
   const user = userEvent.setup();
-  renderWithProviders(<InsuranceChatbot documents={docs} />);
+  renderWithProviders(
+    <InsuranceChatbot
+      documents={docs}
+      portfolioSessionToken="portfolio-token"
+    />,
+  );
   await user.click(
     screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
   );
@@ -26,7 +31,13 @@ describe("InsuranceChatbot", () => {
   beforeEach(() => vi.restoreAllMocks());
 
   it("keeps the full-tab conversation inside a scrollable panel", () => {
-    renderWithProviders(<InsuranceChatbot documents={docs} mode="full" />);
+    renderWithProviders(
+      <InsuranceChatbot
+        documents={docs}
+        portfolioSessionToken="portfolio-token"
+        mode="full"
+      />,
+    );
 
     expect(
       screen.queryByRole("heading", { name: "AI 보험 상담" }),
@@ -200,7 +211,11 @@ describe("InsuranceChatbot", () => {
     const onExpand = vi.fn();
     const user = userEvent.setup();
     renderWithProviders(
-      <InsuranceChatbot documents={docs} onExpand={onExpand} />,
+      <InsuranceChatbot
+        documents={docs}
+        portfolioSessionToken="portfolio-token"
+        onExpand={onExpand}
+      />,
     );
 
     await user.click(
