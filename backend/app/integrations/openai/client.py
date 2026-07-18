@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator
 from functools import lru_cache
 from typing import Any, cast
 
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 from pydantic import BaseModel
 
 from app.core.config import get_settings
@@ -101,27 +101,27 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return [list(item.embedding) for item in response.data]
 
 
-def search_official_web(
+async def search_official_web_async(
     *,
     api_key: str,
     model: str,
     query: str,
     allowed_domains: list[str],
 ) -> Any:
-    """Run a web search restricted to the caller's verified domain allowlist."""
+    """Run an allowlisted web search that can be cancelled with its request task."""
 
-    client = OpenAI(api_key=api_key, timeout=60.0, max_retries=0)
-    return client.responses.create(
-        model=model,
-        input=query,
-        tools=[
-            {
-                "type": "web_search",
-                "filters": {"allowed_domains": allowed_domains},
-            }
-        ],
-        include=["web_search_call.action.sources"],
-    )
+    async with AsyncOpenAI(api_key=api_key, timeout=60.0, max_retries=0) as client:
+        return await client.responses.create(
+            model=model,
+            input=query,
+            tools=[
+                {
+                    "type": "web_search",
+                    "filters": {"allowed_domains": allowed_domains},
+                }
+            ],
+            include=["web_search_call.action.sources"],
+        )
 
 
 def compact_prompt_text(text: str, max_chars: int) -> str:
