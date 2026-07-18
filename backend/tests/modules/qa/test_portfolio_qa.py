@@ -878,6 +878,30 @@ def test_agent_requires_web_tool_for_latest_official_information() -> None:
     assert "공식 웹사이트 검색 근거" in result.answer
 
 
+def test_agent_general_guidance_cannot_bypass_required_web_search() -> None:
+    context = build_qa_context("요즘 보험업법 최신 개정 알려줘", [], None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    result = validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            answer_mode="general_guidance",
+            answer="최신 법령은 공식 자료 근거가 필요해서 확인 없이 단정하지 않습니다.",
+        ),
+        dependencies,
+    )
+
+    assert result.status == "no_data"
+    assert result.citations == []
+    assert result.generation == "fallback"
+    assert "공식 웹사이트 검색 근거" in result.answer
+
+
 def test_agent_may_answer_general_guidance_without_tool_result() -> None:
     context = build_qa_context("너는 어떤 질문에 답할 수 있어?", _policies(), None, [])
     dependencies = QaAgentDependencies(

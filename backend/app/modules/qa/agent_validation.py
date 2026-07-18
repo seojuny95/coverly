@@ -24,6 +24,8 @@ def validated_agent_response(
     draft: AgentCounselorDraft,
     dependencies: QaAgentDependencies,
 ) -> PortfolioQuestionResponse:
+    if draft.answer_mode == "general_guidance" and requires_official_web(context.question):
+        return _missing_required_web_response(context)
     if draft.answer_mode == "general_guidance":
         return _validated_general_guidance_response(context, draft)
 
