@@ -1,12 +1,52 @@
 import logging
 import uuid
+from typing import Any
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 
 from app.core.middleware import REQUEST_ID_STATE_KEY
 
 logger = logging.getLogger(__name__)
+
+
+class ApiErrorDetail(BaseModel):
+    code: str
+    message: str
+    request_id: str
+
+
+class ApiErrorResponse(BaseModel):
+    error: ApiErrorDetail
+
+
+class RequestValidationErrorDetail(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    loc: list[str | int]
+    msg: str
+    type: str
+
+
+class RequestValidationErrorResponse(BaseModel):
+    detail: list[RequestValidationErrorDetail]
+
+
+def api_error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
+    """Describe application errors without changing FastAPI validation errors."""
+
+    return {
+        status_code: {
+            "model": (
+                ApiErrorResponse | RequestValidationErrorResponse
+                if status_code == 422
+                else ApiErrorResponse
+            ),
+            "description": "Coverly API error",
+        }
+        for status_code in status_codes
+    }
 
 
 class ApiError(Exception):

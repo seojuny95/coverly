@@ -58,6 +58,7 @@ class PremiumSummary(TypedDict, total=False):
 
 InsuredGender = Literal["남성", "여성"]
 LifeStage = Literal["어린이", "성인", "시니어"]
+PolicyAnalysisStatus = Literal["완료", "부분"]
 
 
 class InsuredDemographics(TypedDict):

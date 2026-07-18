@@ -5,12 +5,13 @@ from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends, Form, UploadFile
 
-from app.core.errors import ApiError
+from app.core.errors import ApiError, api_error_responses
 from app.modules.policy.parsing import (
     PdfPasswordIncorrectError,
     PdfPasswordRequiredError,
 )
 from app.modules.policy.pipeline import EmptyTextError, PipelineResult, run_pipeline
+from app.modules.policy.schemas import PolicyParseResponse
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
@@ -54,7 +55,12 @@ async def _read_pdf(file: UploadFile) -> bytes:
     return data
 
 
-@router.post("/parse")
+@router.post(
+    "/parse",
+    response_model=PolicyParseResponse,
+    response_model_exclude_unset=True,
+    responses=api_error_responses(400, 403, 413, 422, 503),
+)
 async def parse_policy(
     file: UploadFile,
     pipeline: PolicyPipelineDep,
@@ -65,7 +71,7 @@ async def parse_policy(
         min_length=1,
         max_length=512,
     ),
-) -> dict[str, object]:
+) -> PolicyParseResponse:
     data = await _read_pdf(file)
     pdf_password = password if password else None
     try:
@@ -115,8 +121,10 @@ async def parse_policy(
 
     client_result = dict(result)
     client_result.pop("문서세션ID", None)
-    return {
-        "status": "accepted",
-        "documentId": document.id,
-        **client_result,
-    }
+    return PolicyParseResponse.model_validate(
+        {
+            "status": "accepted",
+            "document_id": document.id,
+            **client_result,
+        }
+    )

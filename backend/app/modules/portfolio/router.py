@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.core.errors import ApiError
+from app.core.errors import ApiError, api_error_responses
 from app.modules.analysis.summary_overview import (
     SummaryOverviewUnavailableError,
     attach_summary_overview,
@@ -44,7 +44,11 @@ PortfolioSummaryServiceDep = Annotated[
 ]
 
 
-@router.post("/summary", response_model=PortfolioCoverageSummary)
+@router.post(
+    "/summary",
+    response_model=PortfolioCoverageSummary,
+    responses=api_error_responses(403, 503),
+)
 def coverage_summary(
     request: PortfolioSummaryRequest,
     summarize: PortfolioSummaryServiceDep,
