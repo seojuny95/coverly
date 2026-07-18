@@ -6,7 +6,11 @@ from agents import RunContextWrapper, function_tool
 
 from app.modules.evidence.catalog import citation_from_evidence
 from app.modules.qa.agent_contracts import GroundedToolAnswer, QaAgentDependencies
-from app.modules.qa.agent_evidence import consultation_evidence, response_evidence
+from app.modules.qa.agent_evidence import (
+    consultation_evidence,
+    portfolio_snapshot_evidence,
+    response_evidence,
+)
 from app.modules.qa.context import QaContext, context_with_question
 from app.modules.qa.resolvers import (
     contextual_suggestions,
@@ -218,7 +222,7 @@ def answer_from_portfolio_consultation(
             evidence=response_evidence(context, grounded_response),
         )
 
-    evidence = consultation_evidence(context)
+    evidence = consultation_evidence(context) or portfolio_snapshot_evidence(context)
     if not evidence:
         return GroundedToolAnswer(
             matched=False,
@@ -226,7 +230,7 @@ def answer_from_portfolio_consultation(
         )
     response = PortfolioQuestionResponse(
         status="answered",
-        answer="질문과 직접 관련된 evidence만 골라 상담 답변을 작성하세요.",
+        answer="제공된 evidence 중 질문과 직접 관련된 항목만 골라 상담 답변을 작성하세요.",
         citations=[],
         limitations=standard_limitations(context.facts),
         suggestions=contextual_suggestions(context),

@@ -13,7 +13,7 @@ from app.modules.qa.agent_contracts import (
     QaAgentDependencies,
     QaAgentUnavailable,
 )
-from app.modules.qa.agent_evidence import consultation_evidence
+from app.modules.qa.agent_evidence import consultation_evidence, portfolio_snapshot_evidence
 from app.modules.qa.agent_tools import web_search_response
 from app.modules.qa.agent_validation import validated_agent_response
 from app.modules.qa.context import QaContext, build_qa_context
@@ -755,6 +755,22 @@ def test_consultation_does_not_expose_portfolio_to_unrelated_fact_question() -> 
     context = build_qa_context("하준이법이 뭐야?", _policies(), None, [])
 
     assert consultation_evidence(context) == ()
+
+
+def test_portfolio_snapshot_exposes_bounded_agent_fallback_evidence() -> None:
+    context = build_qa_context(
+        "보험 잘 몰라서 그런데, 비슷하게 겹쳐 보이는 보장만 쉬운 말로 골라줘",
+        _alias_policies(),
+        None,
+        [],
+    )
+
+    assert consultation_evidence(context) == ()
+
+    evidence = portfolio_snapshot_evidence(context)
+
+    assert len(evidence) <= 24
+    assert any("같은 담보명 확인" in item.fact for item in evidence)
 
 
 def test_agent_consultation_rejects_answer_without_selected_evidence() -> None:

@@ -14,7 +14,7 @@ from app.modules.evidence.catalog import citation_from_evidence
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.qa.agent import build_qa_agent_runner
 from app.modules.qa.agent_contracts import AgentCounselorDraft, QaAgentDependencies, QaAgentRunner
-from app.modules.qa.agent_evidence import consultation_evidence
+from app.modules.qa.agent_evidence import consultation_evidence, portfolio_snapshot_evidence
 from app.modules.qa.agent_validation import validated_agent_response
 from app.modules.qa.context import QaContext
 from app.modules.qa.resolvers import context_fallback, resolve_precomputed_answer
@@ -278,7 +278,10 @@ def _evaluate_case(
 
     evidence_text = ""
     if probe.last_context is not None:
-        evidence_text = "\n".join(item.fact for item in consultation_evidence(probe.last_context))
+        evidence = consultation_evidence(probe.last_context) or portfolio_snapshot_evidence(
+            probe.last_context
+        )
+        evidence_text = "\n".join(item.fact for item in evidence)
     evidence_passed = all(term in evidence_text for term in case.required_evidence_terms)
     if case.expected_route != "agent":
         evidence_passed = True
