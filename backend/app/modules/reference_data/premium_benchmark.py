@@ -125,7 +125,9 @@ def warm_premium_benchmark_cache() -> int:
         benchmarks = _repository().list_all()
     except Exception:
         logger.exception("premium_benchmark_cache_warm_failed")
-        benchmarks = ()
+        # An empty tuple is a successful result. Do not cache it after a
+        # transient failure, or later requests could never retry the database.
+        return 0
 
     _preloaded_benchmarks = benchmarks
     return len(benchmarks)

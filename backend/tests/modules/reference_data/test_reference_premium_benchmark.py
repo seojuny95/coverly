@@ -26,6 +26,21 @@ class _FailingRepository:
         raise RuntimeError("database unavailable")
 
 
+class _RecoveringRepository:
+    def __init__(self, benchmark: PremiumBenchmark) -> None:
+        self.benchmark = benchmark
+        self.list_calls = 0
+        self.find_calls = 0
+
+    def find_by_age(self, age: int | None) -> PremiumBenchmark | None:
+        self.find_calls += 1
+        return self.benchmark if age == 35 else None
+
+    def list_all(self) -> tuple[PremiumBenchmark, ...]:
+        self.list_calls += 1
+        raise RuntimeError("database temporarily unavailable")
+
+
 def test_premium_benchmark_lookup_caches_successful_age_queries(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -116,11 +131,39 @@ def test_premium_benchmark_lookup_does_not_invent_fallback_data(
     assert subject.premium_benchmark_for_age(35) is None
 
 
-def test_warm_premium_benchmark_cache_keeps_failures_empty(
+def test_failed_warm_premium_benchmark_cache_retries_on_a_later_request(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(subject, "_repository", lambda: _FailingRepository())
+    benchmark = PremiumBenchmark(
+        age_band_label="30~39세",
+        min_age=30,
+        max_age=39,
+        average_monthly_income=3_860_000,
+        suggested_min_ratio=0.05,
+        suggested_max_ratio=0.10,
+        suggested_min_premium=193_000,
+        suggested_max_premium=386_000,
+        income_source=PremiumBenchmarkSource(
+            label="소득 자료",
+            url="https://example.com/income",
+            published_at="2025-01-01",
+            reliability="official",
+            caveat="개인 소득과 다를 수 있어요.",
+        ),
+        guide_source=PremiumBenchmarkSource(
+            label="보험료 가이드",
+            url="https://example.com/guide",
+            published_at="2025-01-01",
+            reliability="private_guidance",
+            caveat="일반 가이드예요.",
+        ),
+    )
+    repository = _RecoveringRepository(benchmark)
+    monkeypatch.setattr(subject, "_repository", lambda: repository)
+    subject._cached_premium_benchmark_for_age.cache_clear()
     monkeypatch.setattr(subject, "_preloaded_benchmarks", None)
 
     assert subject.warm_premium_benchmark_cache() == 0
-    assert subject.premium_benchmark_for_age(35) is None
+    assert subject.premium_benchmark_for_age(35) == benchmark
+    assert repository.list_calls == 1
+    assert repository.find_calls == 1
