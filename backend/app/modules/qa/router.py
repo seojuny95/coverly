@@ -59,14 +59,20 @@ def ask_portfolio_question_stream(
     snapshot = resolve_portfolio_snapshot(sessions, request)
 
     def events() -> Iterator[str]:
-        for event in stream_answer(
+        answer_events = stream_answer(
             request.question,
             list(snapshot.policies),
             demographics=request.demographics,
             history=request.history,
             policy_rag_session_ids=snapshot.rag_session_ids,
-        ):
-            yield f"data: {json.dumps(event.model_dump(mode='json'), ensure_ascii=False)}\n\n"
+        )
+        try:
+            for event in answer_events:
+                yield f"data: {json.dumps(event.model_dump(mode='json'), ensure_ascii=False)}\n\n"
+        finally:
+            close = getattr(answer_events, "close", None)
+            if callable(close):
+                close()
 
     return StreamingResponse(
         events(),

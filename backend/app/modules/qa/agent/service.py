@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Iterator
 
+from app.modules.consultation.contracts import InsuredDemographics
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.qa.agent.contracts import (
     QaAgentCompleted,
@@ -11,7 +12,6 @@ from app.modules.qa.agent.contracts import (
     QaAgentUnavailable,
 )
 from app.modules.qa.context import build_qa_context
-from app.modules.qa.contracts import InsuredDemographics
 from app.modules.qa.response_support import agent_unavailable_response
 from app.modules.qa.schemas import ConversationMessage
 from app.modules.qa.streaming import QaProgressEvent, QaStreamEvent, stream_response
@@ -38,16 +38,22 @@ def stream_answer_with_agent(
     try:
         stream_agent = getattr(agent_runner, "stream", None)
         if callable(stream_agent):
-            for item in stream_agent(context):
-                if isinstance(item, QaAgentProgress):
-                    yield QaProgressEvent(
-                        type="progress",
-                        stage=item.stage,
-                        text=item.text,
-                    )
-                elif isinstance(item, QaAgentCompleted):
-                    yield from stream_response(item.response)
-                    return
+            agent_items = stream_agent(context)
+            try:
+                for item in agent_items:
+                    if isinstance(item, QaAgentProgress):
+                        yield QaProgressEvent(
+                            type="progress",
+                            stage=item.stage,
+                            text=item.text,
+                        )
+                    elif isinstance(item, QaAgentCompleted):
+                        yield from stream_response(item.response)
+                        return
+            finally:
+                close = getattr(agent_items, "close", None)
+                if callable(close):
+                    close()
             yield from stream_response(agent_unavailable_response(context))
             return
         yield from stream_response(agent_runner.run(context))

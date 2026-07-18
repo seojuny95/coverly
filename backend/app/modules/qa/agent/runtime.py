@@ -1,15 +1,18 @@
 """Runtime and sync-to-stream bridge for the QA agent."""
 
 import asyncio
+import logging
 from collections.abc import Iterator
+from contextlib import suppress
 from queue import Queue
-from threading import Thread
+from threading import Event, Thread
 
 from agents import (
     InputGuardrailTripwireTriggered,
     OutputGuardrailTripwireTriggered,
     RunConfig,
     Runner,
+    RunResultStreaming,
 )
 from agents.models.openai_provider import OpenAIProvider
 
@@ -25,7 +28,11 @@ from app.modules.qa.agent.contracts import (
     QaAgentUnavailable,
 )
 from app.modules.qa.agent.definition import create_qa_agent
-from app.modules.qa.agent.progress import ProgressHooks, QueuedAgentStreamItem
+from app.modules.qa.agent.progress import (
+    ProgressHooks,
+    QueuedAgentStreamItem,
+    enqueue_stream_item,
+)
 from app.modules.qa.agent.prompt import build_agent_input
 from app.modules.qa.agent.selection import select_tool_result
 from app.modules.qa.agent.validation import validated_agent_response
@@ -33,6 +40,12 @@ from app.modules.qa.context import QaContext
 from app.modules.qa.response_support import out_of_scope_response
 from app.modules.qa.schemas import PortfolioQuestionResponse
 from app.modules.qa.tools.web_search import OfficialWebSearcher, default_official_web_search
+
+logger = logging.getLogger(__name__)
+
+_STREAM_QUEUE_CAPACITY = 16
+_CANCELLATION_POLL_SECONDS = 0.05
+_WORKER_JOIN_TIMEOUT_SECONDS = 2.0
 
 
 def build_qa_agent_runner(
@@ -104,7 +117,8 @@ class OpenAiQaAgentRunner:
             raise QaAgentUnavailable("OPENAI_API_KEY is not configured")
 
         dependencies = self._dependencies(context)
-        queue: Queue[QueuedAgentStreamItem] = Queue()
+        queue: Queue[QueuedAgentStreamItem] = Queue(maxsize=_STREAM_QUEUE_CAPACITY)
+        cancellation_requested = Event()
         worker = Thread(
             target=_run_streamed_worker,
             args=(
@@ -113,17 +127,25 @@ class OpenAiQaAgentRunner:
                 self._model or settings.openai_model,
                 settings.openai_api_key,
                 queue,
+                cancellation_requested,
             ),
             daemon=True,
+            name="coverly-qa-agent",
         )
         worker.start()
-        while True:
-            item = queue.get()
-            if item is None:
-                break
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        try:
+            while True:
+                item = queue.get()
+                if item is None:
+                    break
+                if isinstance(item, BaseException):
+                    raise item
+                yield item
+        finally:
+            cancellation_requested.set()
+            worker.join(timeout=_WORKER_JOIN_TIMEOUT_SECONDS)
+            if worker.is_alive():
+                logger.warning("QA agent worker did not stop within the cancellation timeout")
 
     def _dependencies(self, context: QaContext) -> QaAgentDependencies:
         return QaAgentDependencies(
@@ -142,13 +164,23 @@ def _run_streamed_worker(
     model: str,
     api_key: str,
     queue: Queue[QueuedAgentStreamItem],
+    cancellation_requested: Event,
 ) -> None:
     try:
-        asyncio.run(_run_streamed_agent(context, dependencies, model, api_key, queue))
+        asyncio.run(
+            _run_streamed_agent(
+                context,
+                dependencies,
+                model,
+                api_key,
+                queue,
+                cancellation_requested,
+            )
+        )
     except Exception as exc:
-        queue.put(exc)
+        enqueue_stream_item(queue, cancellation_requested, exc)
     finally:
-        queue.put(None)
+        enqueue_stream_item(queue, cancellation_requested, None)
 
 
 async def _run_streamed_agent(
@@ -157,29 +189,62 @@ async def _run_streamed_agent(
     model: str,
     api_key: str,
     queue: Queue[QueuedAgentStreamItem],
+    cancellation_requested: Event,
 ) -> None:
     result = Runner.run_streamed(
         create_qa_agent(model),
         input=build_agent_input(context),
         context=dependencies,
         max_turns=6,
-        hooks=ProgressHooks(queue),
+        hooks=ProgressHooks(queue, cancellation_requested),
         run_config=_run_config(api_key),
+    )
+    cancellation_monitor = asyncio.create_task(
+        _cancel_when_requested(result, cancellation_requested)
     )
     try:
         async for _event in result.stream_events():
             pass
     except InputGuardrailTripwireTriggered:
-        queue.put(QaAgentCompleted(out_of_scope_response(context)))
+        enqueue_stream_item(
+            queue,
+            cancellation_requested,
+            QaAgentCompleted(out_of_scope_response(context)),
+        )
         return
     except OutputGuardrailTripwireTriggered:
         fallback = _unambiguous_tool_fallback(dependencies)
         if fallback is None:
             raise
-        queue.put(QaAgentCompleted(fallback))
+        enqueue_stream_item(
+            queue,
+            cancellation_requested,
+            QaAgentCompleted(fallback),
+        )
+        return
+    finally:
+        cancellation_monitor.cancel()
+        with suppress(asyncio.CancelledError):
+            await cancellation_monitor
+
+    if cancellation_requested.is_set():
         return
     draft = result.final_output_as(AgentCounselorDraft, raise_if_incorrect_type=True)
-    queue.put(QaAgentCompleted(_validated_or_cached_response(context, draft, dependencies)))
+    enqueue_stream_item(
+        queue,
+        cancellation_requested,
+        QaAgentCompleted(_validated_or_cached_response(context, draft, dependencies)),
+    )
+
+
+async def _cancel_when_requested(
+    result: RunResultStreaming,
+    cancellation_requested: Event,
+) -> None:
+    while not cancellation_requested.is_set():
+        await asyncio.sleep(_CANCELLATION_POLL_SECONDS)
+
+    result.cancel(mode="immediate")
 
 
 def _validated_or_cached_response(

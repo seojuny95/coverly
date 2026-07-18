@@ -1,6 +1,7 @@
 """Progress events emitted while the QA agent is running."""
 
-from queue import Queue
+from queue import Full, Queue
+from threading import Event
 from typing import Any
 
 from agents import RunHooks
@@ -11,8 +12,13 @@ type QueuedAgentStreamItem = QaAgentStreamItem | BaseException | None
 
 
 class ProgressHooks(RunHooks[QaAgentDependencies]):
-    def __init__(self, queue: Queue[QueuedAgentStreamItem]) -> None:
+    def __init__(
+        self,
+        queue: Queue[QueuedAgentStreamItem],
+        cancellation_requested: Event,
+    ) -> None:
         self._queue = queue
+        self._cancellation_requested = cancellation_requested
         self._emitted: set[str] = set()
 
     async def on_agent_start(self, _context: Any, _agent: Any) -> None:
@@ -30,7 +36,27 @@ class ProgressHooks(RunHooks[QaAgentDependencies]):
         if stage in self._emitted:
             return
         self._emitted.add(stage)
-        self._queue.put(QaAgentProgress(stage=stage, text=text))
+        enqueue_stream_item(
+            self._queue,
+            self._cancellation_requested,
+            QaAgentProgress(stage=stage, text=text),
+        )
+
+
+def enqueue_stream_item(
+    queue: Queue[QueuedAgentStreamItem],
+    cancellation_requested: Event,
+    item: QueuedAgentStreamItem,
+) -> bool:
+    """Enqueue without leaving a producer blocked after the consumer closes."""
+
+    while not cancellation_requested.is_set():
+        try:
+            queue.put(item, timeout=0.05)
+        except Full:
+            continue
+        return True
+    return False
 
 
 def tool_progress(tool_name: str) -> tuple[str, str]:
