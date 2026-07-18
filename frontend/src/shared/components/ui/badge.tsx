@@ -19,10 +19,16 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // App tone pills (grounding / status). Faithful to the existing zinc,
+        // blue, amber, emerald color usage across portfolio and analysis views.
+        neutral: "bg-zinc-100 text-zinc-600",
+        info: "bg-blue-50 text-blue-700",
+        warning: "bg-amber-50 text-amber-700",
+        success: "bg-emerald-50 text-emerald-700",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "neutral",
     },
   },
 );

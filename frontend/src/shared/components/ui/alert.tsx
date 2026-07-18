@@ -11,6 +11,15 @@ const alertVariants = cva(
         default: "bg-card text-card-foreground",
         destructive:
           "bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
+        // Grounding / status callouts, faithful to the existing colored notice
+        // boxes (info = blue, caution = amber, confirmed = emerald, alert = red).
+        info: "border-blue-100 bg-blue-50 text-zinc-700 *:data-[slot=alert-description]:text-zinc-600",
+        warning:
+          "border-amber-100 bg-amber-50 text-zinc-700 *:data-[slot=alert-description]:text-zinc-600",
+        success:
+          "border-emerald-100 bg-emerald-50 text-zinc-700 *:data-[slot=alert-description]:text-zinc-600",
+        danger:
+          "border-red-100 bg-red-50 text-zinc-700 *:data-[slot=alert-description]:text-zinc-600",
       },
     },
     defaultVariants: {
