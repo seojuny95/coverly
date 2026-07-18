@@ -8,10 +8,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from app.modules.qa.agent import build_qa_agent_runner
-from app.modules.qa.generation import QaStreamEvent
+from app.modules.qa.agent.runtime import build_qa_agent_runner
+from app.modules.qa.agent.service import stream_answer_with_agent
 from app.modules.qa.schemas import PortfolioQuestionRequest
-from app.modules.qa.service import stream_portfolio_answer
+from app.modules.qa.streaming import QaStreamEvent
 
 router = APIRouter(tags=["qa"])
 
@@ -19,7 +19,7 @@ PortfolioAnswerStreamer = Callable[..., Iterator[QaStreamEvent]]
 
 
 def get_portfolio_answer_streamer() -> PortfolioAnswerStreamer:
-    return partial(stream_portfolio_answer, agent_runner=build_qa_agent_runner())
+    return partial(stream_answer_with_agent, agent_runner=build_qa_agent_runner())
 
 
 PortfolioAnswerStreamerDep = Annotated[
@@ -33,7 +33,7 @@ def ask_portfolio_question_stream(
     request: PortfolioQuestionRequest,
     stream_answer: PortfolioAnswerStreamerDep,
 ) -> StreamingResponse:
-    """Stream the answer as Server-Sent Events: meta → delta* → end."""
+    """Stream the answer as Server-Sent Events: progress* → meta → delta* → end."""
 
     def events() -> Iterator[str]:
         for event in stream_answer(

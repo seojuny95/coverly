@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, cast
 
+from app.modules.policy.summary.catalog import canonical_insurer_name
 from app.modules.qa.schemas import (
     ClaimChannelBlock,
     ClaimChannelInsurer,
@@ -66,14 +67,11 @@ def _match(insurer: str, entries: list[dict[str, Any]]) -> dict[str, Any] | None
     name = insurer.strip()
     if not name:
         return None
-    for entry in entries:  # exact first
-        if entry["보험사"] == name:
-            return entry
-    # Then only when the parsed name contains the (shorter) directory name — a
-    # full legal name resolves to its short form. Never the reverse: a too-short
-    # parsed fragment must not bind to an arbitrary longer entry (wrong channel).
+    canonical_name = canonical_insurer_name(name)
+    if canonical_name is None:
+        return None
     for entry in entries:
-        if entry["보험사"] in name:
+        if canonical_insurer_name(entry["보험사"]) == canonical_name:
             return entry
     return None
 

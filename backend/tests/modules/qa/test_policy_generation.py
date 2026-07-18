@@ -1,16 +1,9 @@
 import json
-from datetime import UTC, datetime, timedelta
 
 import pytest
-from pytest import MonkeyPatch
 
-from app.modules.portfolio.schemas import PolicyInput
 from app.modules.qa.contracts import ConsultationEvidence
-from app.modules.qa.service import stream_portfolio_answer
 from app.rag.policy import (
-    PolicyChunk,
-    PolicyGenerationResult,
-    PolicyRetrievalHit,
     generate_policy_answer,
 )
 
@@ -241,65 +234,3 @@ def test_policy_generator_rejects_personal_payout_verdict_in_draft() -> None:
     )
 
     assert result.generation == "fallback"
-
-
-def test_policy_session_stream_routes_to_independent_generator(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    from app.modules.qa import service as qa_service
-
-    policy = PolicyInput.model_validate(
-        {
-            "id": "p1",
-            "기본정보": {
-                "보험사": "테스트보험",
-                "상품명": "건강보험",
-                "보험분류": "질병",
-            },
-            "보장목록": [{"담보명": "암진단비", "가입금액": "3,000만원", "지급유형": "정액"}],
-            "문서세션ID": "session-token",
-        }
-    )
-    now = datetime(2026, 1, 1, tzinfo=UTC)
-    hit = PolicyRetrievalHit(
-        chunk=PolicyChunk(
-            id="chunk-1",
-            session_id="session-id",
-            text="암진단비 특별약관 원문에 진단확정 문구가 있습니다.",
-            content_type="text",
-            chunk_index=1,
-            table_index=None,
-            created_at=now,
-            expires_at=now + timedelta(hours=1),
-        ),
-        score=0.9,
-    )
-    monkeypatch.setattr(qa_service, "retrieve_policy_context", lambda _ids, _query: [hit])
-    monkeypatch.setattr(
-        qa_service,
-        "generate_policy_answer",
-        lambda _question, evidence: PolicyGenerationResult(
-            answer="증권 원문에서 진단확정 문구를 확인했어요.",
-            evidence_ids=("session:1",),
-            limitations=("업로드 증권 원문 범위의 답변입니다.",),
-            suggestions=(),
-            generation="llm",
-        ),
-    )
-
-    def shared_generator_must_not_run(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("shared QA generator should not run for policy RAG")
-
-    monkeypatch.setattr(qa_service, "stream_consultation_answer", shared_generator_must_not_run)
-
-    events = list(stream_portfolio_answer("암진단비 원문을 알려줘", [policy]))
-
-    assert events[0]["type"] == "meta"
-    assert events[-1]["type"] == "end"
-    deltas = [str(event["text"]) for event in events if event["type"] == "delta"]
-    assert len(deltas) > 1
-    assert "증권 원문에서 진단확정 문구" in "".join(deltas)
-    assert events[0]["generation"] == "llm"
-    citations = events[-1]["citations"]
-    assert isinstance(citations, list)
-    assert citations[0]["evidence_id"] == "session:1"

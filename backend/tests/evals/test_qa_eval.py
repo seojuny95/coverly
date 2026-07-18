@@ -1,4 +1,4 @@
-from evals.qa.runner import evaluate, fixture_policies, load_cases
+from evals.qa.runner import evaluate, fixture_policies, load_cases, render_report
 
 
 def test_qa_eval_dataset_has_beginner_and_product_scenarios() -> None:
@@ -28,6 +28,18 @@ def test_qa_baseline_eval_runs_without_live_model() -> None:
 
     assert report.total == 3
     assert all(result.status != "error" for result in report.results)
+    assert report.contract_passed == report.total
+
+
+def test_qa_baseline_reports_contract_and_content_coverage_separately() -> None:
+    report = evaluate(load_cases())
+    rendered = render_report(report)
+
+    assert report.contract_passed == report.total
+    assert report.content_evaluated == 5
+    assert report.content_passed == report.content_evaluated
+    assert f"contracts={report.total}/{report.total}" in rendered
+    assert "content=5/5" in rendered
 
 
 def test_qa_eval_fixture_policies_are_loaded_from_json() -> None:

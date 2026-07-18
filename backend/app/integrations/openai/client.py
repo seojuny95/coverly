@@ -29,7 +29,11 @@ def _get_client(api_key: str) -> OpenAI:
     return OpenAI(api_key=api_key, timeout=_TIMEOUT_S, max_retries=_MAX_RETRIES)
 
 
-def structured_completer(schema: type[BaseModel]) -> JsonCompleter:
+def structured_completer(
+    schema: type[BaseModel],
+    *,
+    model: str | None = None,
+) -> JsonCompleter:
     """Build a completer that constrains the model's output to `schema`."""
 
     def complete(system: str, user: str) -> dict[str, object]:
@@ -38,7 +42,7 @@ def structured_completer(schema: type[BaseModel]) -> JsonCompleter:
             raise RuntimeError("OPENAI_API_KEY is not configured")
 
         response = _get_client(settings.openai_api_key).responses.parse(
-            model=settings.openai_model,
+            model=model or settings.openai_model,
             input=cast(
                 Any,
                 [

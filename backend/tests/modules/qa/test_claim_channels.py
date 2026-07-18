@@ -3,11 +3,11 @@
 from app.modules.qa.claim_channels import channels_for
 
 
-def test_channels_for_matches_insurer_by_containment() -> None:
-    result = channels_for(["삼성화재해상보험"], has_medical_indemnity=False)
+def test_channels_for_matches_canonical_catalog_name_to_directory_name() -> None:
+    result = channels_for(["현대해상화재보험"], has_medical_indemnity=False)
 
     assert result.insurers
-    assert result.insurers[0].name == "삼성화재"
+    assert result.insurers[0].name == "현대해상"
     assert result.insurers[0].customer_center
     assert result.medical_indemnity is None
 
@@ -27,3 +27,9 @@ def test_channels_for_dedupes_and_skips_unknown_insurers() -> None:
 
     assert len(result.insurers) == 1
     assert result.insurers[0].name == "삼성화재"
+
+
+def test_channels_for_does_not_guess_unknown_partial_insurer_name() -> None:
+    result = channels_for(["삼성화재해상보험"], has_medical_indemnity=False)
+
+    assert result.insurers == ()

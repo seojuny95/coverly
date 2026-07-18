@@ -7,6 +7,7 @@ from app.modules.policy.classification import classify_policy
 from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.policy.models import PolicySummary
 from app.modules.policy.summary.catalog import (
+    canonical_insurer_name,
     get_insurer_aliases,
     get_insurer_candidates,
     get_insurer_contact_evidence,
@@ -28,6 +29,7 @@ __all__ = [
     "extract_local_policy_summary",
     "extract_policy_summary",
     "extract_policy_summary_with_llm",
+    "canonical_insurer_name",
     "get_insurer_aliases",
     "get_insurer_candidates",
     "get_insurer_contact_evidence",

@@ -9,9 +9,9 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
-from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.qa.claim_channels import channels_for
 from app.modules.qa.context import QaContext
+from app.modules.qa.pii import mask_qa_pii
 from app.rag.official.sources import rag_sources
 
 SearchPurpose = Literal[
@@ -21,8 +21,6 @@ SearchPurpose = Literal[
     "insurance_term",
 ]
 logger = logging.getLogger(__name__)
-_EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-_PHONE_PATTERN = re.compile(r"(?<!\d)(?:01[016789]|02|0[3-6][1-5])[-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)")
 _URL_PATTERN = re.compile(r"https?://[^\s)\]]+")
 _GENERAL_LAW_DOMAINS = ("law.go.kr", "korea.kr", "molit.go.kr")
 _MAX_CITED_SOURCES = 3
@@ -112,9 +110,7 @@ def default_official_web_search(
 
 
 def sanitize_search_query(query: str) -> str:
-    masked = mask_demographic_identifiers(" ".join(query.split()))
-    masked = _EMAIL_PATTERN.sub("[이메일]", masked)
-    return _PHONE_PATTERN.sub("[전화번호]", masked)
+    return mask_qa_pii(" ".join(query.split()))
 
 
 def _search_prompt(query: str, purpose: SearchPurpose) -> str:

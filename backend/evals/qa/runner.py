@@ -12,21 +12,19 @@ from typing import Literal, cast
 
 from app.modules.evidence.catalog import citation_from_evidence
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.agent import build_qa_agent_runner
-from app.modules.qa.agent_contracts import AgentCounselorDraft, QaAgentDependencies, QaAgentRunner
-from app.modules.qa.agent_evidence import consultation_evidence, portfolio_snapshot_evidence
-from app.modules.qa.agent_validation import validated_agent_response
+from app.modules.qa.agent.contracts import AgentCounselorDraft, QaAgentDependencies, QaAgentRunner
+from app.modules.qa.agent.runtime import build_qa_agent_runner
+from app.modules.qa.agent.service import stream_answer_with_agent
+from app.modules.qa.agent.validation import validated_agent_response
 from app.modules.qa.context import QaContext
-from app.modules.qa.resolvers import context_fallback, resolve_precomputed_answer
+from app.modules.qa.response_support import out_of_scope_response
 from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
-from app.modules.qa.service import stream_portfolio_answer
-from app.modules.qa.web_search import WebSearchResult
-from app.rag.official.answer import answer_official_question
-from app.rag.policy import generate_policy_answer
+from app.modules.qa.tools.evidence import portfolio_snapshot_evidence
+from app.modules.qa.tools.web_search import WebSearchResult
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "dataset.json"
 POLICY_FIXTURE = Path(__file__).resolve().parent / "fixture_policies.json"
-EvalRoute = Literal["fast", "agent", "agent_no_tool", "planned", "scope"]
+EvalRoute = Literal["agent", "agent_no_tool", "input_guardrail"]
 
 _UNIVERSAL_FORBIDDEN = (
     "안심하세요",
@@ -57,8 +55,9 @@ class QaEvalResult:
     profile: str
     passed: bool
     route_passed: bool
-    answer_evaluated: bool
-    answer_passed: bool
+    contract_passed: bool
+    content_evaluated: bool
+    content_passed: bool
     evidence_passed: bool
     status: str
     generation: str
@@ -75,8 +74,9 @@ class QaEvalReport:
     mode: str
     passed: int
     total: int
-    answer_evaluated: int
-    answer_passed: int
+    contract_passed: int
+    content_evaluated: int
+    content_passed: int
     results: tuple[QaEvalResult, ...]
     model: str | None = None
 
@@ -90,9 +90,11 @@ class _ProbeAgent:
         self,
         *,
         expected_route: EvalRoute,
+        expected_status: str,
         delegate: QaAgentRunner | None = None,
     ) -> None:
         self.expected_route = expected_route
+        self.expected_status = expected_status
         self.delegate = delegate
         self.calls = 0
         self.last_context: QaContext | None = None
@@ -102,6 +104,9 @@ class _ProbeAgent:
         self.last_context = context
         if self.delegate is not None:
             return self.delegate.run(context)
+
+        if self.expected_route == "input_guardrail":
+            return out_of_scope_response(context)
 
         if self.expected_route == "agent_no_tool":
             dependencies = QaAgentDependencies(
@@ -124,26 +129,19 @@ class _ProbeAgent:
                 dependencies,
             )
 
-        deterministic = resolve_precomputed_answer(
-            context,
-            try_official=False,
-            official_answer=None,
-            default_official_answer=answer_official_question,
-            complete=None,
-            pass_complete=False,
-            retrieve_policy=lambda _ids, _question: [],
-            generate_policy=generate_policy_answer,
-        )
-        if deterministic is not None:
-            return deterministic
+        if self.expected_status == "no_data":
+            return PortfolioQuestionResponse(
+                status="no_data",
+                answer="질문에 필요한 근거를 확인하지 못했습니다.",
+                citations=[],
+                limitations=["근거 조회 결과가 없는 계약을 확인했습니다."],
+            )
 
-        evidence = consultation_evidence(context)
+        evidence = portfolio_snapshot_evidence(context)
         citations = [citation_from_evidence(item) for item in evidence[:3]]
-        if not citations:
-            return context_fallback(context)
         return PortfolioQuestionResponse(
             status="answered",
-            answer="복합 상담은 Agent 경로에서 관련 근거를 사용해 답합니다.",
+            answer="Agent가 요청한 도구에서 업로드 증권 근거를 확인할 수 있습니다.",
             citations=citations,
             limitations=[],
         )
@@ -164,13 +162,14 @@ def evaluate(
     active_cases = cases if cases is not None else load_cases()
     delegate = build_qa_agent_runner(model=model) if live else None
     results = tuple(_evaluate_case(case, delegate=delegate, live=live) for case in active_cases)
-    evaluated = tuple(result for result in results if result.answer_evaluated)
+    evaluated = tuple(result for result in results if result.content_evaluated)
     return QaEvalReport(
         mode="live" if live else "baseline",
         passed=sum(result.passed for result in results),
         total=len(results),
-        answer_evaluated=len(evaluated),
-        answer_passed=sum(result.answer_passed for result in evaluated),
+        contract_passed=sum(result.contract_passed for result in results),
+        content_evaluated=len(evaluated),
+        content_passed=sum(result.content_passed for result in evaluated),
         results=results,
         model=model,
     )
@@ -184,7 +183,8 @@ def render_report(report: QaEvalReport, *, show_passing: bool = False) -> str:
         (
             f"mode={report.mode} passed={report.passed}/{report.total} "
             f"pass_rate={report.pass_rate:.3f} "
-            f"answers={report.answer_passed}/{report.answer_evaluated} "
+            f"contracts={report.contract_passed}/{report.total} "
+            f"content={report.content_passed}/{report.content_evaluated} "
             f"model={report.model or 'default'} "
             f"avg_elapsed_ms={average_ms:.1f} median_elapsed_ms={median_ms:.1f}"
         )
@@ -212,11 +212,15 @@ def _evaluate_case(
     delegate: QaAgentRunner | None,
     live: bool,
 ) -> QaEvalResult:
-    probe = _ProbeAgent(expected_route=case.expected_route, delegate=delegate)
+    probe = _ProbeAgent(
+        expected_route=case.expected_route,
+        expected_status=case.expected_status,
+        delegate=delegate,
+    )
     started = perf_counter()
     try:
         events = list(
-            stream_portfolio_answer(
+            stream_answer_with_agent(
                 case.question,
                 fixture_policies(),
                 history=list(case.history),
@@ -237,8 +241,9 @@ def _evaluate_case(
             profile=case.profile,
             passed=False,
             route_passed=False,
-            answer_evaluated=live or case.expected_route != "agent",
-            answer_passed=False,
+            contract_passed=False,
+            content_evaluated=live or case.expected_route != "agent",
+            content_passed=False,
             evidence_passed=False,
             status="error",
             generation="error",
@@ -250,9 +255,9 @@ def _evaluate_case(
             failures=(f"{type(exc).__name__}: {exc}",),
         )
 
-    expected_calls = 0 if case.expected_route in {"planned", "scope"} else 1
+    expected_calls = 1
     route_passed = probe.calls == expected_calls
-    answer_evaluated = live or case.expected_route != "agent"
+    content_evaluated = live or case.expected_route in {"agent_no_tool", "input_guardrail"}
     include_passed = all(
         any(term in rendered_output for term in group) for group in case.must_include_groups
     )
@@ -260,27 +265,22 @@ def _evaluate_case(
     forbidden_passed = all(term not in answer for term in forbidden)
     status_passed = status == case.expected_status
     citations_passed = not case.require_citations or bool(citations)
-    generation_passed = not (live and case.expected_route == "agent") or generation == "llm"
+    generation_passed = (
+        not (live and case.expected_route == "agent" and case.expected_status == "answered")
+        or generation == "llm"
+    )
     limitations = cast(list[object], end.get("limitations", []))
     no_tool_passed = case.expected_route != "agent_no_tool" or (
         generation == "llm"
         and not citations
         and "일반 안내" in " ".join(str(item) for item in limitations)
     )
-    answer_passed = (
-        status_passed
-        and include_passed
-        and forbidden_passed
-        and citations_passed
-        and generation_passed
-        and no_tool_passed
-    )
+    contract_passed = status_passed and citations_passed and generation_passed and no_tool_passed
+    content_passed = include_passed and forbidden_passed
 
     evidence_text = ""
     if probe.last_context is not None:
-        evidence = consultation_evidence(probe.last_context) or portfolio_snapshot_evidence(
-            probe.last_context
-        )
+        evidence = portfolio_snapshot_evidence(probe.last_context)
         evidence_text = "\n".join(item.fact for item in evidence)
     evidence_passed = all(term in evidence_text for term in case.required_evidence_terms)
     if case.expected_route != "agent":
@@ -289,29 +289,35 @@ def _evaluate_case(
     failures: list[str] = []
     if not route_passed:
         failures.append(f"expected agent calls {expected_calls}, got {probe.calls}")
-    if answer_evaluated and not status_passed:
+    if not status_passed:
         failures.append(f"expected status {case.expected_status}, got {status}")
-    if answer_evaluated and not include_passed:
+    if content_evaluated and not include_passed:
         failures.append("required answer points were missing")
-    if answer_evaluated and not forbidden_passed:
+    if content_evaluated and not forbidden_passed:
         failures.append("answer contained a forbidden assertion")
-    if answer_evaluated and not citations_passed:
+    if not citations_passed:
         failures.append("answer did not include a required source citation")
-    if answer_evaluated and not generation_passed:
+    if not generation_passed:
         failures.append("agent answer fell back instead of completing with validated LLM output")
-    if answer_evaluated and not no_tool_passed:
+    if not no_tool_passed:
         failures.append("expected a no-tool general guidance answer")
     if not evidence_passed:
         failures.append("required portfolio evidence was not exposed to the agent")
 
-    passed = route_passed and evidence_passed and (answer_passed or not answer_evaluated)
+    passed = (
+        route_passed
+        and evidence_passed
+        and contract_passed
+        and (content_passed or not content_evaluated)
+    )
     return QaEvalResult(
         case_id=case.id,
         profile=case.profile,
         passed=passed,
         route_passed=route_passed,
-        answer_evaluated=answer_evaluated,
-        answer_passed=answer_passed,
+        contract_passed=contract_passed,
+        content_evaluated=content_evaluated,
+        content_passed=content_passed,
         evidence_passed=evidence_passed,
         status=status,
         generation=generation,
@@ -343,7 +349,7 @@ def _render_eval_output(answer: str, end_event: dict[str, object]) -> str:
 
 def _case_from_json(row: dict[str, object]) -> QaEvalCase:
     route = str(row["expected_route"])
-    if route not in {"fast", "agent", "agent_no_tool", "planned", "scope"}:
+    if route not in {"agent", "agent_no_tool", "input_guardrail"}:
         raise ValueError(f"unknown expected route: {route}")
     history = tuple(
         ConversationMessage.model_validate(item)
