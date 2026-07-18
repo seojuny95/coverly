@@ -165,6 +165,47 @@ def test_single_web_result_is_recovered_without_a_selected_result_id() -> None:
     assert result.citations == web_response.citations
 
 
+def test_required_web_result_replaces_an_explicit_non_web_selection() -> None:
+    dependencies = _dependencies("최신 보험 정책을 알려줘")
+    dependencies.input_decision = QaInputDecision(
+        scope="insurance",
+        should_block=False,
+        requires_fresh_official_source=True,
+        insurance_request="최신 보험 정책을 알려줘",
+        out_of_scope_request=None,
+        reason="시점에 따라 달라지는 정보",
+    )
+    non_web = dependencies.register(
+        "official_rag",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="기존 공식자료 답변",
+            citations=[],
+            limitations=[],
+        ),
+    )
+    dependencies.register(
+        "web",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="최신 공식 웹 답변",
+            citations=[],
+            limitations=[],
+        ),
+    )
+
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id=non_web.result_id,
+            answer="최신 공식 웹 답변",
+        ),
+        dependencies,
+    )
+
+    assert result.answer == "최신 공식 웹 답변"
+
+
 def test_general_guidance_without_tool_data_remains_available() -> None:
     dependencies = _dependencies("어떤 보험 질문을 할 수 있어?")
 

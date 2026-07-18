@@ -8,7 +8,6 @@ from app.modules.qa.agent.contracts import (
     AgentCounselorDraft,
     QaAgentDependencies,
     QaAgentUnavailable,
-    RegisteredToolResult,
 )
 from app.modules.qa.agent.grounding import (
     NUMERIC_CLAIM,
@@ -18,6 +17,7 @@ from app.modules.qa.agent.input_guardrail import (
     requires_fresh_official_source,
     requires_uploaded_policy_terms,
 )
+from app.modules.qa.agent.selection import select_tool_result
 from app.modules.qa.context import QaContext
 from app.modules.qa.response_support import (
     contextual_suggestions,
@@ -64,7 +64,7 @@ def validated_agent_response(
             return _missing_required_web_response(context)
         return _validated_general_guidance_response(context, draft)
 
-    selected = _select_tool_result(draft, dependencies)
+    selected = select_tool_result(dependencies, draft.selected_result_id)
     if (
         selected is not None
         and requires_uploaded_policy_terms(dependencies)
@@ -116,32 +116,6 @@ def validated_agent_response(
         ),
         context.insured,
     )
-
-
-def _select_tool_result(
-    draft: AgentCounselorDraft,
-    dependencies: QaAgentDependencies,
-) -> RegisteredToolResult | None:
-    selected = (
-        dependencies.tool_results.get(draft.selected_result_id)
-        if draft.selected_result_id is not None
-        else None
-    )
-    if requires_fresh_official_source(dependencies):
-        if selected is not None and selected.kind == "web":
-            return selected
-        web_results = [item for item in dependencies.tool_results.values() if item.kind == "web"]
-        return web_results[0] if len(web_results) == 1 else None
-
-    if selected is not None:
-        return selected
-
-    results = list(dependencies.tool_results.values())
-    if len(results) == 1:
-        return results[0]
-    if results and all(item.response == results[0].response for item in results[1:]):
-        return results[0]
-    return None
 
 
 def _validated_general_guidance_response(

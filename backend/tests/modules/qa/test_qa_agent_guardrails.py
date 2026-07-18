@@ -313,6 +313,69 @@ def test_output_review_receives_selected_tool_evidence() -> None:
     assert selected["evidence"] == ["암진단비 가입금액 3,000만원 확인"]
 
 
+def test_output_review_uses_required_web_result_over_selected_non_web_result() -> None:
+    dependencies = _dependencies(
+        {
+            "scope": "insurance",
+            "should_block": False,
+            "requires_fresh_official_source": True,
+            "insurance_request": "최신 보험 정책을 확인해줘",
+            "out_of_scope_request": None,
+            "reason": "최신 공식 정보가 필요함",
+        }
+    )
+    dependencies.input_decision = QaInputDecision(
+        scope="insurance",
+        should_block=False,
+        requires_fresh_official_source=True,
+        insurance_request="최신 보험 정책을 확인해줘",
+        out_of_scope_request=None,
+        reason="최신 공식 정보가 필요함",
+    )
+    non_web = dependencies.register(
+        "official_rag",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="기존 공식자료 답변",
+            citations=[],
+            limitations=[],
+        ),
+    )
+    dependencies.register(
+        "web",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="최신 공식 웹 답변",
+            citations=[],
+            limitations=[],
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    def classify(_system: str, user: str) -> dict[str, object]:
+        captured.update(json.loads(user))
+        return {
+            "unsupported_factual_claims": [],
+            "directs_purchase_or_cancellation": False,
+            "asserts_payout_or_coverage_certainty": False,
+            "invents_personal_facts": False,
+            "reason": "최신 웹 근거와 일치함",
+        }
+
+    dependencies.classify_output = classify
+    classify_output_safety(
+        dependencies,
+        AgentCounselorDraft(
+            selected_result_id=non_web.result_id,
+            answer="최신 공식 웹 답변",
+        ),
+    )
+
+    selected = cast(dict[str, object], captured["selected_tool"])
+    assert selected["kind"] == "web"
+    assert selected["authoritative_answer"] == "최신 공식 웹 답변"
+
+
 def test_sdk_output_guardrail_trips_for_unsupported_factual_claim() -> None:
     dependencies = _dependencies(
         {
@@ -429,6 +492,39 @@ def test_deterministic_tool_result_remains_available_as_guardrail_fallback() -> 
     dependencies.register("policies", response, trust_level="deterministic")
 
     assert _unambiguous_tool_fallback(dependencies) == response
+
+
+def test_non_web_result_cannot_be_guardrail_fallback_for_fresh_information() -> None:
+    dependencies = _dependencies(
+        {
+            "scope": "insurance",
+            "should_block": False,
+            "requires_fresh_official_source": True,
+            "insurance_request": "최신 보험 정책을 확인해줘",
+            "out_of_scope_request": None,
+            "reason": "최신 공식 정보가 필요함",
+        }
+    )
+    dependencies.input_decision = QaInputDecision(
+        scope="insurance",
+        should_block=False,
+        requires_fresh_official_source=True,
+        insurance_request="최신 보험 정책을 확인해줘",
+        out_of_scope_request=None,
+        reason="최신 공식 정보가 필요함",
+    )
+    dependencies.register(
+        "policies",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="현재 보유 증권은 1개예요.",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+
+    assert _unambiguous_tool_fallback(dependencies) is None
 
 
 def test_structured_value_grounding_checks_periods_percentages_and_dates() -> None:
