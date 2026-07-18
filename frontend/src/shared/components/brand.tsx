@@ -1,11 +1,11 @@
 import Link from "next/link";
 
-export const logoLinkClassName =
+export const brandLinkClassName =
   "group flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-4";
 
 // Visual mark only, no navigation. Lets call sites that need custom link
 // behavior (e.g. a leave-confirmation guard) compose their own wrapper.
-export function CoverlyMark() {
+export function BrandMark() {
   return (
     <>
       <span className="text-[19px] font-semibold tracking-[-0.065em] text-zinc-950">
@@ -19,14 +19,14 @@ export function CoverlyMark() {
   );
 }
 
-export function CoverlyLogo({ className = "" }: { className?: string }) {
+export function BrandLink({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/"
-      className={`${logoLinkClassName} ${className}`}
+      className={`${brandLinkClassName} ${className}`}
       aria-label="Coverly AI 홈"
     >
-      <CoverlyMark />
+      <BrandMark />
     </Link>
   );
 }

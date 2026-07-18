@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CoverlyMark } from "../../shared/components/logo";
+import { BrandMark } from "../../shared/components/brand";
 
 const ANALYSIS_STEP_MESSAGES = [
   "증권에서 보장 내용을 찾고 있어요",
@@ -85,7 +85,7 @@ export function AnalysisProgress({
     >
       {surface === "page" ? (
         <span className="absolute top-6 left-5 flex items-center gap-1.5 sm:left-6">
-          <CoverlyMark />
+          <BrandMark />
         </span>
       ) : null}
       <div className="flex w-full max-w-[760px] flex-col items-center">

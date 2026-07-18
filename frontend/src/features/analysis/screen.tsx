@@ -12,12 +12,12 @@ import {
   useState,
 } from "react";
 
-import { PixelEyebrow } from "../../shared/components/eyebrow";
+import { SectionLabel } from "../../shared/components/section-label";
 import {
-  CoverlyLogo,
-  CoverlyMark,
-  logoLinkClassName,
-} from "../../shared/components/logo";
+  BrandLink,
+  BrandMark,
+  brandLinkClassName,
+} from "../../shared/components/brand";
 import { Button } from "../../shared/components/ui/button";
 
 import { UploadInsuranceModal } from "./upload-modal";
@@ -218,10 +218,10 @@ export function InsuranceAnalysisPage({
   if (!analysis || insuranceDocuments.length === 0) {
     return (
       <main className="relative flex min-h-screen items-center justify-center bg-white px-5 text-zinc-950">
-        <CoverlyLogo className="absolute top-6 left-6" />
+        <BrandLink className="absolute top-6 left-6" />
         <section className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white px-6 py-8 text-center shadow-[10px_10px_0_#e8edff]">
           <div className="mb-5 flex justify-center">
-            <PixelEyebrow>분석 결과</PixelEyebrow>
+            <SectionLabel>분석 결과</SectionLabel>
           </div>
           <h1 className="text-2xl font-semibold tracking-[-0.04em]">
             분석할 보험증권이 없어요
@@ -245,10 +245,10 @@ export function InsuranceAnalysisPage({
         <LeaveGuardLink
           href="/"
           enabled={hasData}
-          className={logoLinkClassName}
+          className={brandLinkClassName}
           ariaLabel="Coverly AI 홈"
         >
-          <CoverlyMark />
+          <BrandMark />
         </LeaveGuardLink>
       </header>
 
@@ -305,7 +305,7 @@ export function InsuranceAnalysisPage({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <div className="mb-4">
-                  <PixelEyebrow>나의 보장 지도</PixelEyebrow>
+                  <SectionLabel>나의 보장 지도</SectionLabel>
                 </div>
                 <h1 className="text-3xl font-semibold tracking-[-0.05em] text-zinc-950 sm:text-4xl">
                   내 보험을 종류별로 정리했어요
@@ -489,7 +489,7 @@ export function InsuranceAnalysisPage({
             tabIndex={0}
           >
             <div className="mb-7">
-              <PixelEyebrow>내 보험 분석</PixelEyebrow>
+              <SectionLabel>내 보험 분석</SectionLabel>
               <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
                 가입한 보험을 한눈에 확인해요
               </h1>
@@ -516,7 +516,7 @@ export function InsuranceAnalysisPage({
         ) : (
           <div>
             <div className="mb-7">
-              <PixelEyebrow>근거 기반 Q&A</PixelEyebrow>
+              <SectionLabel>근거 기반 Q&A</SectionLabel>
               <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
                 내 보험을 AI 상담사와 함께 살펴봐요
               </h1>
