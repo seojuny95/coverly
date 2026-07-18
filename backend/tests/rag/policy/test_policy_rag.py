@@ -150,6 +150,18 @@ def test_policy_pii_masks_landline_and_representative_phone_numbers() -> None:
     assert masked.count("[전화번호]") == 2
 
 
+def test_policy_pii_masks_phone_separator_and_invalid_identifier_variants() -> None:
+    text = "연락처 010.1234.5678 또는 010 9876 5432\n주민번호 991332-9123456"
+
+    masked = mask_policy_pii(text)
+
+    assert "010.1234.5678" not in masked
+    assert "010 9876 5432" not in masked
+    assert "991332-9123456" not in masked
+    assert masked.count("[전화번호]") == 2
+    assert "[주민등록번호]" in masked
+
+
 def test_policy_pii_masks_contact_and_policy_identifiers() -> None:
     text = (
         "이메일 test.person@example.com\n"
