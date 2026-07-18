@@ -13,18 +13,20 @@ from typing import Literal, cast
 from app.modules.evidence.catalog import citation_from_evidence
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.qa.agent import build_qa_agent_runner
-from app.modules.qa.agent_contracts import QaAgentRunner
+from app.modules.qa.agent_contracts import AgentCounselorDraft, QaAgentDependencies, QaAgentRunner
 from app.modules.qa.agent_evidence import consultation_evidence
+from app.modules.qa.agent_validation import validated_agent_response
 from app.modules.qa.context import QaContext
 from app.modules.qa.resolvers import context_fallback, resolve_precomputed_answer
 from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
 from app.modules.qa.service import stream_portfolio_answer
+from app.modules.qa.web_search import WebSearchResult
 from app.rag.official.answer import answer_official_question
 from app.rag.policy import generate_policy_answer
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "dataset.json"
 POLICY_FIXTURE = Path(__file__).resolve().parent / "fixture_policies.json"
-EvalRoute = Literal["fast", "agent", "scope"]
+EvalRoute = Literal["fast", "agent", "agent_no_tool", "planned", "scope"]
 
 _UNIVERSAL_FORBIDDEN = (
     "안심하세요",
@@ -62,6 +64,7 @@ class QaEvalResult:
     generation: str
     agent_calls: int
     citation_count: int
+    no_tool_passed: bool
     elapsed_ms: float
     answer: str
     failures: tuple[str, ...]
@@ -75,6 +78,7 @@ class QaEvalReport:
     answer_evaluated: int
     answer_passed: int
     results: tuple[QaEvalResult, ...]
+    model: str | None = None
 
     @property
     def pass_rate(self) -> float:
@@ -82,7 +86,13 @@ class QaEvalReport:
 
 
 class _ProbeAgent:
-    def __init__(self, delegate: QaAgentRunner | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        expected_route: EvalRoute,
+        delegate: QaAgentRunner | None = None,
+    ) -> None:
+        self.expected_route = expected_route
         self.delegate = delegate
         self.calls = 0
         self.last_context: QaContext | None = None
@@ -92,6 +102,27 @@ class _ProbeAgent:
         self.last_context = context
         if self.delegate is not None:
             return self.delegate.run(context)
+
+        if self.expected_route == "agent_no_tool":
+            dependencies = QaAgentDependencies(
+                context=context,
+                complete=None,
+                official_answer=None,
+                web_search=lambda *_args, **_kwargs: WebSearchResult(status="unavailable"),
+            )
+            return validated_agent_response(
+                context,
+                AgentCounselorDraft(
+                    answer_mode="general_guidance",
+                    answer=(
+                        "저는 올려주신 보험증권을 기준으로 가입 보험, 담보, 가입금액, "
+                        "겹치는 보장, 청구 방법을 함께 확인해드릴 수 있어요. "
+                        "개인정보와 증권 내용은 답변 근거 확인에 필요한 범위에서만 다룹니다. "
+                        "지급 조건은 약관 근거가 필요해서 확인 없이 단정하지 않습니다."
+                    ),
+                ),
+                dependencies,
+            )
 
         deterministic = resolve_precomputed_answer(
             context,
@@ -128,9 +159,10 @@ def evaluate(
     cases: tuple[QaEvalCase, ...] | None = None,
     *,
     live: bool = False,
+    model: str | None = None,
 ) -> QaEvalReport:
     active_cases = cases if cases is not None else load_cases()
-    delegate = build_qa_agent_runner() if live else None
+    delegate = build_qa_agent_runner(model=model) if live else None
     results = tuple(_evaluate_case(case, delegate=delegate, live=live) for case in active_cases)
     evaluated = tuple(result for result in results if result.answer_evaluated)
     return QaEvalReport(
@@ -140,6 +172,7 @@ def evaluate(
         answer_evaluated=len(evaluated),
         answer_passed=sum(result.answer_passed for result in evaluated),
         results=results,
+        model=model,
     )
 
 
@@ -152,6 +185,7 @@ def render_report(report: QaEvalReport, *, show_passing: bool = False) -> str:
             f"mode={report.mode} passed={report.passed}/{report.total} "
             f"pass_rate={report.pass_rate:.3f} "
             f"answers={report.answer_passed}/{report.answer_evaluated} "
+            f"model={report.model or 'default'} "
             f"avg_elapsed_ms={average_ms:.1f} median_elapsed_ms={median_ms:.1f}"
         )
     ]
@@ -162,6 +196,7 @@ def render_report(report: QaEvalReport, *, show_passing: bool = False) -> str:
         lines.append(
             f"{state} {result.case_id} route_calls={result.agent_calls} "
             f"status={result.status} generation={result.generation} "
+            f"no_tool={result.no_tool_passed} "
             f"elapsed_ms={result.elapsed_ms:.1f}"
         )
         for failure in result.failures:
@@ -177,7 +212,7 @@ def _evaluate_case(
     delegate: QaAgentRunner | None,
     live: bool,
 ) -> QaEvalResult:
-    probe = _ProbeAgent(delegate)
+    probe = _ProbeAgent(expected_route=case.expected_route, delegate=delegate)
     started = perf_counter()
     try:
         events = list(
@@ -194,6 +229,7 @@ def _evaluate_case(
         status = str(end.get("status", "unknown"))
         generation = str(end.get("generation", "fallback"))
         citations = cast(list[object], end.get("citations", []))
+        rendered_output = _render_eval_output(answer, end)
     except Exception as exc:
         elapsed_ms = (perf_counter() - started) * 1000
         return QaEvalResult(
@@ -208,28 +244,36 @@ def _evaluate_case(
             generation="error",
             agent_calls=probe.calls,
             citation_count=0,
+            no_tool_passed=False,
             elapsed_ms=elapsed_ms,
             answer="",
             failures=(f"{type(exc).__name__}: {exc}",),
         )
 
-    expected_calls = 0 if case.expected_route == "scope" else 1
+    expected_calls = 0 if case.expected_route in {"planned", "scope"} else 1
     route_passed = probe.calls == expected_calls
     answer_evaluated = live or case.expected_route != "agent"
     include_passed = all(
-        any(term in answer for term in group) for group in case.must_include_groups
+        any(term in rendered_output for term in group) for group in case.must_include_groups
     )
     forbidden = (*_UNIVERSAL_FORBIDDEN, *case.must_not_include)
-    forbidden_passed = all(term not in answer for term in forbidden)
+    forbidden_passed = all(term not in rendered_output for term in forbidden)
     status_passed = status == case.expected_status
     citations_passed = not case.require_citations or bool(citations)
     generation_passed = not (live and case.expected_route == "agent") or generation == "llm"
+    limitations = cast(list[object], end.get("limitations", []))
+    no_tool_passed = case.expected_route != "agent_no_tool" or (
+        generation == "llm"
+        and not citations
+        and "일반 안내" in " ".join(str(item) for item in limitations)
+    )
     answer_passed = (
         status_passed
         and include_passed
         and forbidden_passed
         and citations_passed
         and generation_passed
+        and no_tool_passed
     )
 
     evidence_text = ""
@@ -252,6 +296,8 @@ def _evaluate_case(
         failures.append("answer did not include a required source citation")
     if answer_evaluated and not generation_passed:
         failures.append("agent answer fell back instead of completing with validated LLM output")
+    if answer_evaluated and not no_tool_passed:
+        failures.append("expected a no-tool general guidance answer")
     if not evidence_passed:
         failures.append("required portfolio evidence was not exposed to the agent")
 
@@ -268,6 +314,7 @@ def _evaluate_case(
         generation=generation,
         agent_calls=probe.calls,
         citation_count=len(citations),
+        no_tool_passed=no_tool_passed,
         elapsed_ms=elapsed_ms,
         answer=answer,
         failures=tuple(failures),
@@ -279,9 +326,21 @@ def fixture_policies(path: Path = POLICY_FIXTURE) -> list[PolicyInput]:
     return [PolicyInput.model_validate(row) for row in rows]
 
 
+def _render_eval_output(answer: str, end_event: dict[str, object]) -> str:
+    claim_channels = end_event.get("claim_channels")
+    if claim_channels is None:
+        return answer
+    return "\n".join(
+        (
+            answer,
+            json.dumps(claim_channels, ensure_ascii=False, sort_keys=True),
+        )
+    )
+
+
 def _case_from_json(row: dict[str, object]) -> QaEvalCase:
     route = str(row["expected_route"])
-    if route not in {"fast", "agent", "scope"}:
+    if route not in {"fast", "agent", "agent_no_tool", "planned", "scope"}:
         raise ValueError(f"unknown expected route: {route}")
     history = tuple(
         ConversationMessage.model_validate(item)
@@ -316,6 +375,7 @@ def main() -> int:
     parser.add_argument("--show-passing", action="store_true")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--case", action="append", default=[])
+    parser.add_argument("--model")
     args = parser.parse_args()
 
     cases = load_cases()
@@ -324,7 +384,7 @@ def main() -> int:
     if args.case:
         selected_ids = set(args.case)
         cases = tuple(case for case in cases if case.id in selected_ids)
-    report = evaluate(cases, live=args.live)
+    report = evaluate(cases, live=args.live, model=args.model)
     print(render_report(report, show_passing=args.show_passing))
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

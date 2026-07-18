@@ -862,6 +862,53 @@ def test_agent_requires_web_tool_for_latest_official_information() -> None:
     assert "공식 웹사이트 검색 근거" in result.answer
 
 
+def test_agent_may_answer_general_guidance_without_tool_result() -> None:
+    context = build_qa_context("너는 어떤 질문에 답할 수 있어?", _policies(), None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    result = validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            answer_mode="general_guidance",
+            answer=(
+                "저는 올려주신 보험증권을 기준으로 가입한 보험, 담보, 가입금액, "
+                "겹치는 보장, 청구 방법을 함께 확인해드릴 수 있어요."
+            ),
+        ),
+        dependencies,
+    )
+
+    assert result.status == "answered"
+    assert result.generation == "llm"
+    assert result.citations == []
+    assert "일반 안내" in result.limitations[0]
+
+
+def test_agent_general_guidance_cannot_mention_uploaded_policy_identity() -> None:
+    context = build_qa_context("너는 어떤 질문에 답할 수 있어?", _policies(), None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    with raises(QaAgentUnavailable):
+        validated_agent_response(
+            context,
+            AgentCounselorDraft(
+                answer_mode="general_guidance",
+                answer="테스트보험 건강보험은 암진단비가 있어요.",
+            ),
+            dependencies,
+        )
+
+
 def _health_plus_auto() -> list[PolicyInput]:
     return [
         PolicyInput.model_validate(
