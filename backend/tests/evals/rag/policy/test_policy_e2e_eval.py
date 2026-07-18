@@ -22,8 +22,8 @@ def test_policy_rag_e2e_dataset_is_pii_safe_and_well_labeled() -> None:
 
     assert set(raw) == {"retrieval_cases", "extra_cases"}
     assert raw["retrieval_cases"]["include"] == "all"
-    assert len(raw["extra_cases"]) >= 10
-    assert len(cases) >= 130
+    assert len(raw["extra_cases"]) >= 45
+    assert len(cases) >= 170
     assert {case.expected_status for case in cases} == {"answered", "no_data"}
     assert all(case.must_include_groups for case in cases)
     assert "sample-" in serialized

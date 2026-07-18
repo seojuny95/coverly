@@ -18,9 +18,11 @@ def test_official_rag_e2e_dataset_selects_generation_scenarios() -> None:
     raw_cases = json.loads(EVAL_FIXTURE.read_text(encoding="utf-8"))
     cases = load_e2e_eval_cases()
 
-    assert len(raw_cases) >= 30
-    assert all(set(raw_case) == {"id"} for raw_case in raw_cases)
-    assert len(cases) == len(raw_cases) * 2
+    assert set(raw_cases) == {"generation_cases", "retrieval_cases", "extra_cases"}
+    assert raw_cases["generation_cases"]["include"] == "all"
+    assert raw_cases["retrieval_cases"]["include"] == "all"
+    assert len(raw_cases["extra_cases"]) >= 15
+    assert len(cases) >= 150
     assert {case.expected_status for case in cases} == {"answered", "filtered", "no_evidence"}
 
 

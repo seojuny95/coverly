@@ -99,9 +99,10 @@ QA router, planner, 사용자 업로드 증권은 거치지 않는다.
 
 ### 평가셋 구성
 
-- 총 30개 시나리오, 질문 표현 2개씩 60개 케이스.
-- generation 평가셋 전체를 retrieval→generation으로 다시 실행한다.
-- 고지의무, 면책, 청약철회, 화재보험 계산, 대위권, 보험나이, 금융소비자보호, 보험업법, 상품명/의료리스크 정책, negative/out-of-scope를 포함한다.
+- 총 150개 케이스.
+- generation 평가셋 전체 60개와 retrieval 평가셋 전체 72개를 retrieval→generation으로 다시 실행한다.
+- 별도 negative/out-of-scope 18개를 추가했다.
+- 고지의무, 면책, 청약철회, 화재보험 계산, 대위권, 보험나이, 금융소비자보호, 보험업법, 상품명/의료리스크 정책, 개인계약 조회 불가, 실시간/의료/법률/투자 범위 밖 질문을 포함한다.
 - 기본 실행은 OpenAI 호출 없이 deterministic extractive completer를 사용한다.
 - live LLM은 `--live-generation` 옵션으로 별도 확인한다.
 - E2E는 generation 계약 검증이 목적이라 `required_citation_ids`를 strict하게 본다.
@@ -113,6 +114,7 @@ QA router, planner, 사용자 업로드 증권은 거치지 않는다.
 |---|---:|---|
 | RAG E2E v1 baseline | 13/24, pass_rate 0.542 | 대표 시나리오만 골라 연결 smoke test로 시작했다. 부족한 지점을 충분히 드러내지 못했다. |
 | RAG E2E broad baseline | 21/60, pass_rate 0.350 | generation 전체 시나리오로 확장했다. 실패는 필요한 chunk가 top-5에 없거나, 검색은 됐지만 추출형 답변이 필수 표현을 담지 못한 경우, negative/out-of-scope가 answered로 흐르는 경우다. |
+| RAG E2E reliable baseline | 47/150, pass_rate 0.313 | generation 전체, retrieval 전체, extra negative를 합쳐 150개로 확장했다. negative/out-of-scope 거절과 retrieval miss가 더 명확히 드러난다. |
 
 ## 현재 상태 요약
 
@@ -122,7 +124,7 @@ QA router, planner, 사용자 업로드 증권은 거치지 않는다.
 | Retrieval offline | 44/54, accepted 0.815 | 빠른 회귀 확인 가능 |
 | Retrieval production | 49/54, accepted 0.907 | 운영 index 기준 확인 완료 |
 | Generation | 60/60 | 고정 context 답변 계약 확인 가능 |
-| RAG E2E offline | 21/60, pass_rate 0.350 | generation 전체 세트 기반 broad E2E baseline |
+| RAG E2E offline | 47/150, pass_rate 0.313 | 150개 reliable baseline |
 
 Official RAG의 component 평가는 v1 수준으로 구축되었다.
 남은 큰 작업은 official E2E 실패 케이스를 retrieval 개선과 answer context 압축 개선으로 나눠 처리하고, QA 기능이 안정된 뒤 `router/e2e 평가`와 `blind holdout`을 추가하는 것이다.

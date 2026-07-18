@@ -18,7 +18,7 @@ from typing import cast
 from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter, compact_prompt_text
 from app.rag.embeddings import HashingEmbedder
-from app.rag.official.answer import answer_official_question
+from app.rag.official.answer import RagAnswerStatus, answer_official_question
 from app.rag.official.loaders import load_official_chunks
 from app.rag.official.models import RagChunk
 from app.rag.official.retrieval import retrieve
@@ -26,9 +26,12 @@ from evals.rag.official.generation import (
     EVAL_FIXTURE as GENERATION_FIXTURE,
 )
 from evals.rag.official.generation import (
+    GenerationDifficulty,
     GenerationEvalCase,
+    GenerationProfile,
     load_generation_eval_cases,
 )
+from evals.rag.official.retrieval import RetrievalEvalCase, load_retrieval_eval_cases
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "e2e_dataset.json"
 _OFFLINE_ANSWER_CHARS = 850
@@ -72,11 +75,20 @@ class OfficialRagE2EResult:
 
 
 def load_e2e_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[GenerationEvalCase, ...]:
-    selected_ids = _selected_scenario_ids(path)
-    return tuple(
-        case
-        for case in load_generation_eval_cases(GENERATION_FIXTURE)
-        if _scenario_id(case.id) in selected_ids
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, list):
+        selected_ids = _selected_scenario_ids(raw)
+        return tuple(
+            case
+            for case in load_generation_eval_cases(GENERATION_FIXTURE)
+            if _scenario_id(case.id) in selected_ids
+        )
+
+    config = cast(dict[str, object], raw)
+    return (
+        *_generation_cases_from_config(config["generation_cases"]),
+        *_retrieval_cases_from_config(config["retrieval_cases"]),
+        *_extra_cases_from_config(config["extra_cases"]),
     )
 
 
@@ -260,9 +272,87 @@ def _notes(
     return tuple(notes)
 
 
-def _selected_scenario_ids(path: Path) -> set[str]:
-    raw_cases = cast(list[dict[str, object]], json.loads(path.read_text(encoding="utf-8")))
+def _generation_cases_from_config(raw: object) -> tuple[GenerationEvalCase, ...]:
+    config = cast(dict[str, object], raw)
+    selected_ids = _selected_scenario_ids_from_config(config["include"])
+    return tuple(
+        case
+        for case in load_generation_eval_cases(GENERATION_FIXTURE)
+        if _scenario_id(case.id) in selected_ids
+    )
+
+
+def _retrieval_cases_from_config(raw: object) -> tuple[GenerationEvalCase, ...]:
+    config = cast(dict[str, object], raw)
+    retrieval_cases = load_retrieval_eval_cases()
+    selected_ids = _selected_retrieval_case_ids(config["include"], retrieval_cases)
+    return tuple(
+        _generation_case_from_retrieval_case(case)
+        for case in retrieval_cases
+        if case.id in selected_ids
+    )
+
+
+def _extra_cases_from_config(raw: object) -> tuple[GenerationEvalCase, ...]:
+    return tuple(
+        _extra_case_from_json(cast(dict[str, object], item)) for item in cast(list[object], raw)
+    )
+
+
+def _generation_case_from_retrieval_case(case: RetrievalEvalCase) -> GenerationEvalCase:
+    expected_no_hits = case.expected_no_hits
+    must_include_groups = tuple(
+        (term,) for accepted in case.accepted_evidence for term in accepted.required_terms
+    )
+    return GenerationEvalCase(
+        id=f"retrieval__{case.id}",
+        question=case.query,
+        hit_chunk_ids=case.relevant_chunk_ids,
+        expected_status="no_evidence" if expected_no_hits else "answered",
+        must_include_groups=() if expected_no_hits else must_include_groups,
+        must_not_include=(
+            "가입하세요",
+            "무조건 지급",
+            "반드시 보장",
+            "공식자료에서 확인했습니다" if expected_no_hits else "상품을 추천합니다",
+        ),
+        required_citation_ids=() if expected_no_hits else case.relevant_chunk_ids,
+        expected_missing_context_terms=(),
+        profile=case.profile,
+        difficulty=case.difficulty,
+    )
+
+
+def _extra_case_from_json(raw: dict[str, object]) -> GenerationEvalCase:
+    return GenerationEvalCase(
+        id=str(raw["id"]),
+        question=str(raw["question"]),
+        hit_chunk_ids=_string_tuple(raw["hit_chunk_ids"]),
+        expected_status=cast(RagAnswerStatus, str(raw["expected_status"])),
+        must_include_groups=_string_groups(raw["must_include_groups"]),
+        must_not_include=_string_tuple(raw["must_not_include"]),
+        required_citation_ids=_string_tuple(raw["required_citation_ids"]),
+        expected_missing_context_terms=_string_tuple(raw["expected_missing_context_terms"]),
+        profile=cast(GenerationProfile, str(raw.get("profile", "out_of_scope"))),
+        difficulty=cast(GenerationDifficulty, str(raw.get("difficulty", "hard"))),
+    )
+
+
+def _selected_scenario_ids(raw_cases: list[object]) -> set[str]:
+    return {str(cast(dict[str, object], item)["id"]) for item in raw_cases}
+
+
+def _selected_scenario_ids_from_config(include: object) -> set[str]:
+    if include == "all":
+        return {_scenario_id(case.id) for case in load_generation_eval_cases(GENERATION_FIXTURE)}
+    raw_cases = cast(list[dict[str, object]], include)
     return {str(item["id"]) for item in raw_cases}
+
+
+def _selected_retrieval_case_ids(include: object, cases: tuple[RetrievalEvalCase, ...]) -> set[str]:
+    if include == "all":
+        return {case.id for case in cases}
+    return set(_string_tuple(include))
 
 
 def _scenario_id(case_id: str) -> str:
@@ -285,6 +375,14 @@ def _present_terms(terms: tuple[str, ...], text: str) -> tuple[str, ...]:
 
 def _normalize(text: str) -> str:
     return " ".join(text.split())
+
+
+def _string_tuple(value: object) -> tuple[str, ...]:
+    return tuple(str(item) for item in cast(list[object], value))
+
+
+def _string_groups(value: object) -> tuple[tuple[str, ...], ...]:
+    return tuple(_string_tuple(group) for group in cast(list[object], value))
 
 
 def _rate(values: Iterable[bool]) -> float:
