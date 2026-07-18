@@ -43,6 +43,10 @@ class PortfolioSessionDocumentLimitExceeded(Exception):
     """The portfolio already contains the maximum number of documents."""
 
 
+class PortfolioSessionDocumentCancelled(Exception):
+    """The client cancelled this document before parsing completed."""
+
+
 @dataclass(frozen=True)
 class PortfolioSessionAccess:
     token: str
@@ -100,18 +104,19 @@ class PortfolioSessionService:
         token: str,
         result: PipelineResult,
         *,
+        document_id: str | None = None,
         now: datetime | None = None,
     ) -> RegisteredPolicyDocument:
         current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
-        document_id = uuid.uuid4().hex
+        resolved_document_id = document_id or uuid.uuid4().hex
         rag_session_id = rag_session_id_from_result(result, now=current)
         try:
-            policy = policy_for_storage(result, document_id=document_id)
+            policy = policy_for_storage(result, document_id=resolved_document_id)
             stored = self._repository.add_document(
                 claims.session_id,
                 StoredPolicyDocument(
-                    id=document_id,
+                    id=resolved_document_id,
                     policy=policy,
                     rag_session_id=rag_session_id,
                 ),
@@ -127,8 +132,10 @@ class PortfolioSessionService:
                 self._delete_rag_session(rag_session_id)
             if stored == "limit_exceeded":
                 raise PortfolioSessionDocumentLimitExceeded
+            if stored == "cancelled":
+                raise PortfolioSessionDocumentCancelled
             raise InvalidPortfolioSessionToken
-        return RegisteredPolicyDocument(id=document_id)
+        return RegisteredPolicyDocument(id=resolved_document_id)
 
     def snapshot(
         self,
@@ -191,6 +198,26 @@ class PortfolioSessionService:
     def delete(self, token: str, *, now: datetime | None = None) -> None:
         claims = self._verify(token, now=now or datetime.now(UTC))
         rag_session_ids = self._repository.delete(claims.session_id)
+        if rag_session_ids is None:
+            raise InvalidPortfolioSessionToken
+        for rag_session_id in rag_session_ids:
+            self._delete_rag_session(rag_session_id)
+
+    def delete_documents(
+        self,
+        token: str,
+        document_ids: list[str],
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        current = now or datetime.now(UTC)
+        claims = self._verify(token, now=current)
+        selected_ids = tuple(dict.fromkeys(document_ids))
+        rag_session_ids = self._repository.delete_documents(
+            claims.session_id,
+            selected_ids,
+            now=current,
+        )
         if rag_session_ids is None:
             raise InvalidPortfolioSessionToken
         for rag_session_id in rag_session_ids:

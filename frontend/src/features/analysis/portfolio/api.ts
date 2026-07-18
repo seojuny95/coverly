@@ -1,5 +1,9 @@
 import type { AnalyzedInsurance } from "../store";
 import { apiResponseError, apiUrl } from "../../../shared/api/client";
+import {
+  QaStreamProtocolError,
+  requireQaStreamEvent,
+} from "../../../shared/api/qa-stream";
 import type {
   ClaimChannelBlock,
   ChatHistoryItem,
@@ -7,15 +11,17 @@ import type {
   CoverageGroup,
   DeathBenefitGuideInput,
   EssentialCoverageItem,
-  InsuredDemographics,
   PortfolioCoverageSummary,
   PortfolioQuestionRequest,
   PortfolioSummaryRequest,
+  QaEndEvent,
+  QaMetaEvent,
+  QaProgressEvent,
+  QaStreamEvent,
   ReferenceSource,
   SourceReliability,
   SpecialPolicyAnalysis,
 } from "../../../shared/api/contracts";
-import { isDamageInsurance } from "./eligibility";
 
 export type PortfolioSummary = PortfolioCoverageSummary;
 export type {
@@ -28,27 +34,6 @@ export type {
   ReferenceSource,
   SourceReliability,
   SpecialPolicyAnalysis,
-};
-
-export type QaAnswer = {
-  status: "answered" | "refused" | "no_data";
-  answer: string;
-  citations: Array<{
-    policy_id?: string;
-    insurer?: string;
-    product_name?: string;
-    coverage_name?: string;
-    evidence_id?: string;
-  }>;
-  limitations: string[];
-  suggestions?: string[];
-  generation?: "llm" | "fallback";
-  sections?: Array<{
-    title: string;
-    content: string;
-    basis: "confirmed_fact" | "general_guidance";
-  }>;
-  claim_channels?: ClaimChannelBlock | null;
 };
 
 async function postPortfolioSummary(
@@ -90,22 +75,11 @@ export function requestPortfolioSummary(
   return postPortfolioSummary(body, signal);
 }
 
-export type QaStreamEnd = {
-  status: QaAnswer["status"] | "clarify";
-  generation?: "llm" | "fallback";
-  citations: QaAnswer["citations"];
-  limitations: string[];
-  suggestions?: string[];
-  claim_channels?: ClaimChannelBlock | null;
-};
-
-export type QaStreamProgress = {
-  stage: string;
-  text: string;
-};
+export type QaStreamEnd = QaEndEvent;
+export type QaStreamProgress = QaProgressEvent;
 
 type QaStreamHandlers = {
-  onMeta?: (meta: { status: QaStreamEnd["status"] }) => void;
+  onMeta?: (meta: QaMetaEvent) => void;
   onProgress?: (progress: QaStreamProgress) => void;
   onDelta: (text: string) => void | Promise<void>;
   onEnd: (end: QaStreamEnd) => void;
@@ -119,12 +93,10 @@ export async function streamPortfolioQuestion(
   portfolioSessionToken: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  const demographics = getPolicyDemographics(insuranceDocuments);
   const body = {
     question,
     ...portfolioSelection(insuranceDocuments, portfolioSessionToken),
-    demographics,
-    history: prepareChatHistory(history),
+    history,
   } satisfies PortfolioQuestionRequest;
   const response = await fetch(apiUrl("/qa/stream"), {
     method: "POST",
@@ -135,31 +107,47 @@ export async function streamPortfolioQuestion(
   if (!response.ok || !response.body) {
     throw await apiResponseError(response, "상담 요청에 실패했어요.");
   }
+  if (!response.headers.get("content-type")?.includes("text/event-stream")) {
+    throw new QaStreamProtocolError();
+  }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  const protocol: { phase: "progress" | "answer" | "end" } = {
+    phase: "progress",
+  };
 
-  const dispatch = async (raw: string) => {
-    const line = raw.trim();
-    if (!line.startsWith("data:")) return;
-    let event: Record<string, unknown>;
+  const dispatch = async (frame: string) => {
+    const data = frame
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+    if (!data) return;
+
+    let payload: unknown;
     try {
-      event = JSON.parse(line.slice(5).trim()) as Record<string, unknown>;
+      payload = JSON.parse(data);
     } catch {
-      return; // skip a malformed/keepalive frame rather than aborting the stream
+      throw new QaStreamProtocolError();
     }
+    const event: QaStreamEvent = requireQaStreamEvent(payload);
+
     if (event.type === "meta") {
-      handlers.onMeta?.({ status: event.status as QaStreamEnd["status"] });
+      if (protocol.phase !== "progress") throw new QaStreamProtocolError();
+      protocol.phase = "answer";
+      handlers.onMeta?.(event);
     } else if (event.type === "progress") {
-      handlers.onProgress?.({
-        stage: String(event.stage ?? ""),
-        text: String(event.text ?? ""),
-      });
+      if (protocol.phase !== "progress") throw new QaStreamProtocolError();
+      handlers.onProgress?.(event);
     } else if (event.type === "delta") {
-      await handlers.onDelta(String(event.text ?? ""));
+      if (protocol.phase !== "answer") throw new QaStreamProtocolError();
+      await handlers.onDelta(event.text);
     } else if (event.type === "end") {
-      handlers.onEnd(event as unknown as QaStreamEnd);
+      if (protocol.phase !== "answer") throw new QaStreamProtocolError();
+      protocol.phase = "end";
+      handlers.onEnd(event);
     }
   };
 
@@ -167,60 +155,26 @@ export async function streamPortfolioQuestion(
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary !== -1) {
-      await dispatch(buffer.slice(0, boundary));
-      buffer = buffer.slice(boundary + 2);
-      boundary = buffer.indexOf("\n\n");
+    let boundary = nextSseBoundary(buffer);
+    while (boundary) {
+      await dispatch(buffer.slice(0, boundary.index));
+      buffer = buffer.slice(boundary.index + boundary.length);
+      if (protocol.phase === "end") {
+        await reader.cancel();
+        return;
+      }
+      boundary = nextSseBoundary(buffer);
     }
   }
+  buffer += decoder.decode();
   if (buffer.trim()) await dispatch(buffer);
+  if (protocol.phase !== "end") throw new QaStreamProtocolError();
 }
 
-export function prepareChatHistory(history: ChatHistoryItem[]) {
-  return history.slice(-12);
-}
-
-export type PolicyDemographicsCandidate = {
-  age: number;
-  gender: InsuredDemographics["성별"];
-  lifeStage?: InsuredDemographics["생애단계"];
-};
-
-// Shared scan over non-damage policies for usable (age, gender) info. Q&A takes
-// the first match as best-effort context; portfolio summary stays deterministic.
-export function collectPolicyDemographicsCandidates(
-  insuranceDocuments: AnalyzedInsurance[],
-): PolicyDemographicsCandidate[] {
-  const candidates: PolicyDemographicsCandidate[] = [];
-  for (const document of insuranceDocuments) {
-    if (isDamageInsurance(document.result)) continue;
-    const info = document.result.기본정보?.피보험자정보;
-    if (typeof info?.나이 === "number" && info.성별) {
-      candidates.push({
-        age: info.나이,
-        gender: info.성별,
-        lifeStage: info.생애단계,
-      });
-    }
-  }
-  return candidates;
-}
-
-function getPolicyDemographics(insuranceDocuments: AnalyzedInsurance[]) {
-  const [first] = collectPolicyDemographicsCandidates(insuranceDocuments);
-  if (!first) {
-    return {
-      age: null,
-      gender: "미상" as const,
-      source: "unknown" as const,
-      status: "missing" as const,
-    };
-  }
-  return {
-    age: first.age,
-    gender: first.gender,
-    source: "policy" as const,
-    status: "verified_policy" as const,
-  };
+function nextSseBoundary(buffer: string): {
+  index: number;
+  length: number;
+} | null {
+  const match = /\r?\n\r?\n/.exec(buffer);
+  return match ? { index: match.index, length: match[0].length } : null;
 }

@@ -1,5 +1,6 @@
 import { apiResponseError, apiUrl } from "../../shared/api/client";
 import type {
+  PortfolioSessionDocumentsDeleteRequest,
   PortfolioSessionRequest,
   PortfolioSessionResponse,
 } from "../../shared/api/contracts";
@@ -9,7 +10,11 @@ export type PortfolioSessionResult = PortfolioSessionResponse;
 type SessionPath =
   | "/portfolio/sessions"
   | "/portfolio/sessions/refresh"
-  | "/portfolio/sessions/delete";
+  | "/portfolio/sessions/delete"
+  | "/portfolio/sessions/documents/delete";
+
+type SessionRequestBody =
+  PortfolioSessionRequest | PortfolioSessionDocumentsDeleteRequest;
 
 export class PortfolioSessionExpiredError extends Error {
   constructor() {
@@ -34,6 +39,17 @@ export async function deletePortfolioSession(
   await request("/portfolio/sessions/delete", portfolioSessionToken);
 }
 
+export async function deletePortfolioSessionDocuments(
+  portfolioSessionToken: string,
+  documentIds: string[],
+): Promise<void> {
+  if (documentIds.length === 0) return;
+  await request("/portfolio/sessions/documents/delete", undefined, {
+    portfolioSessionToken,
+    documentIds,
+  } satisfies PortfolioSessionDocumentsDeleteRequest);
+}
+
 async function requestSession(
   path: SessionPath,
   token?: string,
@@ -42,12 +58,18 @@ async function requestSession(
   return (await response.json()) as PortfolioSessionResult;
 }
 
-async function request(path: SessionPath, token?: string): Promise<Response> {
+async function request(
+  path: SessionPath,
+  token?: string,
+  explicitBody?: SessionRequestBody,
+): Promise<Response> {
   let response: Response;
   try {
-    const body = token
-      ? ({ portfolioSessionToken: token } satisfies PortfolioSessionRequest)
-      : undefined;
+    const body =
+      explicitBody ??
+      (token
+        ? ({ portfolioSessionToken: token } satisfies PortfolioSessionRequest)
+        : undefined);
     response = await fetch(apiUrl(path), {
       method: "POST",
       headers: { "Content-Type": "application/json" },

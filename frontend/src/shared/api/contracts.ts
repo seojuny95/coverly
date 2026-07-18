@@ -4,9 +4,11 @@ type Schemas = components["schemas"];
 
 export type ApiErrorDetail = Schemas["ApiErrorDetail"];
 export type ApiErrorResponse = Schemas["ApiErrorResponse"];
+export type ApiErrorCode = Schemas["ApiErrorCode"];
 
 export type PolicyParseResponse = Schemas["PolicyParseResponse"];
 export type PolicySummary = Schemas["PolicySummary"];
+export type PolicyClassification = NonNullable<PolicySummary["보험분류"]>;
 export type PolicyCoverage = Schemas["Coverage"];
 export type CoveragePeriod = Schemas["CoveragePeriod"];
 export type PremiumSummary = Schemas["PremiumSummary"];
@@ -14,6 +16,8 @@ export type InsuredDemographics = Schemas["InsuredDemographics-Output"];
 export type VehicleInfo = Schemas["VehicleInfo"];
 
 export type PortfolioSessionRequest = Schemas["PortfolioSessionRequest"];
+export type PortfolioSessionDocumentsDeleteRequest =
+  Schemas["PortfolioSessionDocumentsDeleteRequest"];
 export type PortfolioSessionResponse = Schemas["PortfolioSessionResponse"];
 export type CoverageTotal = Schemas["CoverageTotalItem"];
 export type PortfolioCoverageSummary = Schemas["PortfolioCoverageSummary"];
@@ -29,3 +33,11 @@ export type CoverageGroup = Schemas["CoverageGroup"];
 
 export type PortfolioQuestionRequest = Schemas["PortfolioQuestionRequest"];
 export type ChatHistoryItem = Schemas["ConversationMessage"];
+export type QaStreamEvent =
+  | Schemas["QaProgressEvent"]
+  | Schemas["QaMetaEvent"]
+  | Schemas["QaDeltaEvent"]
+  | Schemas["QaEndEvent"];
+export type QaProgressEvent = Schemas["QaProgressEvent"];
+export type QaMetaEvent = Schemas["QaMetaEvent"];
+export type QaEndEvent = Schemas["QaEndEvent"];

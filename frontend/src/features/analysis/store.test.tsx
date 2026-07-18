@@ -55,6 +55,7 @@ describe("InsuranceDataProvider", () => {
             status: "accepted",
             문자수: 1,
             기본정보: {
+              ...POLICY_RESULT_DEFAULTS.기본정보,
               보험사: "삼성화재",
               증권번호: "POLICY-TEST-001",
             },
@@ -75,6 +76,7 @@ describe("InsuranceDataProvider", () => {
             status: "accepted",
             문자수: 1,
             기본정보: {
+              ...POLICY_RESULT_DEFAULTS.기본정보,
               보험사: "삼성 화재",
               증권번호: "policy-test-001",
             },
@@ -103,6 +105,7 @@ describe("InsuranceDataProvider", () => {
             status: "accepted",
             문자수: 1,
             기본정보: {
+              ...POLICY_RESULT_DEFAULTS.기본정보,
               피보험자: "테스트고객",
             },
           },
@@ -123,6 +126,7 @@ describe("InsuranceDataProvider", () => {
             status: "accepted",
             문자수: 1,
             기본정보: {
+              ...POLICY_RESULT_DEFAULTS.기본정보,
               피보험자: "테스트고객",
             },
           },

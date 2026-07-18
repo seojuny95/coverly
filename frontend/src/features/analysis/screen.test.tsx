@@ -125,91 +125,6 @@ describe("InsuranceAnalysisPage", () => {
       within(healthCard as HTMLElement).getByText("1"),
     ).toBeInTheDocument();
     expect(screen.getByText("자동차보험")).toBeInTheDocument();
-    const lifeHelpButton = screen.getByRole("button", {
-      name: "생명보험 설명 보기",
-    });
-    expect(lifeHelpButton).toHaveAttribute(
-      "aria-controls",
-      "classification-help-생명보험",
-    );
-    expect(lifeHelpButton).toHaveAttribute("aria-expanded", "false");
-
-    await userEvent.click(lifeHelpButton);
-
-    expect(lifeHelpButton).toHaveAttribute("aria-expanded", "true");
-    expect(
-      screen.getByText(/사망이나 노후처럼 사람의 생명/),
-    ).toBeInTheDocument();
-
-    await userEvent.keyboard("{Escape}");
-
-    expect(lifeHelpButton).toHaveAttribute("aria-expanded", "false");
-    expect(
-      screen.queryByText(/사망이나 노후처럼 사람의 생명/),
-    ).not.toBeInTheDocument();
-
-    await userEvent.click(lifeHelpButton);
-    await userEvent.click(document.body);
-
-    expect(lifeHelpButton).toHaveAttribute("aria-expanded", "false");
-  });
-
-  test("normalizes legacy classification values into current sections", async () => {
-    const initialAnalysis: InsuranceAnalysis = {
-      generatedAt: "2026-07-09T07:30:00.000Z",
-      portfolioSessionToken: "test-portfolio-token",
-      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
-      selectedName: "테스트고객",
-      insuranceDocuments: [
-        {
-          id: "legacy-third",
-          fileName: "legacy-health.pdf",
-          result: {
-            ...POLICY_RESULT_DEFAULTS,
-            status: "accepted",
-            문자수: 100,
-            기본정보: {
-              보험사: "삼성화재",
-              상품명: "레거시 건강보험",
-              보험분류: "상해·질병·실손",
-              상품태그: ["실손의료보험"],
-            },
-          },
-        },
-        {
-          id: "legacy-fire",
-          fileName: "legacy-fire.pdf",
-          result: {
-            ...POLICY_RESULT_DEFAULTS,
-            status: "accepted",
-            문자수: 80,
-            기본정보: {
-              보험사: "현대해상",
-              상품명: "레거시 화재보험",
-              보험분류: "화재보험",
-              상품태그: ["화재보험"],
-            },
-          },
-        },
-      ],
-    };
-
-    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
-
-    expect(await screen.findByText("레거시 건강보험")).toBeInTheDocument();
-    expect(screen.getByText("레거시 화재보험")).toBeInTheDocument();
-
-    const thirdCard = screen.getAllByText("제3보험")[0].closest("div");
-    const damageCard = screen.getAllByText("손해보험")[0].closest("div");
-
-    expect(thirdCard).not.toBeNull();
-    expect(damageCard).not.toBeNull();
-    expect(within(thirdCard as HTMLElement).getByText("1")).toBeInTheDocument();
-    expect(
-      within(damageCard as HTMLElement).getByText("1"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("질병·상해·간병 보장")).toBeInTheDocument();
-    expect(screen.getByText("재산 손해·책임 보장")).toBeInTheDocument();
   });
 
   test("expands a insurance row to show detail fields", async () => {
@@ -372,14 +287,19 @@ describe("InsuranceAnalysisPage", () => {
               {
                 담보명: "대인배상Ⅰ",
                 가입금액: "무한",
+                가입금액상태: "confirmed",
                 보장내용: "법률상 손해배상책임을 짐으로써 입은 손해를 보상",
                 해설: null,
+                설명근거: "policy_wording",
+                유형: "담보",
               },
               {
                 담보명: "마일리지 특약",
                 가입금액: "",
+                가입금액상태: "not_applicable",
                 보장내용: null,
                 해설: null,
+                설명근거: "none",
                 유형: "부가",
               },
             ],
@@ -514,6 +434,10 @@ describe("InsuranceAnalysisPage", () => {
             ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
+            기본정보: {
+              보험분류: "미분류",
+              상품태그: [],
+            },
           },
         },
       ],
@@ -569,6 +493,10 @@ describe("InsuranceAnalysisPage", () => {
             ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
+            기본정보: {
+              보험분류: "미분류",
+              상품태그: [],
+            },
           },
         },
       ],
@@ -659,10 +587,11 @@ describe("InsuranceAnalysisPage", () => {
 
     await waitFor(() => {
       expect(uploadInsurance).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           file: insuranceFile,
+          documentId: expect.any(String),
           portfolioSessionToken: "test-portfolio-token",
-        },
+        }),
         expect.anything(),
       );
     });

@@ -3,11 +3,7 @@ import type {
   DeathBenefitGuideInput,
   EssentialCoverageItem,
 } from "./api";
-import {
-  CoverageAmountMeter,
-  CoverageStatusBadge,
-  ReferenceSourceList,
-} from "./coverage-guide";
+import { CoverageStatusBadge, ReferenceSourceList } from "./coverage-guide";
 import { formatKoreanWon } from "./money-format";
 
 const DIAGNOSIS_KINDS = new Set<EssentialCoverageItem["kind"]>([
@@ -15,51 +11,6 @@ const DIAGNOSIS_KINDS = new Set<EssentialCoverageItem["kind"]>([
   "cerebrovascular",
   "ischemic_heart",
 ]);
-
-const RECOMMENDED_INSURANCE_COPY = {
-  death: {
-    title: "사망보험",
-    description:
-      "피보험자가 사망했을 때 남은 가족에게 정해진 보험금을 지급해요. 유가족의 생활비와 자녀 양육비, 남은 대출 상환, 장례비처럼 갑자기 생기는 재정 공백을 메우는 목적이며, 필요한 금액은 부양가족·미성년 자녀·큰 부채 여부에 따라 달라져요.",
-    rangeLabel: "안내금액",
-    rangeNote:
-      "1인 가구 기준으로는 장례비 1,000만~2,000만원 정도부터 보고, 부양가족이 있으면 생활비까지 따로 봐야 해요.",
-  },
-  diagnosis: {
-    title: "3대 진단보험",
-    description:
-      "암, 뇌혈관질환, 심장질환처럼 치료와 회복에 시간이 오래 걸리는 질병에 대비하는 보험이에요. 병원비뿐 아니라 치료 중 쉬는 기간의 생활비, 간병비, 소득 공백까지 함께 보는 보장이어서 금액은 질병별 기본 범위와 가족 부양 부담을 같이 확인해요.",
-    rangeLabel: "적정 진단비 감",
-  },
-  medicalIndemnity: {
-    title: "실손의료보험",
-    description:
-      "입원·통원처럼 자주 생기는 의료비 중 실제로 쓴 돈을 약관 한도 안에서 돌려받는 보험이에요.",
-    rangeLabel: "확인 기준",
-  },
-} as const;
-
-const DIAGNOSIS_GUIDE_COPY: Partial<
-  Record<
-    EssentialCoverageItem["kind"],
-    {
-      description: string;
-    }
-  >
-> = {
-  cancer: {
-    description:
-      "암으로 진단받았을 때 정해진 보험금을 한 번에 받을 수 있는 보장이에요. 급여 치료비 부담은 줄어들 수 있어도 비급여 치료, 간병, 소득 감소가 생길 수 있어 치료 중 쉬는 기간의 생활비 성격까지 함께 봐요.",
-  },
-  cerebrovascular: {
-    description:
-      "뇌출혈, 뇌경색 등 뇌혈관질환으로 진단받았을 때 받을 수 있는 보장이에요. 치료 뒤 재활, 간병, 후유장해 가능성까지 볼 수 있어 뇌출혈처럼 좁은 담보보다 뇌혈관질환 진단비 기준을 우선 확인해요.",
-  },
-  ischemic_heart: {
-    description:
-      "협심증, 급성심근경색 등 심장질환으로 진단받았을 때 받을 수 있는 보장이에요. 시술, 수술, 입원으로 소득 공백이 생길 수 있어 급성심근경색만 보는 것보다 협심증까지 포함하는 넓은 보장을 우선 확인해요.",
-  },
-};
 
 export function recommendedDiagnosisItems(items: EssentialCoverageItem[]) {
   return items.filter((item) => DIAGNOSIS_KINDS.has(item.kind));
@@ -89,15 +40,13 @@ export function RecommendedInsuranceCards({
     <article className="analysis-overview-reveal analysis-overview-delay-1 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
       <div>
         <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
-          권장보험
+          핵심 보장 확인
         </p>
       </div>
 
       <div className="mt-4 space-y-4">
         <RecommendedSingleCoverageCard
-          categoryLabel="사망 대비"
           item={death}
-          copy={RECOMMENDED_INSURANCE_COPY.death}
           deathBenefitContext={deathBenefitContext}
           onDeathBenefitContextChange={onDeathBenefitContextChange}
           isRefreshing={isDeathBenefitRefreshing}
@@ -115,16 +64,12 @@ export function RecommendedInsuranceCards({
 }
 
 function RecommendedSingleCoverageCard({
-  categoryLabel,
   item,
-  copy,
   deathBenefitContext,
   onDeathBenefitContextChange,
   isRefreshing,
 }: {
-  categoryLabel: string;
   item: EssentialCoverageItem | undefined;
-  copy: typeof RECOMMENDED_INSURANCE_COPY.death;
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
   isRefreshing: boolean;
@@ -153,14 +98,16 @@ function RecommendedSingleCoverageCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
           <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
-            {categoryLabel}
+            사망 보장
           </p>
           <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
-            {copy.title}
+            {item?.label ?? "확인 결과"}
           </h4>
-          <p className="mt-2 text-sm leading-6 text-zinc-700">
-            {copy.description}
-          </p>
+          {item?.guidance_situation ? (
+            <p className="mt-2 text-sm leading-6 text-zinc-700">
+              {item.guidance_situation}
+            </p>
+          ) : null}
         </div>
         <CoverageStatusBadge
           status={item?.status ?? "not_found"}
@@ -201,12 +148,7 @@ function RecommendedSingleCoverageCard({
         </fieldset>
 
         <div>
-          <CoverageAmountMeter
-            item={item}
-            rangeLabel={copy.rangeLabel}
-            fallbackNote={item?.guidance_reason ?? copy.rangeNote}
-            isRefreshing={isRefreshing}
-          />
+          <CoverageReference item={item} isRefreshing={isRefreshing} />
 
           {!item?.matched_coverage_names?.length ? (
             <p className="mt-3 text-xs leading-5 text-zinc-500">
@@ -322,11 +264,8 @@ function RecommendedDiagnosisCard({
             진단 이후 생활
           </p>
           <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
-            {RECOMMENDED_INSURANCE_COPY.diagnosis.title}
+            진단 보장
           </h4>
-          <p className="mt-2 text-sm leading-6 text-zinc-700">
-            {RECOMMENDED_INSURANCE_COPY.diagnosis.description}
-          </p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200">
           {confirmedCount}/3 확인
@@ -343,16 +282,14 @@ function RecommendedDiagnosisCard({
 }
 
 function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
-  const guide = DIAGNOSIS_GUIDE_COPY[item.kind];
-
   return (
     <li className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-zinc-950">{item.label}</p>
-          {guide ? (
+          {item.guidance_situation ? (
             <p className="mt-1 text-xs leading-5 text-zinc-600">
-              {guide.description}
+              {item.guidance_situation}
             </p>
           ) : null}
         </div>
@@ -360,11 +297,7 @@ function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
       </div>
 
       <div className="mt-3">
-        <CoverageAmountMeter
-          item={item}
-          rangeLabel={RECOMMENDED_INSURANCE_COPY.diagnosis.rangeLabel}
-          fallbackNote="소득, 부양가족, 보험료 부담에 따라 달라질 수 있어요."
-        />
+        <CoverageReference item={item} />
       </div>
 
       <CoverageGroupList
@@ -389,11 +322,8 @@ function RecommendedMedicalIndemnityCard({
             실제 의료비
           </p>
           <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
-            {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.title}
+            {item?.label ?? "실손의료 보장"}
           </h4>
-          <p className="mt-2 text-sm leading-6 text-zinc-700">
-            {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.description}
-          </p>
         </div>
         <CoverageStatusBadge status={item?.status ?? "not_found"} />
       </div>
@@ -413,9 +343,7 @@ function RecommendedMedicalIndemnityCard({
 
         {item?.reference_basis ? (
           <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold text-zinc-500">
-              {RECOMMENDED_INSURANCE_COPY.medicalIndemnity.rangeLabel}
-            </p>
+            <p className="text-xs font-semibold text-zinc-500">확인 기준</p>
             <p className="mt-1 text-sm leading-6 text-zinc-700">
               {item.reference_basis}
             </p>
@@ -427,6 +355,81 @@ function RecommendedMedicalIndemnityCard({
       <CoverageNamesNotice names={item?.matched_coverage_names ?? []} />
     </section>
   );
+}
+
+function CoverageReference({
+  item,
+  isRefreshing = false,
+}: {
+  item: EssentialCoverageItem | undefined;
+  isRefreshing?: boolean;
+}) {
+  if (isRefreshing) {
+    return (
+      <div
+        role="status"
+        aria-label="참고 금액을 다시 확인하고 있어요"
+        aria-busy="true"
+        aria-live="polite"
+        className="h-28 animate-pulse rounded-2xl bg-zinc-100"
+      />
+    );
+  }
+
+  if (!item) {
+    return (
+      <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500">
+        확인 결과를 불러오지 못했어요.
+      </div>
+    );
+  }
+
+  const referenceAmount =
+    item.reference_amount_label ??
+    formatReferenceAmount(item.reference_min_amount, item.reference_max_amount);
+
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold text-zinc-500">현재 가입금액</p>
+          <p className="mt-1 text-lg font-semibold text-zinc-950">
+            {item.confirmed_amount == null
+              ? "미확인"
+              : formatKoreanWon(item.confirmed_amount)}
+          </p>
+        </div>
+        {referenceAmount ? (
+          <div>
+            <p className="text-xs font-semibold text-zinc-500">참고 금액</p>
+            <p className="mt-1 text-sm font-medium text-zinc-700">
+              {referenceAmount}
+            </p>
+          </div>
+        ) : null}
+      </div>
+      {item.reference_basis ? (
+        <p className="mt-3 text-xs leading-5 text-zinc-500">
+          {item.reference_basis}
+        </p>
+      ) : null}
+      {item.guidance_reason && item.guidance_reason !== item.reference_basis ? (
+        <p className="mt-2 text-xs leading-5 text-zinc-500">
+          {item.guidance_reason}
+        </p>
+      ) : null}
+      <ReferenceSourceList sources={item.reference_sources ?? []} />
+    </div>
+  );
+}
+
+function formatReferenceAmount(
+  minAmount: number | null | undefined,
+  maxAmount: number | null | undefined,
+) {
+  if (minAmount == null || maxAmount == null) return null;
+  if (minAmount === maxAmount) return formatKoreanWon(minAmount);
+  return `${formatKoreanWon(minAmount)} ~ ${formatKoreanWon(maxAmount)}`;
 }
 
 function CoverageNamesNotice({ names }: { names: string[] }) {

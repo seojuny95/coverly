@@ -19,6 +19,7 @@ from app.modules.qa.agent.validation import validated_agent_response
 from app.modules.qa.context import QaContext
 from app.modules.qa.response_support import out_of_scope_response
 from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
+from app.modules.qa.streaming import QaDeltaEvent, QaEndEvent
 from app.modules.qa.tools.evidence import portfolio_snapshot_evidence
 from app.modules.qa.tools.web_search import WebSearchResult
 
@@ -228,11 +229,13 @@ def _evaluate_case(
             )
         )
         elapsed_ms = (perf_counter() - started) * 1000
-        answer = "".join(str(event.get("text", "")) for event in events)
+        answer = "".join(event.text for event in events if isinstance(event, QaDeltaEvent))
         end = events[-1]
-        status = str(end.get("status", "unknown"))
-        generation = str(end.get("generation", "fallback"))
-        citations = cast(list[object], end.get("citations", []))
+        if not isinstance(end, QaEndEvent):
+            raise ValueError("QA stream did not finish with an end event")
+        status = end.status
+        generation = end.generation
+        citations = end.citations
         rendered_output = _render_eval_output(answer, end)
     except Exception as exc:
         elapsed_ms = (perf_counter() - started) * 1000
@@ -269,7 +272,7 @@ def _evaluate_case(
         not (live and case.expected_route == "agent" and case.expected_status == "answered")
         or generation == "llm"
     )
-    limitations = cast(list[object], end.get("limitations", []))
+    limitations = end.limitations
     no_tool_passed = case.expected_route != "agent_no_tool" or (
         generation == "llm"
         and not citations
@@ -335,14 +338,18 @@ def fixture_policies(path: Path = POLICY_FIXTURE) -> list[PolicyInput]:
     return [PolicyInput.model_validate(row) for row in rows]
 
 
-def _render_eval_output(answer: str, end_event: dict[str, object]) -> str:
-    claim_channels = end_event.get("claim_channels")
+def _render_eval_output(answer: str, end_event: QaEndEvent) -> str:
+    claim_channels = end_event.claim_channels
     if claim_channels is None:
         return answer
     return "\n".join(
         (
             answer,
-            json.dumps(claim_channels, ensure_ascii=False, sort_keys=True),
+            json.dumps(
+                claim_channels.model_dump(mode="json"),
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
         )
     )
 

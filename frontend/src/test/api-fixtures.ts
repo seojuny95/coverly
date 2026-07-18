@@ -6,7 +6,10 @@ import type {
 export const POLICY_RESULT_DEFAULTS = {
   status: "accepted",
   문자수: 0,
-  기본정보: {},
+  기본정보: {
+    보험분류: "미분류",
+    상품태그: [],
+  },
   보장목록: [],
   분석상태: "완료",
 } satisfies InsurancePolicyResult;

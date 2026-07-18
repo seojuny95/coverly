@@ -1,7 +1,14 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.core.errors import ApiError, api_error_handler
+from app.core.errors import (
+    ApiError,
+    api_error_handler,
+    http_error_handler,
+    request_validation_error_handler,
+)
 from app.core.lifespan import lifespan
 from app.core.middleware import request_id_middleware
 from app.modules.policy.router import router as policies_router
@@ -27,6 +34,8 @@ def create_app() -> FastAPI:
     )
     app.middleware("http")(request_id_middleware)
     app.add_exception_handler(ApiError, api_error_handler)
+    app.add_exception_handler(RequestValidationError, request_validation_error_handler)
+    app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.include_router(policies_router)
     app.include_router(portfolio_sessions_router)
     app.include_router(portfolio_router)

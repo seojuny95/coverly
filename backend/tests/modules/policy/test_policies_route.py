@@ -9,11 +9,34 @@ from app.modules.policy.parsing import (
     PdfPasswordRequiredError,
 )
 from app.modules.policy.pipeline import EmptyTextError, PipelineResult
+from app.modules.policy.schemas import Coverage as CoverageResponse
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.service import RegisteredPolicyDocument
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
 
 PORTFOLIO_TOKEN = "test-portfolio-token"
+DOCUMENT_ID = "11111111-1111-4111-8111-111111111111"
+
+
+def test_public_coverage_explanation_basis_is_explicit() -> None:
+    base = {
+        "담보명": "암진단비",
+        "가입금액": "3,000만원",
+        "가입금액상태": "confirmed",
+        "유형": "담보",
+    }
+
+    policy_wording = CoverageResponse.model_validate(
+        {**base, "보장내용": "암 진단 확정 시 지급", "해설": None}
+    )
+    generated_guidance = CoverageResponse.model_validate(
+        {**base, "보장내용": None, "해설": "암 진단 시 정액으로 지급하는 담보예요."}
+    )
+    no_explanation = CoverageResponse.model_validate({**base, "보장내용": None, "해설": None})
+
+    assert policy_wording.설명근거 == "policy_wording"
+    assert generated_guidance.설명근거 == "generated_guidance"
+    assert no_explanation.설명근거 == "none"
 
 
 @pytest.fixture(autouse=True)
@@ -31,9 +54,12 @@ def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             self,
             token: str,
             result: PipelineResult,
+            *,
+            document_id: str,
         ) -> RegisteredPolicyDocument:
             assert token == PORTFOLIO_TOKEN
-            return RegisteredPolicyDocument(id="document-1")
+            assert document_id == "11111111111141118111111111111111"
+            return RegisteredPolicyDocument(id=document_id)
 
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
     yield
@@ -46,7 +72,7 @@ def test_parse_rejects_non_pdf_upload() -> None:
     response = client.post(
         "/policies/parse",
         files={"file": ("note.txt", b"not a pdf", "text/plain")},
-        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
     )
 
     assert response.status_code == 400
@@ -59,6 +85,26 @@ def test_parse_rejects_non_pdf_upload() -> None:
     }
 
 
+def test_parse_maps_malformed_multipart_to_common_error() -> None:
+    response = TestClient(app).post(
+        "/policies/parse",
+        content=b"malformed multipart body",
+        headers={
+            "content-type": "multipart/form-data",
+            "x-request-id": "multipart-request",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": {
+            "code": "INVALID_MULTIPART_REQUEST",
+            "message": "업로드 요청 형식을 확인해주세요.",
+            "request_id": "multipart-request",
+        }
+    }
+
+
 def test_parse_rejects_pdf_larger_than_limit() -> None:
     client = TestClient(app)
     payload = b"%PDF-" + (b"x" * (10 * 1024 * 1024))
@@ -66,7 +112,7 @@ def test_parse_rejects_pdf_larger_than_limit() -> None:
     response = client.post(
         "/policies/parse",
         files={"file": ("large.pdf", payload, "application/pdf")},
-        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
     )
 
     assert response.status_code == 413
@@ -83,7 +129,7 @@ def test_parse_rejects_unreadable_pdf_body() -> None:
     response = client.post(
         "/policies/parse",
         files={"file": ("broken.pdf", b"%PDF-1.7\nbroken", "application/pdf")},
-        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
     )
 
     assert response.status_code == 422
@@ -98,7 +144,7 @@ def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) ->
         "기본정보": {
             "보험사": "삼성화재",
             "상품명": "건강보험",
-            "보험분류": "상해·질병·실손",
+            "보험분류": "제3보험",
             "상품태그": ["질병"],
         },
         "보장목록": [
@@ -122,12 +168,24 @@ def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) ->
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload == {"status": "accepted", "documentId": "document-1", **result}
+    assert payload == {
+        "status": "accepted",
+        "documentId": DOCUMENT_ID,
+        **result,
+        "보장목록": [
+            {
+                **result["보장목록"][0],
+                "가입금액상태": "confirmed",
+                "설명근거": "generated_guidance",
+                "유형": "담보",
+            }
+        ],
+    }
 
 
 def test_parse_registers_result_under_portfolio_session_without_exposing_rag_token(
@@ -136,7 +194,12 @@ def test_parse_registers_result_under_portfolio_session_without_exposing_rag_tok
     from app.modules.policy import router as policies
 
     result: PipelineResult = {
-        "기본정보": {"보험사": "보험사A", "상품명": "건강보험"},
+        "기본정보": {
+            "보험사": "보험사A",
+            "상품명": "건강보험",
+            "보험분류": "제3보험",
+            "상품태그": [],
+        },
         "보장목록": [],
         "분석상태": "완료",
         "문자수": 42,
@@ -152,10 +215,13 @@ def test_parse_registers_result_under_portfolio_session_without_exposing_rag_tok
             self,
             token: str,
             pipeline_result: PipelineResult,
+            *,
+            document_id: str,
         ) -> RegisteredPolicyDocument:
             seen["token"] = token
             seen["result"] = pipeline_result
-            return RegisteredPolicyDocument(id="document-1")
+            seen["document_id"] = document_id
+            return RegisteredPolicyDocument(id=document_id)
 
     monkeypatch.setattr(policies, "run_pipeline", _run)
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
@@ -163,15 +229,19 @@ def test_parse_registers_result_under_portfolio_session_without_exposing_rag_tok
         response = TestClient(app).post(
             "/policies/parse",
             files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-            data={"portfolioSessionToken": "portfolio-token"},
+            data={"portfolioSessionToken": "portfolio-token", "documentId": DOCUMENT_ID},
         )
     finally:
         app.dependency_overrides.pop(get_portfolio_session_service, None)
 
     assert response.status_code == 200
-    assert response.json()["documentId"] == "document-1"
+    assert response.json()["documentId"] == DOCUMENT_ID
     assert "문서세션ID" not in response.json()
-    assert seen == {"token": "portfolio-token", "result": result}
+    assert seen == {
+        "token": "portfolio-token",
+        "result": result,
+        "document_id": "11111111111141118111111111111111",
+    }
 
 
 def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -179,7 +249,11 @@ def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) 
 
     seen: dict[str, str | None] = {}
     result: PipelineResult = {
-        "기본정보": {"보험사": "삼성화재"},
+        "기본정보": {
+            "보험사": "삼성화재",
+            "보험분류": "제3보험",
+            "상품태그": [],
+        },
         "보장목록": [],
         "분석상태": "완료",
         "문자수": 42,
@@ -195,7 +269,11 @@ def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) 
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"password": "900101", "portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={
+            "password": "900101",
+            "portfolioSessionToken": PORTFOLIO_TOKEN,
+            "documentId": DOCUMENT_ID,
+        },
     )
 
     assert response.status_code == 200
@@ -216,7 +294,7 @@ def test_parse_maps_missing_pdf_password_to_422(
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
     )
 
     assert response.status_code == 422
@@ -238,7 +316,11 @@ def test_parse_maps_wrong_pdf_password_to_422(
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"password": "wrong", "portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={
+            "password": "wrong",
+            "portfolioSessionToken": PORTFOLIO_TOKEN,
+            "documentId": DOCUMENT_ID,
+        },
     )
 
     assert response.status_code == 422
@@ -252,7 +334,11 @@ def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.Monk
     from app.modules.policy import router as policies
 
     result: PipelineResult = {
-        "기본정보": {"보험분류": "자동차", "상품명": "Hicar 다이렉트개인용"},
+        "기본정보": {
+            "보험분류": "손해보험",
+            "상품명": "Hicar 다이렉트개인용",
+            "상품태그": ["자동차보험"],
+        },
         "보장목록": [{"담보명": "대인배상", "가입금액": "무한", "보장내용": None, "해설": None}],
         "분석상태": "완료",
         "문자수": 10,
@@ -267,13 +353,20 @@ def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.Monk
     response = client.post(
         "/policies/parse",
         files={"file": ("auto.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
     )
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["기본정보"]["보험분류"] == "자동차"
-    assert payload["보장목록"] == result["보장목록"]
+    assert payload["기본정보"]["보험분류"] == "손해보험"
+    assert payload["보장목록"] == [
+        {
+            **result["보장목록"][0],
+            "가입금액상태": "confirmed",
+            "설명근거": "none",
+            "유형": "담보",
+        }
+    ]
     assert payload["분석상태"] == "완료"
 
 
@@ -289,7 +382,7 @@ def test_parse_maps_empty_text_error_to_422(monkeypatch: pytest.MonkeyPatch) -> 
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
     )
 
     assert response.status_code == 422
@@ -310,7 +403,7 @@ def test_parse_maps_reference_data_failure_to_retryable_error(
     response = client.post(
         "/policies/parse",
         files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
-        data={"portfolioSessionToken": PORTFOLIO_TOKEN},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
     )
 
     assert response.status_code == 503

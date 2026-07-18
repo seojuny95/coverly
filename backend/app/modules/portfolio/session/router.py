@@ -7,6 +7,7 @@ from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDe
 from app.modules.portfolio.session.http import expired_portfolio_session_error
 from app.modules.portfolio.session.schemas import (
     PortfolioSessionDeleteResponse,
+    PortfolioSessionDocumentsDeleteRequest,
     PortfolioSessionRequest,
     PortfolioSessionResponse,
 )
@@ -62,6 +63,25 @@ def delete_portfolio_session(
 ) -> PortfolioSessionDeleteResponse:
     try:
         sessions.delete(request.portfolio_session_token)
+    except InvalidPortfolioSessionToken:
+        raise expired_portfolio_session_error() from None
+    return PortfolioSessionDeleteResponse(status="deleted")
+
+
+@router.post(
+    "/documents/delete",
+    response_model=PortfolioSessionDeleteResponse,
+    responses=api_error_responses(403, 503),
+)
+def delete_portfolio_session_documents(
+    request: PortfolioSessionDocumentsDeleteRequest,
+    sessions: PortfolioSessionServiceDep,
+) -> PortfolioSessionDeleteResponse:
+    try:
+        sessions.delete_documents(
+            request.portfolio_session_token,
+            request.document_id_strings(),
+        )
     except InvalidPortfolioSessionToken:
         raise expired_portfolio_session_error() from None
     return PortfolioSessionDeleteResponse(status="deleted")

@@ -1,5 +1,10 @@
 import type { paths } from "./generated";
-import type { ApiErrorDetail, ApiErrorResponse } from "./contracts";
+import type {
+  ApiErrorCode,
+  ApiErrorDetail,
+  ApiErrorResponse,
+} from "./contracts";
+import { isApiErrorCode } from "./generated-runtime";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -9,7 +14,7 @@ export function apiUrl(path: keyof paths): string {
 }
 
 export class ApiResponseError extends Error {
-  readonly code?: string;
+  readonly code?: ApiErrorCode;
   readonly requestId?: string;
   readonly status: number;
 
@@ -19,7 +24,7 @@ export class ApiResponseError extends Error {
     requestId,
     status,
   }: {
-    code?: string;
+    code?: ApiErrorCode;
     message: string;
     requestId?: string;
     status: number;
@@ -78,7 +83,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
   if (!isRecord(value) || !isRecord(value.error)) return false;
   return (
-    typeof value.error.code === "string" &&
+    isApiErrorCode(value.error.code) &&
     typeof value.error.message === "string" &&
     typeof value.error.request_id === "string"
   );

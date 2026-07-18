@@ -29,25 +29,19 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
           보장금 합계
         </h2>
         <p className="mt-1 text-sm leading-6 text-zinc-500">
-          생명보험과 제3보험의 보장을 합산 기준에 따라 묶어서 보여드려요.
+          확인된 합산 금액과 별도 표시 항목을 함께 보여드려요.
         </p>
-        <dl className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs leading-5">
-          <LegendItem term="정액보상" termClassName="bg-blue-50 text-blue-700">
-            약속된 보장금액은 보험별로 합산해 봐요
-          </LegendItem>
+        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs leading-5">
+          <LegendItem term="합산" termClassName="bg-blue-50 text-blue-700" />
           <LegendItem
-            term="실손보장"
+            term="별도 표시"
             termClassName="bg-emerald-50 text-emerald-700"
-          >
-            실제 발생한 손해를 보상하는 담보라 합산하지 않아요
-          </LegendItem>
+          />
           <LegendItem
             term="개별 확인"
             termClassName="bg-zinc-100 text-zinc-600"
-          >
-            지급 방식을 확인 못 해 따로 봐요
-          </LegendItem>
-        </dl>
+          />
+        </div>
       </div>
 
       {status === "loading" ? (
@@ -68,21 +62,16 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
 function LegendItem({
   term,
   termClassName,
-  children,
 }: {
   term: string;
   termClassName: string;
-  children: string;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <dt
-        className={`inline-flex shrink-0 rounded-full px-2 py-0.5 font-semibold ${termClassName}`}
-      >
-        {term}
-      </dt>
-      <dd className="text-zinc-500">{children}</dd>
-    </div>
+    <span
+      className={`inline-flex shrink-0 rounded-full px-2 py-0.5 font-semibold ${termClassName}`}
+    >
+      {term}
+    </span>
   );
 }
 

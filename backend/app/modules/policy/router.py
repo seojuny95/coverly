@@ -2,8 +2,9 @@
 
 import asyncio
 from typing import Annotated, Protocol
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.core.errors import ApiError, api_error_responses
 from app.modules.policy.parsing import (
@@ -15,6 +16,7 @@ from app.modules.policy.schemas import PolicyParseResponse
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
+    PortfolioSessionDocumentCancelled,
     PortfolioSessionDocumentLimitExceeded,
 )
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
@@ -23,6 +25,10 @@ router = APIRouter(prefix="/policies", tags=["policies"])
 
 MAX_PDF_BYTES = 10 * 1024 * 1024
 _CHUNK_SIZE = 1024 * 1024
+_PDF_UPLOAD_DESCRIPTION = (
+    "PDF document only. The server verifies the %PDF signature and accepts at most "
+    f"{MAX_PDF_BYTES // (1024 * 1024)} MiB."
+)
 
 
 class PolicyPipeline(Protocol):
@@ -59,12 +65,24 @@ async def _read_pdf(file: UploadFile) -> bytes:
     "/parse",
     response_model=PolicyParseResponse,
     response_model_exclude_unset=True,
-    responses=api_error_responses(400, 403, 413, 422, 503),
+    responses=api_error_responses(400, 403, 409, 413, 422, 503),
 )
 async def parse_policy(
-    file: UploadFile,
+    file: Annotated[
+        UploadFile,
+        File(
+            media_type="application/pdf",
+            description=_PDF_UPLOAD_DESCRIPTION,
+            json_schema_extra={
+                "contentMediaType": "application/pdf",
+                "format": "binary",
+                "x-maxBytes": MAX_PDF_BYTES,
+            },
+        ),
+    ],
     pipeline: PolicyPipelineDep,
     sessions: PortfolioSessionServiceDep,
+    document_id: Annotated[UUID, Form(alias="documentId")],
     password: str | None = Form(default=None),
     portfolio_session_token: str = Form(
         alias="portfolioSessionToken",
@@ -105,6 +123,7 @@ async def parse_policy(
             sessions.add_pipeline_result,
             portfolio_session_token,
             result,
+            document_id=document_id.hex,
         )
     except InvalidPortfolioSessionToken:
         raise ApiError(
@@ -117,6 +136,12 @@ async def parse_policy(
             status_code=422,
             code="PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
             message="한 번에 분석할 수 있는 보험증권 수를 초과했어요.",
+        ) from None
+    except PortfolioSessionDocumentCancelled:
+        raise ApiError(
+            status_code=409,
+            code="POLICY_UPLOAD_CANCELLED",
+            message="취소된 업로드예요. 파일을 다시 선택해주세요.",
         ) from None
 
     client_result = dict(result)

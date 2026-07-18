@@ -1,7 +1,4 @@
-import type { CSSProperties } from "react";
-
 import { Button } from "../../../shared/components/ui/button";
-import type { EmptyReason } from "./eligibility";
 import { ClaimGuide } from "./claim-guide";
 import { formatWon } from "./money-format";
 import type {
@@ -10,37 +7,12 @@ import type {
   PortfolioSummary,
   SpecialPolicyAnalysis,
 } from "./api";
-import {
-  PositionLabel,
-  RangeArrow,
-  ReferenceSourceList,
-  progressPosition,
-  sourceTypeLabel,
-} from "./coverage-guide";
+import { ReferenceSourceList, sourceTypeLabel } from "./coverage-guide";
 import {
   RecommendedInsuranceCards,
   recommendedDiagnosisItems,
 } from "./recommendation-cards";
 import { SpecialPolicySections } from "./special-policy-sections";
-
-const EMPTY_COPY: Record<EmptyReason, { title: string; description: string }> =
-  {
-    "auto-only": {
-      title: "확인할 보험 정보가 없어요",
-      description:
-        "담보 내용이 있는 보험증권을 올리면 전체 보험을 확인할 수 있어요.",
-    },
-    "no-coverage": {
-      title: "확인할 담보가 없어요",
-      description:
-        "담보 내용이 있는 보험증권을 올리면 전체 보험을 확인할 수 있어요.",
-    },
-    mixed: {
-      title: "확인할 담보가 없어요",
-      description:
-        "담보 내용이 있는 보험증권을 올리면 전체 보험을 확인할 수 있어요.",
-    },
-  };
 
 export function PortfolioAnalysisPanel({
   status,
@@ -48,8 +20,7 @@ export function PortfolioAnalysisPanel({
   deathBenefitContext,
   onDeathBenefitContextChange,
   isDeathBenefitRefreshing = false,
-  eligibleCount,
-  emptyReason,
+  policyCount,
   onRetry,
 }: {
   status: "loading" | "success" | "error";
@@ -57,11 +28,9 @@ export function PortfolioAnalysisPanel({
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
   isDeathBenefitRefreshing?: boolean;
-  eligibleCount: number;
-  emptyReason: EmptyReason;
+  policyCount: number;
   onRetry: () => void;
 }) {
-  if (eligibleCount === 0) return <InfoState {...EMPTY_COPY[emptyReason]} />;
   if (status === "loading") return <AnalysisLoading />;
 
   if (status === "error") {
@@ -91,7 +60,7 @@ export function PortfolioAnalysisPanel({
         deathBenefitContext={deathBenefitContext}
         onDeathBenefitContextChange={onDeathBenefitContextChange}
         isDeathBenefitRefreshing={isDeathBenefitRefreshing}
-        policyCount={eligibleCount}
+        policyCount={policyCount}
         specialAnalyses={specialAnalyses}
         onRetry={onRetry}
       />
@@ -130,10 +99,11 @@ function PortfolioOverview({
   ).length;
   const premium = summary?.premium ?? null;
   const premiumBenchmark = summary?.premium_benchmark ?? null;
-  const premiumComparison = premiumSummaryComparison(
-    premium,
-    premiumBenchmark,
-    items,
+  const hasPremiumReference = Boolean(
+    premium &&
+    premiumBenchmark &&
+    typeof premium.monthly_total === "number" &&
+    premium.monthly_policy_count > 0,
   );
   const generatedOverview = summary?.overview ?? null;
 
@@ -209,7 +179,7 @@ function PortfolioOverview({
             </div>
 
             <div className="mt-5 flex flex-wrap gap-2 text-xs text-zinc-300">
-              {premiumComparison ? (
+              {hasPremiumReference ? (
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
                   월 보험료 {formatWon(premium?.monthly_total ?? null)}
                 </span>
@@ -227,11 +197,10 @@ function PortfolioOverview({
               ) : null}
             </div>
 
-            {premiumComparison ? (
+            {hasPremiumReference ? (
               <PremiumSummaryBar
                 premium={premium}
                 benchmark={premiumBenchmark}
-                comparison={premiumComparison}
               />
             ) : null}
           </div>
@@ -275,27 +244,22 @@ function ActualLossCoverageReview({
   return (
     <article className="analysis-overview-reveal analysis-overview-delay-2 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
       <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
-        실손형 지급 방식
+        계약별 확인 결과
       </p>
       <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
-        실손형 보장 중복 점검
+        여러 계약에 표시된 담보
       </h3>
-      <p className="mt-3 text-sm leading-6 text-zinc-700">
-        실제 발생한 손해를 보상하는 담보는 같은 손해를 여러 계약에서 보장하는지
-        따로 확인해요. 실손의료보험 가입 여부 점검과는 다른 항목이에요.
-      </p>
       {duplicateNames.length > 0 ? (
         <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-          여러 계약에서 확인된 실손형 담보: {duplicateNames.join(" · ")}. 실제
-          중복 보상 제한은 각 약관에서 확인해요.
+          여러 계약에 표시된 담보: {duplicateNames.join(" · ")}
         </p>
       ) : coverages.length > 0 ? (
         <p className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-600">
-          같은 실손형 담보가 여러 계약에서 확인되지는 않았어요.
+          여러 계약에 함께 표시된 담보는 없어요.
         </p>
       ) : (
         <p className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-600">
-          현재 자료에서는 실손형 담보를 확인하지 못했어요.
+          현재 자료에서 계약별로 비교할 담보가 없어요.
         </p>
       )}
     </article>
@@ -305,14 +269,9 @@ function ActualLossCoverageReview({
 function PremiumSummaryBar({
   premium,
   benchmark,
-  comparison,
 }: {
   premium: PortfolioSummary["premium"];
   benchmark: PortfolioSummary["premium_benchmark"];
-  comparison: {
-    label: string;
-    title: string;
-  };
 }) {
   if (
     !premium ||
@@ -323,39 +282,23 @@ function PremiumSummaryBar({
     return null;
   }
 
-  const maxAmount =
-    Math.max(premium.monthly_total, benchmark.suggested_max_premium) * 1.2;
-  const minPosition = progressPosition(
-    benchmark.suggested_min_premium,
-    maxAmount,
-  );
-  const maxPosition = progressPosition(
-    benchmark.suggested_max_premium,
-    maxAmount,
-  );
-  const userPosition = progressPosition(premium.monthly_total, maxAmount);
   const sourceLabels = [
     sourceTypeLabel(benchmark.income_source.reliability),
     sourceTypeLabel(benchmark.guide_source.reliability),
   ];
-  const style = {
-    "--premium-position": `${userPosition}%`,
-  } as CSSProperties;
 
   return (
     <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <p className="text-xs font-semibold text-blue-200">
-            매달 내는 보험료
-          </p>
+          <p className="text-xs font-semibold text-blue-200">현재 월 보험료</p>
           <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">
-            {comparison.label}
+            {formatWon(premium.monthly_total)}
           </p>
         </div>
-        <div className="text-right">
+        <div className="sm:text-right">
           <p className="text-xs text-zinc-400">
-            {benchmark.age_band_label} 평균 소득 기준
+            {benchmark.age_band_label} 참고 구간
           </p>
           <p className="mt-1 text-sm font-medium text-zinc-200">
             {formatWon(benchmark.suggested_min_premium)} ~{" "}
@@ -364,40 +307,10 @@ function PremiumSummaryBar({
         </div>
       </div>
 
-      <div className="mt-4">
-        <div className="relative h-24" style={style}>
-          <div className="absolute inset-x-0 top-10 h-2 rounded-full bg-white/10" />
-          <div className="premium-position-fill absolute top-10 left-0 z-10 h-2 rounded-full bg-blue-400" />
-          <div
-            className="absolute top-10 z-20 h-2 rounded-full bg-emerald-300/55 ring-1 ring-white/15"
-            style={{
-              left: `${minPosition}%`,
-              width: `${Math.max(maxPosition - minPosition, 4)}%`,
-            }}
-          />
-          <RangeArrow left={minPosition} label="권장 5%" tone="white" />
-          <RangeArrow left={maxPosition} label="권장 10%" tone="white" />
-          <span
-            aria-hidden="true"
-            className="absolute top-9 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-zinc-950 bg-blue-300 shadow-sm"
-            style={{ left: `${userPosition}%` }}
-          />
-          <PositionLabel left={userPosition}>
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-blue-900">
-              {formatWon(premium.monthly_total)}
-            </span>
-          </PositionLabel>
-          <div className="absolute inset-x-0 top-20 flex justify-between text-[11px] text-zinc-400">
-            <span>0원</span>
-            <span>{formatWon(Math.round(maxAmount))}</span>
-          </div>
-        </div>
-      </div>
-
       <p className="mt-3 text-xs leading-5 text-zinc-300">
         월 소득의 {Math.round(benchmark.suggested_min_ratio * 100)}%~
-        {Math.round(benchmark.suggested_max_ratio * 100)} 권장 구간과
-        비교했어요. {sourceLabels.join(" + ")} 기준이에요.
+        {Math.round(benchmark.suggested_max_ratio * 100)}%에 해당하는 참고
+        금액이에요. {sourceLabels.join(" + ")} 자료를 사용했어요.
       </p>
       <ReferenceSourceList
         sources={[benchmark.income_source, benchmark.guide_source]}
@@ -405,53 +318,6 @@ function PremiumSummaryBar({
       />
     </div>
   );
-}
-
-function premiumSummaryComparison(
-  premium: PortfolioSummary["premium"] | null | undefined,
-  benchmark: PortfolioSummary["premium_benchmark"] | null | undefined,
-  items: EssentialCoverageItem[],
-) {
-  if (
-    !premium ||
-    !benchmark ||
-    typeof premium.monthly_total !== "number" ||
-    premium.monthly_policy_count < 1
-  ) {
-    return null;
-  }
-
-  const allCoreCoverageVisible = items.every(
-    (item) => item.status !== "not_found",
-  );
-
-  if (premium.monthly_total < benchmark.suggested_min_premium) {
-    return {
-      tone: "low" as const,
-      label: allCoreCoverageVisible
-        ? "현재 보험료는 좋아보여요"
-        : "권장보험을 점검해보세요",
-      title: allCoreCoverageVisible
-        ? "현재 보험료는 좋아보여요"
-        : "권장보험을 점검해보세요",
-    };
-  }
-  if (premium.monthly_total > benchmark.suggested_max_premium) {
-    return {
-      tone: "high" as const,
-      label: "현재 보험료는 높아보여요",
-      title: "현재 보험료는 높아보여요",
-    };
-  }
-  return {
-    tone: "in_range" as const,
-    label: allCoreCoverageVisible
-      ? "현재 보험료는 좋아보여요"
-      : "권장보험을 점검해보세요",
-    title: allCoreCoverageVisible
-      ? "현재 보험료는 좋아보여요"
-      : "권장보험을 점검해보세요",
-  };
 }
 
 function AnalysisLoading() {
@@ -476,23 +342,6 @@ function AnalysisLoading() {
           />
         ))}
       </div>
-    </section>
-  );
-}
-
-function InfoState({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <section className="rounded-2xl border border-zinc-200 p-8 text-center">
-      <h2 className="text-xl font-semibold">{title}</h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-zinc-500">
-        {description}
-      </p>
     </section>
   );
 }

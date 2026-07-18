@@ -8,7 +8,7 @@ from app.modules.qa.pii import mask_qa_pii
 def build_agent_input(context: QaContext) -> str:
     history = "\n".join(
         f"{'사용자' if message.role == 'user' else '상담사'}: {message.content}"
-        for message in context.history[-12:]
+        for message in context.history
     )
     conversation = f"\n\n이전 대화:\n{history}" if history else ""
     prompt = (

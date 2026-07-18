@@ -9,26 +9,16 @@ import {
   getInsuredPersonName,
   useInsuranceData,
 } from "../analysis/store";
-import type { PortfolioSessionResult } from "../analysis/session-api";
+import {
+  deletePortfolioSessionDocuments,
+  type PortfolioSessionResult,
+} from "../analysis/session-api";
 import {
   findByteIdenticalDuplicateIndexes,
   findDuplicatePolicyDocuments,
 } from "../analysis/policy-identity";
-import { UploadInsuranceError } from "./api";
-import { fileHasPdfMagic, fileLooksEncryptedPdf } from "./pdf-magic";
+import { UploadInsuranceError, type UploadErrorCode } from "./api";
 import type { SelectedUploadFile, UploadInsurance } from "./types";
-
-const MAX_PDF_BYTES = 10 * 1024 * 1024;
-
-function validateFile(file: File): string | null {
-  const isPdf =
-    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-  if (!isPdf) return "PDF 파일만 올릴 수 있어요.";
-  if (file.size > MAX_PDF_BYTES) {
-    return "파일이 너무 커요. 최대 10MB까지 올릴 수 있어요.";
-  }
-  return null;
-}
 
 function toFiles(files: FileList | File[]): File[] {
   return Array.from(files);
@@ -41,12 +31,18 @@ function isFileSpecificUploadError(err: unknown) {
   return true;
 }
 
-function isPasswordUploadError(code: string) {
+function isPasswordUploadError(code: UploadErrorCode) {
   return code === "PDF_PASSWORD_REQUIRED" || code === "PDF_PASSWORD_INCORRECT";
 }
 
-function isPreflightPasswordError(code?: string) {
-  return code === "PDF_PASSWORD_REQUIRED";
+const ROLLBACK_ERROR_MESSAGE =
+  "업로드한 문서를 정리하지 못했어요. 다시 시도해주세요.";
+
+class UploadRollbackError extends Error {
+  constructor() {
+    super(ROLLBACK_ERROR_MESSAGE);
+    this.name = "UploadRollbackError";
+  }
 }
 
 async function createFileFingerprint(file: File) {
@@ -73,11 +69,9 @@ export function getInsuranceNameOptions(
   }));
 }
 
-// Owns the whole upload lifecycle: file selection/validation, byte-dedup, PDF
-// content check, parallel upload with per-file progress, post-parse duplicate
-// + insured-name resolution, and error/degrade handling. The form component
-// consumes the returned state and handlers and renders; all the async flow and
-// state transitions live here.
+// Owns the whole upload lifecycle: file selection, byte-dedup, parallel upload
+// with per-file progress, post-parse duplicate + insured-name resolution, and
+// error/degrade handling. The server owns PDF validation.
 export function useUploadOrchestration({
   uploadInsurance,
   onAnalysisComplete,
@@ -85,6 +79,7 @@ export function useUploadOrchestration({
   fixedSelectedName,
   existingDocuments,
   createSession,
+  deleteSessionDocuments = deletePortfolioSessionDocuments,
 }: {
   uploadInsurance: UploadInsurance;
   onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
@@ -92,6 +87,10 @@ export function useUploadOrchestration({
   fixedSelectedName?: string;
   existingDocuments: AnalyzedInsurance[];
   createSession: () => Promise<PortfolioSessionResult>;
+  deleteSessionDocuments?: (
+    portfolioSessionToken: string,
+    documentIds: string[],
+  ) => Promise<void>;
 }) {
   const { analysis: currentAnalysis, setAnalysis } = useInsuranceData();
   const router = useRouter();
@@ -126,25 +125,19 @@ export function useUploadOrchestration({
   const [selectedName, setSelectedName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pendingCleanupRef = useRef<{
+    portfolioSessionToken: string;
+    documentIds: string[];
+  } | null>(null);
 
   const selectFiles = (files: FileList | File[]) => {
+    if (pendingAnalysis || isAnalyzing) return;
     const incomingFiles = toFiles(files);
     if (incomingFiles.length === 0) {
       setSelectedUploadFiles([]);
       setPendingAnalysis(null);
       setSelectedName("");
       setError("올릴 파일을 찾지 못했어요. PDF를 다시 선택해주세요.");
-      return;
-    }
-
-    const invalidFile = incomingFiles.find((file) => validateFile(file));
-    if (invalidFile) {
-      const validationError = validateFile(invalidFile);
-      setSelectedUploadFiles([]);
-      setPendingAnalysis(null);
-      setSelectedName("");
-      setError(validationError);
-      if (inputRef.current) inputRef.current.value = "";
       return;
     }
 
@@ -157,40 +150,6 @@ export function useUploadOrchestration({
     setPendingAnalysis(null);
     setSelectedName("");
     setError(null);
-
-    void Promise.all(
-      selectedFiles.map(async (selectedFile) => ({
-        id: selectedFile.id,
-        isEncrypted: await fileLooksEncryptedPdf(selectedFile.file),
-      })),
-    ).then((inspectedFiles) => {
-      const encryptedIds = new Set(
-        inspectedFiles
-          .filter((inspectedFile) => inspectedFile.isEncrypted)
-          .map((inspectedFile) => inspectedFile.id),
-      );
-      if (encryptedIds.size === 0) {
-        return;
-      }
-
-      setSelectedUploadFiles((current) =>
-        current.map((selectedFile) => {
-          if (!encryptedIds.has(selectedFile.id)) {
-            return selectedFile;
-          }
-
-          if (isPreflightPasswordError(selectedFile.errorCode)) {
-            return selectedFile;
-          }
-
-          return {
-            ...selectedFile,
-            errorCode: "PDF_PASSWORD_REQUIRED",
-            errorMessage: "잠긴 PDF예요. 비밀번호를 먼저 입력해주세요.",
-          };
-        }),
-      );
-    });
   };
 
   const removeSelectedFile = (fileId: string) => {
@@ -218,7 +177,7 @@ export function useUploadOrchestration({
   // surface one "remove and retry" summary. Non-listed files are left as-is.
   const failSelectedFiles = (
     files: Array<{ id: string; fileName: string }>,
-    code: string,
+    code: ApiErrorCodeOrLocalUiCode,
     message: string,
   ) => {
     const failedIds = new Set(files.map((file) => file.id));
@@ -247,8 +206,6 @@ export function useUploadOrchestration({
     );
   };
 
-  // Used by both duplicate paths: the byte-identical pre-upload check and the
-  // post-parse semantic check.
   const rejectDuplicateFiles = (
     duplicates: Array<{ id: string; fileName: string }>,
   ) => {
@@ -261,7 +218,26 @@ export function useUploadOrchestration({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (selectedUploadFiles.length === 0 || isAnalyzing) return;
+    if (selectedUploadFiles.length === 0 || isAnalyzing || pendingAnalysis)
+      return;
+
+    const pendingCleanup = pendingCleanupRef.current;
+    if (pendingCleanup) {
+      setIsAnalyzing(true);
+      setError(null);
+      try {
+        await deleteSessionDocuments(
+          currentAnalysis?.portfolioSessionToken ??
+            pendingCleanup.portfolioSessionToken,
+          pendingCleanup.documentIds,
+        );
+        pendingCleanupRef.current = null;
+      } catch {
+        setError(ROLLBACK_ERROR_MESSAGE);
+        setIsAnalyzing(false);
+        return;
+      }
+    }
 
     setIsAnalyzing(true);
     setAnalysisProgress({ completed: 0, total: selectedUploadFiles.length });
@@ -277,72 +253,54 @@ export function useUploadOrchestration({
     setPendingAnalysis(null);
     setSelectedName("");
     let shouldKeepProgress = false;
+    let portfolioSessionToken: string | undefined;
+    const assignedDocumentIds = new Map(
+      selectedUploadFiles.map((selectedFile) => [
+        selectedFile.id,
+        crypto.randomUUID(),
+      ]),
+    );
+    let successfulDocumentIds = [...assignedDocumentIds.values()];
+    const rollbackSuccessfulDocuments = async () => {
+      if (!portfolioSessionToken || successfulDocumentIds.length === 0) return;
+      try {
+        await deleteSessionDocuments(
+          portfolioSessionToken,
+          successfulDocumentIds,
+        );
+        pendingCleanupRef.current = null;
+        successfulDocumentIds = [];
+      } catch {
+        pendingCleanupRef.current = {
+          portfolioSessionToken,
+          documentIds: [...successfulDocumentIds],
+        };
+        throw new UploadRollbackError();
+      }
+    };
     try {
-      const fileFingerprints = await Promise.all(
-        selectedUploadFiles.map((selectedFile) =>
-          createFileFingerprint(selectedFile.file),
-        ),
-      );
-
-      // Reject files whose bytes are not actually a PDF (e.g. an image renamed
-      // to .pdf). The backend re-validates content and remains the authoritative
-      // gate; this is fast client-side feedback.
-      const contentIsPdf = await Promise.all(
-        selectedUploadFiles.map((selectedFile) =>
-          fileHasPdfMagic(selectedFile.file),
-        ),
-      );
-      const invalidTypeFiles = selectedUploadFiles.filter(
-        (_, index) => !contentIsPdf[index],
-      );
-      if (invalidTypeFiles.length > 0) {
-        failSelectedFiles(
-          invalidTypeFiles.map((selectedFile) => ({
-            id: selectedFile.id,
-            fileName: selectedFile.file.name,
-          })),
-          "INVALID_PDF",
-          "PDF 형식이 아니에요.",
-        );
-        return;
-      }
-
-      // Catch byte-identical re-uploads before spending a full parse + LLM pass.
-      const byteIdenticalIndexes = findByteIdenticalDuplicateIndexes({
-        fingerprints: fileFingerprints,
-        existingDocuments,
-      });
-      if (byteIdenticalIndexes.size > 0) {
-        rejectDuplicateFiles(
-          selectedUploadFiles
-            .filter((_, index) => byteIdenticalIndexes.has(index))
-            .map((selectedFile) => ({
-              id: selectedFile.id,
-              fileName: selectedFile.file.name,
-            })),
-        );
-        return;
-      }
-
       const portfolioSession = currentAnalysis
         ? {
             portfolioSessionToken: currentAnalysis.portfolioSessionToken,
             expiresAt: currentAnalysis.portfolioSessionExpiresAt,
           }
         : await sessionMutation.mutateAsync();
+      portfolioSessionToken = portfolioSession.portfolioSessionToken;
 
       const uploadResults = await Promise.all(
-        selectedUploadFiles.map(async (selectedFile, index) => {
+        selectedUploadFiles.map(async (selectedFile) => {
           try {
             const uploadInput = {
               file: selectedFile.file,
+              documentId: assignedDocumentIds.get(selectedFile.id)!,
               ...(selectedFile.password
                 ? { password: selectedFile.password }
                 : {}),
               portfolioSessionToken: portfolioSession.portfolioSessionToken,
             };
             const result = await uploadMutation.mutateAsync(uploadInput);
-            const { documentId, ...policyResult } = result;
+            const { documentId: _documentId, ...policyResult } = result;
+            void _documentId;
             setAnalysisProgress((current) => ({
               ...current,
               completed: current.completed + 1,
@@ -357,17 +315,14 @@ export function useUploadOrchestration({
             return {
               status: "fulfilled" as const,
               selectedFileId: selectedFile.id,
-              document: {
-                id: documentId,
-                fileName: selectedFile.file.name,
-                fileFingerprint: fileFingerprints[index],
-                result: policyResult,
-              },
+              documentId: uploadInput.documentId,
+              fileName: selectedFile.file.name,
+              policyResult,
             };
           } catch (err) {
-            if (!isFileSpecificUploadError(err)) throw err;
-
-            const uploadError = err as UploadInsuranceError;
+            const uploadError = isFileSpecificUploadError(err)
+              ? (err as UploadInsuranceError)
+              : undefined;
             setAnalysisProgress((current) => ({
               ...current,
               completed: current.completed + 1,
@@ -375,20 +330,22 @@ export function useUploadOrchestration({
             setSelectedUploadFiles((current) =>
               current.map((currentFile) =>
                 currentFile.id === selectedFile.id
-                  ? {
-                      ...currentFile,
-                      status: "failed",
-                      errorCode: uploadError.code,
-                      errorMessage: uploadError.userMessage,
-                    }
+                  ? uploadError
+                    ? {
+                        ...currentFile,
+                        status: "failed",
+                        errorCode: uploadError.code,
+                        errorMessage: uploadError.userMessage,
+                      }
+                    : { ...currentFile, status: "idle" }
                   : currentFile,
               ),
             );
             return {
               status: "rejected" as const,
               fileName: selectedFile.file.name,
-              code: uploadError.code,
-              message: uploadError.userMessage,
+              error: err,
+              uploadError,
             };
           }
         }),
@@ -398,13 +355,21 @@ export function useUploadOrchestration({
         (result) => result.status === "rejected",
       );
       if (failedUploads.length > 0) {
+        await rollbackSuccessfulDocuments();
+        const unexpectedFailure = failedUploads.find(
+          (result) => !result.uploadError,
+        );
+        if (unexpectedFailure) throw unexpectedFailure.error;
+        const uploadErrors = failedUploads.flatMap((result) =>
+          result.uploadError ? [result.uploadError] : [],
+        );
         const hasPasswordErrors = failedUploads.some(
           (result) =>
-            result.status === "rejected" && isPasswordUploadError(result.code),
+            result.uploadError &&
+            isPasswordUploadError(result.uploadError.code),
         );
-        const onlyPasswordErrors = failedUploads.every(
-          (result) =>
-            result.status === "rejected" && isPasswordUploadError(result.code),
+        const onlyPasswordErrors = uploadErrors.every((uploadError) =>
+          isPasswordUploadError(uploadError.code),
         );
         setError(
           onlyPasswordErrors
@@ -416,13 +381,45 @@ export function useUploadOrchestration({
         return;
       }
 
-      const insuranceDocuments = uploadResults.flatMap((result) =>
-        result.status === "fulfilled" ? [result.document] : [],
+      // Only accepted PDFs reach this stage, so the server's size gate has
+      // already bounded the sequential reads used for local duplicate UX.
+      const fileFingerprints: string[] = [];
+      for (const selectedFile of selectedUploadFiles) {
+        fileFingerprints.push(await createFileFingerprint(selectedFile.file));
+      }
+      const byteIdenticalIndexes = findByteIdenticalDuplicateIndexes({
+        fingerprints: fileFingerprints,
+        existingDocuments,
+      });
+      if (byteIdenticalIndexes.size > 0) {
+        await rollbackSuccessfulDocuments();
+        rejectDuplicateFiles(
+          selectedUploadFiles
+            .filter((_, index) => byteIdenticalIndexes.has(index))
+            .map((selectedFile) => ({
+              id: selectedFile.id,
+              fileName: selectedFile.file.name,
+            })),
+        );
+        return;
+      }
+
+      const insuranceDocuments = uploadResults.flatMap((result, index) =>
+        result.status === "fulfilled"
+          ? [
+              {
+                id: result.documentId,
+                fileName: result.fileName,
+                fileFingerprint: fileFingerprints[index],
+                result: result.policyResult,
+              },
+            ]
+          : [],
       );
       const selectedFileIdsByDocumentId = new Map(
         uploadResults.flatMap((result) =>
           result.status === "fulfilled"
-            ? [[result.document.id, result.selectedFileId]]
+            ? [[result.documentId, result.selectedFileId]]
             : [],
         ),
       );
@@ -432,11 +429,22 @@ export function useUploadOrchestration({
         portfolioSessionExpiresAt: portfolioSession.expiresAt,
         insuranceDocuments,
       };
-      shouldKeepProgress = continueWithNameValidation(
+      shouldKeepProgress = await continueWithNameValidation(
         analysis,
         selectedFileIdsByDocumentId,
+        rollbackSuccessfulDocuments,
       );
     } catch (err) {
+      if (
+        !(err instanceof UploadRollbackError) &&
+        successfulDocumentIds.length > 0
+      ) {
+        try {
+          await rollbackSuccessfulDocuments();
+        } catch {
+          err = new UploadRollbackError();
+        }
+      }
       setSelectedUploadFiles((current) =>
         current.map((selectedFile) =>
           selectedFile.status === "reading"
@@ -444,7 +452,9 @@ export function useUploadOrchestration({
             : selectedFile,
         ),
       );
-      if (err instanceof UploadInsuranceError) {
+      if (err instanceof UploadRollbackError) {
+        setError(ROLLBACK_ERROR_MESSAGE);
+      } else if (err instanceof UploadInsuranceError) {
         setError(err.userMessage);
       } else {
         setError(
@@ -460,14 +470,16 @@ export function useUploadOrchestration({
     }
   };
 
-  const continueWithNameValidation = (
+  const continueWithNameValidation = async (
     analysis: InsuranceAnalysis,
     selectedFileIdsByDocumentId: Map<string, string>,
+    rollbackSuccessfulDocuments: () => Promise<void>,
   ) => {
     const insuranceDocumentsWithoutName = analysis.insuranceDocuments.filter(
       (insuranceDocument) => !getInsuredPersonName(insuranceDocument),
     );
     if (insuranceDocumentsWithoutName.length > 0) {
+      await rollbackSuccessfulDocuments();
       failSelectedFiles(
         insuranceDocumentsWithoutName.flatMap((document) => {
           const selectedFileId = selectedFileIdsByDocumentId.get(document.id);
@@ -486,6 +498,7 @@ export function useUploadOrchestration({
       existingDocuments,
     });
     if (duplicateDocuments.length > 0) {
+      await rollbackSuccessfulDocuments();
       rejectDuplicateFiles(
         duplicateDocuments.flatMap((document) => {
           const selectedFileId = selectedFileIdsByDocumentId.get(document.id);
@@ -502,6 +515,7 @@ export function useUploadOrchestration({
         (option) => option.name,
       );
       if (names.length > 1 || names[0] !== fixedSelectedName) {
+        await rollbackSuccessfulDocuments();
         setError(
           `${fixedSelectedName}님의 보험증권만 추가할 수 있어요. 같은 피보험자의 증권만 선택해주세요.`,
         );
@@ -541,9 +555,27 @@ export function useUploadOrchestration({
     navigateToAnalysis();
   };
 
-  const handleNameSelectionSubmit = () => {
-    if (!pendingAnalysis || !selectedName) return;
-    saveSelectedNameAnalysis(pendingAnalysis, selectedName);
+  const handleNameSelectionSubmit = async () => {
+    if (!pendingAnalysis || !selectedName || isAnalyzing) return;
+    const excludedDocumentIds = pendingAnalysis.insuranceDocuments
+      .filter(
+        (insuranceDocument) =>
+          getInsuredPersonName(insuranceDocument) !== selectedName,
+      )
+      .map((insuranceDocument) => insuranceDocument.id);
+    setIsAnalyzing(true);
+    setError(null);
+    try {
+      await deleteSessionDocuments(
+        pendingAnalysis.portfolioSessionToken,
+        excludedDocumentIds,
+      );
+      saveSelectedNameAnalysis(pendingAnalysis, selectedName);
+    } catch {
+      setError(ROLLBACK_ERROR_MESSAGE);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return {
@@ -562,3 +594,8 @@ export function useUploadOrchestration({
     handleNameSelectionSubmit,
   };
 }
+
+type ApiErrorCodeOrLocalUiCode = Exclude<
+  UploadErrorCode,
+  "UPLOAD_NETWORK_ERROR" | "UPLOAD_FAILED"
+>;

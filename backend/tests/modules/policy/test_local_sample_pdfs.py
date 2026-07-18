@@ -23,6 +23,7 @@ def test_local_sample_parse_response_includes_required_display_values() -> None:
         response = client.post(
             "/policies/parse",
             files={"file": (pdf_path.name, pdf_path.read_bytes(), "application/pdf")},
+            data={"documentId": "11111111-1111-4111-8111-111111111111"},
         )
 
         assert response.status_code == 200, f"{filename}: expected upload acceptance"

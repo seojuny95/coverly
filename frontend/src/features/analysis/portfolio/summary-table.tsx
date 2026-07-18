@@ -40,15 +40,6 @@ type CoverageGroup = {
   rows: CoverageRow[];
 };
 
-const MAJOR_CATEGORY_ORDER = [
-  "사망",
-  "후유장해",
-  "진단",
-  "수술",
-  "치료",
-  "기타",
-];
-
 export function CoverageSummaryTable({
   summary,
 }: {
@@ -164,7 +155,7 @@ function ActualLossCoverage({ row }: { row: ActualLossCoverageRow }) {
           </p>
           {row.duplicateAcrossContracts ? (
             <p className="mt-1 text-xs font-normal text-amber-700">
-              다른 계약에도 같은 담보가 있어 중복 보상 제한 여부를 확인해보세요.
+              여러 계약에서 같은 담보가 확인됐어요.
             </p>
           ) : null}
         </CoverageDisclosure>
@@ -173,7 +164,7 @@ function ActualLossCoverage({ row }: { row: ActualLossCoverageRow }) {
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right align-top">
-        <CoverageBasis tone="actual-loss">실손보장</CoverageBasis>
+        <CoverageBasis tone="actual-loss">별도 표시</CoverageBasis>
       </td>
     </tr>
   );
@@ -306,17 +297,10 @@ function buildCoverageGroups(summary: PortfolioSummary): CoverageGroup[] {
     });
   });
 
-  return [...groups.entries()]
-    .sort(
-      ([leftCategory], [rightCategory]) =>
-        categoryRank(leftCategory) - categoryRank(rightCategory),
-    )
-    .map(([majorCategory, rows]) => ({ majorCategory, rows }));
-}
-
-function categoryRank(category: string) {
-  const index = MAJOR_CATEGORY_ORDER.indexOf(category);
-  return index === -1 ? MAJOR_CATEGORY_ORDER.length : index;
+  return [...groups.entries()].map(([majorCategory, rows]) => ({
+    majorCategory,
+    rows,
+  }));
 }
 
 function coverageSourceLabel(source: {
@@ -329,7 +313,5 @@ function coverageSourceLabel(source: {
 }
 
 function summedBasisLabel(coverageCount: number) {
-  return coverageCount === 1
-    ? "정액보상"
-    : `정액보상 · ${coverageCount}개 합산`;
+  return coverageCount === 1 ? "합산" : `${coverageCount}개 합산`;
 }

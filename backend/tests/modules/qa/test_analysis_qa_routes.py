@@ -12,7 +12,8 @@ from app.modules.qa.agent.service import stream_answer_with_agent
 from app.modules.qa.context import QaContext
 from app.modules.qa.router import get_portfolio_answer_streamer
 from app.modules.qa.router import router as qa_router
-from app.modules.qa.schemas import PortfolioQuestionResponse
+from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
+from app.modules.qa.streaming import QaEndEvent, QaMetaEvent
 
 DOCUMENT_ID = "00000000-0000-0000-0000-000000000001"
 
@@ -135,12 +136,21 @@ def test_qa_stream_loads_policies_and_rag_ids_from_portfolio_session() -> None:
         question: str,
         policies: list[PolicyInput],
         **kwargs: object,
-    ) -> Iterator[dict[str, object]]:
+    ) -> Iterator[QaMetaEvent | QaEndEvent]:
         seen["question"] = question
         seen["policies"] = policies
         seen["rag_session_ids"] = kwargs["policy_rag_session_ids"]
-        yield {"type": "meta", "status": "answered"}
-        yield {"type": "end", "status": "answered"}
+        seen["history"] = kwargs["history"]
+        yield QaMetaEvent(type="meta", status="answered", generation="fallback")
+        yield QaEndEvent(
+            type="end",
+            status="answered",
+            generation="fallback",
+            citations=[],
+            limitations=[],
+            suggestions=[],
+            claim_channels=None,
+        )
 
     app = FastAPI()
     app.include_router(qa_router)
@@ -153,6 +163,13 @@ def test_qa_stream_loads_policies_and_rag_ids_from_portfolio_session() -> None:
             "question": "내 보험 알려줘",
             "portfolioSessionToken": "portfolio-token",
             "policyIds": [DOCUMENT_ID],
+            "history": [
+                {
+                    "role": "user",
+                    "content": "x" * 1_200 if index == 14 else f"message-{index}",
+                }
+                for index in range(15)
+            ],
         },
     )
 
@@ -161,6 +178,15 @@ def test_qa_stream_loads_policies_and_rag_ids_from_portfolio_session() -> None:
     assert seen["policy_ids"] == [DOCUMENT_ID.replace("-", "")]
     assert seen["policies"] == [policy]
     assert seen["rag_session_ids"] == ("rag-document-1",)
+    history = seen["history"]
+    assert isinstance(history, list)
+    assert history == [
+        ConversationMessage(
+            role="user",
+            content="x" * 1_000 if index == 14 else f"message-{index}",
+        )
+        for index in range(3, 15)
+    ]
 
 
 def test_agent_service_streams_progress_before_the_answer() -> None:
@@ -172,8 +198,9 @@ def test_agent_service_streams_progress_before_the_answer() -> None:
         )
     )
 
-    assert [event["type"] for event in events] == ["progress", "meta", "delta", "end"]
-    assert events[0]["stage"] == "portfolio"
+    assert [event.type for event in events] == ["progress", "meta", "delta", "end"]
+    assert events[0].type == "progress"
+    assert events[0].stage == "portfolio"
 
 
 def test_agent_service_exposes_a_grounded_failure_instead_of_using_legacy_logic() -> None:
@@ -185,6 +212,7 @@ def test_agent_service_exposes_a_grounded_failure_instead_of_using_legacy_logic(
         )
     )
 
-    assert events[0]["status"] == "no_data"
-    answer = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert events[0].type == "meta"
+    assert events[0].status == "no_data"
+    answer = "".join(event.text for event in events if event.type == "delta")
     assert "근거 조회를 완료하지 못했어요" in answer

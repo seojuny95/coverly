@@ -49,7 +49,7 @@ def _guardrail_input(dependencies: QaAgentDependencies) -> str:
     context = dependencies.context
     payload = {
         "question": context.question,
-        "history": [message.model_dump(mode="json") for message in context.history[-12:]],
+        "history": [message.model_dump(mode="json") for message in context.history],
     }
     return mask_qa_pii(dump_prompt_json(payload))
 

@@ -9,7 +9,7 @@ from app.modules.portfolio.demographics import resolve_portfolio_demographics
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.summary import PortfolioFacts, build_portfolio_facts
 from app.modules.qa.contracts import InsuredDemographics
-from app.modules.qa.schemas import ConversationMessage
+from app.modules.qa.schemas import ConversationMessage, recent_history
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ def build_qa_context(
     return QaContext(
         question=question.strip(),
         policies=policies,
-        history=history or [],
+        history=recent_history(history),
         insured=insured,
         facts=facts,
         auto_policies=auto_policies,

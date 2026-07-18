@@ -52,30 +52,14 @@ describe("InsuranceChatbot", () => {
     );
   });
 
-  it("shows the analysis limitations in the initial message", async () => {
+  it("does not synthesize limitations before the server answers", async () => {
     await openChat();
 
     expect(
-      screen.getByText(
-        "자동차보험과 약관이 필요한 보상 판단은 답변에서 제외해요.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
+      screen.queryByText(
         "보상 조건·면책·지급 가능성은 약관 근거 없이 판단하지 않습니다.",
       ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("실손형 담보는 가입금액 합계에 포함하지 않았습니다."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "지급유형 또는 금액이 확인되지 않은 담보는 합계에 포함하지 않았습니다.",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("손해보험은 보장금 합계에 포함하지 않았어요."),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
   });
 
   it("shows a pending indicator then streams the answer", async () => {
@@ -98,6 +82,7 @@ describe("InsuranceChatbot", () => {
 
     await act(async () => {
       handlers?.onProgress?.({
+        type: "progress",
         stage: "portfolio_facts",
         text: "올려주신 증권의 가입 담보를 확인하고 있어요.",
       });
@@ -110,10 +95,13 @@ describe("InsuranceChatbot", () => {
     await act(async () => {
       handlers?.onDelta("암 진단비는 1,000만원이에요.");
       handlers?.onEnd({
+        type: "end",
         status: "answered",
+        generation: "llm",
         citations: [],
         limitations: [],
         suggestions: ["다른 질문 있어요?"],
+        claim_channels: null,
       });
       resolveStream?.();
     });
@@ -133,13 +121,18 @@ describe("InsuranceChatbot", () => {
       async (_question, _documents, _history, handlers) => {
         handlers.onDelta("확인한 보장을 정리했어요.");
         handlers.onEnd({
+          type: "end",
           status: "answered",
+          generation: "llm",
           citations: ["암", "뇌", "심장", "수술"].map((coverage_name) => ({
+            policy_id: null,
             insurer: "테스트보험",
+            product_name: null,
             coverage_name,
           })),
           limitations: [],
           suggestions: [],
+          claim_channels: null,
         });
       },
     );
@@ -154,12 +147,14 @@ describe("InsuranceChatbot", () => {
     expect(screen.queryByText("테스트보험 · 수술")).not.toBeInTheDocument();
   });
 
-  it("does not repeat initial-only limitations under answers", async () => {
+  it("shows every limitation returned by the server", async () => {
     vi.spyOn(api, "streamPortfolioQuestion").mockImplementation(
       async (_question, _documents, _history, handlers) => {
         handlers.onDelta("확인한 내용을 답변했어요.");
         handlers.onEnd({
+          type: "end",
           status: "answered",
+          generation: "llm",
           citations: [],
           limitations: [
             "보상 조건·면책·지급 가능성은 약관 근거 없이 판단하지 않습니다.",
@@ -169,6 +164,7 @@ describe("InsuranceChatbot", () => {
             "이 답변에만 필요한 안내예요.",
           ],
           suggestions: [],
+          claim_channels: null,
         });
       },
     );

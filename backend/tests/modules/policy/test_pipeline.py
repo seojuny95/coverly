@@ -18,7 +18,7 @@ def _fake_parse(text: str, tables: tuple[Table, ...] = ()) -> Callable[[bytes], 
 
 def test_empty_text_raises() -> None:
     def fake_summarize(text: str) -> PolicySummary:
-        return {"보험분류": "", "상품태그": []}
+        return {"보험분류": "미분류", "상품태그": []}
 
     def fake_extract(
         doc: ParsedDocument,
@@ -43,7 +43,7 @@ def test_auto_policy_is_not_skipped() -> None:
         return [], "완료"
 
     def fake_summarize(text: str) -> PolicySummary:
-        return {"보험분류": "자동차", "상품태그": []}
+        return {"보험분류": "손해보험", "상품태그": []}
 
     result = run_pipeline(
         b"%PDF-x",
@@ -53,12 +53,12 @@ def test_auto_policy_is_not_skipped() -> None:
     )
     assert calls == ["extract"]  # 자동차도 추출을 시도
     assert result["분석상태"] in {"완료", "부분"}
-    assert result["기본정보"]["보험분류"] == "자동차"
+    assert result["기본정보"]["보험분류"] == "손해보험"
 
 
 def test_result_shape(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_summarize(text: str) -> PolicySummary:
-        return {"보험분류": "실손", "상품태그": []}
+        return {"보험분류": "제3보험", "상품태그": []}
 
     def fake_extract(
         doc: ParsedDocument,

@@ -1,5 +1,6 @@
 import { apiUrl, readApiErrorPayload } from "../../shared/api/client";
 import type {
+  ApiErrorCode,
   CoveragePeriod,
   InsuredDemographics,
   PolicyCoverage,
@@ -19,13 +20,20 @@ export type InsuranceUploadResult = PolicyParseResponse;
 
 export type InsurancePolicyResult = Omit<InsuranceUploadResult, "documentId">;
 
+export type LocalUploadErrorCode =
+  | "UPLOAD_NETWORK_ERROR"
+  | "UPLOAD_FAILED"
+  | "DUPLICATE_POLICY"
+  | "MISSING_INSURED_PERSON";
+export type UploadErrorCode = ApiErrorCode | LocalUploadErrorCode;
+
 const GENERIC_UPLOAD_MESSAGE =
   "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
 const SERVER_UPLOAD_MESSAGE =
   "서버에서 파일을 처리하지 못했어요. 잠시 후 다시 시도해주세요.";
 
 export class UploadInsuranceError extends Error {
-  readonly code: string;
+  readonly code: UploadErrorCode;
   readonly requestId?: string;
   readonly status?: number;
   readonly userMessage: string;
@@ -36,7 +44,7 @@ export class UploadInsuranceError extends Error {
     status,
     userMessage,
   }: {
-    code: string;
+    code: UploadErrorCode;
     requestId?: string;
     status?: number;
     userMessage: string;
@@ -52,15 +60,18 @@ export class UploadInsuranceError extends Error {
 
 export async function uploadInsurance({
   file,
+  documentId,
   password,
   portfolioSessionToken,
 }: {
   file: File;
+  documentId: string;
   password?: string;
   portfolioSessionToken: string;
 }): Promise<InsuranceUploadResult> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("documentId", documentId);
   if (password) {
     formData.append("password", password);
   }
@@ -80,7 +91,7 @@ export async function uploadInsurance({
   }
 
   if (!response.ok) {
-    let code = "UPLOAD_FAILED";
+    let code: UploadErrorCode = "UPLOAD_FAILED";
     let requestId = response.headers.get("x-request-id") ?? undefined;
     let userMessage = GENERIC_UPLOAD_MESSAGE;
     const { detail: error, isJson } = await readApiErrorPayload(response);

@@ -17,13 +17,6 @@ const INITIAL_SUGGESTIONS = [
   "확인 가능한 보장금 합계는 얼마예요?",
 ];
 
-const INITIAL_ONLY_LIMITATIONS = [
-  "보상 조건·면책·지급 가능성은 약관 근거 없이 판단하지 않습니다.",
-  "실손형 담보는 가입금액 합계에 포함하지 않았습니다.",
-  "지급유형 또는 금액이 확인되지 않은 담보는 합계에 포함하지 않았습니다.",
-  "손해보험은 보장금 합계에 포함하지 않았어요.",
-];
-
 export function InsuranceChatbot({
   documents,
   portfolioSessionToken,
@@ -44,10 +37,6 @@ export function InsuranceChatbot({
       id: 0,
       role: "assistant",
       text: "안녕하세요. 올려주신 보험을 같이 살펴볼게요. 궁금한 건 편하게 말씀해 주세요.",
-      limitations: [
-        "자동차보험과 약관이 필요한 보상 판단은 답변에서 제외해요.",
-        ...INITIAL_ONLY_LIMITATIONS,
-      ],
     },
   ]);
   const [suggestions, setSuggestions] = useState(INITIAL_SUGGESTIONS);
@@ -103,9 +92,7 @@ export function InsuranceChatbot({
     updateMessage(assistantId, (message) => ({
       ...message,
       sources,
-      limitations: end.limitations.filter(
-        (item) => !INITIAL_ONLY_LIMITATIONS.includes(item),
-      ),
+      limitations: end.limitations,
       claimChannels: end.claim_channels,
     }));
     setSuggestions(

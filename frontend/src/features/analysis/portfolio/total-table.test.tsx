@@ -133,7 +133,7 @@ describe("CoverageTotalTable", () => {
     );
 
     expect(screen.getByText("일상생활배상책임")).toBeInTheDocument();
-    expect(screen.getAllByText("실손보장")).toHaveLength(2);
+    expect(screen.getAllByText("별도 표시")).toHaveLength(2);
   });
 
   it("does not duplicate damage-policy actual-loss coverage in the total", () => {
