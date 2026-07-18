@@ -5,10 +5,10 @@ from collections.abc import Callable
 from app.modules.policy.coverage import table_parsing
 from app.modules.policy.coverage.explanation import explain_coverages_fast
 from app.modules.policy.coverage.normalization import normalize_coverages as normalize_coverages
-from app.modules.policy.models import Coverage, ParsedDocument
+from app.modules.policy.models import Coverage, ParsedDocument, PolicyAnalysisStatus
 
-STATUS_OK = "완료"
-STATUS_PARTIAL = "부분"
+STATUS_OK: PolicyAnalysisStatus = "완료"
+STATUS_PARTIAL: PolicyAnalysisStatus = "부분"
 
 Normalizer = Callable[[str], list[Coverage]]
 Explainer = Callable[[list[str]], tuple[dict[str, str], bool]]
@@ -33,7 +33,7 @@ def extract_coverages(
     *,
     normalize: Normalizer = normalize_coverages,
     explain: Explainer = explain_coverages_fast,
-) -> tuple[list[Coverage], str]:
+) -> tuple[list[Coverage], PolicyAnalysisStatus]:
     """Extract and explain policy coverages without propagating stage failures."""
     try:
         source = build_coverage_source(doc)

@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.core.errors import api_error_responses
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.http import expired_portfolio_session_error
 from app.modules.portfolio.session.schemas import (
@@ -16,7 +17,11 @@ from app.modules.portfolio.session.service import (
 router = APIRouter(prefix="/portfolio/sessions", tags=["portfolio-sessions"])
 
 
-@router.post("", response_model=PortfolioSessionResponse)
+@router.post(
+    "",
+    response_model=PortfolioSessionResponse,
+    responses=api_error_responses(503),
+)
 def create_portfolio_session(
     sessions: PortfolioSessionServiceDep,
 ) -> PortfolioSessionResponse:
@@ -27,7 +32,11 @@ def create_portfolio_session(
     )
 
 
-@router.post("/refresh", response_model=PortfolioSessionResponse)
+@router.post(
+    "/refresh",
+    response_model=PortfolioSessionResponse,
+    responses=api_error_responses(403, 503),
+)
 def refresh_portfolio_session(
     request: PortfolioSessionRequest,
     sessions: PortfolioSessionServiceDep,
@@ -42,7 +51,11 @@ def refresh_portfolio_session(
     )
 
 
-@router.post("/delete", response_model=PortfolioSessionDeleteResponse)
+@router.post(
+    "/delete",
+    response_model=PortfolioSessionDeleteResponse,
+    responses=api_error_responses(403, 503),
+)
 def delete_portfolio_session(
     request: PortfolioSessionRequest,
     sessions: PortfolioSessionServiceDep,

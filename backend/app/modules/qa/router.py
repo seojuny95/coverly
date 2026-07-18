@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from app.core.errors import api_error_responses
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.http import resolve_portfolio_snapshot
 from app.modules.qa.agent.runtime import build_qa_agent_runner
@@ -30,7 +31,10 @@ PortfolioAnswerStreamerDep = Annotated[
 ]
 
 
-@router.post("/qa/stream")
+@router.post(
+    "/qa/stream",
+    responses=api_error_responses(403, 503),
+)
 def ask_portfolio_question_stream(
     request: PortfolioQuestionRequest,
     stream_answer: PortfolioAnswerStreamerDep,

@@ -13,7 +13,12 @@ from collections.abc import Callable
 from typing import NotRequired, TypedDict
 
 from app.modules.policy.coverage.service import extract_coverages
-from app.modules.policy.models import Coverage, ParsedDocument, PolicySummary
+from app.modules.policy.models import (
+    Coverage,
+    ParsedDocument,
+    PolicyAnalysisStatus,
+    PolicySummary,
+)
 from app.modules.policy.parsing import parse_document
 from app.modules.policy.summary.service import extract_policy_summary
 from app.rag.policy.indexing import index_policy_document
@@ -22,7 +27,7 @@ from app.rag.policy.indexing import index_policy_document
 class PipelineResult(TypedDict):
     기본정보: PolicySummary
     보장목록: list[Coverage]
-    분석상태: str
+    분석상태: PolicyAnalysisStatus
     문자수: int
     문서세션ID: NotRequired[str]
 
@@ -37,7 +42,10 @@ def run_pipeline(
     password: str | None = None,
     parse: Callable[[bytes], ParsedDocument] = parse_document,
     summarize: Callable[[str], PolicySummary] = extract_policy_summary,
-    extract: Callable[[ParsedDocument], tuple[list[Coverage], str]] = extract_coverages,
+    extract: Callable[
+        [ParsedDocument],
+        tuple[list[Coverage], PolicyAnalysisStatus],
+    ] = extract_coverages,
     index: Callable[[ParsedDocument], str | None] = index_policy_document,
 ) -> PipelineResult:
     if parse is parse_document:

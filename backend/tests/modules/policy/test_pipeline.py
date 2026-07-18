@@ -2,7 +2,13 @@ from collections.abc import Callable
 
 import pytest
 
-from app.modules.policy.models import Coverage, ParsedDocument, PolicySummary, Table
+from app.modules.policy.models import (
+    Coverage,
+    ParsedDocument,
+    PolicyAnalysisStatus,
+    PolicySummary,
+    Table,
+)
 from app.modules.policy.pipeline import EmptyTextError, run_pipeline
 
 
@@ -16,7 +22,7 @@ def test_empty_text_raises() -> None:
 
     def fake_extract(
         doc: ParsedDocument,
-    ) -> tuple[list[Coverage], str]:
+    ) -> tuple[list[Coverage], PolicyAnalysisStatus]:
         return [], "완료"
 
     with pytest.raises(EmptyTextError):
@@ -32,7 +38,7 @@ def test_auto_policy_is_not_skipped() -> None:
     # 자동차 분류여도 보장추출을 호출한다(스킵 없음).
     calls: list[str] = []
 
-    def extract(doc: ParsedDocument) -> tuple[list[Coverage], str]:
+    def extract(doc: ParsedDocument) -> tuple[list[Coverage], PolicyAnalysisStatus]:
         calls.append("extract")
         return [], "완료"
 
@@ -56,7 +62,7 @@ def test_result_shape(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def fake_extract(
         doc: ParsedDocument,
-    ) -> tuple[list[Coverage], str]:
+    ) -> tuple[list[Coverage], PolicyAnalysisStatus]:
         return [], "완료"
 
     result = run_pipeline(
