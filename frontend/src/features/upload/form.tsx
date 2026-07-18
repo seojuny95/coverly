@@ -7,10 +7,7 @@ import {
   createPortfolioSession,
   type PortfolioSessionResult,
 } from "../analysis/session-api";
-import {
-  primaryButtonClassName,
-  secondaryButtonClassName,
-} from "../../shared/components/coverly-brand";
+import { Button } from "../../shared/components/ui/button";
 import { AnalysisProgress } from "./progress";
 import { PolicyDocumentGuide } from "./document-guide";
 import { SelectedFileList } from "./file-list";
@@ -183,13 +180,14 @@ export function InsuranceUploadForm({
                 if (event.target.files) selectFiles(event.target.files);
               }}
             />
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => inputRef.current?.click()}
-              className={`relative mt-6 ${secondaryButtonClassName}`}
+              className="relative mt-6"
             >
               PDF 불러오기
-            </button>
+            </Button>
           </div>
 
           {isModal ? null : (
@@ -217,17 +215,17 @@ export function InsuranceUploadForm({
               onPasswordChange={updateSelectedFilePassword}
               disableRemove={isAnalyzing}
             />
-            <button
+            <Button
               type="submit"
               disabled={
                 selectedUploadFiles.length === 0 ||
                 isAnalyzing ||
                 (hasPasswordRetryFiles && hasMissingPasswords)
               }
-              className={`${primaryButtonClassName} self-stretch ${isModal ? "" : "sm:self-end"}`}
+              className={`self-stretch ${isModal ? "" : "sm:self-end"}`}
             >
               {isAnalyzing ? "보험 정리 중이에요" : submitLabel}
-            </button>
+            </Button>
           </div>
 
           {pendingAnalysis ? (
@@ -331,14 +329,14 @@ function NameSelectionPanel({
         })}
       </div>
 
-      <button
+      <Button
         type="button"
         onClick={onContinue}
         disabled={!selectedName}
-        className={`mt-4 ${primaryButtonClassName}`}
+        className="mt-4"
       >
         선택한 피보험자로 보기
-      </button>
+      </Button>
     </div>
   );
 }

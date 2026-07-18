@@ -12,13 +12,13 @@ import {
   useState,
 } from "react";
 
+import { PixelEyebrow } from "../../shared/components/eyebrow";
 import {
   CoverlyLogo,
   CoverlyMark,
-  PixelEyebrow,
-  coverlyLogoLinkClassName,
-  primaryButtonClassName,
-} from "../../shared/components/coverly-brand";
+  logoLinkClassName,
+} from "../../shared/components/logo";
+import { Button } from "../../shared/components/ui/button";
 
 import { UploadInsuranceModal } from "./upload-modal";
 import { InsurerLogo, InsuranceDetail, TagBadge } from "./policy-detail";
@@ -229,9 +229,9 @@ export function InsuranceAnalysisPage({
           <p className="mt-3 text-sm leading-6 text-zinc-500">
             보험증권 PDF를 올리면 AI가 정리한 결과를 여기에서 볼 수 있어요.
           </p>
-          <Link href="/upload" className={`mt-6 ${primaryButtonClassName}`}>
-            보험증권 올리기
-          </Link>
+          <Button asChild className="mt-6">
+            <Link href="/upload">보험증권 올리기</Link>
+          </Button>
         </section>
       </main>
     );
@@ -245,7 +245,7 @@ export function InsuranceAnalysisPage({
         <LeaveGuardLink
           href="/"
           enabled={hasData}
-          className={coverlyLogoLinkClassName}
+          className={logoLinkClassName}
           ariaLabel="Coverly AI 홈"
         >
           <CoverlyMark />
@@ -317,13 +317,9 @@ export function InsuranceAnalysisPage({
                 </p>
               </div>
               <div className="flex flex-col items-start gap-3 sm:items-end">
-                <button
-                  type="button"
-                  onClick={openUploadModal}
-                  className={primaryButtonClassName}
-                >
+                <Button type="button" onClick={openUploadModal}>
                   보험증권 더 올리기
-                </button>
+                </Button>
                 <p className="font-mono text-[10px] tracking-[0.04em] text-zinc-400">
                   정리한 시각 {formatDateTime(analysis.generatedAt)}
                 </p>
@@ -596,9 +592,9 @@ function PolicySessionExpiredNotice() {
         개인정보 보호를 위해 업로드한 문서 연결이 종료되었어요. 다시 분석하려면
         보험증권을 다시 올려주세요.
       </p>
-      <Link href="/upload" className={`mt-3 ${primaryButtonClassName}`}>
-        보험증권 다시 올리기
-      </Link>
+      <Button asChild className="mt-3">
+        <Link href="/upload">보험증권 다시 올리기</Link>
+      </Button>
     </div>
   );
 }

@@ -36,7 +36,9 @@ src/
 │   └── analysis/                # 분석 화면, 세션, 인메모리 상태, 이탈 경고
 │       └── portfolio/           # 보장 합계, 상담 전 검토, Q&A
 ├── shared/
-│   └── components/              # 앱 전역 공용 UI
+│   ├── components/              # 앱 전역 공용 UI
+│   │   └── ui/                  # shadcn/ui 컴포넌트
+│   └── lib/                     # 공용 UI 유틸리티 (cn 등)
 └── test/                         # 전역 테스트 설정과 공용 테스트 helper
 ```
 
@@ -52,6 +54,7 @@ src/
 - **서버 사실을 만들지 않는가**: 분석 총평, 보장 판단, 기준금액, 출처를 프론트에서 synthetic fallback으로 생성하지 않는다. 서버가 실패하면 재시도/오류/미확인을 보여준다.
 - **컴포넌트 경계가 명확한가**: route file은 얇게 유지하고, 화면 상태·API 호출·표시 로직은 `features/` 안에서 기능별로 나눈다. 너무 큰 컴포넌트는 하위 컴포넌트와 helper로 분리한다.
 - **공통 경계를 놓치지 않는가**: 둘 이상의 화면이나 기능에서 재사용할 수 있는 UI와 hook을 각 사용처에 복제하지 않는다. 앱 전체에서 쓰는 UI는 `shared/components/`에 두고, 한 기능 안에서만 공유하면 해당 `features/*/` 안의 공통 컴포넌트나 hook으로 둔다. 이름만 공통인 억지 추상화는 만들지 않되, 같은 동작·접근성·스타일 규칙의 중복은 공통 경계로 올린다.
+- **공용 UI를 우회하지 않는가**: 버튼처럼 앱 전체에서 동작·접근성·스타일이 같아야 하는 요소는 `shared/components/ui/`의 shadcn/ui 컴포넌트를 사용한다. 링크를 버튼처럼 표시할 때는 별도 class 문자열을 복제하지 않고 `Button`의 `asChild`를 사용한다.
 - **코드 길이가 책임 혼합을 드러내지 않는가**: 파일이나 컴포넌트가 길어지는 것은 로직과 UI 책임을 분리해야 한다는 신호로 본다. 줄 수 자체를 목표로 삼지는 않지만, 서로 독립적으로 이름 붙일 수 있는 상태 관리·파생 계산·화면 섹션이 한 파일에 쌓이면 hook, helper, 하위 컴포넌트로 분리한다.
 - **Next.js/React 관용 방식인가**: 기본은 Server Components이고, 상호작용·브라우저 API·client state가 필요한 파일에만 `"use client"`를 둔다. 불필요한 client boundary를 만들지 않는다.
 - **react-query 사용이 일관적인가**: 서버 조회는 `useQuery`, 생성·전송은 `useMutation`을 사용한다. 임의 fetch state, 중복 캐시, 영속 저장으로 민감정보를 남기지 않는다.
@@ -77,6 +80,7 @@ src/
 - 파일명은 kebab-case, 컴포넌트는 PascalCase를 사용한다.
 - 기능 폴더가 문맥을 제공하므로 하위 파일명에 같은 기능명을 prefix로 반복하지 않는다. 예: `features/upload/form.tsx`, `features/analysis/store.tsx`, `features/analysis/portfolio/panel.tsx`.
 - 파일명은 폴더 안에서 간결하게 유지하되 export 이름은 import 문맥과 React DevTools에서 의미가 드러나게 짓는다. 예: `form.tsx`의 `InsuranceUploadForm`, `panel.tsx`의 `PortfolioAnalysisPanel`.
+- shadcn/ui 컴포넌트는 `components.json`의 alias에 따라 `shared/components/ui/`에 두고, 공용 class 병합에는 `shared/lib/utils.ts`의 `cn`을 사용한다.
 - 마크다운은 한국어, 코드 코멘트는 영어. 사용자 대상 UI 카피는 한국어.
 - 사용자 대상 UI 카피를 작성하거나 수정할 때는 [UX_COPY.md](UX_COPY.md)를 먼저 확인한다.
 

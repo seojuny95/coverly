@@ -1,10 +1,8 @@
 "use client";
 
-import {
-  CoverlyLogo,
-  PixelEyebrow,
-  primaryButtonClassName,
-} from "./coverly-brand";
+import { PixelEyebrow } from "./eyebrow";
+import { CoverlyLogo } from "./logo";
+import { Button } from "./ui/button";
 
 type ErrorScreenProps = {
   digest?: string;
@@ -30,13 +28,9 @@ export function ErrorScreen({ digest, onRetry }: ErrorScreenProps) {
           </p>
         ) : null}
         {onRetry ? (
-          <button
-            type="button"
-            onClick={onRetry}
-            className={`mt-6 ${primaryButtonClassName}`}
-          >
+          <Button type="button" onClick={onRetry} className="mt-6">
             다시 시도하기
-          </button>
+          </Button>
         ) : null}
       </section>
     </main>

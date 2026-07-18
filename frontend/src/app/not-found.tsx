@@ -1,9 +1,7 @@
 import Link from "next/link";
-import {
-  CoverlyLogo,
-  PixelEyebrow,
-  primaryButtonClassName,
-} from "@/shared/components/coverly-brand";
+import { PixelEyebrow } from "@/shared/components/eyebrow";
+import { CoverlyLogo } from "@/shared/components/logo";
+import { Button } from "@/shared/components/ui/button";
 
 export default function NotFound() {
   return (
@@ -17,9 +15,9 @@ export default function NotFound() {
         <p className="mt-3 text-sm leading-6 text-zinc-500">
           주소가 바뀌었거나 페이지가 없어졌을 수 있어요.
         </p>
-        <Link href="/upload" className={`mt-6 ${primaryButtonClassName}`}>
-          보험증권 올리기
-        </Link>
+        <Button asChild className="mt-6">
+          <Link href="/upload">보험증권 올리기</Link>
+        </Button>
       </section>
     </main>
   );

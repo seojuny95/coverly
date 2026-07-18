@@ -1,4 +1,4 @@
-import { ghostButtonClassName } from "../../shared/components/coverly-brand";
+import { Button } from "../../shared/components/ui/button";
 import { InsuranceUploadForm, type UploadInsurance } from "../upload/form";
 import type { AnalyzedInsurance, InsuranceAnalysis } from "./store";
 import { useDialogA11y } from "./use-dialog-a11y";
@@ -37,13 +37,9 @@ export function UploadInsuranceModal({
               보험증권 더 올리기
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={ghostButtonClassName}
-          >
+          <Button type="button" variant="ghost" onClick={onClose}>
             닫기
-          </button>
+          </Button>
         </div>
 
         <div className="mt-6">

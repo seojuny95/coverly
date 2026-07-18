@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { AnalyzedInsurance } from "../store";
 import { useDialogA11y } from "../use-dialog-a11y";
-import { primaryButtonClassName } from "../../../shared/components/coverly-brand";
+import { Button } from "../../../shared/components/ui/button";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import {
   streamPortfolioQuestion,
@@ -264,13 +264,12 @@ export function InsuranceChatbot({
               placeholder="예: 겹치는 보장이 있나요?"
               className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600 disabled:bg-zinc-100 disabled:text-zinc-500"
             />
-            <button
+            <Button
               type="submit"
               disabled={!question.trim() || streaming || sessionExpired}
-              className={primaryButtonClassName}
             >
               질문하기
-            </button>
+            </Button>
           </div>
         </form>
       </div>

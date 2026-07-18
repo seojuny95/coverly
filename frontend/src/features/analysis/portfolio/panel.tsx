@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import { primaryButtonClassName } from "../../../shared/components/coverly-brand";
+import { Button } from "../../../shared/components/ui/button";
 import type { EmptyReason } from "./eligibility";
 import { ClaimGuide } from "./claim-guide";
 import { formatWon } from "./money-format";
@@ -73,13 +73,9 @@ export function PortfolioAnalysisPanel({
         <p className="mt-2 text-sm text-zinc-500">
           업로드한 증권은 그대로 있어요. 잠시 후 다시 확인해주세요.
         </p>
-        <button
-          type="button"
-          className={`mt-5 ${primaryButtonClassName}`}
-          onClick={onRetry}
-        >
+        <Button type="button" className="mt-5" onClick={onRetry}>
           다시 확인하기
-        </button>
+        </Button>
       </section>
     );
   }
@@ -157,13 +153,9 @@ function PortfolioOverview({
           <p className="mt-3 text-sm leading-6 text-zinc-300">
             확인된 보장 정보는 그대로예요. 잠시 후 총평을 다시 생성해주세요.
           </p>
-          <button
-            type="button"
-            className={`mt-5 ${primaryButtonClassName}`}
-            onClick={onRetry}
-          >
+          <Button type="button" className="mt-5" onClick={onRetry}>
             총평 다시 생성하기
-          </button>
+          </Button>
         </div>
 
         <RecommendedInsuranceCards

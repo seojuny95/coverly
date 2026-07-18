@@ -1,10 +1,8 @@
 import Link from "next/link";
 
-import {
-  CoverlyLogo,
-  PixelEyebrow,
-  primaryButtonClassName,
-} from "@/shared/components/coverly-brand";
+import { PixelEyebrow } from "@/shared/components/eyebrow";
+import { CoverlyLogo } from "@/shared/components/logo";
+import { Button } from "@/shared/components/ui/button";
 
 const insuranceSources = [
   { company: "보험사 A", type: "생명보험" },
@@ -235,9 +233,9 @@ export default function Home() {
           보여드려요.
         </p>
 
-        <Link href="/upload" className={`mt-8 ${primaryButtonClassName}`}>
-          내 보험 분석하기
-        </Link>
+        <Button asChild className="mt-8">
+          <Link href="/upload">내 보험 분석하기</Link>
+        </Button>
         <p className="mt-3 text-xs text-zinc-400">
           상담 전화도, 가입 권유도 없어요.
         </p>

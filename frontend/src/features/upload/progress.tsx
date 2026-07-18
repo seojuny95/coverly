@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CoverlyMark } from "../../shared/components/coverly-brand";
+import { CoverlyMark } from "../../shared/components/logo";
 
 const ANALYSIS_STEP_MESSAGES = [
   "증권에서 보장 내용을 찾고 있어요",
