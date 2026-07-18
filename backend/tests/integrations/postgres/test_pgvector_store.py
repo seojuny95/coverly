@@ -1,5 +1,8 @@
+from typing import Any, cast
+
 import pytest
 from pytest import raises
+from sqlalchemy.engine import Connection
 
 from app.integrations.postgres import official_rag_store as pgvector_store_module
 from app.integrations.postgres.official_rag_store import (
@@ -67,3 +70,47 @@ def test_shared_pgvector_store_is_cached(monkeypatch: pytest.MonkeyPatch) -> Non
         assert calls["count"] == 1
     finally:
         pgvector_store_module.shared_pgvector_store.cache_clear()
+
+
+def test_normalize_live_index_names_skips_missing_staging_pkey(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = PgVectorRagStore.__new__(PgVectorRagStore)
+    store._table_name = "official_rag_chunks"
+    statements: list[str] = []
+
+    class _FakeConnection:
+        def execute(self, statement: Any, *args: object, **kwargs: object) -> None:
+            statements.append(str(statement))
+
+    monkeypatch.setattr(store, "_constraint_exists", lambda *args, **kwargs: False)
+
+    store._normalize_live_index_names(
+        cast(Connection, _FakeConnection()),
+        "official_rag_chunks_staging",
+    )
+
+    assert all("RENAME CONSTRAINT" not in statement for statement in statements)
+    assert len(statements) == 3
+
+
+def test_normalize_live_index_names_renames_existing_staging_pkey(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = PgVectorRagStore.__new__(PgVectorRagStore)
+    store._table_name = "official_rag_chunks"
+    statements: list[str] = []
+
+    class _FakeConnection:
+        def execute(self, statement: Any, *args: object, **kwargs: object) -> None:
+            statements.append(str(statement))
+
+    monkeypatch.setattr(store, "_constraint_exists", lambda *args, **kwargs: True)
+
+    store._normalize_live_index_names(
+        cast(Connection, _FakeConnection()),
+        "official_rag_chunks_staging",
+    )
+
+    assert any("RENAME CONSTRAINT" in statement for statement in statements)
+    assert len(statements) == 4

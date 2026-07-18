@@ -8,18 +8,16 @@ from app.rag.official.chunkers.standard_terms import build_standard_terms_chunks
 from app.rag.official.models import RagChunk
 from app.rag.official.sources import OfficialSource
 
-_PRODUCT_EXPLANATION_SOURCE_IDS = frozenset(
-    {
-        "knia_auto_insurance_product_explanation_2024_04_01",
-    }
-)
-
 
 def build_chunks(source: OfficialSource, pages: list[str]) -> list[RagChunk]:
     """Build chunks for one PDF official source from extracted page texts."""
 
-    if source.category == "standard_clause":
+    if source.document_type == "standard_terms":
         return build_standard_terms_chunks(source, pages)
-    if source.id in _PRODUCT_EXPLANATION_SOURCE_IDS:
+    if source.document_type == "product_explanation":
         return build_product_explanation_chunks(source, pages)
-    return build_consumer_guide_chunks(source, pages)
+    if source.document_type == "consumer_guide":
+        return build_consumer_guide_chunks(source, pages)
+    raise ValueError(
+        f"{source.id}: unsupported PDF official source document_type {source.document_type}"
+    )

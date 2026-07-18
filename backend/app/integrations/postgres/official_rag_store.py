@@ -105,12 +105,16 @@ class PgVectorRagStore:
     def _normalize_live_index_names(self, connection: Connection, staging_table_name: str) -> None:
         live_table = f"data_{self._table_name}"
         staging_table = f"data_{staging_table_name}"
+        staging_pkey = f"data_{staging_table_name}_pkey"
+        if self._constraint_exists(connection, table_name=live_table, constraint_name=staging_pkey):
+            connection.execute(
+                text(
+                    f'ALTER TABLE IF EXISTS "{live_table}" '
+                    f'RENAME CONSTRAINT "{staging_pkey}" '
+                    f'TO "{live_table}_pkey"'
+                )
+            )
         statements = (
-            (
-                f'ALTER TABLE IF EXISTS "{live_table}" '
-                f'RENAME CONSTRAINT "data_{staging_table_name}_pkey" '
-                f'TO "{live_table}_pkey"'
-            ),
             (
                 f'ALTER INDEX IF EXISTS "{staging_table}_embedding_idx" '
                 f'RENAME TO "{live_table}_embedding_idx"'
@@ -126,6 +130,28 @@ class PgVectorRagStore:
         )
         for statement in statements:
             connection.execute(text(statement))
+
+    def _constraint_exists(
+        self,
+        connection: Connection,
+        *,
+        table_name: str,
+        constraint_name: str,
+    ) -> bool:
+        result = connection.execute(
+            text(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conrelid = to_regclass(:table_name)
+                      AND conname = :constraint_name
+                )
+                """
+            ),
+            {"table_name": f"public.{table_name}", "constraint_name": constraint_name},
+        )
+        return bool(result.scalar())
 
     def _drop_table_if_exists(self, table_name: str) -> None:
         engine = create_engine(self._database_url)
