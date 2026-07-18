@@ -4,7 +4,7 @@ import {
   CoverlyLogo,
   PixelEyebrow,
   primaryButtonClassName,
-} from "@/components/coverly-brand";
+} from "@/shared/components/coverly-brand";
 
 const insuranceSources = [
   { company: "보험사 A", type: "생명보험" },

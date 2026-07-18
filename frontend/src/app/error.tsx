@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { AppErrorFallback } from "@/components/app-error-fallback";
+import { AppErrorFallback } from "@/shared/components/app-error-fallback";
 
 export default function Error({
   error,

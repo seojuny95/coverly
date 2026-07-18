@@ -3,7 +3,7 @@ import {
   CoverlyLogo,
   PixelEyebrow,
   primaryButtonClassName,
-} from "@/components/coverly-brand";
+} from "@/shared/components/coverly-brand";
 
 export default function NotFound() {
   return (

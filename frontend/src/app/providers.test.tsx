@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useQuery } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { Providers } from "./providers";
-import { useInsuranceData } from "../features/insurance-analysis/insurance-analysis-store";
+import { useInsuranceData } from "../features/analysis/store";
 
 const navigation = vi.hoisted(() => ({ pathname: "/upload" }));
 

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   InsuranceDataProvider,
   useInsuranceData,
-} from "../features/insurance-analysis/insurance-analysis-store";
+} from "../features/analysis/store";
 
 // In-memory only: no persister. Cache is intentionally lost on full reload so
 // sensitive policy data never lands in storage (no auth).

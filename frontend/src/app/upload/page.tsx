@@ -1,5 +1,5 @@
-import { InsuranceUploadForm } from "@/features/insurance-upload/insurance-upload-form";
-import { CoverlyLogo, PixelEyebrow } from "@/components/coverly-brand";
+import { InsuranceUploadForm } from "@/features/upload/form";
+import { CoverlyLogo, PixelEyebrow } from "@/shared/components/coverly-brand";
 
 export default function UploadPage() {
   return (
