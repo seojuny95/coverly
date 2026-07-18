@@ -1,11 +1,11 @@
-import { Button } from "../../shared/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "../../shared/components/ui/dialog";
+} from "@/shared/components/ui/dialog";
 import { InsuranceUploadForm, type UploadInsurance } from "../upload/form";
 import type { AnalyzedInsurance, InsuranceAnalysis } from "./store";
 
@@ -31,6 +31,8 @@ export function UploadInsuranceModal({
     >
       <DialogContent
         showCloseButton={false}
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
         className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-[12px_12px_0_rgba(232,237,255,0.45)] sm:p-6"
       >
         <DialogHeader className="flex-row items-start justify-between gap-4 space-y-0">
