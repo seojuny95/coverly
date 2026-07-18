@@ -13,6 +13,7 @@ from app.modules.policy.schemas import Coverage as CoverageResponse
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.models import PolicyDocumentReservation
 from app.modules.portfolio.session.service import (
+    PortfolioSessionDocumentConflict,
     PortfolioSessionDocumentLimitExceeded,
     RegisteredPolicyDocument,
 )
@@ -307,6 +308,48 @@ def test_parse_reserves_slot_before_running_pipeline(monkeypatch: pytest.MonkeyP
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED"
     assert calls == ["reserve"]
+
+
+def test_parse_rejects_duplicate_document_before_running_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.upload import router as policies
+
+    pipeline_called = False
+
+    def _run(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        nonlocal pipeline_called
+        pipeline_called = True
+        return {
+            "기본정보": {},
+            "보장목록": [],
+            "분석상태": "완료",
+            "문자수": 1,
+        }
+
+    class _Sessions:
+        def begin_upload(
+            self,
+            token: str,
+            *,
+            document_id: str,
+        ) -> PolicyDocumentReservation:
+            raise PortfolioSessionDocumentConflict
+
+    monkeypatch.setattr(policies, "run_pipeline", _run)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+    try:
+        response = TestClient(app).post(
+            "/policies/parse",
+            files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+            data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
+        )
+    finally:
+        app.dependency_overrides.pop(get_portfolio_session_service, None)
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "POLICY_UPLOAD_CANCELLED"
+    assert not pipeline_called
 
 
 def test_parse_releases_reservation_when_pipeline_fails(

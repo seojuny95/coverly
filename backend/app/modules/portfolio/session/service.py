@@ -48,6 +48,10 @@ class PortfolioSessionDocumentCancelled(Exception):
     """The client cancelled this document before parsing completed."""
 
 
+class PortfolioSessionDocumentConflict(Exception):
+    """The document id is already stored or has an upload in progress."""
+
+
 @dataclass(frozen=True)
 class PortfolioSessionAccess:
     token: str
@@ -131,17 +135,24 @@ class PortfolioSessionService:
     ) -> PolicyDocumentReservation:
         current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
+        settings = get_settings()
         resolved_document_id = document_id or uuid.uuid4().hex
         reserved = self._repository.reserve_document(
             claims.session_id,
             resolved_document_id,
             now=current,
-            max_documents=get_settings().portfolio_session_max_documents,
+            expires_at=min(
+                claims.expires_at,
+                current + timedelta(seconds=settings.policy_upload_reservation_ttl_seconds),
+            ),
+            max_documents=settings.portfolio_session_max_documents,
         )
         if reserved == "limit_exceeded":
             raise PortfolioSessionDocumentLimitExceeded
         if reserved == "cancelled":
             raise PortfolioSessionDocumentCancelled
+        if reserved == "duplicate":
+            raise PortfolioSessionDocumentConflict
         if reserved == "missing":
             raise InvalidPortfolioSessionToken
         return PolicyDocumentReservation(

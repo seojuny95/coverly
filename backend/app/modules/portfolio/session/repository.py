@@ -11,7 +11,13 @@ from app.modules.portfolio.session.models import (
     StoredPolicyDocument,
 )
 
-ReserveDocumentResult = Literal["reserved", "missing", "limit_exceeded", "cancelled"]
+ReserveDocumentResult = Literal[
+    "reserved",
+    "duplicate",
+    "missing",
+    "limit_exceeded",
+    "cancelled",
+]
 CompleteDocumentResult = Literal["stored", "missing", "cancelled"]
 
 
@@ -28,6 +34,7 @@ class PortfolioSessionRepository(Protocol):
         document_id: str,
         *,
         now: datetime,
+        expires_at: datetime,
         max_documents: int,
     ) -> ReserveDocumentResult: ...
 

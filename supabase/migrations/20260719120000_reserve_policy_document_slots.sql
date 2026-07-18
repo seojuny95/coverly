@@ -3,6 +3,7 @@ create table private.policy_document_reservations (
     references private.portfolio_sessions(id) on delete cascade,
   document_id uuid not null,
   created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
   primary key (portfolio_session_id, document_id)
 );
 

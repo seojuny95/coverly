@@ -17,6 +17,7 @@ from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDe
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
     PortfolioSessionDocumentCancelled,
+    PortfolioSessionDocumentConflict,
     PortfolioSessionDocumentLimitExceeded,
 )
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
@@ -66,6 +67,7 @@ def _portfolio_session_error(
         InvalidPortfolioSessionToken
         | PortfolioSessionDocumentLimitExceeded
         | PortfolioSessionDocumentCancelled
+        | PortfolioSessionDocumentConflict
     ),
 ) -> ApiError:
     if isinstance(error, InvalidPortfolioSessionToken):
@@ -79,6 +81,12 @@ def _portfolio_session_error(
             status_code=422,
             code="PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
             message="한 번에 분석할 수 있는 보험증권 수를 초과했어요.",
+        )
+    if isinstance(error, PortfolioSessionDocumentConflict):
+        return ApiError(
+            status_code=409,
+            code="POLICY_UPLOAD_CANCELLED",
+            message="같은 문서의 업로드가 이미 진행 중이거나 완료됐어요.",
         )
     return ApiError(
         status_code=409,
@@ -127,6 +135,7 @@ async def parse_policy(
         InvalidPortfolioSessionToken,
         PortfolioSessionDocumentLimitExceeded,
         PortfolioSessionDocumentCancelled,
+        PortfolioSessionDocumentConflict,
     ) as exc:
         raise _portfolio_session_error(exc) from None
 
@@ -169,6 +178,7 @@ async def parse_policy(
             InvalidPortfolioSessionToken,
             PortfolioSessionDocumentLimitExceeded,
             PortfolioSessionDocumentCancelled,
+            PortfolioSessionDocumentConflict,
         ) as exc:
             raise _portfolio_session_error(exc) from None
     finally:

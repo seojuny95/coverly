@@ -61,6 +61,7 @@ class PgPortfolioSessionRepository:
         document_id: str,
         *,
         now: datetime,
+        expires_at: datetime,
         max_documents: int,
     ) -> ReserveDocumentResult:
         with self._pool.connection() as connection:
@@ -79,13 +80,25 @@ class PgPortfolioSessionRepository:
             ).fetchone()
             if cancelled is not None:
                 return "cancelled"
+            connection.execute(
+                """DELETE FROM private.policy_document_reservations
+                   WHERE portfolio_session_id = %s AND expires_at <= %s""",
+                (session_id, now),
+            )
             existing_reservation = connection.execute(
                 """SELECT 1 FROM private.policy_document_reservations
                    WHERE portfolio_session_id = %s AND document_id = %s""",
                 (session_id, document_id),
             ).fetchone()
             if existing_reservation is not None:
-                return "reserved"
+                return "duplicate"
+            existing_document = connection.execute(
+                """SELECT 1 FROM private.policy_documents
+                   WHERE portfolio_session_id = %s AND id = %s""",
+                (session_id, document_id),
+            ).fetchone()
+            if existing_document is not None:
+                return "duplicate"
             occupied_slots = connection.execute(
                 """SELECT
                        (SELECT count(*) FROM private.policy_documents
@@ -100,9 +113,9 @@ class PgPortfolioSessionRepository:
                 return "limit_exceeded"
             connection.execute(
                 """INSERT INTO private.policy_document_reservations (
-                       portfolio_session_id, document_id
-                   ) VALUES (%s, %s)""",
-                (session_id, document_id),
+                       portfolio_session_id, document_id, expires_at
+                   ) VALUES (%s, %s, %s)""",
+                (session_id, document_id, expires_at),
             )
         return "reserved"
 
@@ -241,6 +254,14 @@ class PgPortfolioSessionRepository:
 
     def delete(self, session_id: str) -> tuple[str, ...] | None:
         with self._pool.connection() as connection:
+            session = connection.execute(
+                """SELECT id FROM private.portfolio_sessions
+                   WHERE id = %s
+                   FOR UPDATE""",
+                (session_id,),
+            ).fetchone()
+            if session is None:
+                return None
             rows = connection.execute(
                 """SELECT rag_session_id FROM private.policy_documents
                    WHERE portfolio_session_id = %s AND rag_session_id IS NOT NULL""",
@@ -250,7 +271,7 @@ class PgPortfolioSessionRepository:
                 "DELETE FROM private.portfolio_sessions WHERE id = %s RETURNING id",
                 (session_id,),
             ).fetchone()
-        if deleted is None:
+        if deleted is None:  # pragma: no cover - protected by the row lock above
             return None
         return tuple(str(row["rag_session_id"]) for row in rows)
 

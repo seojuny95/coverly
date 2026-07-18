@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -20,6 +20,7 @@ from app.modules.portfolio.session.repository import (
 )
 from app.modules.portfolio.session.service import (
     PortfolioSessionDocumentCancelled,
+    PortfolioSessionDocumentConflict,
     PortfolioSessionDocumentLimitExceeded,
     PortfolioSessionService,
 )
@@ -34,7 +35,7 @@ class _Repository:
         self.cache: CachedPortfolioAnalysis | None = None
         self.version = 0
         self.cancelled_document_ids: set[str] = set()
-        self.reservations: set[str] = set()
+        self.reservations: dict[str, datetime] = {}
 
     def create(self, session: NewPortfolioSession) -> None:
         self.session = session
@@ -45,17 +46,25 @@ class _Repository:
         document_id: str,
         *,
         now: datetime,
+        expires_at: datetime,
         max_documents: int,
     ) -> ReserveDocumentResult:
         if self.session is None or self.session.id != session_id:
             return "missing"
         if document_id in self.cancelled_document_ids:
             return "cancelled"
+        self.reservations = {
+            reserved_id: reserved_until
+            for reserved_id, reserved_until in self.reservations.items()
+            if reserved_until > now
+        }
         if document_id in self.reservations:
-            return "reserved"
+            return "duplicate"
+        if document_id in self.documents:
+            return "duplicate"
         if len(self.documents) + len(self.reservations) >= max_documents:
             return "limit_exceeded"
-        self.reservations.add(document_id)
+        self.reservations[document_id] = expires_at
         return "reserved"
 
     def complete_document(
@@ -68,18 +77,18 @@ class _Repository:
         if self.session is None or self.session.id != reservation.session_id:
             return "missing"
         if reservation.document_id in self.cancelled_document_ids:
-            self.reservations.discard(reservation.document_id)
+            self.reservations.pop(reservation.document_id, None)
             return "cancelled"
         if reservation.document_id not in self.reservations:
             return "missing"
-        self.reservations.remove(reservation.document_id)
+        self.reservations.pop(reservation.document_id)
         self.documents[document.id] = document
         self.version += 1
         self.cache = None
         return "stored"
 
     def release_document(self, reservation: PolicyDocumentReservation) -> None:
-        self.reservations.discard(reservation.document_id)
+        self.reservations.pop(reservation.document_id, None)
 
     def snapshot(
         self,
@@ -132,7 +141,8 @@ class _Repository:
         if self.session is None or self.session.id != session_id:
             return None
         self.cancelled_document_ids.update(document_ids)
-        self.reservations.difference_update(document_ids)
+        for document_id in document_ids:
+            self.reservations.pop(document_id, None)
         deleted = [
             self.documents.pop(document_id)
             for document_id in document_ids
@@ -207,6 +217,7 @@ def _settings(monkeypatch: pytest.MonkeyPatch) -> None:
         policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
         database_url = "postgresql://example/test"
         portfolio_session_max_documents = 50
+        policy_upload_reservation_ttl_seconds = 300
 
     monkeypatch.setattr(service, "get_settings", lambda: _Settings())
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
@@ -365,7 +376,7 @@ def test_cancellation_after_reservation_removes_late_rag_document() -> None:
         sessions.complete_upload(reservation, result, now=now)
 
     assert repository.documents == {}
-    assert repository.reservations == set()
+    assert repository.reservations == {}
     assert rag_store.deleted == ["late-rag-document"]
 
 
@@ -400,7 +411,7 @@ def test_failed_completion_releases_slot_and_removes_rag_document() -> None:
     with pytest.raises(RuntimeError, match="database unavailable"):
         sessions.complete_upload(reservation, result, now=now)
 
-    assert repository.reservations == set()
+    assert repository.reservations == {}
     assert rag_store.deleted == ["failed-rag-document"]
 
 
@@ -415,6 +426,7 @@ def test_document_limit_removes_the_unlinked_rag_document(
         policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
         database_url = "postgresql://example/test"
         portfolio_session_max_documents = 1
+        policy_upload_reservation_ttl_seconds = 300
 
     monkeypatch.setattr(service, "get_settings", lambda: _Settings())
     now = datetime(2026, 7, 18, tzinfo=UTC)
@@ -450,6 +462,7 @@ def test_in_progress_upload_counts_toward_document_limit(
         policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
         database_url = "postgresql://example/test"
         portfolio_session_max_documents = 1
+        policy_upload_reservation_ttl_seconds = 300
 
     monkeypatch.setattr(service, "get_settings", lambda: _Settings())
     now = datetime(2026, 7, 18, tzinfo=UTC)
@@ -465,6 +478,52 @@ def test_in_progress_upload_counts_toward_document_limit(
     second = sessions.begin_upload(access.token, document_id="document-2", now=now)
 
     assert second.document_id == "document-2"
+
+
+def test_duplicate_document_id_does_not_share_or_release_an_active_reservation() -> None:
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+
+    first = sessions.begin_upload(access.token, document_id="document-1", now=now)
+
+    with pytest.raises(PortfolioSessionDocumentConflict):
+        sessions.begin_upload(access.token, document_id="document-1", now=now)
+
+    assert "document-1" in repository.reservations
+    sessions.release_upload(first)
+    assert repository.reservations == {}
+
+
+def test_expired_upload_reservation_releases_its_document_slot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.portfolio.session import service
+
+    class _Settings:
+        policy_rag_ttl_seconds = 900
+        policy_rag_max_ttl_seconds = 7200
+        policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
+        database_url = "postgresql://example/test"
+        portfolio_session_max_documents = 1
+        policy_upload_reservation_ttl_seconds = 30
+
+    monkeypatch.setattr(service, "get_settings", lambda: _Settings())
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+    sessions.begin_upload(access.token, document_id="document-1", now=now)
+
+    next_reservation = sessions.begin_upload(
+        access.token,
+        document_id="document-2",
+        now=now + timedelta(seconds=31),
+    )
+
+    assert next_reservation.document_id == "document-2"
+    assert set(repository.reservations) == {"document-2"}
 
 
 def _empty_policy(document_id: str) -> PolicyInput:
