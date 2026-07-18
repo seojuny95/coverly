@@ -32,6 +32,7 @@ class PortfolioSessionRepository(Protocol):
         self,
         session_id: str,
         document_id: str,
+        reservation_id: str,
         *,
         now: datetime,
         expires_at: datetime,

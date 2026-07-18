@@ -19,6 +19,7 @@ from app.modules.portfolio.session.repository import (
     ReserveDocumentResult,
 )
 from app.modules.portfolio.session.service import (
+    InvalidPortfolioSessionToken,
     PortfolioSessionDocumentCancelled,
     PortfolioSessionDocumentConflict,
     PortfolioSessionDocumentLimitExceeded,
@@ -35,7 +36,7 @@ class _Repository:
         self.cache: CachedPortfolioAnalysis | None = None
         self.version = 0
         self.cancelled_document_ids: set[str] = set()
-        self.reservations: dict[str, datetime] = {}
+        self.reservations: dict[str, tuple[str, datetime]] = {}
 
     def create(self, session: NewPortfolioSession) -> None:
         self.session = session
@@ -44,6 +45,7 @@ class _Repository:
         self,
         session_id: str,
         document_id: str,
+        reservation_id: str,
         *,
         now: datetime,
         expires_at: datetime,
@@ -54,9 +56,9 @@ class _Repository:
         if document_id in self.cancelled_document_ids:
             return "cancelled"
         self.reservations = {
-            reserved_id: reserved_until
-            for reserved_id, reserved_until in self.reservations.items()
-            if reserved_until > now
+            reserved_id: reservation
+            for reserved_id, reservation in self.reservations.items()
+            if reservation[1] > now
         }
         if document_id in self.reservations:
             return "duplicate"
@@ -64,7 +66,7 @@ class _Repository:
             return "duplicate"
         if len(self.documents) + len(self.reservations) >= max_documents:
             return "limit_exceeded"
-        self.reservations[document_id] = expires_at
+        self.reservations[document_id] = (reservation_id, expires_at)
         return "reserved"
 
     def complete_document(
@@ -79,7 +81,10 @@ class _Repository:
         if reservation.document_id in self.cancelled_document_ids:
             self.reservations.pop(reservation.document_id, None)
             return "cancelled"
-        if reservation.document_id not in self.reservations:
+        stored_reservation = self.reservations.get(reservation.document_id)
+        if stored_reservation is None or stored_reservation[0] != reservation.reservation_id:
+            return "missing"
+        if stored_reservation[1] <= now:
             return "missing"
         self.reservations.pop(reservation.document_id)
         self.documents[document.id] = document
@@ -88,7 +93,9 @@ class _Repository:
         return "stored"
 
     def release_document(self, reservation: PolicyDocumentReservation) -> None:
-        self.reservations.pop(reservation.document_id, None)
+        stored_reservation = self.reservations.get(reservation.document_id)
+        if stored_reservation is not None and stored_reservation[0] == reservation.reservation_id:
+            self.reservations.pop(reservation.document_id)
 
     def snapshot(
         self,
@@ -524,6 +531,39 @@ def test_expired_upload_reservation_releases_its_document_slot(
 
     assert next_reservation.document_id == "document-2"
     assert set(repository.reservations) == {"document-2"}
+
+
+def test_stale_reservation_cannot_release_or_complete_a_new_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.portfolio.session import service
+
+    class _Settings:
+        policy_rag_ttl_seconds = 900
+        policy_rag_max_ttl_seconds = 7200
+        policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
+        database_url = "postgresql://example/test"
+        portfolio_session_max_documents = 1
+        policy_upload_reservation_ttl_seconds = 30
+
+    monkeypatch.setattr(service, "get_settings", lambda: _Settings())
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    later = now + timedelta(seconds=31)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+    stale = sessions.begin_upload(access.token, document_id="document-1", now=now)
+    current = sessions.begin_upload(access.token, document_id="document-1", now=later)
+
+    sessions.release_upload(stale)
+    assert repository.reservations["document-1"][0] == current.reservation_id
+
+    with pytest.raises(InvalidPortfolioSessionToken):
+        sessions.complete_upload(stale, _empty_pipeline_result(), now=later)
+
+    assert repository.reservations["document-1"][0] == current.reservation_id
+    completed = sessions.complete_upload(current, _empty_pipeline_result(), now=later)
+    assert completed.id == "document-1"
 
 
 def _empty_policy(document_id: str) -> PolicyInput:

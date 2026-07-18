@@ -25,6 +25,7 @@ class StoredPolicyDocument:
 class PolicyDocumentReservation:
     session_id: str
     document_id: str
+    reservation_id: str
 
 
 @dataclass(frozen=True)

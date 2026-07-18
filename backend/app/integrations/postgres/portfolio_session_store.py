@@ -59,6 +59,7 @@ class PgPortfolioSessionRepository:
         self,
         session_id: str,
         document_id: str,
+        reservation_id: str,
         *,
         now: datetime,
         expires_at: datetime,
@@ -113,9 +114,9 @@ class PgPortfolioSessionRepository:
                 return "limit_exceeded"
             connection.execute(
                 """INSERT INTO private.policy_document_reservations (
-                       portfolio_session_id, document_id, expires_at
-                   ) VALUES (%s, %s, %s)""",
-                (session_id, document_id, expires_at),
+                       portfolio_session_id, document_id, reservation_id, expires_at
+                   ) VALUES (%s, %s, %s, %s)""",
+                (session_id, document_id, reservation_id, expires_at),
             )
         return "reserved"
 
@@ -151,8 +152,14 @@ class PgPortfolioSessionRepository:
             reserved = connection.execute(
                 """DELETE FROM private.policy_document_reservations
                    WHERE portfolio_session_id = %s AND document_id = %s
+                     AND reservation_id = %s AND expires_at > %s
                    RETURNING document_id""",
-                (reservation.session_id, reservation.document_id),
+                (
+                    reservation.session_id,
+                    reservation.document_id,
+                    reservation.reservation_id,
+                    now,
+                ),
             ).fetchone()
             if reserved is None:
                 return "missing"
@@ -182,8 +189,13 @@ class PgPortfolioSessionRepository:
         with self._pool.connection() as connection:
             connection.execute(
                 """DELETE FROM private.policy_document_reservations
-                   WHERE portfolio_session_id = %s AND document_id = %s""",
-                (reservation.session_id, reservation.document_id),
+                   WHERE portfolio_session_id = %s AND document_id = %s
+                     AND reservation_id = %s""",
+                (
+                    reservation.session_id,
+                    reservation.document_id,
+                    reservation.reservation_id,
+                ),
             )
 
     def snapshot(

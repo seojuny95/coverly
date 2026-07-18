@@ -66,6 +66,7 @@ def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             return PolicyDocumentReservation(
                 session_id="portfolio-session",
                 document_id=document_id,
+                reservation_id="reservation-1",
             )
 
         def complete_upload(
@@ -236,7 +237,11 @@ def test_parse_registers_result_under_portfolio_session_without_exposing_rag_tok
         ) -> PolicyDocumentReservation:
             seen["token"] = token
             seen["document_id"] = document_id
-            return PolicyDocumentReservation(session_id="portfolio", document_id=document_id)
+            return PolicyDocumentReservation(
+                session_id="portfolio",
+                document_id=document_id,
+                reservation_id="reservation-1",
+            )
 
         def complete_upload(
             self,
@@ -361,6 +366,7 @@ def test_parse_releases_reservation_when_pipeline_fails(
     reservation = PolicyDocumentReservation(
         session_id="portfolio-session",
         document_id="11111111111141118111111111111111",
+        reservation_id="reservation-1",
     )
 
     def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:

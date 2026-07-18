@@ -137,9 +137,11 @@ class PortfolioSessionService:
         claims = self._verify(token, now=current)
         settings = get_settings()
         resolved_document_id = document_id or uuid.uuid4().hex
+        reservation_id = uuid.uuid4().hex
         reserved = self._repository.reserve_document(
             claims.session_id,
             resolved_document_id,
+            reservation_id,
             now=current,
             expires_at=min(
                 claims.expires_at,
@@ -158,6 +160,7 @@ class PortfolioSessionService:
         return PolicyDocumentReservation(
             session_id=claims.session_id,
             document_id=resolved_document_id,
+            reservation_id=reservation_id,
         )
 
     def complete_upload(
