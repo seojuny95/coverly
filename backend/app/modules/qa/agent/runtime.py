@@ -27,6 +27,7 @@ from app.modules.qa.agent.contracts import (
 from app.modules.qa.agent.definition import create_qa_agent
 from app.modules.qa.agent.progress import ProgressHooks, QueuedAgentStreamItem
 from app.modules.qa.agent.prompt import build_agent_input
+from app.modules.qa.agent.selection import select_tool_result
 from app.modules.qa.agent.validation import validated_agent_response
 from app.modules.qa.context import QaContext
 from app.modules.qa.response_support import out_of_scope_response
@@ -207,8 +208,5 @@ def _unambiguous_tool_fallback(
     results = list(dependencies.tool_results.values())
     if any(item.trust_level != "deterministic" for item in results):
         return None
-    if len(results) == 1:
-        return results[0].response
-    if results and all(item.response == results[0].response for item in results[1:]):
-        return results[0].response
-    return None
+    selected = select_tool_result(dependencies, None)
+    return selected.response if selected is not None else None

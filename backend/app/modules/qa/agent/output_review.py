@@ -10,8 +10,8 @@ from app.modules.qa.agent.contracts import (
     AgentCounselorDraft,
     QaAgentDependencies,
     QaOutputSafetyDecision,
-    RegisteredToolResult,
 )
+from app.modules.qa.agent.selection import select_tool_result
 from app.modules.qa.pii import mask_qa_pii
 
 _MAX_TOOL_CONTENT_CHARS = 2_500
@@ -38,7 +38,7 @@ def _review_payload(
     dependencies: QaAgentDependencies,
     draft: AgentCounselorDraft,
 ) -> str:
-    selected = _selected_tool_result(dependencies, draft.selected_result_id)
+    selected = select_tool_result(dependencies, draft.selected_result_id)
     payload: dict[str, object] = {
         "question": dependencies.context.question,
         "answer_mode": draft.answer_mode,
@@ -74,20 +74,6 @@ def _review_payload(
             "limitations": response.limitations,
         }
     return dump_prompt_json(payload)
-
-
-def _selected_tool_result(
-    dependencies: QaAgentDependencies,
-    result_id: str | None,
-) -> RegisteredToolResult | None:
-    if result_id is not None and result_id in dependencies.tool_results:
-        return dependencies.tool_results[result_id]
-    results = list(dependencies.tool_results.values())
-    if len(results) == 1:
-        return results[0]
-    if results and all(item.response == results[0].response for item in results[1:]):
-        return results[0]
-    return None
 
 
 def _safety_instructions() -> str:
