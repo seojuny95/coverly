@@ -1,10 +1,7 @@
 import Link from "next/link";
 
-import {
-  CoverlyLogo,
-  PixelEyebrow,
-  primaryButtonClassName,
-} from "@/components/coverly-brand";
+import { SectionLabel } from "@/shared/components/section-label";
+import { Button } from "@/shared/components/ui/button";
 
 const insuranceSources = [
   { company: "보험사 A", type: "생명보험" },
@@ -216,10 +213,8 @@ export default function Home() {
   return (
     <main className="overflow-hidden bg-white text-zinc-950">
       <section className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center px-6 pt-24 pb-10 text-center sm:pt-28 sm:pb-14 lg:px-8">
-        <CoverlyLogo className="absolute top-6 left-6 lg:left-8" />
-
         <div className="mb-6">
-          <PixelEyebrow>보험을 팔지 않는 AI 보험 분석</PixelEyebrow>
+          <SectionLabel>보험을 팔지 않는 AI 보험 분석</SectionLabel>
         </div>
 
         <h1 className="max-w-5xl text-[2.25rem] leading-[1.04] font-semibold tracking-[-0.075em] [word-break:keep-all] text-zinc-950 sm:text-[clamp(3.5rem,7.2vw,6.7rem)] sm:leading-[1.01]">
@@ -235,9 +230,9 @@ export default function Home() {
           보여드려요.
         </p>
 
-        <Link href="/upload" className={`mt-8 ${primaryButtonClassName}`}>
-          내 보험 분석하기
-        </Link>
+        <Button asChild className="mt-8">
+          <Link href="/upload">내 보험 분석하기</Link>
+        </Button>
         <p className="mt-3 text-xs text-zinc-400">
           상담 전화도, 가입 권유도 없어요.
         </p>
@@ -273,7 +268,7 @@ function WhatWeDontDo() {
       className="mx-auto w-full max-w-6xl px-6 pb-24 lg:px-8"
     >
       <div className="flex justify-center">
-        <PixelEyebrow>WHAT WE DON&apos;T DO</PixelEyebrow>
+        <SectionLabel>WHAT WE DON&apos;T DO</SectionLabel>
       </div>
       <div className="mx-auto mt-6 grid max-w-4xl gap-3 sm:grid-cols-3">
         {dontDoItems.map((item) => (

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { AppErrorFallback } from "@/components/app-error-fallback";
+import { ErrorScreen } from "@/shared/components/error-screen";
 
 export default function GlobalError({
   error,
@@ -22,7 +22,7 @@ export default function GlobalError({
   return (
     <html lang="ko">
       <body>
-        <AppErrorFallback digest={error.digest} onRetry={reset} />
+        <ErrorScreen digest={error.digest} onRetry={reset} showBrand />
       </body>
     </html>
   );
