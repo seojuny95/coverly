@@ -4,10 +4,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.modules.portfolio.schemas import PortfolioSelectionInput
+from app.core.generation import GenerationMode
+from app.modules.portfolio.schemas import ClaimChannelBlock, PortfolioSelectionInput
 from app.modules.qa.contracts import (
     AnswerSection,
-    GenerationMode,
     InsuredDemographics,
 )
 
@@ -35,30 +35,6 @@ class AnswerCitation(BaseModel):
     source_url: str | None = None
     source_page: int | None = Field(default=None, ge=1)
     source_version: str | None = None
-
-
-class ClaimChannelLink(BaseModel):
-    label: str
-    url: str
-
-
-class ClaimChannelInsurer(BaseModel):
-    name: str
-    customer_center: str | None = None
-    note: str | None = None
-    links: list[ClaimChannelLink] = Field(default_factory=list)
-
-
-class ClaimChannelMedicalIndemnity(BaseModel):
-    name: str
-    description: str | None = None
-    call_center: str | None = None
-    links: list[ClaimChannelLink] = Field(default_factory=list)
-
-
-class ClaimChannelBlock(BaseModel):
-    insurers: list[ClaimChannelInsurer] = Field(default_factory=list)
-    medical_indemnity: ClaimChannelMedicalIndemnity | None = None
 
 
 class PortfolioQuestionResponse(BaseModel):

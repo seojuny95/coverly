@@ -1,11 +1,10 @@
 """Deterministic source selection and table parsing for policy coverages."""
 
 import re
-from typing import Literal
 
 from app.core.grounding import normalize_amount, wording_grounded
 from app.core.tables import serialize_table
-from app.modules.policy.models import Coverage, ParsedDocument
+from app.modules.policy.models import Coverage, CoverageType, ParsedDocument
 
 _TableRows = list[list[str | None]]
 
@@ -382,7 +381,7 @@ def _table_rows_to_coverages(rows: list[list[str]]) -> list[Coverage]:
         if not raw_amount and amount_column is not None:
             raw_amount = _continuation_amount(rows, index, name_column, amount_column)
         if name and not should_skip_coverage_name(name):
-            row_type: Literal["담보", "부가"] = "담보" if raw_amount else "부가"
+            row_type: CoverageType = "담보" if raw_amount else "부가"
             detail = (
                 cells[detail_column].strip()
                 if detail_column is not None and len(cells) > detail_column
@@ -481,9 +480,9 @@ def _detail_from_source_row(name: str, source: str) -> str | None:
 def _resolve_amount_and_type(
     name: str,
     amount: str,
-    row_type: Literal["담보", "부가"],
+    row_type: CoverageType,
     source: str,
-) -> tuple[str, Literal["담보", "부가"]]:
+) -> tuple[str, CoverageType]:
     """The row's verbatim amount and its 담보/부가 type, table structure first.
 
     The source table is more reliable than the LLM's field mapping: when the
@@ -543,7 +542,7 @@ def coverage_from_values(
     name: str,
     detail: str | None,
     amount: str,
-    row_type: Literal["담보", "부가"],
+    row_type: CoverageType,
     source: str,
 ) -> Coverage:
     """Build one grounded coverage from parsed row values.

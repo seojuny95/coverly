@@ -1,7 +1,6 @@
 """Structured LLM normalization for policy coverage table sources."""
 
 from functools import lru_cache
-from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -12,7 +11,7 @@ from app.modules.policy.coverage.table_parsing import (
     should_skip_coverage_name,
 )
 from app.modules.policy.demographics import mask_demographic_identifiers
-from app.modules.policy.models import Coverage
+from app.modules.policy.models import Coverage, CoverageType
 
 _SYSTEM = (
     "너는 보험 증권의 담보(보장) 표를 통일된 형식으로 정리하는 도우미다. "
@@ -43,7 +42,7 @@ class _CoverageRow(BaseModel):
     담보명: str
     보장내용: str | None
     가입금액: str
-    유형: Literal["담보", "부가"] = "담보"
+    유형: CoverageType = "담보"
 
 
 class _CoverageList(BaseModel):
