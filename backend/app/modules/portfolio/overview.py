@@ -111,6 +111,7 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
     review = [item for item in items if item.status == "needs_review"]
     premium = _premium_judgment(summary, missing)
     duplicate_actual_loss_names = duplicate_actual_loss_coverage_names(summary)
+    has_medical_indemnity_overlap = _has_medical_indemnity_overlap(items)
 
     return {
         "premium": premium,
@@ -144,6 +145,7 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
             missing,
             review,
             duplicate_actual_loss_names,
+            has_medical_indemnity_overlap,
         ),
         "limitations": [
             "업로드한 증권에서 읽은 담보명, 가입금액, 월 보험료 기준의 1차 해석",
@@ -158,7 +160,9 @@ def _overview_prompt_facts(summary: PortfolioCoverageSummary) -> dict[str, objec
 
     items = summary.essential_coverage_check.items
     missing = [item for item in items if item.status == "not_found"]
-    review = [item for item in items if item.status == "needs_review"]
+    terms_review = [
+        item for item in items if item.status == "needs_review" and item.kind != "medical_indemnity"
+    ]
     return {
         "monthly_premium_confirmed": bool(
             summary.premium is not None and summary.premium.monthly_policy_count > 0
@@ -167,8 +171,8 @@ def _overview_prompt_facts(summary: PortfolioCoverageSummary) -> dict[str, objec
             item.label for item in items if item.status != "not_found"
         ],
         "not_confirmed_in_current_materials": [item.label for item in missing],
-        "needs_terms_review": [item.label for item in review],
-        "has_overlapping_actual_loss_names": bool(duplicate_actual_loss_coverage_names(summary)),
+        "needs_terms_review": [item.label for item in terms_review],
+        "has_overlapping_actual_loss_contracts": _has_overlap_review(summary),
         "limitations": [
             "업로드한 자료에서 확인한 내용만 사용",
             "현재 자료에서 확인되지 않은 항목을 실제 미가입으로 단정하지 않음",
@@ -187,11 +191,24 @@ def _allowed_overview_paragraphs(
         allowed.add(_PREMIUM_OVERVIEW_PARAGRAPH)
     if any(item.status == "not_found" for item in summary.essential_coverage_check.items):
         allowed.add(_MISSING_OVERVIEW_PARAGRAPH)
-    if any(item.status == "needs_review" for item in summary.essential_coverage_check.items):
+    if any(
+        item.status == "needs_review" and item.kind != "medical_indemnity"
+        for item in summary.essential_coverage_check.items
+    ):
         allowed.add(_TERMS_REVIEW_OVERVIEW_PARAGRAPH)
-    if duplicate_actual_loss_coverage_names(summary):
+    if _has_overlap_review(summary):
         allowed.add(_OVERLAP_OVERVIEW_PARAGRAPH)
     return allowed
+
+
+def _has_overlap_review(summary: PortfolioCoverageSummary) -> bool:
+    return bool(duplicate_actual_loss_coverage_names(summary)) or _has_medical_indemnity_overlap(
+        summary.essential_coverage_check.items
+    )
+
+
+def _has_medical_indemnity_overlap(items: list[EssentialCoverageItem]) -> bool:
+    return any(item.kind == "medical_indemnity" and item.status == "needs_review" for item in items)
 
 
 def _premium_judgment(
@@ -252,6 +269,7 @@ def _takeaways(
     missing: list[EssentialCoverageItem],
     review: list[EssentialCoverageItem],
     duplicate_actual_loss_names: list[str],
+    has_medical_indemnity_overlap: bool,
 ) -> list[dict[str, str]]:
     return [
         {
@@ -272,7 +290,7 @@ def _takeaways(
             "label": "다음 확인",
             "title": (
                 "중복 여부 확인"
-                if duplicate_actual_loss_names
+                if duplicate_actual_loss_names or has_medical_indemnity_overlap
                 else "보장 범위 확인"
                 if review
                 else "미확인 보장 확인"
@@ -283,6 +301,7 @@ def _takeaways(
                 missing,
                 review,
                 duplicate_actual_loss_names,
+                has_medical_indemnity_overlap,
             ),
         },
     ]
@@ -306,10 +325,13 @@ def _next_detail(
     missing: list[EssentialCoverageItem],
     review: list[EssentialCoverageItem],
     duplicate_actual_loss_names: list[str],
+    has_medical_indemnity_overlap: bool,
 ) -> str:
     if duplicate_actual_loss_names:
         names = " · ".join(duplicate_actual_loss_names)
         return f"{names} 실손형 담보의 중복 보상 제한 여부를 약관에서 확인해요."
+    if has_medical_indemnity_overlap:
+        return "실손의료보험이 여러 계약에서 확인돼 중복 가입 여부와 약관 조건을 확인해요."
     if review:
         return f"{_joined_labels(review)}의 실제 보장 범위와 약관 조건을 확인해요."
     if missing:
