@@ -9,6 +9,7 @@ API key. Use ``--live-generation`` when validating the live LLM answer step.
 from __future__ import annotations
 
 import json
+import re
 from argparse import ArgumentParser
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ from evals.rag.official.retrieval import RetrievalEvalCase, load_retrieval_eval_
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "e2e_dataset.json"
 _OFFLINE_ANSWER_CHARS = 850
+_LABEL_TITLE_RE = re.compile(r"\(([^)]+)\)")
 FailureBucket = Literal[
     "passed",
     "retrieval_miss",
@@ -139,10 +141,12 @@ def evaluate_e2e(
 
     active_cases = cases if cases is not None else load_e2e_eval_cases()
     chunks = load_official_chunks()
+    chunks_by_id = {chunk.id: chunk for chunk in chunks}
     results = tuple(
         _evaluate_case(
             case,
             chunks=chunks,
+            chunks_by_id=chunks_by_id,
             complete=active_completer,
         )
         for case in active_cases
@@ -223,6 +227,7 @@ def _evaluate_case(
     case: GenerationEvalCase,
     *,
     chunks: tuple[RagChunk, ...],
+    chunks_by_id: dict[str, RagChunk],
     complete: JsonCompleter | None,
 ) -> OfficialRagE2EResult:
     hits = retrieve(
@@ -232,17 +237,22 @@ def _evaluate_case(
         final_k=5,
     )
     hit_chunk_ids = tuple(hit.chunk.id for hit in hits)
-    required_citations_retrieved = all(
-        citation_id in hit_chunk_ids for citation_id in case.required_citation_ids
+    required_citation_groups = _required_citation_groups(case, chunks_by_id)
+    required_citations_retrieved = not required_citation_groups or all(
+        any(citation_id in hit_chunk_ids for citation_id in group)
+        for group in required_citation_groups
     )
     answer = answer_official_question(case.question, hits=hits, complete=complete)
     citation_ids = tuple(citation.chunk_id for citation in answer.citations)
     answer_text = _normalize(answer.answer)
     status_matched = answer.status == case.expected_status
     citation_valid = all(citation_id in hit_chunk_ids for citation_id in citation_ids)
-    required_citation_covered = not case.required_citation_ids or (
+    required_citation_covered = not required_citation_groups or (
         answer.status == "answered"
-        and all(citation_id in citation_ids for citation_id in case.required_citation_ids)
+        and all(
+            any(citation_id in citation_ids for citation_id in group)
+            for group in required_citation_groups
+        )
     )
     must_include_covered = all(
         any(_normalize(term) in answer_text for term in group) for group in case.must_include_groups
@@ -275,6 +285,7 @@ def _evaluate_case(
         citation_ids=citation_ids,
         notes=_notes(
             case,
+            chunks_by_id,
             status_matched=status_matched,
             citation_valid=citation_valid,
             required_citation_covered=required_citation_covered,
@@ -289,6 +300,7 @@ def _evaluate_case(
 
 def _notes(
     case: GenerationEvalCase,
+    chunks_by_id: dict[str, RagChunk],
     *,
     status_matched: bool,
     citation_valid: bool,
@@ -305,7 +317,7 @@ def _notes(
     if not citation_valid:
         notes.append("answer cited chunks that were not retrieved")
     if not required_citation_covered:
-        missing = sorted(set(case.required_citation_ids) - set(citation_ids))
+        missing = _missing_citation_groups(case, chunks_by_id, citation_ids)
         notes.append(f"missing required citation ids: {', '.join(missing)}")
     if not must_include_covered:
         missing_groups = _missing_term_groups(case.must_include_groups, answer_text)
@@ -360,7 +372,8 @@ def _generation_case_from_retrieval_case(case: RetrievalEvalCase) -> GenerationE
             "반드시 보장",
             "공식자료에서 확인했습니다" if expected_no_hits else "상품을 추천합니다",
         ),
-        required_citation_ids=() if expected_no_hits else case.relevant_chunk_ids,
+        required_citation_ids=(),
+        required_citation_groups=() if expected_no_hits else (case.relevant_chunk_ids,),
         expected_missing_context_terms=(),
         profile=case.profile,
         difficulty=case.difficulty,
@@ -376,6 +389,9 @@ def _extra_case_from_json(raw: dict[str, object]) -> GenerationEvalCase:
         must_include_groups=_string_groups(raw["must_include_groups"]),
         must_not_include=_string_tuple(raw["must_not_include"]),
         required_citation_ids=_string_tuple(raw["required_citation_ids"]),
+        required_citation_groups=tuple(
+            (citation_id,) for citation_id in _string_tuple(raw["required_citation_ids"])
+        ),
         expected_missing_context_terms=_string_tuple(raw["expected_missing_context_terms"]),
         profile=cast(GenerationProfile, str(raw.get("profile", "out_of_scope"))),
         difficulty=cast(GenerationDifficulty, str(raw.get("difficulty", "hard"))),
@@ -415,6 +431,67 @@ def _missing_term_groups(groups: tuple[tuple[str, ...], ...], text: str) -> tupl
 def _present_terms(terms: tuple[str, ...], text: str) -> tuple[str, ...]:
     normalized = _normalize(text)
     return tuple(term for term in terms if _normalize(term) in normalized)
+
+
+def _required_citation_groups(
+    case: GenerationEvalCase,
+    chunks_by_id: dict[str, RagChunk],
+) -> tuple[tuple[str, ...], ...]:
+    groups = _base_required_citation_groups(case)
+    return tuple(
+        _expand_equivalent_standard_clause_citations(group, chunks_by_id) for group in groups
+    )
+
+
+def _missing_citation_groups(
+    case: GenerationEvalCase,
+    chunks_by_id: dict[str, RagChunk],
+    citation_ids: tuple[str, ...],
+) -> tuple[str, ...]:
+    original_groups = _base_required_citation_groups(case)
+    expanded_groups = _required_citation_groups(case, chunks_by_id)
+    return tuple(
+        " / ".join(original)
+        for original, expanded in zip(original_groups, expanded_groups, strict=True)
+        if not any(citation_id in citation_ids for citation_id in expanded)
+    )
+
+
+def _expand_equivalent_standard_clause_citations(
+    citation_ids: tuple[str, ...],
+    chunks_by_id: dict[str, RagChunk],
+) -> tuple[str, ...]:
+    expanded = list(citation_ids)
+    for citation_id in citation_ids:
+        chunk = chunks_by_id.get(citation_id)
+        if chunk is None or chunk.source_category != "standard_clause":
+            continue
+        label_title = _label_title(chunk.label)
+        if not label_title:
+            continue
+        for candidate in chunks_by_id.values():
+            if candidate.source_category != "standard_clause":
+                continue
+            if candidate.source_id != chunk.source_id:
+                continue
+            if _label_title(candidate.label) == label_title:
+                expanded.append(candidate.id)
+    return tuple(dict.fromkeys(expanded))
+
+
+def _base_required_citation_groups(case: GenerationEvalCase) -> tuple[tuple[str, ...], ...]:
+    if case.required_citation_groups:
+        return case.required_citation_groups
+    return tuple((citation_id,) for citation_id in case.required_citation_ids)
+
+
+def _label_title(label: str | None) -> str:
+    if not label:
+        return ""
+    match = _LABEL_TITLE_RE.search(label)
+    if match is None:
+        return ""
+    return _normalize(match.group(1)).replace(" ", "")
 
 
 def _normalize(text: str) -> str:

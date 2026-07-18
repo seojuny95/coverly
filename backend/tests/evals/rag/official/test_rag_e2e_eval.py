@@ -74,6 +74,149 @@ def test_official_rag_e2e_scores_retrieval_then_generation(
     assert "passed=1/1" in render_report(report)
 
 
+def test_official_rag_e2e_accepts_one_retrieved_citation_from_required_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chunk = RagChunk(
+        id="chunk-2",
+        source_id="source",
+        source_title="공식자료",
+        source_category="standard_clause",
+        publisher="테스트",
+        text="계약자는 청약할 때 중요한 사항을 사실대로 알려야 합니다.",
+        page_start=1,
+        page_end=1,
+    )
+    case = GenerationEvalCase(
+        id="disclosure__q1",
+        question="계약 전 알릴 의무가 뭐야?",
+        hit_chunk_ids=("chunk-1", "chunk-2"),
+        expected_status="answered",
+        must_include_groups=(("사실대로",),),
+        must_not_include=(),
+        required_citation_ids=(),
+        required_citation_groups=(("chunk-1", "chunk-2"),),
+        expected_missing_context_terms=(),
+    )
+
+    monkeypatch.setattr("evals.rag.official.e2e.load_official_chunks", lambda: (chunk,))
+    monkeypatch.setattr(
+        "evals.rag.official.e2e.retrieve",
+        lambda **_: [RetrievalHit(chunk=chunk, score=1.0, keyword_score=1.0, vector_score=1.0)],
+    )
+
+    report = evaluate_e2e((case,), complete=offline_extractive_completer)
+
+    assert report.passed == 1
+    assert report.retrieval_required_citation_rate == 1.0
+
+
+def test_official_rag_e2e_accepts_equivalent_standard_clause_citation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected_chunk = RagChunk(
+        id="life-disclosure",
+        source_id="standard_terms",
+        source_title="표준약관",
+        source_category="standard_clause",
+        publisher="테스트",
+        text="중요한 사항을 사실대로 알려야 합니다.",
+        page_start=1,
+        page_end=1,
+        label="제13조(계약 전 알릴 의무)",
+    )
+    retrieved_chunk = RagChunk(
+        id="injury-disclosure",
+        source_id="standard_terms",
+        source_title="표준약관",
+        source_category="standard_clause",
+        publisher="테스트",
+        text="중요한 사항을 사실대로 알려야 합니다.",
+        page_start=2,
+        page_end=2,
+        label="제15조(계약전 알릴 의무)",
+    )
+    case = GenerationEvalCase(
+        id="equivalent-standard-clause",
+        question="계약 전 알릴 의무가 뭐야?",
+        hit_chunk_ids=("life-disclosure",),
+        expected_status="answered",
+        must_include_groups=(("사실대로",),),
+        must_not_include=(),
+        required_citation_ids=("life-disclosure",),
+        expected_missing_context_terms=(),
+    )
+
+    monkeypatch.setattr(
+        "evals.rag.official.e2e.load_official_chunks",
+        lambda: (expected_chunk, retrieved_chunk),
+    )
+    monkeypatch.setattr(
+        "evals.rag.official.e2e.retrieve",
+        lambda **_: [
+            RetrievalHit(chunk=retrieved_chunk, score=1.0, keyword_score=1.0, vector_score=1.0)
+        ],
+    )
+
+    report = evaluate_e2e((case,), complete=offline_extractive_completer)
+
+    assert report.passed == 1
+    assert report.results[0].citation_ids == ("injury-disclosure",)
+
+
+def test_official_rag_e2e_does_not_accept_equivalent_clause_from_different_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected_chunk = RagChunk(
+        id="source-a-disclosure",
+        source_id="standard_terms_a",
+        source_title="표준약관 A",
+        source_category="standard_clause",
+        publisher="테스트",
+        text="중요한 사항을 사실대로 알려야 합니다.",
+        page_start=1,
+        page_end=1,
+        label="제13조(계약 전 알릴 의무)",
+    )
+    retrieved_chunk = RagChunk(
+        id="source-b-disclosure",
+        source_id="standard_terms_b",
+        source_title="표준약관 B",
+        source_category="standard_clause",
+        publisher="테스트",
+        text="중요한 사항을 사실대로 알려야 합니다.",
+        page_start=2,
+        page_end=2,
+        label="제15조(계약전 알릴 의무)",
+    )
+    case = GenerationEvalCase(
+        id="cross-source-standard-clause",
+        question="계약 전 알릴 의무가 뭐야?",
+        hit_chunk_ids=("source-a-disclosure",),
+        expected_status="answered",
+        must_include_groups=(("사실대로",),),
+        must_not_include=(),
+        required_citation_ids=("source-a-disclosure",),
+        expected_missing_context_terms=(),
+    )
+
+    monkeypatch.setattr(
+        "evals.rag.official.e2e.load_official_chunks",
+        lambda: (expected_chunk, retrieved_chunk),
+    )
+    monkeypatch.setattr(
+        "evals.rag.official.e2e.retrieve",
+        lambda **_: [
+            RetrievalHit(chunk=retrieved_chunk, score=1.0, keyword_score=1.0, vector_score=1.0)
+        ],
+    )
+
+    report = evaluate_e2e((case,), complete=offline_extractive_completer)
+
+    assert report.passed == 0
+    assert report.results[0].failure_bucket == "retrieval_miss"
+
+
 def test_official_rag_e2e_requires_openai_key_for_live_generation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

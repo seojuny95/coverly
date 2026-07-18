@@ -129,10 +129,6 @@ def render_report(report: ExtractionEvalReport, *, show_passing: bool = False) -
     return "\n".join(lines)
 
 
-def render_extraction_report(report: ExtractionEvalReport, *, show_passing: bool = False) -> str:
-    return render_report(report, show_passing=show_passing)
-
-
 def _case_from_json(raw: dict[str, object]) -> ExtractionEvalCase:
     return ExtractionEvalCase(
         id=str(raw["id"]),

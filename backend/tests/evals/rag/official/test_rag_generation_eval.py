@@ -123,6 +123,61 @@ def test_generation_eval_scores_contract_checks(
     assert "FAIL failing" in render_report(report)
 
 
+def test_generation_eval_accepts_one_citation_from_required_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chunks = (
+        RagChunk(
+            id="chunk-1",
+            source_id="source",
+            source_title="공식자료",
+            source_category="standard_clause",
+            publisher="테스트",
+            text="계약 전 알릴 의무는 중요한 사항을 사실대로 알리는 것입니다.",
+            page_start=1,
+            page_end=1,
+        ),
+        RagChunk(
+            id="chunk-2",
+            source_id="source",
+            source_title="공식자료",
+            source_category="standard_clause",
+            publisher="테스트",
+            text="동일한 내용을 다른 표준약관 조항에서도 설명합니다.",
+            page_start=2,
+            page_end=2,
+        ),
+    )
+    case = GenerationEvalCase(
+        id="citation-group",
+        question="계약 전 알릴 의무가 뭐야?",
+        hit_chunk_ids=("chunk-1", "chunk-2"),
+        expected_status="answered",
+        must_include_groups=(("사실대로",),),
+        must_not_include=(),
+        required_citation_ids=(),
+        required_citation_groups=(("chunk-1", "chunk-2"),),
+        expected_missing_context_terms=(),
+    )
+
+    monkeypatch.setattr(
+        "evals.rag.official.generation.load_official_chunks",
+        lambda: chunks,
+    )
+
+    def complete(_: str, __: str) -> dict[str, object]:
+        return {
+            "answer": "중요한 사항을 사실대로 알리는 것입니다.",
+            "citation_ids": ["chunk-2"],
+            "missing_context": [],
+        }
+
+    report = evaluate_generation((case,), complete=complete)
+
+    assert report.passed == 1
+    assert report.required_citation_coverage == 1.0
+
+
 def test_generation_eval_keeps_empty_explicit_case_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
