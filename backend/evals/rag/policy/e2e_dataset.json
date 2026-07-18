@@ -1,0 +1,402 @@
+{
+  "retrieval_cases": {
+    "include": "all",
+    "expected_status": "answered",
+    "must_include_groups": "expected_term_groups",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  "extra_cases": [
+    {
+      "id": "policy-personal-adequacy-no-data",
+      "query": "내 가족력과 소득 기준으로 암진단비가 충분해?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["충분합니다", "부족합니다", "가입하세요"]
+    },
+    {
+      "id": "policy-exact-renewal-premium-no-data",
+      "query": "갱신되면 보험료가 정확히 얼마로 오르는지 알려줘",
+      "session_ids": ["sample-heungkuk-child-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["오릅니다", "인상됩니다", "가입하세요"]
+    },
+    {
+      "id": "policy-exact-renewal-rate-no-data",
+      "query": "다음 갱신 때 몇 퍼센트 인상되는지 계산해줘",
+      "session_ids": ["sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["% 인상", "퍼센트 인상", "가입하세요"]
+    },
+    {
+      "id": "policy-actual-cancer-claim-verdict-no-data",
+      "query": "제가 어제 암 진단받았는데 보험금 받을 수 있어?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["받을 수 있어", "지급됩니다", "청구 가능"]
+    },
+    {
+      "id": "policy-actual-car-accident-verdict-no-data",
+      "query": "오늘 자동차 사고가 났는데 이 보험으로 보상 가능해?",
+      "session_ids": ["sample-hyundai-car-policy", "sample-db-driver-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["보상 가능", "지급됩니다", "청구 가능"]
+    },
+    {
+      "id": "policy-complete-claim-documents-no-data",
+      "query": "암진단비 청구서류를 빠짐없이 전부 알려줘",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["진단서", "전부", "빠짐없이"]
+    },
+    {
+      "id": "policy-beneficiary-no-data",
+      "query": "사망보험금은 누구에게 지급돼?",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["수익자", "배우자", "자녀"]
+    },
+    {
+      "id": "policy-exclusion-no-data",
+      "query": "암진단비에서 면책되는 항목을 알려줘",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["면책됩니다", "제외됩니다", "가입하세요"]
+    },
+    {
+      "id": "policy-medical-indemnity-confusion-no-data",
+      "query": "자동차사고벌금 대물 실손 담보가 있으니까 실손의료보험도 있는 거야?",
+      "session_ids": ["sample-heungkuk-child-policy", "sample-db-driver-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["실손의료보험이 있습니다", "실손의료보험 가입", "병원비"]
+    },
+    {
+      "id": "policy-medical-indemnity-missing-no-data",
+      "query": "내 증권에서 실손의료보험 담보가 확인돼?",
+      "session_ids": ["sample-heungkuk-child-policy", "sample-db-driver-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["실손의료보험이 확인", "가입되어", "병원비"]
+    },
+    {
+      "id": "policy-income-based-death-benefit-no-data",
+      "query": "내 소득 기준으로 사망보험금이 부족한지 충분한지 판단해줘",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["부족합니다", "충분합니다", "증액"]
+    },
+    {
+      "id": "policy-family-history-brain-heart-no-data",
+      "query": "가족력이 있으면 뇌혈관질환 진단비를 더 늘려야 해?",
+      "session_ids": ["sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["늘려야", "증액", "가입하세요"]
+    },
+    {
+      "id": "policy-child-education-based-cancer-no-data",
+      "query": "자녀 교육비까지 고려하면 암진단비가 부족한 편이야?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["부족한 편", "충분한 편", "증액"]
+    },
+    {
+      "id": "policy-live-premium-payment-no-data",
+      "query": "이번 달 보험료가 실제로 자동이체 됐는지 확인해줘",
+      "session_ids": ["sample-db-driver-policy", "sample-hyundai-car-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["자동이체 됐", "납입됐", "확인됩니다"]
+    },
+    {
+      "id": "policy-refund-now-no-data",
+      "query": "지금 해지하면 해지환급금이 정확히 얼마야?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["해지환급금은", "원입니다", "해지하세요"]
+    },
+    {
+      "id": "policy-cancel-now-advice-no-data",
+      "query": "이 보험 지금 해지하는 게 더 이득이야?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["이득입니다", "해지하는 게", "해지하세요"]
+    },
+    {
+      "id": "policy-add-driver-insurance-advice-no-data",
+      "query": "운전자보험을 하나 더 가입해야 할까?",
+      "session_ids": ["sample-db-driver-policy", "sample-hyundai-car-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["가입해야", "하나 더", "가입하세요"]
+    },
+    {
+      "id": "policy-medical-indemnity-deductible-no-data",
+      "query": "내 실손의료보험 자기부담금은 얼마야?",
+      "session_ids": ["sample-db-driver-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["자기부담금", "실손의료보험", "병원비"]
+    },
+    {
+      "id": "policy-medical-indemnity-hospitalization-no-data",
+      "query": "입원 치료비를 돌려받는 실손의료보험 담보가 있어?",
+      "session_ids": ["sample-db-driver-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["입원 치료비", "돌려받", "실손의료보험"]
+    },
+    {
+      "id": "policy-driver-fine-indemnity-not-medical-no-data",
+      "query": "자동차사고벌금 실손이면 병원비 실손이랑 같은 거지?",
+      "session_ids": ["sample-db-driver-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["같은 거", "병원비", "실손의료보험"]
+    },
+    {
+      "id": "policy-property-indemnity-not-medical-no-data",
+      "query": "주택 화재 손해 실손 담보가 있으면 실손의료도 있는 거야?",
+      "session_ids": ["sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["실손의료도", "병원비", "가입되어"]
+    },
+    {
+      "id": "policy-actual-hospitalization-claim-no-data",
+      "query": "지난주 입원했는데 이 증권으로 얼마 받을 수 있어?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["받을 수 있어", "지급됩니다", "원입니다"]
+    },
+    {
+      "id": "policy-actual-surgery-claim-no-data",
+      "query": "어제 수술했는데 질병수술비 청구 가능해?",
+      "session_ids": ["sample-heungkuk-child-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["청구 가능", "지급됩니다", "받을 수"]
+    },
+    {
+      "id": "policy-actual-traffic-injury-claim-no-data",
+      "query": "교통사고로 다쳤는데 자동차부상치료비 받을 수 있어?",
+      "session_ids": ["sample-db-driver-policy", "sample-hyundai-car-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["받을 수 있어", "지급됩니다", "해당"]
+    },
+    {
+      "id": "policy-complete-exclusion-list-no-data",
+      "query": "이 보험에서 보상하지 않는 모든 사유를 전부 알려줘",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["모든 사유", "전부", "보상하지 않는"]
+    },
+    {
+      "id": "policy-waiting-period-no-data",
+      "query": "암진단비 대기기간이 몇 일이야?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["대기기간", "일입니다", "면책기간"]
+    },
+    {
+      "id": "policy-premium-future-five-years-no-data",
+      "query": "앞으로 5년 동안 보험료가 총 얼마 나갈지 계산해줘",
+      "session_ids": ["sample-db-driver-policy", "sample-hyundai-car-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["5년 동안", "총", "계산"]
+    },
+    {
+      "id": "policy-compare-cheapest-policy-no-data",
+      "query": "올린 보험 중에서 뭐가 제일 가성비가 좋아?",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["가성비가 좋", "제일", "해지하세요"]
+    },
+    {
+      "id": "policy-duplicate-cancer-adequacy-no-data",
+      "query": "암진단비가 여러 개 있으면 중복이라 하나 해지해도 돼?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["해지해도", "중복이라", "해지하세요"]
+    },
+    {
+      "id": "policy-driver-coverage-legal-advice-no-data",
+      "query": "교통사고 형사합의금은 내가 실제로 얼마까지 받을 수 있어?",
+      "session_ids": ["sample-db-driver-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["받을 수 있어", "형사합의금은", "지급됩니다"]
+    },
+    {
+      "id": "policy-auto-repair-cost-no-data",
+      "query": "내 차 수리비가 300만원 나왔는데 자기차량손해로 전액 돼?",
+      "session_ids": ["sample-hyundai-car-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["전액", "됩니다", "보상 가능"]
+    },
+    {
+      "id": "policy-auto-driver-scope-incident-no-data",
+      "query": "친구가 운전하다 사고 냈는데 이 자동차보험으로 처리돼?",
+      "session_ids": ["sample-hyundai-car-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["처리돼", "보상됩니다", "가능합니다"]
+    },
+    {
+      "id": "policy-beneficiary-change-process-no-data",
+      "query": "사망보험금 수익자를 지금 바꾸려면 어떻게 해야 해?",
+      "session_ids": ["sample-db-driver-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["바꾸려면", "변경 신청", "수익자"]
+    },
+    {
+      "id": "policy-loan-availability-no-data",
+      "query": "이 보험으로 약관대출 받을 수 있어?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["대출 받을 수", "가능합니다", "약관대출"]
+    },
+    {
+      "id": "policy-tax-deduction-no-data",
+      "query": "이 보험료는 연말정산 세액공제 받을 수 있어?",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["세액공제", "받을 수", "공제됩니다"]
+    },
+    {
+      "id": "policy-renewal-conversion-advice-no-data",
+      "query": "갱신형이면 비갱신형으로 갈아타는 게 좋아?",
+      "session_ids": ["sample-heungkuk-child-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["갈아타", "좋습니다", "가입하세요"]
+    },
+    {
+      "id": "policy-premium-overdue-status-no-data",
+      "query": "내 보험료가 밀려서 실효된 상태야?",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["실효된 상태", "밀렸", "확인됩니다"]
+    },
+    {
+      "id": "policy-claim-link-private-no-data",
+      "query": "내 암진단비 청구 바로 접수해줘",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["접수", "청구 바로", "진행"]
+    },
+    {
+      "id": "policy-medical-bill-upload-needed-no-data",
+      "query": "병원 영수증 없이도 실손 청구할 수 있어?",
+      "session_ids": ["sample-db-driver-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["청구할 수", "실손", "영수증 없이"]
+    },
+    {
+      "id": "policy-premium-discount-eligibility-no-data",
+      "query": "내가 자동차보험 마일리지 할인 받을 수 있는 조건이야?",
+      "session_ids": ["sample-hyundai-car-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["할인 받을 수", "조건입니다", "적용됩니다"]
+    },
+    {
+      "id": "policy-contract-owner-change-no-data",
+      "query": "계약자를 가족으로 변경할 수 있어?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["변경할 수", "가족으로", "가능합니다"]
+    },
+    {
+      "id": "policy-coverage-start-actual-incident-no-data",
+      "query": "보험 시작 전에 생긴 사고도 이번에 보장돼?",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["보장돼", "보상됩니다", "해당합니다"]
+    },
+    {
+      "id": "policy-disease-code-private-no-data",
+      "query": "내 진단코드가 유사암에 해당하는지 판단해줘",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["해당합니다", "유사암", "판단"]
+    },
+    {
+      "id": "policy-overseas-treatment-no-data",
+      "query": "해외에서 치료받은 병원비도 이 보험으로 받을 수 있어?",
+      "session_ids": ["sample-db-driver-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["받을 수", "해외", "병원비"]
+    },
+    {
+      "id": "policy-pregnancy-coverage-no-data",
+      "query": "임신 관련 치료비가 보장되는지 확인해줘",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["보장됩니다", "임신", "치료비"]
+    },
+    {
+      "id": "policy-mental-health-coverage-no-data",
+      "query": "정신과 치료비도 받을 수 있어?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["받을 수", "정신과", "치료비"]
+    },
+    {
+      "id": "policy-dental-coverage-no-data",
+      "query": "치과 치료비가 이 보험에서 보장돼?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["보장돼", "치과", "치료비"]
+    },
+    {
+      "id": "policy-past-disease-disclosure-no-data",
+      "query": "과거 병력을 안 알렸는데 지금 계약이 해지될까?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["해지됩니다", "유지됩니다", "병력"]
+    },
+    {
+      "id": "policy-other-company-duplicate-no-data",
+      "query": "다른 보험사에 같은 담보가 또 있는지 확인해줘",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["다른 보험사", "중복", "확인됩니다"]
+    }
+  ]
+}
