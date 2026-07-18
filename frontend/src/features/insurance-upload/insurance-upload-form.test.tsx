@@ -99,6 +99,33 @@ describe("InsuranceUploadForm", () => {
     ).toBeDisabled();
   });
 
+  test("shows where to get a policy document on demand", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    const guide = screen.getByTestId("policy-document-guide");
+    expect(guide).not.toHaveAttribute("open");
+
+    await user.click(screen.getByText("보험증권을 어디서 받는지 모르겠어요"));
+
+    expect(guide).toHaveAttribute("open");
+    expect(
+      screen.getByText("보험증권을 이렇게 받을 수 있어요"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/보험사 앱·홈페이지 → 계약 관리 또는 증명서 발급/),
+    ).toBeInTheDocument();
+
+    const insurerLookupLink = screen.getByRole("link", {
+      name: "가입한 보험사 확인 (새 창에서 열기)",
+    });
+    expect(insurerLookupLink).toHaveAttribute(
+      "href",
+      "https://cont.insure.or.kr/cont_web/intro.do",
+    );
+    expect(insurerLookupLink).toHaveAttribute("target", "_blank");
+  });
+
   test("selects a PDF through the file picker", async () => {
     const user = userEvent.setup();
     renderForm();
