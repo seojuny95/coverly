@@ -142,25 +142,23 @@ def _premium_judgment(
     if premium.monthly_total < benchmark.suggested_min_premium:
         tone = "low"
         if all_core_coverage_visible:
-            label = "현재 보험료는 좋아보여요"
-            guidance = "핵심 보장이 보인다면 보험료가 낮은 것 자체는 좋은 신호예요."
+            label = "보험료와 보장 조건을 함께 확인해요"
+            guidance = "핵심 보장이 보이는지와 갱신·면책 조건을 함께 확인해보세요."
         else:
-            label = "권장보험을 점검해보세요"
-            guidance = (
-                "보험료가 낮은 이유가 핵심 보장 공백일 수 있으니 권장보험 항목을 먼저 점검해보세요."
-            )
+            label = "미확인 핵심 보장을 확인해요"
+            guidance = "현재 자료에서 찾지 못한 핵심 보장이 실제로 없는지 약관과 함께 확인해보세요."
     elif premium.monthly_total > benchmark.suggested_max_premium:
         tone = "high"
-        label = "현재 보험료는 높아보여요"
-        guidance = "보험료가 과할 수 있으니 가입한 보험과 보장내용을 다시 확인해보세요."
+        label = "보험료 구성과 갱신 조건을 확인해요"
+        guidance = "보험료에 포함된 담보, 갱신 여부, 납입 기간을 현재 자료와 함께 확인해보세요."
     else:
         tone = "in_range"
         if all_core_coverage_visible:
-            label = "현재 보험료는 좋아보여요"
-            guidance = "권장 구간 안에서 핵심 보장도 보여요. 세부 약관 조건만 확인해요."
+            label = "보험료와 보장 조건을 함께 확인해요"
+            guidance = "일반 가이드와의 차이, 세부 약관 조건을 함께 확인해보세요."
         else:
-            label = "권장보험을 점검해보세요"
-            guidance = "보험료는 권장 구간이어도 미확인 권장보험이 있으니 보장 구성을 점검해보세요."
+            label = "미확인 핵심 보장을 확인해요"
+            guidance = "현재 자료에서 찾지 못한 핵심 보장이 실제로 없는지 약관과 함께 확인해보세요."
 
     return {
         "status": tone,

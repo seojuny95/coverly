@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.core.errors import ApiError, api_error_responses
-from app.modules.analysis.summary_overview import (
+from app.modules.portfolio.overview import (
     SummaryOverviewUnavailableError,
     attach_summary_overview,
 )

@@ -1,6 +1,6 @@
 import pytest
 
-from app.modules.analysis.summary_overview import (
+from app.modules.portfolio.overview import (
     SummaryOverviewUnavailableError,
     attach_summary_overview,
     generate_summary_overview,
@@ -162,32 +162,32 @@ def test_summary_overview_failure_is_not_replaced_with_deterministic_copy() -> N
         (
             90_000,
             set(),
-            "현재 보험료는 좋아보여요",
-            "좋은 신호",
+            "보험료와 보장 조건을 함께 확인해요",
+            "갱신·면책 조건을 함께 확인",
         ),
         (
             90_000,
             {"death"},
-            "권장보험을 점검해보세요",
-            "권장보험 항목을 먼저 점검",
+            "미확인 핵심 보장을 확인해요",
+            "핵심 보장이 실제로 없는지 약관과 함께 확인",
         ),
         (
             150_000,
             set(),
-            "현재 보험료는 좋아보여요",
-            "세부 약관 조건만 확인",
+            "보험료와 보장 조건을 함께 확인해요",
+            "일반 가이드와의 차이, 세부 약관 조건",
         ),
         (
             150_000,
             {"death"},
-            "권장보험을 점검해보세요",
-            "보장 구성을 점검",
+            "미확인 핵심 보장을 확인해요",
+            "핵심 보장이 실제로 없는지 약관과 함께 확인",
         ),
         (
             250_000,
             set(),
-            "현재 보험료는 높아보여요",
-            "가입한 보험과 보장내용을 다시 확인",
+            "보험료 구성과 갱신 조건을 확인해요",
+            "보험료에 포함된 담보, 갱신 여부, 납입 기간",
         ),
     ],
 )
