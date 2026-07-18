@@ -40,10 +40,10 @@ def retrieve(
     *,
     chunks: tuple[RagChunk, ...] | None = None,
     embedder: Embedder | None = None,
-    candidate_k: int = 24,
+    candidate_k: int = 120,
     final_k: int = 6,
-    vector_weight: float = 0.50,
-    bm25_weight: float = 0.50,
+    vector_weight: float = 0.40,
+    bm25_weight: float = 0.60,
     store: OfficialRagStore | None = None,
 ) -> list[RetrievalHit]:
     """Retrieve official-source chunks with plain hybrid search.

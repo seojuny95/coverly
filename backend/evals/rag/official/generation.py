@@ -51,6 +51,7 @@ class GenerationEvalCase:
     must_not_include: tuple[str, ...]
     required_citation_ids: tuple[str, ...]
     expected_missing_context_terms: tuple[str, ...]
+    required_citation_groups: tuple[tuple[str, ...], ...] = ()
     profile: GenerationProfile = "term_explain"
     difficulty: GenerationDifficulty = "medium"
 
@@ -251,9 +252,9 @@ def _evaluate_case(
 
     status_matched = answer.status == case.expected_status
     citation_valid = all(citation_id in hit_ids for citation_id in citation_ids)
-    required_citation_covered = not case.required_citation_ids or (
-        answer.status == "answered"
-        and all(citation_id in citation_ids for citation_id in case.required_citation_ids)
+    required_citation_groups = _required_citation_groups(case)
+    required_citation_covered = not required_citation_groups or (
+        answer.status == "answered" and _required_citation_groups_covered(case, citation_ids)
     )
     must_include_covered = all(
         any(_normalize(term) in answer_text for term in group) for group in case.must_include_groups
@@ -311,7 +312,7 @@ def _notes(
         invalid = sorted(set(citation_ids) - set(case.hit_chunk_ids))
         notes.append(f"invalid citation ids: {', '.join(invalid)}")
     if "required_citations" in failed_checks:
-        missing_citations = sorted(set(case.required_citation_ids) - set(citation_ids))
+        missing_citations = _missing_citation_groups(case, citation_ids)
         notes.append(f"missing required citation ids: {', '.join(missing_citations)}")
     if "must_include" in failed_checks:
         missing_answer_groups = _missing_term_groups(case.must_include_groups, answer.answer)
@@ -359,6 +360,31 @@ def _numbers_are_grounded(
     )
     grounded_numbers = set(_NUMBER_RE.findall(grounded_text))
     return answer_numbers.issubset(grounded_numbers)
+
+
+def _required_citation_groups_covered(
+    case: GenerationEvalCase,
+    citation_ids: tuple[str, ...],
+) -> bool:
+    groups = _required_citation_groups(case)
+    return all(any(citation_id in citation_ids for citation_id in group) for group in groups)
+
+
+def _required_citation_groups(case: GenerationEvalCase) -> tuple[tuple[str, ...], ...]:
+    if case.required_citation_groups:
+        return case.required_citation_groups
+    return tuple((citation_id,) for citation_id in case.required_citation_ids)
+
+
+def _missing_citation_groups(
+    case: GenerationEvalCase,
+    citation_ids: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(
+        " / ".join(group)
+        for group in _required_citation_groups(case)
+        if not any(citation_id in citation_ids for citation_id in group)
+    )
 
 
 def _missing_terms(
