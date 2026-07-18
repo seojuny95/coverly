@@ -12,6 +12,8 @@ from app.modules.reference_data.contracts import (
     SourceReliability,
 )
 
+_CONNECT_TIMEOUT_SECONDS = 3
+
 
 class PostgresPremiumBenchmarkRepository:
     """Read age-band premium guides from configured reference tables."""
@@ -43,7 +45,11 @@ class PostgresPremiumBenchmarkRepository:
             benchmark_table=self._benchmark_table,
             source_table=self._source_table,
         )
-        with psycopg.connect(self._database_url, row_factory=dict_row) as connection:
+        with psycopg.connect(
+            self._database_url,
+            connect_timeout=_CONNECT_TIMEOUT_SECONDS,
+            row_factory=dict_row,
+        ) as connection:
             row = connection.execute(query, (age,)).fetchone()
         return _benchmark_from_row(row) if row is not None else None
 
@@ -56,7 +62,11 @@ class PostgresPremiumBenchmarkRepository:
             benchmark_table=self._benchmark_table,
             source_table=self._source_table,
         )
-        with psycopg.connect(self._database_url, row_factory=dict_row) as connection:
+        with psycopg.connect(
+            self._database_url,
+            connect_timeout=_CONNECT_TIMEOUT_SECONDS,
+            row_factory=dict_row,
+        ) as connection:
             rows = connection.execute(query).fetchall()
         return tuple(_benchmark_from_row(row) for row in rows)
 

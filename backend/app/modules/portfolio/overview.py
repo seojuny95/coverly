@@ -6,7 +6,7 @@ from typing import Literal, cast
 from pydantic import BaseModel, Field
 
 from app.integrations.openai.client import JsonCompleter, dump_prompt_json, structured_completer
-from app.modules.evidence.catalog import is_safe_analysis_text
+from app.modules.consultation.safety import is_safe_neutral_analysis_text
 from app.modules.portfolio.schemas import (
     EssentialCoverageItem,
     PortfolioCoverageSummary,
@@ -59,9 +59,11 @@ def generate_summary_overview(
 
     title = draft.title.strip()
     paragraphs = [
-        paragraph.strip() for paragraph in draft.paragraphs if is_safe_analysis_text(paragraph)
+        paragraph.strip()
+        for paragraph in draft.paragraphs
+        if is_safe_neutral_analysis_text(paragraph)
     ][:3]
-    if not title or not is_safe_analysis_text(title) or len(paragraphs) < 2:
+    if not title or not is_safe_neutral_analysis_text(title) or len(paragraphs) < 2:
         return None
 
     takeaways = cast(list[dict[str, str]], judgments["takeaways"])
@@ -278,6 +280,7 @@ def _system_prompt() -> str:
 하지 말아야 할 것:
 - 입력에 없는 가족관계, 소득, 병력, 상품명, 보험사 평가를 만들지 않는다.
 - 새 상품 가입, 증액, 해지, 유지 같은 행동을 지시하지 않는다.
+- 보험료나 보장을 높다/낮다, 충분하다/부족하다, 적정하다고 평가하지 않는다.
 - 보험금 지급 여부나 약관상 보장 여부를 단정하지 않는다.
 - 입력의 금액, 확인/미확인 상태, 판단 라벨을 바꾸지 않는다.
 

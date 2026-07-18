@@ -152,6 +152,31 @@ def test_summary_overview_failure_is_not_replaced_with_deterministic_copy() -> N
 
 
 @pytest.mark.parametrize(
+    "unsafe_title",
+    [
+        "현재 보험료는 높아 보여요",
+        "현재 보험료는 낮아 보여요",
+        "보험료 수준은 적정해요",
+        "현재 보장은 충분해요",
+        "현재 보장은 부족해요",
+    ],
+)
+def test_summary_overview_rejects_adequacy_judgments(unsafe_title: str) -> None:
+    summary = _summary_for_premium_guidance(150_000, set())
+
+    def complete(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": unsafe_title,
+            "paragraphs": [
+                "보험료 구성과 보장 조건을 함께 확인해요.",
+                "업로드한 자료에서 확인한 내용을 기준으로 살펴봤어요.",
+            ],
+        }
+
+    assert generate_summary_overview(summary, complete) is None
+
+
+@pytest.mark.parametrize(
     (
         "monthly_total",
         "missing_kinds",
@@ -205,7 +230,7 @@ def test_summary_overview_combines_premium_range_with_core_coverage_status(
         return {
             "title": "보험료와 핵심 보장을 함께 확인해요",
             "paragraphs": [
-                "보험료는 권장 구간과 핵심 보장 확인 상태를 함께 봐야 해요.",
+                "보험료는 일반 가이드의 범위와 핵심 보장 확인 상태를 함께 봐야 해요.",
                 "업로드한 자료 기준의 1차 해석이므로 약관 조건을 이어서 확인해요.",
             ],
         }

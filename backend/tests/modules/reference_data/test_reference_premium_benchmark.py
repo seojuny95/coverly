@@ -1,4 +1,6 @@
-from pytest import MonkeyPatch
+from collections.abc import Iterator
+
+from pytest import MonkeyPatch, fixture
 
 from app.modules.portfolio.schemas import PremiumBenchmark, PremiumBenchmarkSource
 from app.modules.reference_data import premium_benchmark as subject
@@ -19,10 +21,16 @@ class _CountingRepository:
 
 
 class _FailingRepository:
+    def __init__(self) -> None:
+        self.find_calls = 0
+        self.list_calls = 0
+
     def find_by_age(self, age: int | None) -> PremiumBenchmark | None:
+        self.find_calls += 1
         raise RuntimeError("database unavailable")
 
     def list_all(self) -> tuple[PremiumBenchmark, ...]:
+        self.list_calls += 1
         raise RuntimeError("database unavailable")
 
 
@@ -39,6 +47,15 @@ class _RecoveringRepository:
     def list_all(self) -> tuple[PremiumBenchmark, ...]:
         self.list_calls += 1
         raise RuntimeError("database temporarily unavailable")
+
+
+@fixture(autouse=True)
+def _reset_cache_state(monkeypatch: MonkeyPatch) -> Iterator[None]:
+    subject._cached_premium_benchmark_for_age.cache_clear()
+    monkeypatch.setattr(subject, "_preloaded_benchmarks", None)
+    monkeypatch.setattr(subject, "_failure_retry_at", None)
+    yield
+    subject._cached_premium_benchmark_for_age.cache_clear()
 
 
 def test_premium_benchmark_lookup_caches_successful_age_queries(
@@ -70,9 +87,6 @@ def test_premium_benchmark_lookup_caches_successful_age_queries(
     )
     repository = _CountingRepository(benchmark)
     monkeypatch.setattr(subject, "_repository", lambda: repository)
-    subject._cached_premium_benchmark_for_age.cache_clear()
-    monkeypatch.setattr(subject, "_preloaded_benchmarks", None)
-
     first = subject.premium_benchmark_for_age(35)
     second = subject.premium_benchmark_for_age(35)
 
@@ -110,9 +124,6 @@ def test_warm_premium_benchmark_cache_preloads_age_band_queries(
     )
     repository = _CountingRepository(benchmark)
     monkeypatch.setattr(subject, "_repository", lambda: repository)
-    subject._cached_premium_benchmark_for_age.cache_clear()
-    monkeypatch.setattr(subject, "_preloaded_benchmarks", None)
-
     count = subject.warm_premium_benchmark_cache()
     result = subject.premium_benchmark_for_age(35)
 
@@ -124,11 +135,12 @@ def test_warm_premium_benchmark_cache_preloads_age_band_queries(
 def test_premium_benchmark_lookup_does_not_invent_fallback_data(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(subject, "_repository", lambda: _FailingRepository())
-    subject._cached_premium_benchmark_for_age.cache_clear()
-    monkeypatch.setattr(subject, "_preloaded_benchmarks", None)
+    repository = _FailingRepository()
+    monkeypatch.setattr(subject, "_repository", lambda: repository)
 
     assert subject.premium_benchmark_for_age(35) is None
+    assert subject.premium_benchmark_for_age(35) is None
+    assert repository.find_calls == 1
 
 
 def test_failed_warm_premium_benchmark_cache_retries_on_a_later_request(
@@ -159,11 +171,42 @@ def test_failed_warm_premium_benchmark_cache_retries_on_a_later_request(
         ),
     )
     repository = _RecoveringRepository(benchmark)
+    now = [100.0]
     monkeypatch.setattr(subject, "_repository", lambda: repository)
-    subject._cached_premium_benchmark_for_age.cache_clear()
-    monkeypatch.setattr(subject, "_preloaded_benchmarks", None)
+    monkeypatch.setattr(subject, "monotonic", lambda: now[0])
 
     assert subject.warm_premium_benchmark_cache() == 0
+    assert subject.premium_benchmark_for_age(35) is None
+    assert repository.find_calls == 0
+
+    now[0] += subject._FAILURE_BACKOFF_SECONDS
+
     assert subject.premium_benchmark_for_age(35) == benchmark
     assert repository.list_calls == 1
     assert repository.find_calls == 1
+
+
+def test_persistent_failure_retries_only_once_per_backoff_window(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    repository = _FailingRepository()
+    now = [100.0]
+    monkeypatch.setattr(subject, "_repository", lambda: repository)
+    monkeypatch.setattr(subject, "monotonic", lambda: now[0])
+
+    assert subject.warm_premium_benchmark_cache() == 0
+    assert subject.premium_benchmark_for_age(35) is None
+    assert subject.premium_benchmark_for_age(45) is None
+    assert repository.list_calls == 1
+    assert repository.find_calls == 0
+
+    now[0] += subject._FAILURE_BACKOFF_SECONDS
+
+    assert subject.premium_benchmark_for_age(35) is None
+    assert subject.premium_benchmark_for_age(45) is None
+    assert repository.find_calls == 1
+
+    now[0] += subject._FAILURE_BACKOFF_SECONDS
+
+    assert subject.premium_benchmark_for_age(35) is None
+    assert repository.find_calls == 2

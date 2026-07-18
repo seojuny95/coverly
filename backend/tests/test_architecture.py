@@ -64,6 +64,24 @@ def _imports_namespace(module: str, namespace: str) -> bool:
     return module == namespace or module.startswith(f"{namespace}.")
 
 
+def _feature_import_graph() -> dict[str, set[str]]:
+    modules_root = APP_ROOT / "modules"
+    features = {
+        path.name for path in modules_root.iterdir() if path.is_dir() and _python_files(path)
+    }
+    graph: dict[str, set[str]] = {feature: set() for feature in features}
+    for feature in features:
+        for path in _python_files(modules_root / feature):
+            for module in _imported_modules(path):
+                parts = module.split(".")
+                if len(parts) < 3 or parts[:2] != ["app", "modules"]:
+                    continue
+                dependency = parts[2]
+                if dependency in features and dependency != feature:
+                    graph[feature].add(dependency)
+    return graph
+
+
 def test_removed_app_namespaces_are_not_imported() -> None:
     offenders: list[str] = []
     roots = (APP_ROOT, BACKEND_ROOT / "evals", BACKEND_ROOT / "tests")
@@ -142,6 +160,24 @@ def test_low_level_features_do_not_depend_on_higher_level_features() -> None:
                 offenders.append(str(path.relative_to(BACKEND_ROOT)))
 
     assert offenders == []
+
+
+def test_feature_import_graph_is_acyclic() -> None:
+    remaining = _feature_import_graph()
+    while independent := {
+        feature for feature, dependencies in remaining.items() if not dependencies
+    }:
+        remaining = {
+            feature: dependencies - independent
+            for feature, dependencies in remaining.items()
+            if feature not in independent
+        }
+
+    cycle_edges = {
+        feature: sorted(dependency for dependency in dependencies if dependency in remaining)
+        for feature, dependencies in remaining.items()
+    }
+    assert cycle_edges == {}
 
 
 def test_business_modules_do_not_import_vendor_clients_directly() -> None:
