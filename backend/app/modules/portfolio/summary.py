@@ -15,6 +15,7 @@ from app.modules.coverage.matching import (
     canonicalize_coverage_name,
     choose_display_name,
 )
+from app.modules.portfolio.amounts import parse_amount
 from app.modules.portfolio.essential_coverage import build_essential_coverage_check
 from app.modules.portfolio.premium import summarize_premiums
 from app.modules.portfolio.schemas import (
@@ -87,14 +88,6 @@ _SAFE_FIXED_NAME_TERMS = (
 _UNCONFIRMED_PAYMENT_REASON = "지급 방식을 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_AMOUNT_REASON = "가입금액을 숫자로 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_NAME_REASON = "담보명을 분류하지 못해 합계에는 더하지 않았어요."
-_UNITS = {
-    "원": 1,
-    "천원": 1_000,
-    "만원": 10_000,
-    "백만원": 1_000_000,
-    "천만원": 10_000_000,
-    "억원": 100_000_000,
-}
 MAJOR_CATEGORY_ORDER = (
     "사망",
     "후유장해",
@@ -188,21 +181,6 @@ def _summary_payment_basis(
     return "unknown"
 
 
-def _parse_amount(coverage: CoverageInput) -> int | None:
-    if coverage.가입금액숫자 is not None:
-        return coverage.가입금액숫자
-
-    compact = re.sub(r"\s+", "", coverage.가입금액).replace(",", "")
-    match = re.fullmatch(r"(\d+(?:\.\d+)?)(억원|천만원|백만원|만원|천원|원)", compact)
-    if match is None:
-        return None
-    value = float(match.group(1))
-    amount = value * _UNITS[match.group(2)]
-    if not amount.is_integer():
-        return None
-    return int(amount)
-
-
 def summarize_portfolio_coverages(
     policies: list[PolicyInput],
     death_benefit_context: DeathBenefitGuideInput | None = None,
@@ -246,7 +224,7 @@ def summarize_portfolio_coverages(
             if payment_basis == "unknown":
                 excluded.append(_excluded(policy, coverage, _UNCONFIRMED_PAYMENT_REASON))
                 continue
-            amount = _parse_amount(coverage)
+            amount = parse_amount(coverage)
             if amount is None:
                 excluded.append(_excluded(policy, coverage, _UNCONFIRMED_AMOUNT_REASON))
                 continue
