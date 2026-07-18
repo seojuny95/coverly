@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from datetime import datetime
 
-from app.modules.policy.pipeline import PipelineResult
+from app.modules.policy.pipeline import PipelineResult, policy_sensitive_values
 from app.modules.portfolio.schemas import PolicyInput
 from app.rag.policy.pii import mask_policy_pii
 from app.rag.policy.session_tokens import (
@@ -28,6 +28,7 @@ def rag_session_id_from_result(
 
 def policy_for_storage(result: PipelineResult, *, document_id: str) -> PolicyInput:
     info = result["기본정보"]
+    sensitive_values = policy_sensitive_values(info)
     safe_info = {
         key: info[key]
         for key in (
@@ -47,14 +48,25 @@ def policy_for_storage(result: PipelineResult, *, document_id: str) -> PolicyInp
         {
             "id": document_id,
             "기본정보": safe_info,
-            "보장목록": [_masked_coverage(item) for item in result["보장목록"]],
+            "보장목록": [
+                _masked_coverage(item, sensitive_values=sensitive_values)
+                for item in result["보장목록"]
+            ],
             "분석상태": result.get("분석상태"),
         }
     )
 
 
-def _masked_coverage(coverage: Mapping[str, object]) -> dict[str, object]:
+def _masked_coverage(
+    coverage: Mapping[str, object],
+    *,
+    sensitive_values: tuple[str, ...],
+) -> dict[str, object]:
     return {
-        key: mask_policy_pii(value) if isinstance(value, str) else value
+        key: (
+            mask_policy_pii(value, sensitive_values=sensitive_values)
+            if isinstance(value, str)
+            else value
+        )
         for key, value in coverage.items()
     }

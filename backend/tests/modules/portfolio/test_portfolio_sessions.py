@@ -170,15 +170,15 @@ def test_session_stores_only_qa_safe_policy_facts_and_selects_documents() -> Non
             "상품명": "건강보험",
             "증권번호": "SECRET-CONTRACT-NUMBER",
             "계약자": "홍길동",
-            "피보험자": "홍길동",
+            "피보험자": "김보험",
             "피보험자정보": {"나이": 31, "성별": "남성", "생애단계": "성인"},
         },
         "보장목록": [
             {
                 "담보명": "암진단비",
                 "가입금액": "3,000만원",
-                "보장내용": "암으로 진단 확정된 경우 010-1234-5678",
-                "해설": None,
+                "보장내용": "김보험님이 암으로 진단 확정된 경우 010-1234-5678",
+                "해설": "계약자 홍길동에게 안내",
             }
         ],
         "분석상태": "완료",
@@ -196,7 +196,10 @@ def test_session_stores_only_qa_safe_policy_facts_and_selects_documents() -> Non
     assert len(snapshot.policies) == 1
     stored = snapshot.policies[0].model_dump(mode="json")
     assert stored["기본정보"]["보험사"] == "보험사A"
-    assert stored["보장목록"][0]["보장내용"] == "암으로 진단 확정된 경우 [전화번호]"
+    assert stored["보장목록"][0]["보장내용"] == (
+        "[개인정보]님이 암으로 진단 확정된 경우 [전화번호]"
+    )
+    assert stored["보장목록"][0]["해설"] == "계약자 [개인정보]에게 안내"
     assert "증권번호" not in stored["기본정보"]
     assert "계약자" not in stored["기본정보"]
     assert "피보험자" not in stored["기본정보"]

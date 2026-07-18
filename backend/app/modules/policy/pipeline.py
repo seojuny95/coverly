@@ -56,7 +56,7 @@ def run_pipeline(
     }
     try:
         session_id = (
-            index_policy_document(doc, sensitive_values=_sensitive_values(summary))
+            index_policy_document(doc, sensitive_values=policy_sensitive_values(summary))
             if index is index_policy_document
             else index(doc)
         )
@@ -67,7 +67,7 @@ def run_pipeline(
     return result
 
 
-def _sensitive_values(summary: PolicySummary) -> tuple[str, ...]:
+def policy_sensitive_values(summary: PolicySummary) -> tuple[str, ...]:
     values = [
         summary.get("증권번호"),
         summary.get("계약자"),
