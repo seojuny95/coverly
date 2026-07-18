@@ -234,6 +234,104 @@
       "must_not_include": ["아마", "직접 확인할 수는 없어요"]
     },
     {
+      "id": "capabilities_no_tool",
+      "question": "너한테 어떤 걸 물어보면 제일 잘 답해?",
+      "profile": "general_guidance",
+      "expected_route": "agent_no_tool",
+      "expected_status": "answered",
+      "must_include_groups": [["보험증권"], ["담보"], ["청구"]],
+      "required_evidence_terms": [],
+      "must_not_include": ["NH농협손해보험", "60,000,000원", "지급됩니다"],
+      "live": true
+    },
+    {
+      "id": "privacy_no_tool",
+      "question": "내 개인정보나 증권 내용은 답변할 때 어떻게 써?",
+      "profile": "general_guidance",
+      "expected_route": "agent_no_tool",
+      "expected_status": "answered",
+      "must_include_groups": [["개인정보"], ["보험증권", "증권"], ["필요한 범위", "근거"]],
+      "required_evidence_terms": [],
+      "must_not_include": ["NH농협손해보험", "흥국화재", "삼성화재"],
+      "live": true
+    },
+    {
+      "id": "why_terms_needed_no_tool",
+      "question": "왜 약관 없이는 보장된다고 딱 말하면 안 돼?",
+      "profile": "general_guidance",
+      "expected_route": "agent_no_tool",
+      "expected_status": "answered",
+      "must_include_groups": [["약관", "근거"], ["지급", "조건"]],
+      "required_evidence_terms": [],
+      "must_not_include": ["대장암이면 무조건", "지급됩니다"],
+      "live": true
+    },
+    {
+      "id": "beginner_overlap_paraphrase",
+      "question": "보험 잘 몰라서 그런데, 비슷하게 겹쳐 보이는 보장만 쉬운 말로 골라줘",
+      "profile": "consultation",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["암진단비"], ["뇌혈관질환진단비", "허혈성심질환진단비"], ["정액"]],
+      "required_evidence_terms": ["같은 담보명 확인"],
+      "must_not_include": ["겹치는 보장이 없", "해지하세요"],
+      "live": true
+    },
+    {
+      "id": "medical_indemnity_beginner_paraphrase",
+      "question": "병원비 돌려받는 실비 같은 보험도 내가 갖고 있어?",
+      "profile": "portfolio_fact",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["실손", "실비"], ["삼성화재"]],
+      "required_evidence_terms": ["실손의료비"],
+      "live": true
+    },
+    {
+      "id": "claim_documents_beginner",
+      "question": "보험금 청구하려면 보통 어디서 시작하면 돼? 서류도 같이 알려줘",
+      "profile": "claim",
+      "expected_route": "fast",
+      "expected_status": "answered",
+      "must_include_groups": [["청구"], ["삼성화재", "DB손해보험", "실손24"]],
+      "required_evidence_terms": [],
+      "must_not_include": ["무조건 지급"]
+    },
+    {
+      "id": "specific_unknown_policy_terms",
+      "question": "중대한화상및부식치료비는 어떤 경우에 돈이 나오는 특약이야?",
+      "profile": "policy_terms",
+      "expected_route": "agent",
+      "expected_status": "no_data",
+      "must_include_groups": [["약관", "원문"], ["확인"]],
+      "required_evidence_terms": [],
+      "must_not_include": ["무조건", "지급됩니다"]
+    },
+    {
+      "id": "mixed_scope_and_insurance",
+      "question": "암진단비 합계 알려주고, 오늘 날씨도 알려줘",
+      "profile": "mixed_scope",
+      "expected_route": "planned",
+      "expected_status": "answered",
+      "must_include_groups": [["60,000,000원"], ["보험과 관련 없는", "답변하기 어려워요"]],
+      "required_evidence_terms": ["암진단비"],
+      "must_not_include": ["맑음", "비가"]
+    },
+    {
+      "id": "reference_follow_up_overlap",
+      "question": "그럼 그 겹치는 것들은 다 나쁜 거야?",
+      "history": [
+        {"role": "user", "content": "겹치는 보장이 있는지 봐줘"},
+        {"role": "assistant", "content": "암진단비와 뇌혈관질환진단비 같은 정액형 중복이 확인돼요."}
+      ],
+      "profile": "consultation",
+      "expected_route": "agent",
+      "expected_status": "answered",
+      "must_include_groups": [["정액"], ["나쁘", "불필요", "조건"]],
+      "required_evidence_terms": ["같은 담보명 확인"],
+      "must_not_include": ["해지하세요", "무조건 나쁜"]
+    },
+    {
       "id": "greeting",
       "question": "안녕하세요",
       "profile": "conversation",

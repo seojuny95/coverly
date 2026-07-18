@@ -78,6 +78,16 @@ def consultation_evidence(context: QaContext) -> tuple[ConsultationEvidence, ...
     return evidence
 
 
+def portfolio_snapshot_evidence(
+    context: QaContext,
+    *,
+    max_items: int = 24,
+) -> tuple[ConsultationEvidence, ...]:
+    """Return a bounded portfolio snapshot for agent-led consultation fallback."""
+
+    return context.catalog.items[:max_items]
+
+
 def response_evidence(
     context: QaContext,
     response: PortfolioQuestionResponse,

@@ -13,7 +13,7 @@ from app.modules.qa.agent_contracts import (
     QaAgentDependencies,
     QaAgentUnavailable,
 )
-from app.modules.qa.agent_evidence import consultation_evidence
+from app.modules.qa.agent_evidence import consultation_evidence, portfolio_snapshot_evidence
 from app.modules.qa.agent_tools import web_search_response
 from app.modules.qa.agent_validation import validated_agent_response
 from app.modules.qa.context import QaContext, build_qa_context
@@ -209,6 +209,11 @@ class _AssertingAllPolicyAgent:
             limitations=[],
             suggestions=[],
         )
+
+
+class _FailingAgent:
+    def run(self, context: QaContext) -> PortfolioQuestionResponse:
+        raise AssertionError(f"agent should not run for {context.question!r}")
 
 
 def _official_answer(question: str) -> RagAnswer:
@@ -757,6 +762,22 @@ def test_consultation_does_not_expose_portfolio_to_unrelated_fact_question() -> 
     assert consultation_evidence(context) == ()
 
 
+def test_portfolio_snapshot_exposes_bounded_agent_fallback_evidence() -> None:
+    context = build_qa_context(
+        "보험 잘 몰라서 그런데, 비슷하게 겹쳐 보이는 보장만 쉬운 말로 골라줘",
+        _alias_policies(),
+        None,
+        [],
+    )
+
+    assert consultation_evidence(context) == ()
+
+    evidence = portfolio_snapshot_evidence(context)
+
+    assert len(evidence) <= 24
+    assert any("같은 담보명 확인" in item.fact for item in evidence)
+
+
 def test_agent_consultation_rejects_answer_without_selected_evidence() -> None:
     context = build_qa_context("하준이법이 뭐야?", _policies(), None, [])
     dependencies = QaAgentDependencies(
@@ -860,6 +881,131 @@ def test_agent_requires_web_tool_for_latest_official_information() -> None:
     assert result.status == "no_data"
     assert result.citations == []
     assert "공식 웹사이트 검색 근거" in result.answer
+
+
+def test_agent_recovers_single_web_result_when_selected_id_is_missing() -> None:
+    context = build_qa_context("요즘 보험업법 최신 개정 알려줘", [], None, [])
+    web_response = PortfolioQuestionResponse(
+        status="answered",
+        answer="공식 웹검색 결과로 확인한 최신 안내입니다.",
+        citations=[
+            AnswerCitation(
+                policy_id=None,
+                insurer=None,
+                product_name=None,
+                source_id="web:1",
+            )
+        ],
+        limitations=[],
+    )
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    dependencies.register("web", web_response)
+
+    result = validated_agent_response(
+        context,
+        AgentCounselorDraft(answer_mode="tool_grounded", answer=web_response.answer),
+        dependencies,
+    )
+
+    assert result.status == "answered"
+    assert result.answer == web_response.answer
+    assert result.citations == web_response.citations
+
+
+def test_agent_general_guidance_cannot_bypass_required_web_search() -> None:
+    context = build_qa_context("요즘 보험업법 최신 개정 알려줘", [], None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    result = validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            answer_mode="general_guidance",
+            answer="최신 법령은 공식 자료 근거가 필요해서 확인 없이 단정하지 않습니다.",
+        ),
+        dependencies,
+    )
+
+    assert result.status == "no_data"
+    assert result.citations == []
+    assert result.generation == "fallback"
+    assert "공식 웹사이트 검색 근거" in result.answer
+
+
+def test_agent_may_answer_general_guidance_without_tool_result() -> None:
+    context = build_qa_context("너는 어떤 질문에 답할 수 있어?", _policies(), None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    result = validated_agent_response(
+        context,
+        AgentCounselorDraft(
+            answer_mode="general_guidance",
+            answer=(
+                "저는 올려주신 보험증권을 기준으로 가입한 보험, 담보, 가입금액, "
+                "겹치는 보장, 청구 방법을 함께 확인해드릴 수 있어요."
+            ),
+        ),
+        dependencies,
+    )
+
+    assert result.status == "answered"
+    assert result.generation == "llm"
+    assert result.citations == []
+    assert "일반 안내" in result.limitations[0]
+
+
+def test_agent_general_guidance_cannot_mention_uploaded_policy_identity() -> None:
+    context = build_qa_context("너는 어떤 질문에 답할 수 있어?", _policies(), None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    with raises(QaAgentUnavailable):
+        validated_agent_response(
+            context,
+            AgentCounselorDraft(
+                answer_mode="general_guidance",
+                answer="테스트보험 건강보험은 암진단비가 있어요.",
+            ),
+            dependencies,
+        )
+
+
+def test_agent_general_guidance_cannot_mention_held_coverage_name() -> None:
+    context = build_qa_context("너는 어떤 질문에 답할 수 있어?", _policies(), None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    with raises(QaAgentUnavailable):
+        validated_agent_response(
+            context,
+            AgentCounselorDraft(
+                answer_mode="general_guidance",
+                answer="암진단비 같은 보유 담보를 기준으로 답할 수 있어요.",
+            ),
+            dependencies,
+        )
 
 
 def _health_plus_auto() -> list[PolicyInput]:
@@ -1471,6 +1617,7 @@ def test_qa_scope_only_plan_skips_portfolio_context(monkeypatch: MonkeyPatch) ->
     result = portfolio_qa.answer_portfolio_question(
         "오늘 날씨 알려줘",
         _policies(),
+        agent_runner=_FailingAgent(),
         plan=lambda _system, _user: {
             "questions": [
                 {

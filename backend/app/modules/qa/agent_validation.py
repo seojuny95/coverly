@@ -24,6 +24,11 @@ def validated_agent_response(
     draft: AgentCounselorDraft,
     dependencies: QaAgentDependencies,
 ) -> PortfolioQuestionResponse:
+    if draft.answer_mode == "general_guidance" and requires_official_web(context.question):
+        return _missing_required_web_response(context)
+    if draft.answer_mode == "general_guidance":
+        return _validated_general_guidance_response(context, draft)
+
     selected = _select_tool_result(context, draft, dependencies)
     if selected is None and requires_official_web(context.question):
         return _missing_required_web_response(context)
@@ -116,7 +121,11 @@ def _select_tool_result(
     draft: AgentCounselorDraft,
     dependencies: QaAgentDependencies,
 ) -> RegisteredToolResult | None:
-    selected = dependencies.tool_results.get(draft.selected_result_id)
+    selected = (
+        dependencies.tool_results.get(draft.selected_result_id)
+        if draft.selected_result_id is not None
+        else None
+    )
     if requires_official_web(context.question):
         if selected is not None and selected.kind == "web":
             return selected
@@ -147,6 +156,49 @@ _OFFICIAL_WEB_TOPIC_TERMS = (
     "보험 용어",
     "공식 안내",
 )
+
+
+def _validated_general_guidance_response(
+    context: QaContext,
+    draft: AgentCounselorDraft,
+) -> PortfolioQuestionResponse:
+    answer = draft.answer.strip()
+    if draft.selected_result_id is not None or draft.evidence_ids:
+        raise QaAgentUnavailable("General guidance must not cite tool results or evidence")
+    if not is_safe_analysis_text(answer, allow_official_claims=False):
+        raise QaAgentUnavailable("General guidance failed safety validation")
+    if _NUMERIC_CLAIM.search(answer):
+        raise QaAgentUnavailable("General guidance introduced a numeric portfolio claim")
+    if _mentions_uploaded_policy_identity(answer, context):
+        raise QaAgentUnavailable("General guidance mentioned uploaded-policy identities")
+
+    return with_demographics(
+        PortfolioQuestionResponse(
+            status="answered",
+            answer=answer,
+            citations=[],
+            limitations=["업로드 증권의 구체 사실을 조회하지 않은 일반 안내입니다."],
+            suggestions=contextual_suggestions(context),
+            generation="llm",
+        ),
+        context.insured,
+    )
+
+
+def _mentions_uploaded_policy_identity(answer: str, context: QaContext) -> bool:
+    identities: set[str] = set()
+    for policy in context.policies:
+        identities.update(
+            value
+            for value in (
+                policy.id,
+                policy.기본정보.보험사,
+                policy.기본정보.상품명,
+                *(coverage.담보명 for coverage in policy.보장목록),
+            )
+            if value and len(value.strip()) >= 2
+        )
+    return any(identity in answer for identity in identities)
 
 
 def _numeric_claims_are_grounded(

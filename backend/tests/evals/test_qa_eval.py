@@ -8,10 +8,12 @@ def test_qa_eval_dataset_has_beginner_and_product_scenarios() -> None:
     assert {case.profile for case in cases} >= {
         "portfolio_fact",
         "consultation",
+        "general_guidance",
         "term",
         "policy_terms",
         "fresh_information",
     }
+    assert any(case.expected_route == "agent_no_tool" for case in cases)
 
 
 def test_qa_baseline_eval_runs_without_live_model() -> None:

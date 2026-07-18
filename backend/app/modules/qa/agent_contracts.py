@@ -1,7 +1,7 @@
 """Shared contracts for the QA Agent SDK integration."""
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -51,7 +51,8 @@ class GroundedToolAnswer(BaseModel):
 
 
 class AgentCounselorDraft(BaseModel):
-    selected_result_id: str
+    answer_mode: Literal["tool_grounded", "general_guidance"] = "tool_grounded"
+    selected_result_id: str | None = None
     answer: str = Field(min_length=1, max_length=4_000)
     evidence_ids: list[str] = Field(default_factory=list, max_length=8)
 

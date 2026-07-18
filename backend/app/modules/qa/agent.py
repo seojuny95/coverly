@@ -58,11 +58,13 @@ def build_qa_agent_runner(
     complete: JsonCompleter | None = None,
     official_answer: OfficialAnswerer | None = None,
     web_search: OfficialWebSearcher = default_official_web_search,
+    model: str | None = None,
 ) -> QaAgentRunner:
     return OpenAiQaAgentRunner(
         complete=complete,
         official_answer=official_answer,
         web_search=web_search,
+        model=model,
     )
 
 
@@ -75,10 +77,12 @@ class OpenAiQaAgentRunner:
         complete: JsonCompleter | None = None,
         official_answer: OfficialAnswerer | None = None,
         web_search: OfficialWebSearcher = default_official_web_search,
+        model: str | None = None,
     ) -> None:
         self._complete = complete
         self._official_answer = official_answer
         self._web_search = web_search
+        self._model = model
 
     def run(self, context: QaContext) -> PortfolioQuestionResponse:
         settings = get_settings()
@@ -88,7 +92,7 @@ class OpenAiQaAgentRunner:
         dependencies = self._dependencies(context)
         result = Runner.run_sync(
             _agent(
-                settings.openai_model,
+                self._model or settings.openai_model,
                 required_first_tool=required_first_tool(context),
             ),
             input=build_agent_input(context),
@@ -113,7 +117,13 @@ class OpenAiQaAgentRunner:
         queue: Queue[_QueuedAgentStreamItem] = Queue()
         worker = Thread(
             target=_run_streamed_worker,
-            args=(context, dependencies, settings.openai_model, settings.openai_api_key, queue),
+            args=(
+                context,
+                dependencies,
+                self._model or settings.openai_model,
+                settings.openai_api_key,
+                queue,
+            ),
             daemon=True,
         )
         worker.start()
@@ -300,7 +310,9 @@ def build_agent_input(context: QaContext) -> str:
         "그래도 matched=false이면 사용자 증권의 비교·분석·상담은 "
         "answer_from_portfolio_consultation을 호출하세요. "
         "법, 제도, 보험 용어처럼 증권 밖의 사실을 묻는 질문은 search_official_web을 호출하세요. "
-        "반드시 matched=true인 도구 결과 하나의 result_id를 선택해 최종 출력에 넣으세요."
+        "Coverly 사용법, 답변 범위, 개인정보 처리 방식, 왜 근거가 필요한지처럼 업로드 증권의 "
+        "구체 사실이 필요 없는 질문은 answer_mode=general_guidance로 도구 없이 답할 수 있습니다. "
+        "그 외에는 반드시 matched=true인 도구 결과 하나의 result_id를 선택해 최종 출력에 넣으세요."
     )
     return mask_demographic_identifiers(prompt)
 
@@ -318,10 +330,17 @@ def _agent_instructions() -> str:
 - 웹검색 결과만으로 사용자의 실제 가입 약관 보장 여부를 확정하지 않습니다.
 - 질문 의도 판단은 당신이 하고, 가입 목록·담보 검색·금액 합산·중복 확인·청구 채널·약관 조회는
   반드시 도구 결과로 확인합니다.
+- 사용법, 상담 범위, 개인정보 처리 방식, 근거가 필요한 이유처럼 사용자의 보험 사실을 조회할
+  필요가 없는 질문은 answer_mode=general_guidance로 짧게 답할 수 있습니다.
+- general_guidance 답변에서는 보험사명, 상품명, 가입금액, 보유 담보, 지급 가능성, 최신 법령
+  사실을 말하지 않습니다.
 
 응답:
 - AgentCounselorDraft JSON 스키마로만 답하세요.
-- selected_result_id에는 실제로 호출해 받은 matched=true 결과의 result_id만 넣으세요.
+- 도구를 쓴 답변은 answer_mode=tool_grounded로 두고, selected_result_id에는 실제로 호출해 받은
+  matched=true 결과의 result_id만 넣으세요.
+- 도구 없이 답하는 일반 안내는 answer_mode=general_guidance로 두고 selected_result_id와
+  evidence_ids를 비워 두세요.
 - 도구 응답과 evidence를 재료로 사용해 최종 answer를 직접 작성하세요.
 - 질문에 먼저 답하고, 필요한 설명만 이어가세요. 근거 목록을 그대로 복사하거나 전부 나열하지 마세요.
 - 기본 답변은 짧은 문단 두세 개로 끝내고, 사용자가 묻지 않은 항목까지 완전 탐색해 나열하지 마세요.
