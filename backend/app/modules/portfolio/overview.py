@@ -6,7 +6,6 @@ from typing import Literal, cast
 from pydantic import BaseModel, Field
 
 from app.integrations.openai.client import JsonCompleter, dump_prompt_json, structured_completer
-from app.modules.consultation.safety import is_safe_neutral_analysis_text
 from app.modules.portfolio.schemas import (
     EssentialCoverageItem,
     PortfolioCoverageSummary,
@@ -22,9 +21,39 @@ class SummaryOverviewUnavailableError(RuntimeError):
     """Raised when the required LLM overview cannot be generated safely."""
 
 
+type _OverviewTitle = Literal[
+    "업로드한 증권의 확인 항목을 정리했어요",
+    "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
+    "보험료와 보장 조건을 차례로 확인해요",
+]
+type _OverviewParagraph = Literal[
+    "업로드한 증권에서 읽은 내용을 보험료, 보장 구성, 다음 확인 항목으로 나눠 정리했어요.",
+    "이 총평은 업로드한 자료에서 확인한 내용을 바탕으로 한 1차 정리예요.",
+    "월 보험료는 담보 구성과 갱신 여부, 납입 기간을 함께 확인해야 해요.",
+    "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요.",
+    "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요.",
+]
+
+_BASE_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "업로드한 증권에서 읽은 내용을 보험료, 보장 구성, 다음 확인 항목으로 나눠 정리했어요."
+)
+_LIMITATION_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "이 총평은 업로드한 자료에서 확인한 내용을 바탕으로 한 1차 정리예요."
+)
+_PREMIUM_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "월 보험료는 담보 구성과 갱신 여부, 납입 기간을 함께 확인해야 해요."
+)
+_MISSING_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요."
+)
+_OVERLAP_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요."
+)
+
+
 class _LlmOverviewDraft(BaseModel):
-    title: str = Field(max_length=80)
-    paragraphs: list[str] = Field(min_length=2, max_length=3)
+    title: _OverviewTitle
+    paragraphs: list[_OverviewParagraph] = Field(min_length=2, max_length=3)
 
 
 def attach_summary_overview(
@@ -50,27 +79,23 @@ def generate_summary_overview(
     try:
         raw = (complete or structured_completer(_LlmOverviewDraft))(
             _system_prompt(),
-            _user_prompt(judgments),
+            _user_prompt(_overview_prompt_facts(summary)),
         )
         draft = _LlmOverviewDraft.model_validate(raw)
     except Exception:
         logger.exception("portfolio_overview_generation_failed")
         return None
 
-    title = draft.title.strip()
-    paragraphs = [
-        paragraph.strip()
-        for paragraph in draft.paragraphs
-        if is_safe_neutral_analysis_text(paragraph)
-    ][:3]
-    if not title or not is_safe_neutral_analysis_text(title) or len(paragraphs) < 2:
+    allowed_paragraphs = _allowed_overview_paragraphs(summary)
+    paragraphs = list(dict.fromkeys(draft.paragraphs))
+    if len(paragraphs) < 2 or any(paragraph not in allowed_paragraphs for paragraph in paragraphs):
         return None
 
     takeaways = cast(list[dict[str, str]], judgments["takeaways"])
     return PortfolioOverview(
         generation="llm",
-        title=title,
-        paragraphs=paragraphs,
+        title=draft.title,
+        paragraphs=[str(paragraph) for paragraph in paragraphs],
         takeaways=[PortfolioOverviewTakeaway.model_validate(takeaway) for takeaway in takeaways],
     )
 
@@ -122,6 +147,47 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
             "현재 자료에서 찾지 못한 항목은 미가입 단정이 아니라 추가 확인 대상",
         ],
     }
+
+
+def _overview_prompt_facts(summary: PortfolioCoverageSummary) -> dict[str, object]:
+    """Expose facts needed for sentence selection without adequacy comparisons."""
+
+    items = summary.essential_coverage_check.items
+    missing = [item for item in items if item.status == "not_found"]
+    review = [item for item in items if item.status == "needs_review"]
+    return {
+        "monthly_premium_confirmed": bool(
+            summary.premium is not None and summary.premium.monthly_policy_count > 0
+        ),
+        "confirmed_in_uploaded_documents": [
+            item.label for item in items if item.status != "not_found"
+        ],
+        "not_confirmed_in_current_materials": [item.label for item in missing],
+        "needs_terms_review": [item.label for item in review],
+        "has_overlapping_actual_loss_names": bool(duplicate_actual_loss_coverage_names(summary)),
+        "limitations": [
+            "업로드한 자료에서 확인한 내용만 사용",
+            "현재 자료에서 확인되지 않은 항목을 실제 미가입으로 단정하지 않음",
+        ],
+    }
+
+
+def _allowed_overview_paragraphs(
+    summary: PortfolioCoverageSummary,
+) -> set[_OverviewParagraph]:
+    allowed: set[_OverviewParagraph] = {
+        _BASE_OVERVIEW_PARAGRAPH,
+        _LIMITATION_OVERVIEW_PARAGRAPH,
+    }
+    if summary.premium is not None and summary.premium.monthly_policy_count > 0:
+        allowed.add(_PREMIUM_OVERVIEW_PARAGRAPH)
+    if any(item.status == "not_found" for item in summary.essential_coverage_check.items):
+        allowed.add(_MISSING_OVERVIEW_PARAGRAPH)
+    if duplicate_actual_loss_coverage_names(summary) or any(
+        item.status == "needs_review" for item in summary.essential_coverage_check.items
+    ):
+        allowed.add(_OVERLAP_OVERVIEW_PARAGRAPH)
+    return allowed
 
 
 def _premium_judgment(
@@ -272,8 +338,8 @@ def _system_prompt() -> str:
 
 해야 할 것:
 - 입력 JSON의 판단값만 사용한다.
-- 보험료 판단, 보장 구성, 다음 확인 내용을 자연스러운 한국어로 연결한다.
-- 보험료는 금액 단독으로 좋다/나쁘다 판단하지 말고 premium.guidance와 보장 확인 상태를 함께 따른다.
+- 출력 스키마에 허용된 문장 중 입력 사실과 관련된 문장만 고른다.
+- 보험료 확인 여부, 보장 확인 상태, 다음 확인 내용을 연결한다.
 - 사용자가 올린 자료의 한계를 분명히 말한다.
 - 해요체로 쓴다.
 
@@ -291,10 +357,10 @@ def _system_prompt() -> str:
 """
 
 
-def _user_prompt(judgments: dict[str, object]) -> str:
+def _user_prompt(facts: dict[str, object]) -> str:
     return dump_prompt_json(
         {
-            "task": "아래 결정적 판단값을 바탕으로 전체 보험 총평의 제목과 문단을 작성하세요.",
-            "judgments": judgments,
+            "task": "아래 확인 사실에 맞는 제목과 문단을 허용된 선택지에서 고르세요.",
+            "facts": facts,
         }
     )

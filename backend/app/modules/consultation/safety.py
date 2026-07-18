@@ -30,24 +30,6 @@ _ADEQUACY_TERMS = (
     "필수",
     "무조건",
 )
-_NEUTRAL_ANALYSIS_TERMS = _ADEQUACY_TERMS + (
-    "과다",
-    "과소",
-    "과도",
-    "과한",
-    "적절",
-    "알맞",
-    "높",
-    "낮",
-    "많아",
-    "많은",
-    "많습니다",
-    "적어",
-    "적은",
-    "적습니다",
-    "좋",
-    "나쁘",
-)
 # Sales pushes that _DIRECT_ACTION_TERMS misses but are never acceptable — kept
 # separate from adequacy words that grounded analysis may use in other contexts.
 _SALES_PUSH_TERMS = (
@@ -185,15 +167,6 @@ def is_safe_analysis_text(text: str, *, allow_official_claims: bool = False) -> 
     if any(term in compact for term in _SALES_PUSH_TERMS):
         return False
     return not any(term in cleaned for term in _DIRECT_ACTION_TERMS)
-
-
-def is_safe_neutral_analysis_text(text: str) -> bool:
-    """Allow grounded analysis only when it avoids adequacy or value judgments."""
-
-    cleaned = text.strip()
-    return is_safe_analysis_text(cleaned) and not any(
-        term in cleaned for term in _NEUTRAL_ANALYSIS_TERMS
-    )
 
 
 def filter_safe_unique_texts(
