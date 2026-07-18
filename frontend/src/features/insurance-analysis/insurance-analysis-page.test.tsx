@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -617,10 +623,12 @@ describe("InsuranceAnalysisPage", () => {
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "분석에 추가하기" }));
 
-    expect(uploadInsurance).toHaveBeenCalledWith(
-      { file: insuranceFile },
-      expect.anything(),
-    );
+    await waitFor(() => {
+      expect(uploadInsurance).toHaveBeenCalledWith(
+        { file: insuranceFile },
+        expect.anything(),
+      );
+    });
     expect(
       await screen.findByText(
         "테스트고객님의 보험을 4가지 종류로 보기 쉽게 정리했어요.",
