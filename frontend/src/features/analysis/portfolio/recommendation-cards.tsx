@@ -95,7 +95,7 @@ export function RecommendedInsuranceCards({
 
       <div className="mt-4 space-y-4">
         <RecommendedSingleCoverageCard
-          eyebrow="사망 대비"
+          categoryLabel="사망 대비"
           item={death}
           copy={RECOMMENDED_INSURANCE_COPY.death}
           deathBenefitContext={deathBenefitContext}
@@ -115,14 +115,14 @@ export function RecommendedInsuranceCards({
 }
 
 function RecommendedSingleCoverageCard({
-  eyebrow,
+  categoryLabel,
   item,
   copy,
   deathBenefitContext,
   onDeathBenefitContextChange,
   isRefreshing,
 }: {
-  eyebrow: string;
+  categoryLabel: string;
   item: EssentialCoverageItem | undefined;
   copy: typeof RECOMMENDED_INSURANCE_COPY.death;
   deathBenefitContext: DeathBenefitGuideInput;
@@ -153,7 +153,7 @@ function RecommendedSingleCoverageCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
           <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
-            {eyebrow}
+            {categoryLabel}
           </p>
           <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
             {copy.title}
