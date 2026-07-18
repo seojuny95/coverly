@@ -21,6 +21,11 @@ from app.integrations.openai import JsonCompleter
 from app.rag.official.answer import RagAnswer, RagAnswerStatus, answer_official_question
 from app.rag.official.loaders import load_official_chunks
 from app.rag.official.models import RagChunk, RetrievalHit
+from evals.rag.data import string_groups as _string_groups
+from evals.rag.data import string_tuple as _string_tuple
+from evals.rag.text import missing_term_groups as _missing_term_groups
+from evals.rag.text import normalize_whitespace as _normalize
+from evals.rag.text import present_terms as _present_terms
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "generation_dataset.json"
 
@@ -200,14 +205,6 @@ def _case_from_json(raw: dict[str, object], *, question: str, index: int) -> Gen
         profile=_generation_profile(raw["profile"]),
         difficulty=_generation_difficulty(raw["difficulty"]),
     )
-
-
-def _string_tuple(value: object) -> tuple[str, ...]:
-    return tuple(str(item) for item in cast(list[object], value))
-
-
-def _string_groups(value: object) -> tuple[tuple[str, ...], ...]:
-    return tuple(_string_tuple(group) for group in cast(list[object], value))
 
 
 def _generation_profile(value: object) -> GenerationProfile:
@@ -396,24 +393,6 @@ def _missing_terms(
     normalizer = normalize or _normalize
     normalized_actual_terms = tuple(normalizer(term) for term in actual_terms)
     return tuple(term for term in terms if normalizer(term) not in normalized_actual_terms)
-
-
-def _missing_term_groups(groups: tuple[tuple[str, ...], ...], text: str) -> tuple[str, ...]:
-    normalized = _normalize(text)
-    return tuple(
-        " / ".join(group)
-        for group in groups
-        if not any(_normalize(term) in normalized for term in group)
-    )
-
-
-def _present_terms(terms: tuple[str, ...], text: str) -> tuple[str, ...]:
-    normalized = _normalize(text)
-    return tuple(term for term in terms if _normalize(term) in normalized)
-
-
-def _normalize(text: str) -> str:
-    return " ".join(text.split())
 
 
 def _normalize_missing_context_term(text: str) -> str:

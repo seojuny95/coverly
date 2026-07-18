@@ -5,17 +5,20 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from collections.abc import Callable
 
 from app.integrations.postgres.policy_rag_store import shared_policy_store
 from app.rag.embeddings import Embedder, openai_embedder_from_settings
+from app.rag.lexical import tokenize as _tokens
 from app.rag.policy.models import PolicyRetrievalHit
 from app.rag.policy.session_tokens import verified_policy_session_ids
 from app.rag.policy.store import PolicyRagStore
+from app.rag.scoring import (
+    rank_positions as _rank_positions,
+)
+from app.rag.scoring import (
+    reciprocal_rank_fusion_score as _rrf_score,
+)
 from app.rag.text import normalize_text
-
-_TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]+")
-_RRF_K = 20
 
 
 def retrieve_policy_context(
@@ -122,19 +125,6 @@ def _rerank_with_rrf(query: str, hits: list[PolicyRetrievalHit]) -> list[PolicyR
     ]
 
 
-def _rank_positions(
-    hits: list[PolicyRetrievalHit],
-    *,
-    key: Callable[[PolicyRetrievalHit], tuple[float | int | str, ...]],
-) -> dict[str, int]:
-    ordered = sorted(hits, key=key)
-    return {hit.chunk.id: rank for rank, hit in enumerate(ordered, start=1)}
-
-
-def _rrf_score(*ranks: int, k: int = _RRF_K) -> float:
-    return sum(1 / (k + rank) for rank in ranks)
-
-
 def _bm25_scores(
     hits: list[PolicyRetrievalHit],
     terms: tuple[str, ...],
@@ -185,14 +175,6 @@ def _bm25_score(
     return score
 
 
-def _tokens(text: str) -> tuple[str, ...]:
-    tokens = [token.casefold() for token in _TOKEN_RE.findall(text) if token.strip()]
-    for token in tuple(tokens):
-        if any("가" <= char <= "힣" for char in token):
-            tokens.extend(_char_ngrams(token))
-    return tuple(dict.fromkeys(tokens))
-
-
 def _query_terms(query: str) -> tuple[str, ...]:
     return _tokens(" ".join((query, _query_expansions(query))))
 
@@ -241,14 +223,3 @@ def _amount_expansions(query: str) -> tuple[str, ...]:
         base = int(match.group(1)) * 10000
         expansions.extend(f"{amount:,}원" for amount in range(base, base + 10000, 1000))
     return tuple(expansions)
-
-
-def _char_ngrams(text: str) -> tuple[str, ...]:
-    if len(text) < 2:
-        return ()
-    ngrams: list[str] = []
-    for size in (2, 3, 4):
-        if len(text) < size:
-            continue
-        ngrams.extend(text[index : index + size] for index in range(len(text) - size + 1))
-    return tuple(ngrams)

@@ -15,6 +15,8 @@ from app.integrations.openai import JsonCompleter
 from app.modules.qa.contracts import ConsultationEvidence
 from app.rag.policy.generation import generate_policy_answer
 from app.rag.policy.retrieval import retrieve_policy_context
+from evals.rag.data import string_groups as _string_groups
+from evals.rag.data import string_tuple as _string_tuple
 from evals.rag.policy.retrieval import (
     EVAL_FIXTURE as RETRIEVAL_FIXTURE,
 )
@@ -374,14 +376,6 @@ def _expected_status(value: object) -> Literal["answered", "no_data"]:
     if status not in {"answered", "no_data"}:
         raise ValueError(f"unknown expected_status: {status}")
     return cast(Literal["answered", "no_data"], status)
-
-
-def _string_tuple(value: object) -> tuple[str, ...]:
-    return tuple(str(item) for item in cast(list[object], value))
-
-
-def _string_groups(value: object) -> tuple[tuple[str, ...], ...]:
-    return tuple(_string_tuple(group) for group in cast(list[object], value))
 
 
 def _normalize(text: str) -> str:

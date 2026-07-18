@@ -21,6 +21,7 @@ from app.rag.embeddings import HashingEmbedder
 from app.rag.official.loaders import load_official_chunks
 from app.rag.official.models import RagChunk, RetrievalHit, chunk_embedding_text
 from app.rag.official.retrieval import retrieve
+from evals.rag.data import string_tuple as _string_tuple
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "retrieval_dataset.json"
 EVAL_K = 5
@@ -253,10 +254,6 @@ def _ndcg(hit_chunk_ids: tuple[str, ...], relevant: set[str]) -> float:
     ideal_count = min(len(relevant), EVAL_K)
     ideal_dcg = sum(1 / math.log2(rank + 1) for rank in range(1, ideal_count + 1))
     return dcg / ideal_dcg
-
-
-def _string_tuple(value: object) -> tuple[str, ...]:
-    return tuple(str(item) for item in cast(list[object], value))
 
 
 def _accepted_evidence(value: object) -> tuple[AcceptedEvidence, ...]:

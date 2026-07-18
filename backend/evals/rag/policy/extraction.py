@@ -19,6 +19,8 @@ from app.modules.policy.models import ParsedDocument, Table
 from app.rag.embeddings import HashingEmbedder
 from app.rag.policy.indexing import build_policy_vector_records
 from app.rag.policy.models import PolicyContentType
+from evals.rag.data import string_groups as _string_groups
+from evals.rag.data import string_tuple as _string_tuple
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "extraction_dataset.json"
 
@@ -320,14 +322,6 @@ def _pii_tuple(value: object) -> tuple[PiiKind, ...]:
     if unknown:
         raise ValueError(f"unknown generated pii kinds: {unknown}")
     return cast(tuple[PiiKind, ...], kinds)
-
-
-def _string_tuple(value: object) -> tuple[str, ...]:
-    return tuple(str(item) for item in cast(list[object], value))
-
-
-def _string_groups(value: object) -> tuple[tuple[str, ...], ...]:
-    return tuple(_string_tuple(group) for group in cast(list[object], value))
 
 
 def _contains_all(actual: tuple[str, ...], expected: tuple[str, ...]) -> bool:

@@ -15,13 +15,12 @@ goes through pgvector — this module has no test-only defaults of its own.
 from __future__ import annotations
 
 import math
-import re
 from collections import Counter
-from collections.abc import Callable
 
 from app.core.config import get_settings
 from app.integrations.postgres.official_rag_store import shared_pgvector_store
 from app.rag.embeddings import Embedder, openai_embedder_from_settings
+from app.rag.lexical import tokenize as _tokens
 from app.rag.official.models import (
     QueryPlan,
     RagChunk,
@@ -30,9 +29,15 @@ from app.rag.official.models import (
     chunk_embedding_text,
 )
 from app.rag.official.store import OfficialRagStore
-
-_TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]+")
-_RRF_K = 20
+from app.rag.scoring import (
+    cosine_similarity as _cosine,
+)
+from app.rag.scoring import (
+    rank_positions as _rank_positions,
+)
+from app.rag.scoring import (
+    reciprocal_rank_fusion_score as _rrf_score,
+)
 
 
 def retrieve(
@@ -174,25 +179,6 @@ def _records_from_chunks(
     )
 
 
-def _tokens(text: str) -> tuple[str, ...]:
-    tokens = [token.casefold() for token in _TOKEN_RE.findall(text) if token.strip()]
-    for token in tuple(tokens):
-        if any("가" <= char <= "힣" for char in token):
-            tokens.extend(_char_ngrams(token))
-    return tuple(dict.fromkeys(tokens))
-
-
-def _char_ngrams(text: str) -> tuple[str, ...]:
-    if len(text) < 2:
-        return ()
-    ngrams: list[str] = []
-    for size in (2, 3, 4):
-        if len(text) < size:
-            continue
-        ngrams.extend(text[index : index + size] for index in range(len(text) - size + 1))
-    return tuple(ngrams)
-
-
 def _rerank_with_rrf(
     plan: QueryPlan, hits: list[RetrievalHit], *, top_k: int
 ) -> list[RetrievalHit]:
@@ -242,19 +228,6 @@ def _rerank_with_rrf(
         )
         for hit in ranked_hits[:top_k]
     ]
-
-
-def _rank_positions(
-    hits: list[RetrievalHit],
-    *,
-    key: Callable[[RetrievalHit], tuple[float | str | int, ...]],
-) -> dict[str, int]:
-    ordered = sorted(hits, key=key)
-    return {hit.chunk.id: rank for rank, hit in enumerate(ordered, start=1)}
-
-
-def _rrf_score(*ranks: int, k: int = _RRF_K) -> float:
-    return sum(1 / (k + rank) for rank in ranks)
 
 
 class _Bm25:
@@ -323,10 +296,6 @@ def _normalize_scores(scores: dict[str, float]) -> dict[str, float]:
 
     max_score = max(positive)
     return {key: max(value, 0.0) / max_score for key, value in scores.items()}
-
-
-def _cosine(left: tuple[float, ...], right: tuple[float, ...]) -> float:
-    return sum(a * b for a, b in zip(left, right, strict=True))
 
 
 __all__ = [
