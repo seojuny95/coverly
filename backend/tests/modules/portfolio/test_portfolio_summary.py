@@ -30,6 +30,12 @@ _SAFE_LIMITATION_PARAGRAPH = "이 총평은 업로드한 자료에서 확인한 
 _SAFE_MISSING_PARAGRAPH = (
     "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요."
 )
+_SAFE_TERMS_REVIEW_PARAGRAPH = (
+    "확인 범위가 제한된 담보는 실제 보장 범위와 약관 조건을 이어서 확인해보세요."
+)
+_SAFE_OVERLAP_PARAGRAPH = (
+    "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요."
+)
 
 
 def _policy(
@@ -159,6 +165,41 @@ def test_summary_overview_failure_is_not_replaced_with_deterministic_copy() -> N
 
     with pytest.raises(SummaryOverviewUnavailableError):
         attach_summary_overview(summary, fail)
+
+
+def test_summary_overview_keeps_limited_death_review_separate_from_overlap() -> None:
+    summary = summarize_portfolio_coverages(
+        [
+            _policy(
+                "p1",
+                "건강보험",
+                "보험사A",
+                [{"담보명": "상해사망·후유장해 (20-100%) / 보통약관", "가입금액": "1억원"}],
+            )
+        ]
+    )
+
+    def overlap_copy(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": "업로드한 증권의 확인 항목을 정리했어요",
+            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_OVERLAP_PARAGRAPH],
+        }
+
+    def terms_review_copy(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
+            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_TERMS_REVIEW_PARAGRAPH],
+        }
+
+    assert generate_summary_overview(summary, overlap_copy) is None
+
+    overview = generate_summary_overview(summary, terms_review_copy)
+
+    assert overview is not None
+    next_takeaway = overview.takeaways[2]
+    assert next_takeaway.title == "보장 범위 확인"
+    assert "약관 조건" in next_takeaway.detail
+    assert "중복" not in next_takeaway.title + next_takeaway.detail
 
 
 @pytest.mark.parametrize(

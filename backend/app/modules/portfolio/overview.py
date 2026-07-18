@@ -31,6 +31,7 @@ type _OverviewParagraph = Literal[
     "이 총평은 업로드한 자료에서 확인한 내용을 바탕으로 한 1차 정리예요.",
     "월 보험료는 담보 구성과 갱신 여부, 납입 기간을 함께 확인해야 해요.",
     "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요.",
+    "확인 범위가 제한된 담보는 실제 보장 범위와 약관 조건을 이어서 확인해보세요.",
     "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요.",
 ]
 
@@ -45,6 +46,9 @@ _PREMIUM_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
 )
 _MISSING_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
     "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요."
+)
+_TERMS_REVIEW_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "확인 범위가 제한된 담보는 실제 보장 범위와 약관 조건을 이어서 확인해보세요."
 )
 _OVERLAP_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
     "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요."
@@ -183,9 +187,9 @@ def _allowed_overview_paragraphs(
         allowed.add(_PREMIUM_OVERVIEW_PARAGRAPH)
     if any(item.status == "not_found" for item in summary.essential_coverage_check.items):
         allowed.add(_MISSING_OVERVIEW_PARAGRAPH)
-    if duplicate_actual_loss_coverage_names(summary) or any(
-        item.status == "needs_review" for item in summary.essential_coverage_check.items
-    ):
+    if any(item.status == "needs_review" for item in summary.essential_coverage_check.items):
+        allowed.add(_TERMS_REVIEW_OVERVIEW_PARAGRAPH)
+    if duplicate_actual_loss_coverage_names(summary):
         allowed.add(_OVERLAP_OVERVIEW_PARAGRAPH)
     return allowed
 
@@ -268,7 +272,9 @@ def _takeaways(
             "label": "다음 확인",
             "title": (
                 "중복 여부 확인"
-                if duplicate_actual_loss_names or review
+                if duplicate_actual_loss_names
+                else "보장 범위 확인"
+                if review
                 else "미확인 보장 확인"
                 if missing
                 else "약관 조건 확인"
@@ -305,7 +311,7 @@ def _next_detail(
         names = " · ".join(duplicate_actual_loss_names)
         return f"{names} 실손형 담보의 중복 보상 제한 여부를 약관에서 확인해요."
     if review:
-        return f"{_joined_labels(review)}의 중복 가입과 실제 보장 범위를 확인해요."
+        return f"{_joined_labels(review)}의 실제 보장 범위와 약관 조건을 확인해요."
     if missing:
         return "다른 증권, 특약명, 가입설계서에 빠진 보장이 있는지 봐요."
     return "면책, 감액, 갱신, 자기부담금 조건을 약관에서 확인해요."
