@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.rag.embeddings import HashingEmbedder, openai_embedder_from_settings
-from app.rag.official.chunking import build_chunks
+from app.rag.official.chunkers import build_chunks
 from app.rag.official.indexing import build_vector_records
 from app.rag.official.loaders import _load_law_xml_chunks, load_official_chunks
 from app.rag.official.models import RagChunk, RetrievalHit

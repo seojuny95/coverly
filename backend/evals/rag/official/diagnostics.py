@@ -45,14 +45,16 @@ class RetrievalDiagnosticResult:
 @dataclass(frozen=True)
 class RetrievalDiagnosticReport:
     total_chunks: int
+    candidate_k: int
+    final_k: int
     chunk_stats: tuple[ChunkLengthStats, ...]
     long_chunks: tuple[RagChunk, ...]
     results: tuple[RetrievalDiagnosticResult, ...]
 
     @property
-    def candidate_recall_at_24(self) -> float:
+    def candidate_recall(self) -> float:
         return _rate(
-            result.candidate_rank is not None and result.candidate_rank <= 24
+            result.candidate_rank is not None and result.candidate_rank <= self.candidate_k
             for result in self.results
         )
 
@@ -67,9 +69,10 @@ class RetrievalDiagnosticReport:
         )
 
     @property
-    def recall_at_5(self) -> float:
+    def final_recall(self) -> float:
         return _rate(
-            result.final_rank is not None and result.final_rank <= 5 for result in self.results
+            result.final_rank is not None and result.final_rank <= self.final_k
+            for result in self.results
         )
 
     @property
@@ -82,12 +85,16 @@ class RetrievalDiagnosticReport:
 def diagnose_retrieval(
     cases: tuple[RetrievalEvalCase, ...] | None = None,
     *,
+    candidate_k: int = 120,
+    final_k: int = 6,
     long_chunk_threshold: int = 3000,
 ) -> RetrievalDiagnosticReport:
     chunks = load_official_chunks()
     active_cases = cases or load_retrieval_eval_cases()
     return RetrievalDiagnosticReport(
         total_chunks=len(chunks),
+        candidate_k=candidate_k,
+        final_k=final_k,
         chunk_stats=_chunk_stats(chunks),
         long_chunks=tuple(
             sorted(
@@ -96,7 +103,10 @@ def diagnose_retrieval(
                 reverse=True,
             )
         ),
-        results=tuple(_diagnose_case(case, chunks) for case in active_cases),
+        results=tuple(
+            _diagnose_case(case, chunks, candidate_k=candidate_k, final_k=final_k)
+            for case in active_cases
+        ),
     )
 
 
@@ -122,10 +132,14 @@ def render_report(report: RetrievalDiagnosticReport) -> str:
         (
             "",
             "=== METRICS ===",
-            _metric_line("candidate_recall@24", report.candidate_recall_at_24, report.results),
+            _metric_line(
+                f"candidate_recall@{report.candidate_k}",
+                report.candidate_recall,
+                report.results,
+            ),
             _metric_line("recall@1", report.recall_at_1, report.results),
             _metric_line("recall@3", report.recall_at_3, report.results),
-            _metric_line("recall@5", report.recall_at_5, report.results),
+            _metric_line(f"recall@{report.final_k}", report.final_recall, report.results),
             _metric_line("visible_recall@5", report.visible_recall_at_5, report.results),
             "",
             "=== CASES ===",
@@ -161,21 +175,24 @@ def _chunk_stats(chunks: tuple[RagChunk, ...]) -> tuple[ChunkLengthStats, ...]:
 def _diagnose_case(
     case: RetrievalEvalCase,
     chunks: tuple[RagChunk, ...],
+    *,
+    candidate_k: int,
+    final_k: int,
 ) -> RetrievalDiagnosticResult:
     embedder = HashingEmbedder()
     candidate_hits = retrieve(
         case.query,
         chunks=chunks,
         embedder=embedder,
-        candidate_k=200,
-        final_k=200,
+        candidate_k=candidate_k,
+        final_k=candidate_k,
     )
     top_hits = retrieve(
         case.query,
         chunks=chunks,
         embedder=embedder,
-        candidate_k=24,
-        final_k=10,
+        candidate_k=candidate_k,
+        final_k=final_k,
     )
     return RetrievalDiagnosticResult(
         case_id=case.id,

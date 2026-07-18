@@ -46,7 +46,6 @@ __all__ = [
     "load_e2e_eval_cases",
     "load_generation_eval_cases",
     "load_retrieval_eval_cases",
-    "render_extraction_report",
     "render_report",
 ]
 
@@ -70,7 +69,6 @@ _EXPORT_MODULES = {
     "load_extraction_eval_cases": "evals.rag.official.extraction",
     "load_e2e_eval_cases": "evals.rag.official.e2e",
     "load_generation_eval_cases": "evals.rag.official.generation",
-    "render_extraction_report": "evals.rag.official.extraction",
     "load_retrieval_eval_cases": "evals.rag.official.retrieval",
     "render_report": "evals.rag.official.generation",
 }
