@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.modules.policy.life_stage import life_stage_for_age
+
 
 class CoverageInput(BaseModel):
     """Coverage fields accepted from the current and extended parse response."""
@@ -32,7 +34,7 @@ class PolicyInsuredDemographicsInput(BaseModel):
 
     @model_validator(mode="after")
     def validate_life_stage(self) -> "PolicyInsuredDemographicsInput":
-        expected = "어린이" if self.나이 < 19 else "시니어" if self.나이 >= 65 else "성인"
+        expected = life_stage_for_age(self.나이)
         if self.생애단계 != expected:
             raise ValueError("피보험자 생애단계가 나이와 일치하지 않습니다")
         return self
