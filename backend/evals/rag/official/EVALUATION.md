@@ -3,8 +3,9 @@
 이 문서는 Official RAG 평가를 어떻게 만들고 개선했는지 간단히 기록한다.
 목표는 공식자료 RAG를 `extraction → retrieval → generation`으로 나누어 보고, 어느 단계가 깨졌는지 빠르게 찾는 것이다.
 
-아직 e2e/router 평가는 포함하지 않는다.
-범위 밖 질문을 최종 답변에서 거절하는지는 이후 QA 기능이 안정된 뒤 별도 평가로 다룬다.
+RAG e2e 평가는 포함한다.
+다만 QA router/planner 평가는 포함하지 않는다.
+범위 밖 질문을 최종 QA 응답에서 거절하는지는 이후 QA 기능이 안정된 뒤 별도 평가로 다룬다.
 
 ## Extraction
 
@@ -91,6 +92,25 @@ Retrieval을 거치지 않으므로 실패하면 prompt, citation 처리, 답변
 - 모델이 근거 ID 대신 사람이 읽는 조문명을 반환해도 같은 selected context 안에서 안전하게 매핑한다.
 - 평가 matcher는 실제 근거와 답변에서 확인된 동의 표현만 추가한다.
 
+## RAG E2E
+
+RAG E2E는 official retrieval 결과를 그대로 official generation에 넣었을 때 최종 답변 계약이 지켜지는지 본다.
+QA router, planner, 사용자 업로드 증권은 거치지 않는다.
+
+### 평가셋 구성
+
+- 총 12개 시나리오, 질문 표현 2개씩 24개 케이스.
+- generation 평가셋에서 대표 시나리오를 선택한다.
+- 고지의무, 면책, 청약철회, 화재보험 계산, 대위권, 보험나이, 금융소비자보호, 상품명/의료리스크 정책을 포함한다.
+- 기본 실행은 OpenAI 호출 없이 deterministic extractive completer를 사용한다.
+- live LLM은 `--live-generation` 옵션으로 별도 확인한다.
+
+### 개선 기록
+
+| 단계 | 결과 | 개선 내용 |
+|---|---:|---|
+| RAG E2E v1 baseline | 13/24, pass_rate 0.542 | retrieval→generation 연결 평가를 추가했다. 실패는 필요한 chunk가 top-5에 없거나, 검색은 됐지만 추출형 답변이 필수 표현을 담지 못한 경우다. |
+
 ## 현재 상태 요약
 
 | 영역 | 최신 결과 | 상태 |
@@ -99,6 +119,7 @@ Retrieval을 거치지 않으므로 실패하면 prompt, citation 처리, 답변
 | Retrieval offline | 44/54, accepted 0.815 | 빠른 회귀 확인 가능 |
 | Retrieval production | 49/54, accepted 0.907 | 운영 index 기준 확인 완료 |
 | Generation | 60/60 | 고정 context 답변 계약 확인 가능 |
+| RAG E2E offline | 13/24, pass_rate 0.542 | retrieval→generation 연결 baseline 구축 |
 
 Official RAG의 component 평가는 v1 수준으로 구축되었다.
-남은 큰 작업은 QA 기능이 안정된 뒤 `router/e2e 평가`와 `blind holdout`을 추가하는 것이다.
+남은 큰 작업은 official E2E 실패 케이스를 retrieval 개선과 answer context 압축 개선으로 나눠 처리하고, QA 기능이 안정된 뒤 `router/e2e 평가`와 `blind holdout`을 추가하는 것이다.

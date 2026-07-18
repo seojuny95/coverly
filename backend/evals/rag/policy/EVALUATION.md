@@ -56,3 +56,22 @@ offline 실패의 대부분은 lexical completer의 한계다. 예를 들어 조
   - `2억원` ↔ `20,000만원`
 - retrieval은 후보 검색과 랭킹을 담당한다. 범위 밖 질문 거절이나 여러 계약 비교
   판단은 generation/e2e 또는 structured summary 결합에서 별도로 평가한다.
+
+## RAG E2E
+
+Policy RAG E2E는 업로드 증권 세션 corpus를 검색한 뒤, 검색 결과를 그대로 policy generation에 넣어 최종 답변 계약을 확인한다.
+QA router/planner는 거치지 않는다.
+
+### 평가셋 구성
+
+- 총 19개 케이스.
+- 기존 retrieval 평가셋에서 대표 케이스를 고르고, 1개는 개인 상황 판단 불가 `no_data` 케이스를 추가했다.
+- 운전자보험, 어린이보험, 자동차보험, 제3보험 기본정보, 담보 금액, 후기 페이지 유의사항을 포함한다.
+- 평가셋에는 실제 개인정보를 넣지 않고 `sample-*` 세션 ID와 일반 질문만 사용한다.
+- 기본 completer는 검색된 evidence를 그대로 선택하는 deterministic extractive 방식이다.
+
+### 개선 기록
+
+| 단계 | 결과 | 개선 내용 |
+| --- | ---: | --- |
+| RAG E2E v1 baseline | 19/19, pass_rate 1.000 | retrieval→generation 연결 평가를 추가했다. 선택한 대표 세트에서는 검색 근거, citation, 금지 문구, 근거 부족 fallback이 모두 통과했다. |

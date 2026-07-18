@@ -14,10 +14,12 @@
 ```bash
 uv run python -m evals.rag.official.retrieval
 uv run python -m evals.rag.official.generation --show-passing
+uv run python -m evals.rag.official.e2e
 uv run python -m evals.rag.policy.extraction --show-passing
 uv run python -m evals.rag.policy.retrieval
 uv run python -m evals.rag.policy.generation --set practice --show-passing
 uv run python -m evals.rag.policy.generation --set test
+uv run python -m evals.rag.policy.e2e
 ```
 
 ## 규칙
@@ -30,3 +32,4 @@ uv run python -m evals.rag.policy.generation --set test
   검증한다.
 - retrieval 평가는 답변 가능한 positive 질문의 근거 회수율과 랭킹을 주 품질 지표로 본다.
 - out-of-scope/negative 질문의 답변 거절은 retrieval이 아니라 router/generation/e2e 평가에서 품질 gate로 다룬다.
+- RAG e2e 평가는 QA router/planner를 거치지 않고 `retrieval → generation` 연결만 본다.

@@ -1,0 +1,119 @@
+[
+  {
+    "id": "db-motorcycle-exclusion",
+    "retrieval_case_id": "db-motorcycle-exclusion",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "db-car-treatment-1-to-7",
+    "retrieval_case_id": "db-car-treatment-1-to-7",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "db-premium-breakdown",
+    "retrieval_case_id": "db-premium-breakdown",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "nh-product-name",
+    "retrieval_case_id": "nh-product-name",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "nh-cancer-diagnosis",
+    "retrieval_case_id": "nh-cancer-diagnosis",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "nh-similar-cancer",
+    "retrieval_case_id": "nh-similar-cancer",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "hyundai-premium",
+    "retrieval_case_id": "hyundai-premium",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "hyundai-driver-age",
+    "retrieval_case_id": "hyundai-driver-age",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "hyundai-product-name",
+    "retrieval_case_id": "hyundai-product-name",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "hyundai-policy-period",
+    "retrieval_case_id": "hyundai-policy-period",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "heungkuk-product-name",
+    "retrieval_case_id": "heungkuk-product-name",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "heungkuk-policy-period",
+    "retrieval_case_id": "heungkuk-policy-period",
+    "expected_status": "answered",
+    "must_include_groups": [["보험기간"], ["2095-05-06"]],
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "heungkuk-cancer-diagnosis",
+    "retrieval_case_id": "heungkuk-cancer-diagnosis",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "heungkuk-similar-cancer",
+    "retrieval_case_id": "heungkuk-similar-cancer",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "heungkuk-confirm-address-change",
+    "retrieval_case_id": "heungkuk-confirm-address-change",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "db-late-page-coverage-start",
+    "retrieval_case_id": "db-late-page-coverage-start",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "nh-notice-motorcycle-duty",
+    "retrieval_case_id": "nh-notice-motorcycle-duty",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "hyundai-notice-mileage",
+    "retrieval_case_id": "hyundai-notice-mileage",
+    "expected_status": "answered",
+    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
+  },
+  {
+    "id": "policy-personal-adequacy-no-data",
+    "query": "내 가족력과 소득 기준으로 암진단비가 충분해?",
+    "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+    "expected_status": "no_data",
+    "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+    "must_not_include": ["충분합니다", "부족합니다", "가입하세요"]
+  }
+]
