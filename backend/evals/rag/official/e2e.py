@@ -472,6 +472,8 @@ def _expand_equivalent_standard_clause_citations(
         for candidate in chunks_by_id.values():
             if candidate.source_category != "standard_clause":
                 continue
+            if candidate.source_id != chunk.source_id:
+                continue
             if _label_title(candidate.label) == label_title:
                 expanded.append(candidate.id)
     return tuple(dict.fromkeys(expanded))
