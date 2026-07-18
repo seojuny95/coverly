@@ -1,8 +1,8 @@
 """Resolve trusted insured demographics for portfolio features."""
 
+from app.modules.consultation.contracts import InsuredDemographics
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.summary import is_damage_policy
-from app.modules.qa.contracts import InsuredDemographics
 
 
 def resolve_portfolio_demographics(

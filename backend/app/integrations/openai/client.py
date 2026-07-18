@@ -101,6 +101,29 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return [list(item.embedding) for item in response.data]
 
 
+def search_official_web(
+    *,
+    api_key: str,
+    model: str,
+    query: str,
+    allowed_domains: list[str],
+) -> Any:
+    """Run a web search restricted to the caller's verified domain allowlist."""
+
+    client = OpenAI(api_key=api_key, timeout=60.0, max_retries=0)
+    return client.responses.create(
+        model=model,
+        input=query,
+        tools=[
+            {
+                "type": "web_search",
+                "filters": {"allowed_domains": allowed_domains},
+            }
+        ],
+        include=["web_search_call.action.sources"],
+    )
+
+
 def compact_prompt_text(text: str, max_chars: int) -> str:
     """Normalize excerpt whitespace and cap prompt context with an ellipsis."""
 

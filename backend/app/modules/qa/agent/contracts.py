@@ -6,8 +6,8 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, Field
 
 from app.integrations.openai.client import JsonCompleter
+from app.modules.consultation.contracts import ConsultationEvidence
 from app.modules.qa.context import QaContext
-from app.modules.qa.contracts import ConsultationEvidence
 from app.modules.qa.schemas import PortfolioQuestionResponse
 from app.modules.qa.tools.web_search import OfficialWebSearcher
 from app.rag.official.answer import RagAnswer

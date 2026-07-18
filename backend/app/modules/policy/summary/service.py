@@ -6,14 +6,6 @@ from app.core.grounding import wording_grounded
 from app.modules.policy.classification import classify_policy
 from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.policy.models import PolicySummary
-from app.modules.policy.summary.catalog import (
-    canonical_insurer_name,
-    get_insurer_aliases,
-    get_insurer_candidates,
-    get_insurer_contact_evidence,
-    insurer_name_is_grounded,
-    match_insurer_from_text,
-)
 from app.modules.policy.summary.llm import (
     LlmPolicySummary,
     _coerce_policy_summary,
@@ -21,6 +13,14 @@ from app.modules.policy.summary.llm import (
     extract_policy_summary_with_llm,
 )
 from app.modules.policy.summary.local import extract_local_policy_summary
+from app.modules.reference_data.insurers import (
+    canonical_insurer_name,
+    get_insurer_aliases,
+    get_insurer_candidates,
+    get_insurer_contact_evidence,
+    insurer_name_is_grounded,
+    match_insurer_from_text,
+)
 
 __all__ = [
     "LlmPolicySummary",

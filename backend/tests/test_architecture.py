@@ -14,6 +14,36 @@ LEGACY_APP_NAMESPACES = (
     "app.settings",
 )
 
+FORBIDDEN_FEATURE_IMPORTS: dict[str, tuple[str, ...]] = {
+    "consultation": (
+        "app.modules.analysis",
+        "app.modules.coverage",
+        "app.modules.evidence",
+        "app.modules.policy",
+        "app.modules.portfolio",
+        "app.modules.qa",
+        "app.modules.reference_data",
+        "app.modules.upload",
+    ),
+    "coverage": (
+        "app.modules.analysis",
+        "app.modules.evidence",
+        "app.modules.policy",
+        "app.modules.portfolio",
+        "app.modules.qa",
+    ),
+    "evidence": ("app.modules.qa",),
+    "reference_data": (
+        "app.modules.analysis",
+        "app.modules.evidence",
+        "app.modules.policy",
+        "app.modules.portfolio",
+        "app.modules.qa",
+    ),
+}
+
+VENDOR_CLIENT_NAMESPACES = ("openai", "psycopg")
+
 
 def _python_files(root: Path) -> tuple[Path, ...]:
     return tuple(path for path in root.rglob("*.py") if "__pycache__" not in path.parts)
@@ -28,6 +58,10 @@ def _imported_modules(path: Path) -> tuple[str, ...]:
         elif isinstance(node, ast.ImportFrom) and node.module:
             imports.append(node.module)
     return tuple(imports)
+
+
+def _imports_namespace(module: str, namespace: str) -> bool:
+    return module == namespace or module.startswith(f"{namespace}.")
 
 
 def test_removed_app_namespaces_are_not_imported() -> None:
@@ -83,3 +117,42 @@ def test_rag_evaluators_live_outside_runtime_package() -> None:
     ]
 
     assert runtime_eval_files == []
+
+
+def test_core_does_not_import_business_modules() -> None:
+    offenders = [
+        str(path.relative_to(BACKEND_ROOT))
+        for path in _python_files(APP_ROOT / "core")
+        if any(_imports_namespace(module, "app.modules") for module in _imported_modules(path))
+    ]
+
+    assert offenders == []
+
+
+def test_low_level_features_do_not_depend_on_higher_level_features() -> None:
+    offenders: list[str] = []
+    for feature, forbidden_namespaces in FORBIDDEN_FEATURE_IMPORTS.items():
+        for path in _python_files(APP_ROOT / "modules" / feature):
+            imported_modules = _imported_modules(path)
+            if any(
+                _imports_namespace(module, namespace)
+                for module in imported_modules
+                for namespace in forbidden_namespaces
+            ):
+                offenders.append(str(path.relative_to(BACKEND_ROOT)))
+
+    assert offenders == []
+
+
+def test_business_modules_do_not_import_vendor_clients_directly() -> None:
+    offenders = [
+        str(path.relative_to(BACKEND_ROOT))
+        for path in _python_files(APP_ROOT / "modules")
+        if any(
+            _imports_namespace(module, namespace)
+            for module in _imported_modules(path)
+            for namespace in VENDOR_CLIENT_NAMESPACES
+        )
+    ]
+
+    assert offenders == []

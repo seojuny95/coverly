@@ -1,8 +1,8 @@
 """Structured evidence selectors for QA agent tools."""
 
+from app.modules.consultation.contracts import ConsultationEvidence
 from app.modules.coverage.matching import canonicalize_coverage_name
 from app.modules.qa.context import QaContext
-from app.modules.qa.contracts import ConsultationEvidence
 
 
 def coverage_evidence_by_names(

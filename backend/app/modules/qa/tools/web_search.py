@@ -5,13 +5,13 @@ import re
 from typing import Any, Literal, Protocol, cast
 from urllib.parse import urlparse
 
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
-from app.modules.qa.claim_channels import channels_for
+from app.integrations.openai import search_official_web
 from app.modules.qa.context import QaContext
 from app.modules.qa.pii import mask_qa_pii
+from app.modules.reference_data.claim_channels import channels_for
 from app.rag.official.sources import rag_sources
 
 SearchPurpose = Literal[
@@ -73,18 +73,12 @@ def default_official_web_search(
         )
 
     safe_query = _search_prompt(sanitize_search_query(query), purpose)
-    client = OpenAI(api_key=settings.openai_api_key, timeout=60.0, max_retries=0)
     try:
-        response = client.responses.create(
+        response = search_official_web(
+            api_key=settings.openai_api_key,
             model=settings.openai_web_search_model,
-            input=safe_query,
-            tools=[
-                {
-                    "type": "web_search",
-                    "filters": {"allowed_domains": allowed_domains},
-                }
-            ],
-            include=["web_search_call.action.sources"],
+            query=safe_query,
+            allowed_domains=allowed_domains,
         )
     except Exception as exc:
         logger.warning("Official web search failed with %s", type(exc).__name__)

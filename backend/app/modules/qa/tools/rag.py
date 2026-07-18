@@ -2,8 +2,9 @@
 
 from agents import RunContextWrapper, function_tool
 
-from app.modules.evidence.catalog import citation_from_evidence, with_session_evidence
+from app.modules.evidence.catalog import with_session_evidence
 from app.modules.qa.agent.contracts import GroundedToolAnswer, QaAgentDependencies
+from app.modules.qa.citations import citation_from_evidence
 from app.modules.qa.contracts import AnswerSection
 from app.modules.qa.response_support import question_suggestions, with_demographics
 from app.modules.qa.schemas import AnswerCitation, PortfolioQuestionResponse

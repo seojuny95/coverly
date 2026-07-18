@@ -13,7 +13,7 @@ from app.core.pii import (
     iter_resident_identifier_matches,
     mask_resident_identifiers,
 )
-from app.modules.policy.life_stage import life_stage_for_age
+from app.modules.coverage.life_stage import life_stage_for_age
 from app.modules.policy.models import InsuredDemographics, InsuredGender
 
 _CENTURY_AND_GENDER: dict[str, tuple[int, InsuredGender]] = {

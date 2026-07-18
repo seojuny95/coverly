@@ -3,11 +3,11 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from app.integrations.openai import compact_prompt_text
+from app.modules.consultation.contracts import ConsultationEvidence, InsuredDemographics
 from app.modules.coverage.taxonomy import classify_coverage
 from app.modules.portfolio.schemas import CoverageSourceItem, PolicyInput
 from app.modules.portfolio.summary import PortfolioFacts
-from app.modules.qa.contracts import ConsultationEvidence, InsuredDemographics
-from app.modules.qa.schemas import AnswerCitation
 from app.rag.official.models import RetrievalHit
 from app.rag.policy import PolicyRetrievalHit
 
@@ -168,7 +168,7 @@ def with_official_evidence(
                 id=f"official:{index}",
                 fact=(
                     f"{chunk.publisher} {chunk.source_title}{label}: "
-                    f"{_compact_evidence_text(chunk.text, 700)}"
+                    f"{compact_prompt_text(chunk.text, 700)}"
                 ),
                 source_title=chunk.source_title,
                 publisher=chunk.publisher,
@@ -180,13 +180,6 @@ def with_official_evidence(
         by_id={item.id: item for item in items},
         coverage_ids_by_category=catalog.coverage_ids_by_category,
     )
-
-
-def _compact_evidence_text(text: str, max_chars: int) -> str:
-    compact = "\n".join(line.strip() for line in text.splitlines() if line.strip())
-    if len(compact) <= max_chars:
-        return compact
-    return compact[: max_chars - 1].rstrip() + "…"
 
 
 def build_evidence_catalog(
@@ -469,16 +462,6 @@ def filter_safe_unique_texts(
             continue
         accepted.append(cleaned)
     return accepted
-
-
-def citation_from_evidence(item: ConsultationEvidence) -> AnswerCitation:
-    return AnswerCitation(
-        evidence_id=item.id,
-        policy_id=item.policy_id,
-        insurer=item.insurer,
-        product_name=item.product_name,
-        coverage_name=item.coverage_name,
-    )
 
 
 def valid_evidence_ids(evidence_ids: list[str], catalog: EvidenceCatalog) -> tuple[str, ...] | None:
