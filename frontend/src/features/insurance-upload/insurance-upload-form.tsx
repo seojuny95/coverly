@@ -11,6 +11,7 @@ import {
   secondaryButtonClassName,
 } from "../../components/coverly-brand";
 import { AnalysisProgress } from "./analysis-progress";
+import { PolicyDocumentGuide } from "./policy-document-guide";
 import { SelectedFileList } from "./selected-file-list";
 import type { UploadInsurance } from "./upload-types";
 import {
@@ -187,16 +188,20 @@ export function InsuranceUploadForm({
           </div>
 
           {isModal ? null : (
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-zinc-400">
-              <span className="flex items-center gap-1.5">
-                <ReassuranceCheckIcon />
-                개인정보는 가려서 처리해요
-              </span>
-              <span className="flex items-center gap-1.5">
-                <ReassuranceCheckIcon />
-                가입 권유 전화가 가지 않아요
-              </span>
-            </div>
+            <>
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-zinc-400">
+                <span className="flex items-center gap-1.5">
+                  <ReassuranceCheckIcon />
+                  개인정보는 가려서 처리해요
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <ReassuranceCheckIcon />
+                  가입 권유 전화가 가지 않아요
+                </span>
+              </div>
+
+              <PolicyDocumentGuide />
+            </>
           )}
 
           <div className="mt-4 flex flex-col gap-4">
