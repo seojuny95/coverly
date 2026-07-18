@@ -6,12 +6,12 @@ import {
   primaryButtonClassName,
 } from "./coverly-brand";
 
-type AppErrorFallbackProps = {
+type ErrorScreenProps = {
   digest?: string;
   onRetry?: () => void;
 };
 
-export function AppErrorFallback({ digest, onRetry }: AppErrorFallbackProps) {
+export function ErrorScreen({ digest, onRetry }: ErrorScreenProps) {
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-white px-5 py-12 text-zinc-950">
       <CoverlyLogo className="absolute top-6 left-6" />

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { AppErrorFallback } from "@/shared/components/app-error-fallback";
+import { ErrorScreen } from "@/shared/components/error-screen";
 
 export default function Error({
   error,
@@ -19,5 +19,5 @@ export default function Error({
     });
   }, [error]);
 
-  return <AppErrorFallback digest={error.digest} onRetry={reset} />;
+  return <ErrorScreen digest={error.digest} onRetry={reset} />;
 }
