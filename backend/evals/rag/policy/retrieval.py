@@ -85,6 +85,58 @@ class PolicyEvalReport:
         return sum(self.latency_seconds) / len(self.latency_seconds)
 
 
+@dataclass(frozen=True)
+class OfflinePolicyRetrievalContext:
+    store: PolicyRagStore
+    embedder: Embedder
+    expires_at: datetime
+
+
+def load_policy_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[PolicyEvalCase, ...]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return tuple(_case_from_json(item) for item in raw["cases"])
+
+
+def build_offline_policy_retrieval_context(
+    *,
+    path: Path = EVAL_FIXTURE,
+    sample_dir: Path | None = None,
+    embedder: Embedder | None = None,
+    parse: Callable[[bytes], ParsedDocument] = parse_document,
+) -> OfflinePolicyRetrievalContext:
+    active_embedder = embedder or HashingEmbedder()
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    source_dir = _resolve_sample_dir(sample_dir, source=str(raw["source"]))
+    created_at = datetime.now(UTC)
+    records = _records_from_documents(
+        raw["documents"],
+        active_embedder,
+        source_dir,
+        parse=parse,
+        created_at=created_at,
+    )
+    return OfflinePolicyRetrievalContext(
+        store=_InMemoryPolicyStore(records),
+        embedder=active_embedder,
+        expires_at=created_at + timedelta(hours=1),
+    )
+
+
+def sign_policy_eval_case_sessions(
+    case: PolicyEvalCase,
+    *,
+    expires_at: datetime,
+) -> PolicyEvalCase:
+    return _case_with_session_tokens(case, expires_at=expires_at)
+
+
+def policy_text_matches_expected_group(
+    text: str,
+    expected_term_groups: tuple[tuple[str, ...], ...],
+) -> bool:
+    return _text_matches_expected_group(text, expected_term_groups)
+
+
 def evaluate_policy_retrieval(
     *,
     path: Path = EVAL_FIXTURE,
@@ -100,7 +152,7 @@ def evaluate_policy_retrieval(
     )
     raw = json.loads(path.read_text(encoding="utf-8"))
     source_dir = _resolve_sample_dir(sample_dir, source=str(raw["source"]))
-    cases = tuple(_case_from_json(item) for item in raw["cases"])
+    cases = load_policy_retrieval_eval_cases(path)
     if production:
         report = _evaluate_with_store(
             raw["documents"],

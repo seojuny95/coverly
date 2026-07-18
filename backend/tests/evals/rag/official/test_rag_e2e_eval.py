@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -21,6 +22,15 @@ def test_official_rag_e2e_dataset_selects_generation_scenarios() -> None:
     assert all(set(raw_case) == {"id"} for raw_case in raw_cases)
     assert len(cases) == len(raw_cases) * 2
     assert {case.expected_status for case in cases} == {"answered"}
+
+
+def test_official_rag_e2e_dataset_contains_no_personal_identifiers() -> None:
+    serialized = EVAL_FIXTURE.read_text(encoding="utf-8")
+
+    assert re.search(r"\b\d{6}-[1-4]\d{6}\b", serialized) is None
+    assert re.search(r"\b01[016789]-?\d{3,4}-?\d{4}\b", serialized) is None
+    assert re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", serialized) is None
+    assert "계좌번호" not in serialized
 
 
 def test_official_rag_e2e_scores_retrieval_then_generation(

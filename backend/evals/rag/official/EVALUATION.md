@@ -104,6 +104,8 @@ QA router, planner, 사용자 업로드 증권은 거치지 않는다.
 - 고지의무, 면책, 청약철회, 화재보험 계산, 대위권, 보험나이, 금융소비자보호, 상품명/의료리스크 정책을 포함한다.
 - 기본 실행은 OpenAI 호출 없이 deterministic extractive completer를 사용한다.
 - live LLM은 `--live-generation` 옵션으로 별도 확인한다.
+- E2E는 generation 계약 검증이 목적이라 `required_citation_ids`를 strict하게 본다.
+  Retrieval component처럼 대체 공식 근거를 넓게 인정하는 `accepted_evidence` 기준과는 의도적으로 다르다.
 
 ### 개선 기록
 

@@ -7,27 +7,24 @@ import time
 from argparse import ArgumentParser
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
 
 from app.integrations.openai import JsonCompleter
-from app.modules.policy.parsing import parse_document
 from app.modules.qa.contracts import ConsultationEvidence
-from app.rag.embeddings import HashingEmbedder
 from app.rag.policy.generation import generate_policy_answer
 from app.rag.policy.retrieval import retrieve_policy_context
 from evals.rag.policy.retrieval import (
     EVAL_FIXTURE as RETRIEVAL_FIXTURE,
 )
 from evals.rag.policy.retrieval import (
+    OfflinePolicyRetrievalContext,
     PolicyEvalCase,
-    _case_from_json,
-    _case_with_session_tokens,
-    _InMemoryPolicyStore,
-    _records_from_documents,
-    _resolve_sample_dir,
-    _text_matches_expected_group,
+    build_offline_policy_retrieval_context,
+    load_policy_retrieval_eval_cases,
+    policy_text_matches_expected_group,
+    sign_policy_eval_case_sessions,
 )
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "e2e_dataset.json"
@@ -88,10 +85,7 @@ class PolicyRagE2EReport:
 
 
 def load_e2e_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[PolicyRagE2ECase, ...]:
-    raw_retrieval = json.loads(RETRIEVAL_FIXTURE.read_text(encoding="utf-8"))
-    retrieval_cases = {
-        case.id: case for case in (_case_from_json(item) for item in raw_retrieval["cases"])
-    }
+    retrieval_cases = {case.id: case for case in load_policy_retrieval_eval_cases()}
     raw_cases = cast(list[dict[str, object]], json.loads(path.read_text(encoding="utf-8")))
     return tuple(_case_from_json_e2e(raw, retrieval_cases) for raw in raw_cases)
 
@@ -103,25 +97,12 @@ def evaluate_e2e(
 ) -> PolicyRagE2EReport:
     active_completer = complete or offline_extractive_completer
     active_cases = cases if cases is not None else load_e2e_eval_cases()
-    raw_retrieval = json.loads(RETRIEVAL_FIXTURE.read_text(encoding="utf-8"))
-    sample_dir = _resolve_sample_dir(None, source=str(raw_retrieval["source"]))
-    embedder = HashingEmbedder()
-    created_at = datetime.now(UTC)
-    records = _records_from_documents(
-        raw_retrieval["documents"],
-        embedder,
-        sample_dir,
-        parse=parse_document,
-        created_at=created_at,
-    )
-    store = _InMemoryPolicyStore(records)
-    expires_at = created_at + timedelta(hours=1)
+    context = build_offline_policy_retrieval_context(path=RETRIEVAL_FIXTURE)
     started = time.perf_counter()
     results = tuple(
         _evaluate_case(
-            _case_with_signed_sessions(case, expires_at=expires_at),
-            store=store,
-            embedder=embedder,
+            _case_with_signed_sessions(case, expires_at=context.expires_at),
+            context=context,
             complete=active_completer,
         )
         for case in active_cases
@@ -185,18 +166,13 @@ def _case_from_json_e2e(
     retrieval_cases: dict[str, PolicyEvalCase],
 ) -> PolicyRagE2ECase:
     base_case = _base_retrieval_case(raw, retrieval_cases)
-    must_include_groups = raw.get("must_include_groups")
     return PolicyRagE2ECase(
         id=str(raw["id"]),
         query=base_case.query,
         session_ids=base_case.session_ids,
         expected_status=_expected_status(raw["expected_status"]),
         expected_term_groups=base_case.expected_term_groups,
-        must_include_groups=(
-            _string_groups(must_include_groups)
-            if must_include_groups is not None
-            else base_case.expected_term_groups
-        ),
+        must_include_groups=_string_groups(raw["must_include_groups"]),
         must_not_include=_string_tuple(raw["must_not_include"]),
     )
 
@@ -221,16 +197,15 @@ def _base_retrieval_case(
 def _evaluate_case(
     case: PolicyRagE2ECase,
     *,
-    store: _InMemoryPolicyStore,
-    embedder: HashingEmbedder,
+    context: OfflinePolicyRetrievalContext,
     complete: JsonCompleter,
 ) -> PolicyRagE2EResult:
     hits = retrieve_policy_context(
         list(case.session_ids),
         case.query,
         top_k=5,
-        store=store,
-        embedder=embedder,
+        store=context.store,
+        embedder=context.embedder,
     )
     evidence = tuple(
         ConsultationEvidence(
@@ -245,7 +220,8 @@ def _evaluate_case(
     )
     visible_text = _normalize(" ".join((answer.answer, *answer.suggestions, *answer.limitations)))
     retrieval_matched = case.expected_status == "no_data" or any(
-        _text_matches_expected_group(hit.chunk.text, case.expected_term_groups) for hit in hits
+        policy_text_matches_expected_group(hit.chunk.text, case.expected_term_groups)
+        for hit in hits
     )
     evidence_ids = {item.id for item in evidence}
     citation_valid = all(item_id in evidence_ids for item_id in answer.evidence_ids)
@@ -302,7 +278,7 @@ def _case_with_signed_sessions(
         expected_session_id="",
         expected_term_groups=case.expected_term_groups,
     )
-    signed = _case_with_session_tokens(retrieval_case, expires_at=expires_at)
+    signed = sign_policy_eval_case_sessions(retrieval_case, expires_at=expires_at)
     return PolicyRagE2ECase(
         id=case.id,
         query=case.query,

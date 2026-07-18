@@ -3,66 +3,77 @@
     "id": "db-motorcycle-exclusion",
     "retrieval_case_id": "db-motorcycle-exclusion",
     "expected_status": "answered",
+    "must_include_groups": [["이륜차부담보특약"], ["미가입"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "db-car-treatment-1-to-7",
     "retrieval_case_id": "db-car-treatment-1-to-7",
     "expected_status": "answered",
+    "must_include_groups": [["자동차부상치료비"], ["100 만원", "100만원"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "db-premium-breakdown",
     "retrieval_case_id": "db-premium-breakdown",
     "expected_status": "answered",
+    "must_include_groups": [["보장보험료"], ["11,668원"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "nh-product-name",
     "retrieval_case_id": "nh-product-name",
     "expected_status": "answered",
+    "must_include_groups": [["NH가성비굿플러스어린이보험"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "nh-cancer-diagnosis",
     "retrieval_case_id": "nh-cancer-diagnosis",
     "expected_status": "answered",
+    "must_include_groups": [["암진단비"], ["유사암제외"], ["2,000"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "nh-similar-cancer",
     "retrieval_case_id": "nh-similar-cancer",
     "expected_status": "answered",
+    "must_include_groups": [["유사암진단비"], ["갑상선암"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "hyundai-premium",
     "retrieval_case_id": "hyundai-premium",
     "expected_status": "answered",
+    "must_include_groups": [["1,402,890원"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "hyundai-driver-age",
     "retrieval_case_id": "hyundai-driver-age",
     "expected_status": "answered",
+    "must_include_groups": [["운전자연령"], ["만30세이상"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "hyundai-product-name",
     "retrieval_case_id": "hyundai-product-name",
     "expected_status": "answered",
+    "must_include_groups": [["Hicar 다이렉트개인용"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "hyundai-policy-period",
     "retrieval_case_id": "hyundai-policy-period",
     "expected_status": "answered",
+    "must_include_groups": [["보험기간"], ["2027-06-27"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "heungkuk-product-name",
     "retrieval_case_id": "heungkuk-product-name",
     "expected_status": "answered",
+    "must_include_groups": [["맘편한 자녀사랑보험"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
@@ -76,36 +87,42 @@
     "id": "heungkuk-cancer-diagnosis",
     "retrieval_case_id": "heungkuk-cancer-diagnosis",
     "expected_status": "answered",
+    "must_include_groups": [["암진단비"], ["유사암제외"], ["4,000만원"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "heungkuk-similar-cancer",
     "retrieval_case_id": "heungkuk-similar-cancer",
     "expected_status": "answered",
+    "must_include_groups": [["유사암진단비"], ["1,000만원"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "heungkuk-confirm-address-change",
     "retrieval_case_id": "heungkuk-confirm-address-change",
     "expected_status": "answered",
+    "must_include_groups": [["주소"], ["흥국화재"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "db-late-page-coverage-start",
     "retrieval_case_id": "db-late-page-coverage-start",
     "expected_status": "answered",
+    "must_include_groups": [["제1회 보험료"], ["받은 때"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "nh-notice-motorcycle-duty",
     "retrieval_case_id": "nh-notice-motorcycle-duty",
     "expected_status": "answered",
+    "must_include_groups": [["이륜자동차"], ["알려야"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
     "id": "hyundai-notice-mileage",
     "retrieval_case_id": "hyundai-notice-mileage",
     "expected_status": "answered",
+    "must_include_groups": [["65,077km"]],
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
   {
