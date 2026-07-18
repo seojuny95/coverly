@@ -17,6 +17,7 @@ from app.modules.portfolio.damage_classification import (
     is_fire_policy,
 )
 from app.modules.portfolio.schemas import (
+    SPECIAL_POLICY_KINDS,
     PolicyInput,
     SpecialCoverageCheck,
     SpecialPolicyAnalysis,
@@ -129,13 +130,7 @@ def build_special_policy_analyses(policies: list[PolicyInput]) -> list[SpecialPo
             grouped[match.kind].append(policy)
 
     analyses: list[SpecialPolicyAnalysis] = []
-    ordered_kinds: tuple[SpecialPolicyKind, ...] = (
-        "auto",
-        "driver",
-        "travel",
-        "fire",
-    )
-    for kind in ordered_kinds:
+    for kind in SPECIAL_POLICY_KINDS:
         matched = grouped[kind]
         if not matched:
             continue

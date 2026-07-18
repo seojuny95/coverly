@@ -13,7 +13,6 @@ DemographicStatus = Literal[
     "conflict",
     "missing",
 ]
-GenerationMode = Literal["llm", "fallback"]
 GuidanceBasis = Literal["confirmed_fact", "general_guidance"]
 
 

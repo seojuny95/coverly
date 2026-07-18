@@ -275,7 +275,7 @@ def _claim_channels(
     )
     if not channels.insurers and channels.medical_indemnity is None:
         return None
-    return ClaimChannelBlock.model_validate(channels.model_dump(mode="python"))
+    return channels
 
 
 def _single_policy_age(policies: list[PolicyInput]) -> int | None:

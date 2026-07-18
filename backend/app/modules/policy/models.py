@@ -5,6 +5,7 @@ from typing import Literal, NotRequired, TypedDict
 
 # A pdfplumber table: rows of cells (None = empty cell), immutable for ParsedDocument.
 Table = tuple[tuple[str | None, ...], ...]
+CoverageType = Literal["담보", "부가"]
 
 
 @dataclass(frozen=True)
@@ -34,7 +35,7 @@ class Coverage(TypedDict):
     가입금액: str
     보장내용: str | None
     해설: str | None
-    유형: NotRequired[Literal["담보", "부가"]]
+    유형: NotRequired[CoverageType]
     # 유형 absent defaults to "담보"; "부가" marks name-only riders or rate rows.
 
 

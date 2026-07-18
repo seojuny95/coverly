@@ -55,3 +55,26 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
         "message",
         "request_id",
     }
+
+
+def test_openapi_reuses_shared_claim_and_reference_source_contracts() -> None:
+    schemas = app.openapi()["components"]["schemas"]
+
+    claim_schema_names = {name for name in schemas if name.startswith("ClaimChannel")}
+    assert claim_schema_names == {
+        "ClaimChannelBlock",
+        "ClaimChannelInsurer",
+        "ClaimChannelLink",
+        "ClaimChannelMedicalIndemnity",
+    }
+    claim_channel_schema = schemas["PortfolioCoverageSummary"]["properties"]["claim_channels"]
+    assert claim_channel_schema["anyOf"][0] == {"$ref": "#/components/schemas/ClaimChannelBlock"}
+
+    premium_schema = schemas["PremiumBenchmark"]
+    assert premium_schema["properties"]["income_source"] == {
+        "$ref": "#/components/schemas/ReferenceSource"
+    }
+    assert premium_schema["properties"]["guide_source"] == {
+        "$ref": "#/components/schemas/ReferenceSource"
+    }
+    assert "PremiumBenchmarkSource" not in schemas

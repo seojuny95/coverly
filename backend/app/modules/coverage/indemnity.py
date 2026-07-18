@@ -8,18 +8,10 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from app.modules.coverage.contracts import CoverageDomain
 from app.modules.portfolio.schemas import CoverageInput, PolicyInput
 
 PaymentBasis = Literal["fixed", "indemnity", "unknown"]
-CoverageDomain = Literal[
-    "medical_expense",
-    "travel_medical_expense",
-    "legal_cost",
-    "property_damage",
-    "liability",
-    "auto",
-    "other",
-]
 MedicalIndemnityStatus = Literal["confirmed", "excluded", "unknown"]
 
 

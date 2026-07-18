@@ -8,6 +8,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
+from app.core.generation import GenerationMode
 from app.integrations.openai import JsonCompleter, dump_prompt_json, structured_completer
 
 _UNSAFE_POLICY_TEXT = (
@@ -97,7 +98,7 @@ class PolicyGenerationResult:
     evidence_ids: tuple[str, ...]
     limitations: tuple[str, ...]
     suggestions: tuple[str, ...]
-    generation: Literal["llm", "fallback"]
+    generation: GenerationMode
 
 
 class PolicyEvidence(Protocol):

@@ -5,7 +5,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.modules.coverage.contracts import CoverageDomain
 from app.modules.policy.life_stage import life_stage_for_age
+from app.modules.policy.models import CoverageType, InsuredGender, LifeStage
 
 
 class CoverageInput(BaseModel):
@@ -20,7 +22,7 @@ class CoverageInput(BaseModel):
     지급유형: str | None = None
     가입금액숫자: int | None = Field(default=None, ge=0)
     보장분류: str | None = None
-    유형: str | None = None
+    유형: CoverageType | None = None
 
 
 class PolicyInsuredDemographicsInput(BaseModel):
@@ -29,8 +31,8 @@ class PolicyInsuredDemographicsInput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     나이: int = Field(ge=0, le=120, strict=True)
-    성별: Literal["남성", "여성"]
-    생애단계: Literal["어린이", "성인", "시니어"]
+    성별: InsuredGender
+    생애단계: LifeStage
 
     @model_validator(mode="after")
     def validate_life_stage(self) -> "PolicyInsuredDemographicsInput":
@@ -117,15 +119,7 @@ class CoverageTotalItem(BaseModel):
     composition: list[CoverageSourceItem]
 
 
-ActualLossCoverageDomain = Literal[
-    "medical_expense",
-    "travel_medical_expense",
-    "legal_cost",
-    "property_damage",
-    "liability",
-    "auto",
-    "other",
-]
+ActualLossCoverageDomain = CoverageDomain
 
 
 class ActualLossCoverageItem(BaseModel):
@@ -227,6 +221,7 @@ class EssentialCoverageCheck(BaseModel):
 
 
 SpecialPolicyKind = Literal["auto", "driver", "travel", "fire"]
+SPECIAL_POLICY_KINDS: tuple[SpecialPolicyKind, ...] = ("auto", "driver", "travel", "fire")
 SpecialCoverageStatus = Literal["confirmed", "not_found"]
 
 
@@ -287,12 +282,7 @@ class PremiumOverview(BaseModel):
     items: list[PremiumPolicyItem]
 
 
-class PremiumBenchmarkSource(BaseModel):
-    label: str
-    url: str
-    published_at: str
-    reliability: SourceReliability
-    caveat: str
+PremiumBenchmarkSource = ReferenceSource
 
 
 class PremiumBenchmark(BaseModel):

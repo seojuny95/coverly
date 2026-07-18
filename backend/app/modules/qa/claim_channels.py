@@ -10,7 +10,7 @@ from functools import lru_cache
 from typing import Any, cast
 
 from app.modules.policy.summary.catalog import canonical_insurer_name
-from app.modules.qa.schemas import (
+from app.modules.portfolio.schemas import (
     ClaimChannelBlock,
     ClaimChannelInsurer,
     ClaimChannelLink,
