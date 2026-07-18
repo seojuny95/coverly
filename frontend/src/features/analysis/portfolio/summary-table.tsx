@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { Badge } from "@/shared/components/ui/badge";
+
 import type { PortfolioSummary } from "./api";
 import { formatKoreanWon } from "./money-format";
 
@@ -223,9 +225,12 @@ function CoverageDisclosure({
 
 function DuplicateBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+    <Badge
+      variant="warning"
+      className="h-auto px-2 py-0.5 text-[11px] font-semibold"
+    >
       중복 확인
-    </span>
+    </Badge>
   );
 }
 
@@ -236,18 +241,19 @@ function CoverageBasis({
   children: string;
   tone: "summed" | "actual-loss" | "individual";
 }) {
-  const toneClassName = {
-    summed: "bg-blue-50 text-blue-700",
-    "actual-loss": "bg-emerald-50 text-emerald-700",
-    individual: "bg-zinc-100 text-zinc-600",
-  }[tone];
+  const badgeVariant = {
+    summed: "info",
+    "actual-loss": "success",
+    individual: "neutral",
+  } as const;
 
   return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${toneClassName}`}
+    <Badge
+      variant={badgeVariant[tone]}
+      className="h-auto px-2.5 py-1 text-xs font-semibold"
     >
       {children}
-    </span>
+    </Badge>
   );
 }
 
