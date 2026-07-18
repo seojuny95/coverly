@@ -64,9 +64,10 @@ QA router/planner는 거치지 않는다.
 
 ### 평가셋 구성
 
-- 총 19개 케이스.
-- 기존 retrieval 평가셋에서 대표 케이스를 고르고, 1개는 개인 상황 판단 불가 `no_data` 케이스를 추가했다.
-- 운전자보험, 어린이보험, 자동차보험, 제3보험 기본정보, 담보 금액, 후기 페이지 유의사항을 포함한다.
+- 총 134개 케이스.
+- 기존 retrieval 평가셋 전체 122개를 retrieval→generation으로 다시 실행한다.
+- 별도 `no_data`/hard-negative 12개를 추가했다.
+- 운전자보험, 어린이보험, 자동차보험, 제3보험 기본정보, 담보 금액, 후기 페이지 유의사항, 다중 세션 hard-negative, 실손의료보험 혼동, 개인 상황 판단 불가를 포함한다.
 - 평가셋에는 실제 개인정보를 넣지 않고 `sample-*` 세션 ID와 일반 질문만 사용한다.
 - 기본 completer는 검색된 evidence를 그대로 선택하는 deterministic extractive 방식이다.
 
@@ -74,4 +75,5 @@ QA router/planner는 거치지 않는다.
 
 | 단계 | 결과 | 개선 내용 |
 | --- | ---: | --- |
-| RAG E2E v1 baseline | 19/19, pass_rate 1.000 | retrieval→generation 연결 평가를 추가했다. 선택한 대표 세트에서는 검색 근거, citation, 금지 문구, 근거 부족 fallback이 모두 통과했다. |
+| RAG E2E v1 baseline | 19/19, pass_rate 1.000 | 대표 케이스만 골라 연결 smoke test로 시작했다. 부족한 지점을 충분히 드러내지 못했다. |
+| RAG E2E broad baseline | 118/134, pass_rate 0.881 | retrieval 전체 세트와 no_data/hard-negative를 추가했다. 다중 세션 hard-negative, 실손의료보험 혼동, 수익자/면책/개인 상황 판단 no_data에서 실패가 드러났다. |

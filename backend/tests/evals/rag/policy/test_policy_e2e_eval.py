@@ -17,11 +17,13 @@ from evals.rag.policy.e2e import (
 
 def test_policy_rag_e2e_dataset_is_pii_safe_and_well_labeled() -> None:
     serialized = EVAL_FIXTURE.read_text(encoding="utf-8")
-    raw_cases = json.loads(serialized)
+    raw = json.loads(serialized)
     cases = load_e2e_eval_cases()
 
-    assert len(raw_cases) >= 15
-    assert len(cases) == len(raw_cases)
+    assert set(raw) == {"retrieval_cases", "extra_cases"}
+    assert raw["retrieval_cases"]["include"] == "all"
+    assert len(raw["extra_cases"]) >= 10
+    assert len(cases) >= 130
     assert {case.expected_status for case in cases} == {"answered", "no_data"}
     assert all(case.must_include_groups for case in cases)
     assert "sample-" in serialized

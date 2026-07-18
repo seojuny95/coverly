@@ -18,10 +18,10 @@ def test_official_rag_e2e_dataset_selects_generation_scenarios() -> None:
     raw_cases = json.loads(EVAL_FIXTURE.read_text(encoding="utf-8"))
     cases = load_e2e_eval_cases()
 
-    assert len(raw_cases) >= 10
+    assert len(raw_cases) >= 30
     assert all(set(raw_case) == {"id"} for raw_case in raw_cases)
     assert len(cases) == len(raw_cases) * 2
-    assert {case.expected_status for case in cases} == {"answered"}
+    assert {case.expected_status for case in cases} == {"answered", "filtered", "no_evidence"}
 
 
 def test_official_rag_e2e_dataset_contains_no_personal_identifiers() -> None:

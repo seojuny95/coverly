@@ -86,8 +86,11 @@ class PolicyRagE2EReport:
 
 def load_e2e_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[PolicyRagE2ECase, ...]:
     retrieval_cases = {case.id: case for case in load_policy_retrieval_eval_cases()}
-    raw_cases = cast(list[dict[str, object]], json.loads(path.read_text(encoding="utf-8")))
-    return tuple(_case_from_json_e2e(raw, retrieval_cases) for raw in raw_cases)
+    raw = cast(dict[str, object], json.loads(path.read_text(encoding="utf-8")))
+    return (
+        *_retrieval_cases_from_json(raw["retrieval_cases"], retrieval_cases),
+        *_extra_cases_from_json(raw["extra_cases"], retrieval_cases),
+    )
 
 
 def evaluate_e2e(
@@ -161,6 +164,49 @@ def render_report(report: PolicyRagE2EReport, *, show_passing: bool = False) -> 
     return "\n".join(lines)
 
 
+def _retrieval_cases_from_json(
+    raw: object,
+    retrieval_cases: dict[str, PolicyEvalCase],
+) -> tuple[PolicyRagE2ECase, ...]:
+    config = cast(dict[str, object], raw)
+    case_ids = _selected_retrieval_case_ids(config["include"], retrieval_cases)
+    return tuple(
+        _case_from_retrieval_case(
+            retrieval_cases[case_id],
+            expected_status=_expected_status(config["expected_status"]),
+            must_not_include=_string_tuple(config["must_not_include"]),
+        )
+        for case_id in case_ids
+    )
+
+
+def _extra_cases_from_json(
+    raw: object,
+    retrieval_cases: dict[str, PolicyEvalCase],
+) -> tuple[PolicyRagE2ECase, ...]:
+    return tuple(
+        _case_from_json_e2e(cast(dict[str, object], item), retrieval_cases)
+        for item in cast(list[object], raw)
+    )
+
+
+def _case_from_retrieval_case(
+    case: PolicyEvalCase,
+    *,
+    expected_status: Literal["answered", "no_data"],
+    must_not_include: tuple[str, ...],
+) -> PolicyRagE2ECase:
+    return PolicyRagE2ECase(
+        id=case.id,
+        query=case.query,
+        session_ids=case.session_ids,
+        expected_status=expected_status,
+        expected_term_groups=case.expected_term_groups,
+        must_include_groups=case.expected_term_groups,
+        must_not_include=must_not_include,
+    )
+
+
 def _case_from_json_e2e(
     raw: dict[str, object],
     retrieval_cases: dict[str, PolicyEvalCase],
@@ -175,6 +221,15 @@ def _case_from_json_e2e(
         must_include_groups=_string_groups(raw["must_include_groups"]),
         must_not_include=_string_tuple(raw["must_not_include"]),
     )
+
+
+def _selected_retrieval_case_ids(
+    include: object,
+    retrieval_cases: dict[str, PolicyEvalCase],
+) -> tuple[str, ...]:
+    if include == "all":
+        return tuple(retrieval_cases)
+    return _string_tuple(include)
 
 
 def _base_retrieval_case(

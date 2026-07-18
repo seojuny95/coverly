@@ -1,136 +1,106 @@
-[
-  {
-    "id": "db-motorcycle-exclusion",
-    "retrieval_case_id": "db-motorcycle-exclusion",
+{
+  "retrieval_cases": {
+    "include": "all",
     "expected_status": "answered",
-    "must_include_groups": [["이륜차부담보특약"], ["미가입"]],
+    "must_include_groups": "expected_term_groups",
     "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
   },
-  {
-    "id": "db-car-treatment-1-to-7",
-    "retrieval_case_id": "db-car-treatment-1-to-7",
-    "expected_status": "answered",
-    "must_include_groups": [["자동차부상치료비"], ["100 만원", "100만원"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "db-premium-breakdown",
-    "retrieval_case_id": "db-premium-breakdown",
-    "expected_status": "answered",
-    "must_include_groups": [["보장보험료"], ["11,668원"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "nh-product-name",
-    "retrieval_case_id": "nh-product-name",
-    "expected_status": "answered",
-    "must_include_groups": [["NH가성비굿플러스어린이보험"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "nh-cancer-diagnosis",
-    "retrieval_case_id": "nh-cancer-diagnosis",
-    "expected_status": "answered",
-    "must_include_groups": [["암진단비"], ["유사암제외"], ["2,000"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "nh-similar-cancer",
-    "retrieval_case_id": "nh-similar-cancer",
-    "expected_status": "answered",
-    "must_include_groups": [["유사암진단비"], ["갑상선암"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "hyundai-premium",
-    "retrieval_case_id": "hyundai-premium",
-    "expected_status": "answered",
-    "must_include_groups": [["1,402,890원"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "hyundai-driver-age",
-    "retrieval_case_id": "hyundai-driver-age",
-    "expected_status": "answered",
-    "must_include_groups": [["운전자연령"], ["만30세이상"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "hyundai-product-name",
-    "retrieval_case_id": "hyundai-product-name",
-    "expected_status": "answered",
-    "must_include_groups": [["Hicar 다이렉트개인용"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "hyundai-policy-period",
-    "retrieval_case_id": "hyundai-policy-period",
-    "expected_status": "answered",
-    "must_include_groups": [["보험기간"], ["2027-06-27"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "heungkuk-product-name",
-    "retrieval_case_id": "heungkuk-product-name",
-    "expected_status": "answered",
-    "must_include_groups": [["맘편한 자녀사랑보험"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "heungkuk-policy-period",
-    "retrieval_case_id": "heungkuk-policy-period",
-    "expected_status": "answered",
-    "must_include_groups": [["보험기간"], ["2095-05-06"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "heungkuk-cancer-diagnosis",
-    "retrieval_case_id": "heungkuk-cancer-diagnosis",
-    "expected_status": "answered",
-    "must_include_groups": [["암진단비"], ["유사암제외"], ["4,000만원"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "heungkuk-similar-cancer",
-    "retrieval_case_id": "heungkuk-similar-cancer",
-    "expected_status": "answered",
-    "must_include_groups": [["유사암진단비"], ["1,000만원"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "heungkuk-confirm-address-change",
-    "retrieval_case_id": "heungkuk-confirm-address-change",
-    "expected_status": "answered",
-    "must_include_groups": [["주소"], ["흥국화재"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "db-late-page-coverage-start",
-    "retrieval_case_id": "db-late-page-coverage-start",
-    "expected_status": "answered",
-    "must_include_groups": [["제1회 보험료"], ["받은 때"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "nh-notice-motorcycle-duty",
-    "retrieval_case_id": "nh-notice-motorcycle-duty",
-    "expected_status": "answered",
-    "must_include_groups": [["이륜자동차"], ["알려야"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "hyundai-notice-mileage",
-    "retrieval_case_id": "hyundai-notice-mileage",
-    "expected_status": "answered",
-    "must_include_groups": [["65,077km"]],
-    "must_not_include": ["가입하세요", "해지하세요", "무조건 보장", "반드시 지급"]
-  },
-  {
-    "id": "policy-personal-adequacy-no-data",
-    "query": "내 가족력과 소득 기준으로 암진단비가 충분해?",
-    "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
-    "expected_status": "no_data",
-    "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
-    "must_not_include": ["충분합니다", "부족합니다", "가입하세요"]
-  }
-]
+  "extra_cases": [
+    {
+      "id": "policy-personal-adequacy-no-data",
+      "query": "내 가족력과 소득 기준으로 암진단비가 충분해?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["충분합니다", "부족합니다", "가입하세요"]
+    },
+    {
+      "id": "policy-exact-renewal-premium-no-data",
+      "query": "갱신되면 보험료가 정확히 얼마로 오르는지 알려줘",
+      "session_ids": ["sample-heungkuk-child-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["오릅니다", "인상됩니다", "가입하세요"]
+    },
+    {
+      "id": "policy-exact-renewal-rate-no-data",
+      "query": "다음 갱신 때 몇 퍼센트 인상되는지 계산해줘",
+      "session_ids": ["sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["% 인상", "퍼센트 인상", "가입하세요"]
+    },
+    {
+      "id": "policy-actual-cancer-claim-verdict-no-data",
+      "query": "제가 어제 암 진단받았는데 보험금 받을 수 있어?",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["받을 수 있어", "지급됩니다", "청구 가능"]
+    },
+    {
+      "id": "policy-actual-car-accident-verdict-no-data",
+      "query": "오늘 자동차 사고가 났는데 이 보험으로 보상 가능해?",
+      "session_ids": ["sample-hyundai-car-policy", "sample-db-driver-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["보상 가능", "지급됩니다", "청구 가능"]
+    },
+    {
+      "id": "policy-complete-claim-documents-no-data",
+      "query": "암진단비 청구서류를 빠짐없이 전부 알려줘",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["진단서", "전부", "빠짐없이"]
+    },
+    {
+      "id": "policy-beneficiary-no-data",
+      "query": "사망보험금은 누구에게 지급돼?",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["수익자", "배우자", "자녀"]
+    },
+    {
+      "id": "policy-exclusion-no-data",
+      "query": "암진단비에서 면책되는 항목을 알려줘",
+      "session_ids": ["sample-nh-child-policy", "sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["면책됩니다", "제외됩니다", "가입하세요"]
+    },
+    {
+      "id": "policy-medical-indemnity-confusion-no-data",
+      "query": "자동차사고벌금 대물 실손 담보가 있으니까 실손의료보험도 있는 거야?",
+      "session_ids": ["sample-heungkuk-child-policy", "sample-db-driver-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["실손의료보험이 있습니다", "실손의료보험 가입", "병원비"]
+    },
+    {
+      "id": "policy-medical-indemnity-missing-no-data",
+      "query": "내 증권에서 실손의료보험 담보가 확인돼?",
+      "session_ids": ["sample-heungkuk-child-policy", "sample-db-driver-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["실손의료보험이 확인", "가입되어", "병원비"]
+    },
+    {
+      "id": "policy-income-based-death-benefit-no-data",
+      "query": "내 소득 기준으로 사망보험금이 부족한지 충분한지 판단해줘",
+      "session_ids": ["sample-db-driver-policy", "sample-nh-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["부족합니다", "충분합니다", "증액"]
+    },
+    {
+      "id": "policy-family-history-brain-heart-no-data",
+      "query": "가족력이 있으면 뇌혈관질환 진단비를 더 늘려야 해?",
+      "session_ids": ["sample-heungkuk-child-policy"],
+      "expected_status": "no_data",
+      "must_include_groups": [["답하기 어려워요", "근거가 확인되지 않으면"]],
+      "must_not_include": ["늘려야", "증액", "가입하세요"]
+    }
+  ]
+}
