@@ -257,7 +257,7 @@ def _evaluate_case(
         any(term in rendered_output for term in group) for group in case.must_include_groups
     )
     forbidden = (*_UNIVERSAL_FORBIDDEN, *case.must_not_include)
-    forbidden_passed = all(term not in rendered_output for term in forbidden)
+    forbidden_passed = all(term not in answer for term in forbidden)
     status_passed = status == case.expected_status
     citations_passed = not case.require_citations or bool(citations)
     generation_passed = not (live and case.expected_route == "agent") or generation == "llm"

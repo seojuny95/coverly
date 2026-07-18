@@ -211,6 +211,11 @@ class _AssertingAllPolicyAgent:
         )
 
 
+class _FailingAgent:
+    def run(self, context: QaContext) -> PortfolioQuestionResponse:
+        raise AssertionError(f"agent should not run for {context.question!r}")
+
+
 def _official_answer(question: str) -> RagAnswer:
     assert question
     return RagAnswer(
@@ -878,6 +883,40 @@ def test_agent_requires_web_tool_for_latest_official_information() -> None:
     assert "공식 웹사이트 검색 근거" in result.answer
 
 
+def test_agent_recovers_single_web_result_when_selected_id_is_missing() -> None:
+    context = build_qa_context("요즘 보험업법 최신 개정 알려줘", [], None, [])
+    web_response = PortfolioQuestionResponse(
+        status="answered",
+        answer="공식 웹검색 결과로 확인한 최신 안내입니다.",
+        citations=[
+            AnswerCitation(
+                policy_id=None,
+                insurer=None,
+                product_name=None,
+                source_id="web:1",
+            )
+        ],
+        limitations=[],
+    )
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+    dependencies.register("web", web_response)
+
+    result = validated_agent_response(
+        context,
+        AgentCounselorDraft(answer_mode="tool_grounded", answer=web_response.answer),
+        dependencies,
+    )
+
+    assert result.status == "answered"
+    assert result.answer == web_response.answer
+    assert result.citations == web_response.citations
+
+
 def test_agent_general_guidance_cannot_bypass_required_web_search() -> None:
     context = build_qa_context("요즘 보험업법 최신 개정 알려줘", [], None, [])
     dependencies = QaAgentDependencies(
@@ -944,6 +983,26 @@ def test_agent_general_guidance_cannot_mention_uploaded_policy_identity() -> Non
             AgentCounselorDraft(
                 answer_mode="general_guidance",
                 answer="테스트보험 건강보험은 암진단비가 있어요.",
+            ),
+            dependencies,
+        )
+
+
+def test_agent_general_guidance_cannot_mention_held_coverage_name() -> None:
+    context = build_qa_context("너는 어떤 질문에 답할 수 있어?", _policies(), None, [])
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    with raises(QaAgentUnavailable):
+        validated_agent_response(
+            context,
+            AgentCounselorDraft(
+                answer_mode="general_guidance",
+                answer="암진단비 같은 보유 담보를 기준으로 답할 수 있어요.",
             ),
             dependencies,
         )
@@ -1558,6 +1617,7 @@ def test_qa_scope_only_plan_skips_portfolio_context(monkeypatch: MonkeyPatch) ->
     result = portfolio_qa.answer_portfolio_question(
         "오늘 날씨 알려줘",
         _policies(),
+        agent_runner=_FailingAgent(),
         plan=lambda _system, _user: {
             "questions": [
                 {

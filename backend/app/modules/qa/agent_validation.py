@@ -121,9 +121,11 @@ def _select_tool_result(
     draft: AgentCounselorDraft,
     dependencies: QaAgentDependencies,
 ) -> RegisteredToolResult | None:
-    if draft.selected_result_id is None:
-        return None
-    selected = dependencies.tool_results.get(draft.selected_result_id)
+    selected = (
+        dependencies.tool_results.get(draft.selected_result_id)
+        if draft.selected_result_id is not None
+        else None
+    )
     if requires_official_web(context.question):
         if selected is not None and selected.kind == "web":
             return selected
@@ -192,6 +194,7 @@ def _mentions_uploaded_policy_identity(answer: str, context: QaContext) -> bool:
                 policy.id,
                 policy.기본정보.보험사,
                 policy.기본정보.상품명,
+                *(coverage.담보명 for coverage in policy.보장목록),
             )
             if value and len(value.strip()) >= 2
         )
