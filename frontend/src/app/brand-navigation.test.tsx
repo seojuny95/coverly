@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../test/render-with-providers";
+import { POLICY_RESULT_DEFAULTS } from "../test/api-fixtures";
 import { BrandNavigation } from "./brand-navigation";
 
 const navigation = vi.hoisted(() => ({
@@ -38,7 +39,7 @@ describe("BrandNavigation", () => {
           {
             id: "policy-1",
             fileName: "policy.pdf",
-            result: { status: "accepted", 문자수: 1 },
+            result: { ...POLICY_RESULT_DEFAULTS, 문자수: 1 },
           },
         ],
       },

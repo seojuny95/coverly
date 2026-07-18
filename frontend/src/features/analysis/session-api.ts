@@ -1,16 +1,15 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { apiResponseError, apiUrl } from "../../shared/api/client";
+import type {
+  PortfolioSessionRequest,
+  PortfolioSessionResponse,
+} from "../../shared/api/contracts";
 
-type ApiErrorResponse = {
-  error?: {
-    code?: string;
-  };
-};
+export type PortfolioSessionResult = PortfolioSessionResponse;
 
-export type PortfolioSessionResult = {
-  portfolioSessionToken: string;
-  expiresAt: string;
-};
+type SessionPath =
+  | "/portfolio/sessions"
+  | "/portfolio/sessions/refresh"
+  | "/portfolio/sessions/delete";
 
 export class PortfolioSessionExpiredError extends Error {
   constructor() {
@@ -20,55 +19,54 @@ export class PortfolioSessionExpiredError extends Error {
 }
 
 export async function createPortfolioSession(): Promise<PortfolioSessionResult> {
-  return requestSession("");
+  return requestSession("/portfolio/sessions");
 }
 
 export async function refreshPortfolioSession(
   portfolioSessionToken: string,
 ): Promise<PortfolioSessionResult> {
-  return requestSession("/refresh", portfolioSessionToken);
+  return requestSession("/portfolio/sessions/refresh", portfolioSessionToken);
 }
 
 export async function deletePortfolioSession(
   portfolioSessionToken: string,
 ): Promise<void> {
-  await request("/delete", portfolioSessionToken);
+  await request("/portfolio/sessions/delete", portfolioSessionToken);
 }
 
 async function requestSession(
-  path: string,
+  path: SessionPath,
   token?: string,
 ): Promise<PortfolioSessionResult> {
   const response = await request(path, token);
   return (await response.json()) as PortfolioSessionResult;
 }
 
-async function request(path: string, token?: string): Promise<Response> {
+async function request(path: SessionPath, token?: string): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/portfolio/sessions${path}`, {
+    const body = token
+      ? ({ portfolioSessionToken: token } satisfies PortfolioSessionRequest)
+      : undefined;
+    response = await fetch(apiUrl(path), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: token
-        ? JSON.stringify({ portfolioSessionToken: token })
-        : undefined,
+      body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new Error("Portfolio session request failed");
   }
 
   if (!response.ok) {
-    let code = "";
-    try {
-      const error = (await response.json()) as ApiErrorResponse;
-      code = error.error?.code ?? "";
-    } catch {
-      // Non-JSON failures are transient server errors.
-    }
+    const error = await apiResponseError(
+      response,
+      "Portfolio session request failed",
+    );
+    const code = error.code;
     if (response.status === 403 || code === "INVALID_PORTFOLIO_SESSION") {
       throw new PortfolioSessionExpiredError();
     }
-    throw new Error("Portfolio session request failed");
+    throw error;
   }
 
   return response;

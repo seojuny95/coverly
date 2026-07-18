@@ -208,7 +208,7 @@ function RecommendedSingleCoverageCard({
             isRefreshing={isRefreshing}
           />
 
-          {!item?.matched_coverage_names.length ? (
+          {!item?.matched_coverage_names?.length ? (
             <p className="mt-3 text-xs leading-5 text-zinc-500">
               {item?.detail ?? "현재 자료에서 가입 여부를 확인하지 못했어요."}
             </p>
@@ -217,7 +217,7 @@ function RecommendedSingleCoverageCard({
           {item ? (
             <CoverageGroupList
               groups={item.coverage_groups ?? []}
-              fallbackNames={item.matched_coverage_names}
+              fallbackNames={item.matched_coverage_names ?? []}
             />
           ) : null}
         </div>
@@ -262,10 +262,10 @@ function CoverageGroupList({
             <span>
               {typeof group.total_amount === "number"
                 ? `합계 ${formatKoreanWon(group.total_amount)}`
-                : `${group.coverage_names.length}개`}
+                : `${group.coverage_names?.length ?? 0}개`}
             </span>
           </div>
-          <p className="mt-1">{group.coverage_names.join(" · ")}</p>
+          <p className="mt-1">{group.coverage_names?.join(" · ")}</p>
           <p className="mt-1 opacity-80">{group.detail}</p>
         </div>
       ))}
@@ -369,7 +369,7 @@ function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
 
       <CoverageGroupList
         groups={item.coverage_groups ?? []}
-        fallbackNames={item.matched_coverage_names}
+        fallbackNames={item.matched_coverage_names ?? []}
         emptyNotice="현재 업로드된 보험증권에서는 해당 보장이 확인되지 않아요"
       />
     </li>
@@ -419,7 +419,7 @@ function RecommendedMedicalIndemnityCard({
             <p className="mt-1 text-sm leading-6 text-zinc-700">
               {item.reference_basis}
             </p>
-            <ReferenceSourceList sources={item.reference_sources} />
+            <ReferenceSourceList sources={item.reference_sources ?? []} />
           </div>
         ) : null}
       </div>

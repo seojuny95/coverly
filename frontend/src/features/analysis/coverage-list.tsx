@@ -1,11 +1,11 @@
-import type { InsuranceCoverage } from "../upload/api";
+import type { InsuranceCoverage, InsurancePolicyResult } from "../upload/api";
 
 const GENERATED_NOTICE =
   "증권에 설명이 없어 표준약관을 참고해 만든 안내예요. 정확한 내용은 가입한 상품의 약관에서 확인해 주세요.";
 
 type InsuranceCoverageListProps = {
   coverages?: InsuranceCoverage[];
-  status?: "완료" | "부분";
+  status?: InsurancePolicyResult["분석상태"];
 };
 
 export function InsuranceCoverageList({

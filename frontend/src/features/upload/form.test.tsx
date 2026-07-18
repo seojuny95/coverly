@@ -7,6 +7,10 @@ import { UploadInsuranceError } from "./api";
 import type { AnalyzedInsurance, InsuranceAnalysis } from "../analysis/store";
 import { useInsuranceData } from "../analysis/store";
 import { renderWithProviders } from "../../test/render-with-providers";
+import {
+  POLICY_PARSE_RESPONSE_DEFAULTS,
+  POLICY_RESULT_DEFAULTS,
+} from "../../test/api-fixtures";
 
 // Probe consumer: reads the in-memory context so tests can assert what the
 // form wrote via the default onAnalysisComplete (setAnalysis).
@@ -268,6 +272,7 @@ describe("InsuranceUploadForm", () => {
     const uploadInsurance = vi
       .fn<UploadInsurance>()
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 32,
@@ -292,6 +297,7 @@ describe("InsuranceUploadForm", () => {
         },
       })
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 20,
@@ -360,6 +366,7 @@ describe("InsuranceUploadForm", () => {
   test("requires a name before saving the analysis", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
       status: "accepted",
       documentId: "test-document-id",
       문자수: 20,
@@ -393,6 +400,7 @@ describe("InsuranceUploadForm", () => {
   test("does not fall back to the contract holder when insured person is missing", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
       status: "accepted",
       documentId: "test-document-id",
       문자수: 20,
@@ -424,6 +432,7 @@ describe("InsuranceUploadForm", () => {
     const uploadInsurance = vi
       .fn<UploadInsurance>()
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 32,
@@ -437,6 +446,7 @@ describe("InsuranceUploadForm", () => {
         },
       })
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 20,
@@ -514,6 +524,7 @@ describe("InsuranceUploadForm", () => {
         }),
       )
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 20,
@@ -526,6 +537,7 @@ describe("InsuranceUploadForm", () => {
         },
       })
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 20,
@@ -590,6 +602,7 @@ describe("InsuranceUploadForm", () => {
         }),
       )
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 20,
@@ -668,6 +681,7 @@ describe("InsuranceUploadForm", () => {
   test("rejects duplicate policies in the same upload batch", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
       status: "accepted",
       documentId: "test-document-id",
       문자수: 20,
@@ -709,6 +723,7 @@ describe("InsuranceUploadForm", () => {
     const uploadInsurance = vi
       .fn<UploadInsurance>()
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 20,
@@ -722,6 +737,7 @@ describe("InsuranceUploadForm", () => {
         },
       })
       .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
         documentId: "test-document-id",
         문자수: 20,
@@ -739,6 +755,7 @@ describe("InsuranceUploadForm", () => {
         id: "existing-policy",
         fileName: "existing-policy.pdf",
         result: {
+          ...POLICY_RESULT_DEFAULTS,
           status: "accepted",
           문자수: 20,
           기본정보: {
@@ -778,6 +795,7 @@ describe("InsuranceUploadForm", () => {
       type: "application/pdf",
     });
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
       status: "accepted",
       documentId: "test-document-id",
       문자수: 20,
@@ -820,6 +838,7 @@ describe("InsuranceUploadForm", () => {
         fileName: "existing-policy.pdf",
         fileFingerprint: await fingerprintOf(insuranceFile),
         result: {
+          ...POLICY_RESULT_DEFAULTS,
           status: "accepted",
           문자수: 20,
           기본정보: {
@@ -856,6 +875,7 @@ describe("InsuranceUploadForm", () => {
           setTimeout(
             () =>
               resolve({
+                ...POLICY_PARSE_RESPONSE_DEFAULTS,
                 status: "accepted",
                 documentId: "test-document-id",
                 문자수: 32,
@@ -895,6 +915,7 @@ describe("InsuranceUploadForm", () => {
   test("default behavior writes the analysis into context and navigates client-side", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
       status: "accepted",
       documentId: "test-document-id",
       문자수: 20,
@@ -959,6 +980,7 @@ describe("InsuranceUploadForm", () => {
           new Promise((resolve) => {
             resolveFirstUpload = () =>
               resolve({
+                ...POLICY_PARSE_RESPONSE_DEFAULTS,
                 status: "accepted",
                 documentId: "test-document-id",
                 문자수: 32,

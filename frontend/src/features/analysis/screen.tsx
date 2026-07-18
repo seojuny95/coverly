@@ -30,6 +30,7 @@ import { PortfolioAnalysisPanel } from "./portfolio/panel";
 import { emptyReasonFor } from "./portfolio/eligibility";
 import { usePortfolioSummary } from "./portfolio/use-summary";
 import type { DeathBenefitGuideInput } from "./portfolio/api";
+import { displayClassification } from "./classification";
 
 // Lazy-load the chatbot (and its react-markdown dependency) so they stay out of
 // the initial /analysis bundle — it only mounts after the user opens it.
@@ -57,22 +58,6 @@ const CLASSIFICATION_SUMMARY: Record<string, string> = {
   손해보험: "재산 손해·책임 보장",
   미분류: "종류 확인 필요",
 };
-
-const LIFE_CLASSIFICATIONS = new Set(["생명보험", "생명·연금"]);
-const THIRD_CLASSIFICATIONS = new Set(["제3보험", "상해·질병·실손"]);
-const DAMAGE_CLASSIFICATIONS = new Set([
-  "손해보험",
-  "자동차",
-  "자동차보험",
-  "운전자보험",
-  "운전자상해보험",
-  "여행자보험",
-  "화재보험",
-  "주택화재보험",
-  "배상책임보험",
-  "보증보험",
-  "배상·화재·기타",
-]);
 
 type InsuranceAnalysisPageProps = {
   uploadInsurance?: UploadInsurance;
@@ -595,19 +580,6 @@ function groupInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
     },
     {},
   );
-}
-
-function displayClassification(classification?: string) {
-  if (classification && LIFE_CLASSIFICATIONS.has(classification)) {
-    return "생명보험";
-  }
-  if (classification && THIRD_CLASSIFICATIONS.has(classification)) {
-    return "제3보험";
-  }
-  if (classification && DAMAGE_CLASSIFICATIONS.has(classification)) {
-    return "손해보험";
-  }
-  return "미분류";
 }
 
 function formatDateTime(value: string) {

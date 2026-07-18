@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { POLICY_RESULT_DEFAULTS } from "../../test/api-fixtures";
 import {
   InsuranceDataProvider,
   mergeInsuranceAnalysis,
@@ -13,7 +14,7 @@ function makeAnalysis(id: string): InsuranceAnalysis {
     portfolioSessionToken: "test-portfolio-token",
     portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
     insuranceDocuments: [
-      { id, fileName: `${id}.pdf`, result: { status: "accepted", 문자수: 1 } },
+      { id, fileName: `${id}.pdf`, result: POLICY_RESULT_DEFAULTS },
     ],
   };
 }
@@ -50,6 +51,7 @@ describe("InsuranceDataProvider", () => {
           id: "a",
           fileName: "first.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 1,
             기본정보: {
@@ -69,6 +71,7 @@ describe("InsuranceDataProvider", () => {
           id: "b",
           fileName: "duplicate.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 1,
             기본정보: {
@@ -96,6 +99,7 @@ describe("InsuranceDataProvider", () => {
           fileName: "first.pdf",
           fileFingerprint: "abc123",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 1,
             기본정보: {
@@ -115,6 +119,7 @@ describe("InsuranceDataProvider", () => {
           fileName: "duplicate.pdf",
           fileFingerprint: "abc123",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 1,
             기본정보: {
@@ -140,7 +145,7 @@ describe("InsuranceDataProvider", () => {
         {
           id: "a",
           fileName: "updated.pdf",
-          result: { status: "accepted", 문자수: 2 },
+          result: { ...POLICY_RESULT_DEFAULTS, 문자수: 2 },
         },
       ],
     };

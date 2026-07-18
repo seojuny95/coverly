@@ -1,71 +1,23 @@
-export type InsurancePeriod = {
-  시작일?: string;
-  종료일?: string;
-};
+import { apiUrl, readApiErrorPayload } from "../../shared/api/client";
+import type {
+  CoveragePeriod,
+  InsuredDemographics,
+  PolicyCoverage,
+  PolicyParseResponse,
+  PolicySummary,
+  PremiumSummary,
+  VehicleInfo,
+} from "../../shared/api/contracts";
 
-export type InsurancePremium = {
-  금액?: number;
-  납입주기?: string;
-};
-
-export type InsuranceVehicleInfo = {
-  차량명?: string;
-  차량번호?: string;
-  연식?: string;
-};
-
-export type InsuranceDemographics = {
-  나이?: number;
-  성별?: string;
-  생애단계?: string;
-};
-
-export type InsuranceBasicInfo = {
-  보험사?: string;
-  상품명?: string;
-  증권번호?: string;
-  계약자?: string;
-  피보험자?: string;
-  보험분류?: string;
-  상품태그?: string[];
-  납입기간?: string;
-  만기일?: string;
-  보험기간?: InsurancePeriod;
-  보험료?: InsurancePremium;
-  피보험자정보?: InsuranceDemographics;
-  차량정보?: InsuranceVehicleInfo;
-};
-
-export type InsuranceCoverage = {
-  담보명: string;
-  가입금액: string;
-  보장내용: string | null;
-  해설: string | null;
-  // Absent means "담보" (a real coverage row); "부가" marks name-only rider/rate rows.
-  유형?: "담보" | "부가";
-};
-
-export type InsuranceUploadResult = {
-  status: "accepted";
-  documentId: string;
-  문자수: number;
-  기본정보?: InsuranceBasicInfo;
-  보장목록?: InsuranceCoverage[];
-  분석상태?: "완료" | "부분";
-};
+export type InsurancePeriod = CoveragePeriod;
+export type InsurancePremium = PremiumSummary;
+export type InsuranceVehicleInfo = VehicleInfo;
+export type InsuranceDemographics = InsuredDemographics;
+export type InsuranceBasicInfo = PolicySummary;
+export type InsuranceCoverage = PolicyCoverage;
+export type InsuranceUploadResult = PolicyParseResponse;
 
 export type InsurancePolicyResult = Omit<InsuranceUploadResult, "documentId">;
-
-type ApiErrorResponse = {
-  error?: {
-    code?: string;
-    message?: string;
-    request_id?: string;
-  };
-};
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 const GENERIC_UPLOAD_MESSAGE =
   "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
@@ -116,7 +68,7 @@ export async function uploadInsurance({
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/policies/parse`, {
+    response = await fetch(apiUrl("/policies/parse"), {
       method: "POST",
       body: formData,
     });
@@ -131,17 +83,17 @@ export async function uploadInsurance({
     let code = "UPLOAD_FAILED";
     let requestId = response.headers.get("x-request-id") ?? undefined;
     let userMessage = GENERIC_UPLOAD_MESSAGE;
-    try {
-      const error = (await response.json()) as ApiErrorResponse;
-      code = error.error?.code ?? code;
-      requestId = error.error?.request_id ?? requestId;
+    const { detail: error, isJson } = await readApiErrorPayload(response);
+    if (error) {
+      code = error.code;
+      requestId = error.request_id;
       if (response.status >= 500) {
         userMessage = SERVER_UPLOAD_MESSAGE;
       } else {
-        userMessage = error.error?.message ?? userMessage;
+        userMessage = error.message;
       }
-    } catch {
-      // Keep the generic message when the backend response is not JSON.
+    } else if (isJson && response.status >= 500) {
+      userMessage = SERVER_UPLOAD_MESSAGE;
     }
     throw new UploadInsuranceError({
       code,

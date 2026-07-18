@@ -7,6 +7,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { renderWithProviders } from "../../../test/render-with-providers";
+import { POLICY_RESULT_DEFAULTS } from "../../../test/api-fixtures";
 import { InsuranceAnalysisPage } from "../screen";
 import type { InsuranceAnalysis } from "../store";
 import { CoverageSummaryTable } from "./summary-table";
@@ -21,6 +22,7 @@ function fixture(): InsuranceAnalysis {
         id: "health-1",
         fileName: "health.pdf",
         result: {
+          ...POLICY_RESULT_DEFAULTS,
           status: "accepted",
           문자수: 100,
           기본정보: {
@@ -444,6 +446,7 @@ describe("portfolio features", () => {
       id: "auto-1",
       fileName: "auto.pdf",
       result: {
+        ...POLICY_RESULT_DEFAULTS,
         status: "accepted",
         문자수: 50,
         기본정보: { 보험분류: "손해보험", 상품태그: ["자동차보험"] },

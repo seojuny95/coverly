@@ -13,6 +13,7 @@ const summary: PortfolioSummary = {
       normalizedName: "암진단비",
       composition: [
         {
+          policy_id: null,
           insurer: "삼성화재",
           product_name: "건강보험",
           coverage_name: "암진단비",
@@ -24,6 +25,7 @@ const summary: PortfolioSummary = {
   ],
   actual_loss_coverages: [
     {
+      policy_id: null,
       coverage_name: "실손입원",
       normalized_name: "실손입원",
       original_amount: "5,000만원",
@@ -38,7 +40,9 @@ const summary: PortfolioSummary = {
   ],
   excluded_coverages: [
     {
+      policy_id: null,
       coverage_name: "기타특약",
+      original_amount: "",
       major_category: "기타",
       reason: "금액 기준을 확인하지 못했어요",
       insurer: "삼성화재",

@@ -187,13 +187,13 @@ function PortfolioOverview({
               {generatedOverview.title}
             </h2>
             <div className="mt-4 max-w-3xl space-y-3 text-sm leading-7 text-pretty text-zinc-300">
-              {generatedOverview.paragraphs.map((paragraph) => (
+              {(generatedOverview.paragraphs ?? []).map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
 
             <div className="mt-6 grid gap-3 border-y border-white/10 py-4 text-sm sm:grid-cols-3">
-              {generatedOverview.takeaways.map((takeaway) => (
+              {(generatedOverview.takeaways ?? []).map((takeaway) => (
                 <div key={takeaway.label} className="min-w-0">
                   <p className="text-[11px] font-semibold tracking-[0.12em] text-blue-300 uppercase">
                     {takeaway.label}

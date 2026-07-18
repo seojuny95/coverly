@@ -141,7 +141,9 @@ export const ChatMessage = memo(ChatMessageComponent);
 function ChannelLinks({
   links,
 }: {
-  links: ClaimChannelBlock["insurers"][number]["links"];
+  links: NonNullable<
+    NonNullable<ClaimChannelBlock["insurers"]>[number]["links"]
+  >;
 }) {
   if (!links.length) return null;
   return (
@@ -177,13 +179,13 @@ function ClaimChannels({ block }: { block: ClaimChannelBlock }) {
     <div className="mt-3 space-y-2 border-t border-zinc-100 pt-3">
       <p className="text-[11px] font-semibold text-zinc-500">청구 방법 안내</p>
       <ul className="space-y-1.5 text-xs text-zinc-600">
-        {block.insurers.map((insurer) => (
+        {(block.insurers ?? []).map((insurer) => (
           <li key={insurer.name}>
             <span className="font-medium text-zinc-700">{insurer.name}</span>
             {insurer.customer_center ? (
               <span className="ml-1">고객센터 {insurer.customer_center}</span>
             ) : null}
-            <ChannelLinks links={insurer.links} />
+            <ChannelLinks links={insurer.links ?? []} />
           </li>
         ))}
         {block.medical_indemnity ? (
@@ -196,7 +198,7 @@ function ClaimChannels({ block }: { block: ClaimChannelBlock }) {
                 콜센터 {block.medical_indemnity.call_center}
               </span>
             ) : null}
-            <ChannelLinks links={block.medical_indemnity.links} />
+            <ChannelLinks links={block.medical_indemnity.links ?? []} />
           </li>
         ) : null}
       </ul>
