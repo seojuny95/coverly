@@ -1,6 +1,5 @@
 {
   "version": 1,
-  "candidate_similarity_threshold": 0.88,
   "ignored_parenthetical_modifiers": [
     "감액없음",
     "기본계약",

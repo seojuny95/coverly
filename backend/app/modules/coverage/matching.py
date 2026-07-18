@@ -4,8 +4,6 @@ import re
 import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from difflib import SequenceMatcher
-from typing import Literal
 
 from app.modules.coverage.rules import (
     CoverageMatchingRules,
@@ -18,8 +16,6 @@ from app.modules.coverage.rules import (
 
 _SPACES_PATTERN = re.compile(r"\s+")
 
-MatchKind = Literal["exact", "curated_alias", "candidate", "distinct"]
-
 
 @dataclass(frozen=True)
 class CanonicalCoverageName:
@@ -30,16 +26,6 @@ class CanonicalCoverageName:
     display_name: str
     protected_terms: frozenset[str]
     alias_canonical: str | None
-
-
-@dataclass(frozen=True)
-class MatchDecision:
-    kind: MatchKind
-    mergeable: bool
-    similarity: float
-    left: CanonicalCoverageName
-    right: CanonicalCoverageName
-    reason: str
 
 
 def canonicalize_coverage_name(
@@ -66,35 +52,6 @@ def canonicalize_coverage_name(
         protected_terms=protected_terms_for(identity_key, active_rules.protected_terms),
         alias_canonical=alias_target.canonical_key if alias_target else None,
     )
-
-
-def match_coverage_names(
-    left_name: str,
-    right_name: str,
-    rules: CoverageMatchingRules | None = None,
-) -> MatchDecision:
-    """Classify a pair; candidates are never automatically mergeable."""
-
-    active_rules = rules or default_matching_rules()
-    left = canonicalize_coverage_name(left_name, active_rules)
-    right = canonicalize_coverage_name(right_name, active_rules)
-    similarity = SequenceMatcher(None, left.normalized_key, right.normalized_key).ratio()
-    if left.protected_terms != right.protected_terms:
-        return _decision("distinct", False, similarity, left, right, "protected terms differ")
-    if left.normalized_key == right.normalized_key:
-        kind: MatchKind = (
-            "curated_alias"
-            if left.alias_canonical is not None or right.alias_canonical is not None
-            else "exact"
-        )
-        return _decision(
-            kind, True, similarity, left, right, "validated canonical identities match"
-        )
-    if similarity >= active_rules.candidate_similarity_threshold:
-        return _decision(
-            "candidate", False, similarity, left, right, "similar name requires review"
-        )
-    return _decision("distinct", False, similarity, left, right, "canonical identities differ")
 
 
 def choose_display_name(names: Iterable[str], rules: CoverageMatchingRules | None = None) -> str:
@@ -138,17 +95,6 @@ def query_contains_canonical_name(
                 return True
             start = query_key.find(alias, start + 1)
     return False
-
-
-def _decision(
-    kind: MatchKind,
-    mergeable: bool,
-    similarity: float,
-    left: CanonicalCoverageName,
-    right: CanonicalCoverageName,
-    reason: str,
-) -> MatchDecision:
-    return MatchDecision(kind, mergeable, similarity, left, right, reason)
 
 
 def _normalize_unicode_and_spaces(value: str) -> str:
