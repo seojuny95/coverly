@@ -1,4 +1,4 @@
-import { Button } from "../../../../shared/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 import { formatWon } from "../money-format";
 import type {
   DeathBenefitGuideInput,

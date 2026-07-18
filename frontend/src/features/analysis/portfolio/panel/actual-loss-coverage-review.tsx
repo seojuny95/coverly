@@ -1,5 +1,5 @@
-import { Alert } from "../../../../shared/components/ui/alert";
-import { Card } from "../../../../shared/components/ui/card";
+import { Alert } from "@/shared/components/ui/alert";
+import { Card } from "@/shared/components/ui/card";
 import type { PortfolioSummary } from "../api";
 
 // Kept as a native <article> (not <Card>, which renders a div) so the
@@ -37,6 +37,7 @@ export function ActualLossCoverageReview({
       {duplicateNames.length > 0 ? (
         <Alert
           variant="warning"
+          role="note"
           className="mt-4 rounded-2xl border-amber-200 px-4 py-3 text-sm leading-6 text-amber-800"
         >
           여러 계약에 표시된 담보: {duplicateNames.join(" · ")}

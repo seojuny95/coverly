@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import type { AnalyzedInsurance } from "../store";
 import { useDialogA11y } from "../use-dialog-a11y";
-import { Button } from "../../../shared/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { ChatMessage } from "./chat-message";
 import { useQaChat } from "./use-chat";
@@ -148,7 +148,7 @@ export function InsuranceChatbot({
               autoCorrect="off"
               spellCheck={false}
               placeholder="예: 겹치는 보장이 있나요?"
-              className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600 disabled:bg-zinc-100 disabled:text-zinc-500"
+              className="h-auto min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600 focus-visible:ring-0 disabled:bg-zinc-100 disabled:text-zinc-500"
             />
             <Button
               type="submit"

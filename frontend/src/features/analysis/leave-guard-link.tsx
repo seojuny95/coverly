@@ -11,7 +11,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../../shared/components/ui/alert-dialog";
+} from "@/shared/components/ui/alert-dialog";
 
 // In-app navigation guard: when `enabled`, intercepts the click and shows a
 // custom confirm modal before leaving (in-memory analysis data would be lost).
@@ -49,7 +49,7 @@ export function LeaveGuardLink({
       </a>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent className="w-full max-w-sm rounded-2xl bg-white p-6 text-center">
-          <AlertDialogHeader>
+          <AlertDialogHeader className="sm:place-items-center sm:text-center">
             <AlertDialogTitle className="text-lg font-semibold">
               지금 나가면 분석 내용이 지워져요
             </AlertDialogTitle>
@@ -58,7 +58,7 @@ export function LeaveGuardLink({
               사라져요.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-5 flex-row justify-center gap-2 bg-transparent p-0">
+          <AlertDialogFooter className="mt-5 flex-row justify-center gap-2 border-t-0 bg-transparent p-0">
             <AlertDialogCancel>닫기</AlertDialogCancel>
             <AlertDialogAction
               className="bg-blue-600 hover:bg-blue-700"

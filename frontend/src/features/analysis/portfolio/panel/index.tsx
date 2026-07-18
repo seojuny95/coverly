@@ -1,4 +1,4 @@
-import { Button } from "../../../../shared/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 import { ClaimGuide } from "../claim-guide";
 import type { DeathBenefitGuideInput, PortfolioSummary } from "../api";
 import { SpecialPolicySections } from "../special-policy-sections";

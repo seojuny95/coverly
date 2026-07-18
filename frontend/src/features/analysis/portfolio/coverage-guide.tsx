@@ -1,6 +1,7 @@
 import type { VariantProps } from "class-variance-authority";
 
 import { Badge, type badgeVariants } from "@/shared/components/ui/badge";
+import { cn } from "@/shared/lib/utils";
 
 import type {
   EssentialCoverageItem,
@@ -36,7 +37,10 @@ export function CoverageStatusBadge({
   return (
     <Badge
       variant={STATUS_COPY[status].variant}
-      className="h-auto px-3 py-1 text-xs font-medium"
+      className={cn(
+        "h-auto px-3 py-1 text-xs font-medium",
+        status === "needs_review" && "text-amber-800",
+      )}
     >
       {label ?? STATUS_COPY[status].label}
     </Badge>

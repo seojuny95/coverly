@@ -35,7 +35,12 @@ export function RecommendedDiagnosisCard({
             진단 보장
           </h4>
         </div>
-        <Badge variant="neutral">{confirmedCount}/3 확인</Badge>
+        <Badge
+          variant="neutral"
+          className="h-auto rounded-full bg-white px-3 py-1 ring-1 ring-zinc-200"
+        >
+          {confirmedCount}/3 확인
+        </Badge>
       </div>
 
       <ul className="mt-5 grid gap-3 border-t border-zinc-200 pt-5 lg:grid-cols-3">

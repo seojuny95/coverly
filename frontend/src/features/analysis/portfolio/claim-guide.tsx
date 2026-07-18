@@ -37,7 +37,11 @@ function ClaimChannelOptions({
   return (
     <div className="mt-3 space-y-3">
       {claimChannels.medical_indemnity ? (
-        <Alert variant="info" className="gap-0 px-3 py-2.5 text-xs leading-5">
+        <Alert
+          variant="info"
+          role="note"
+          className="gap-0 rounded-xl px-3 py-2.5 text-xs leading-5"
+        >
           <AlertDescription className="text-xs text-zinc-600 [&_p:not(:last-child)]:mb-0">
             <p className="font-semibold text-zinc-900">
               {claimChannels.medical_indemnity.name}

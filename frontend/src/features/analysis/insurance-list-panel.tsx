@@ -1,5 +1,5 @@
 import { SectionLabel } from "../../shared/components/section-label";
-import { Button } from "../../shared/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 import { POLICY_CLASSIFICATIONS } from "../../shared/api/generated-runtime";
 
 import { InsurerLogo, InsuranceDetail, TagBadge } from "./policy-detail";

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { forwardRef, type ReactNode, useMemo, useState } from "react";
 
 import { SectionLabel } from "../../shared/components/section-label";
-import { Button } from "../../shared/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 
 import { UploadInsuranceModal } from "./upload-modal";
 import {

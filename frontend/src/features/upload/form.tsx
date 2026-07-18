@@ -8,7 +8,7 @@ import {
   deletePortfolioSessionDocuments,
   type PortfolioSessionResult,
 } from "../analysis/session-api";
-import { Button } from "../../shared/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
 import { Label } from "@/shared/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";

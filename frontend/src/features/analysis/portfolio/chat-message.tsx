@@ -126,6 +126,7 @@ function ChatMessageComponent({ message }: { message: ChatMessageData }) {
           </summary>
           <Alert
             variant="warning"
+            role="note"
             className="mt-2 gap-0 border-transparent px-3 py-2 text-xs leading-5 text-amber-900"
           >
             <AlertDescription className="text-xs text-pretty text-amber-900 [&_p:not(:last-child)]:mb-0">

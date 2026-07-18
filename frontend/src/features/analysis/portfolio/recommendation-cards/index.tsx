@@ -1,4 +1,5 @@
-import { Card } from "@/shared/components/ui/card";
+import { cardVariants } from "@/shared/components/ui/card";
+import { cn } from "@/shared/lib/utils";
 
 import type { DeathBenefitGuideInput, EssentialCoverageItem } from "../api";
 import { RecommendedDeathBenefitCard } from "./death-benefit-card";
@@ -31,7 +32,12 @@ export function RecommendedInsuranceCards({
   ).length;
 
   return (
-    <Card className="analysis-overview-reveal analysis-overview-delay-1 p-5 sm:p-6">
+    <article
+      className={cn(
+        cardVariants(),
+        "analysis-overview-reveal analysis-overview-delay-1 p-5 sm:p-6",
+      )}
+    >
       <div>
         <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
           핵심 보장 확인
@@ -53,6 +59,6 @@ export function RecommendedInsuranceCards({
 
         <RecommendedMedicalIndemnityCard item={medicalIndemnity} />
       </div>
-    </Card>
+    </article>
   );
 }

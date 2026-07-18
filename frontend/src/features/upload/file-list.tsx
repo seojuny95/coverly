@@ -99,7 +99,7 @@ export function SelectedFileList({
                         onPasswordChange(selectedFile.id, event.target.value)
                       }
                       autoComplete="off"
-                      className="w-full bg-white px-3 py-2 text-sm text-zinc-950"
+                      className="h-auto w-full border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950"
                       placeholder="PDF를 열 때 쓰는 비밀번호"
                     />
                     <span className="mt-1 block leading-5 text-zinc-500">
