@@ -11,10 +11,10 @@ from app.core.errors import (
 )
 from app.core.lifespan import lifespan
 from app.core.middleware import request_id_middleware
-from app.modules.policy.router import router as policies_router
 from app.modules.portfolio.router import router as portfolio_router
 from app.modules.portfolio.session.router import router as portfolio_sessions_router
 from app.modules.qa.router import router as qa_router
+from app.modules.upload.router import router as policies_router
 
 
 def health() -> dict[str, str]:

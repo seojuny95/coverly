@@ -11,7 +11,11 @@ from app.modules.policy.parsing import (
 from app.modules.policy.pipeline import EmptyTextError, PipelineResult
 from app.modules.policy.schemas import Coverage as CoverageResponse
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
-from app.modules.portfolio.session.service import RegisteredPolicyDocument
+from app.modules.portfolio.session.models import PolicyDocumentReservation
+from app.modules.portfolio.session.service import (
+    PortfolioSessionDocumentLimitExceeded,
+    RegisteredPolicyDocument,
+)
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
 
 PORTFOLIO_TOKEN = "test-portfolio-token"
@@ -50,16 +54,28 @@ def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 
     class _Sessions:
-        def add_pipeline_result(
+        def begin_upload(
             self,
             token: str,
-            result: PipelineResult,
             *,
             document_id: str,
-        ) -> RegisteredPolicyDocument:
+        ) -> PolicyDocumentReservation:
             assert token == PORTFOLIO_TOKEN
             assert document_id == "11111111111141118111111111111111"
-            return RegisteredPolicyDocument(id=document_id)
+            return PolicyDocumentReservation(
+                session_id="portfolio-session",
+                document_id=document_id,
+            )
+
+        def complete_upload(
+            self,
+            reservation: PolicyDocumentReservation,
+            result: PipelineResult,
+        ) -> RegisteredPolicyDocument:
+            return RegisteredPolicyDocument(id=reservation.document_id)
+
+        def release_upload(self, reservation: PolicyDocumentReservation) -> None:
+            pass
 
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
     yield
@@ -138,7 +154,7 @@ def test_parse_rejects_unreadable_pdf_body() -> None:
 
 
 def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.policy import router as policies
+    from app.modules.upload import router as policies
 
     result: PipelineResult = {
         "기본정보": {
@@ -191,7 +207,7 @@ def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) ->
 def test_parse_registers_result_under_portfolio_session_without_exposing_rag_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.modules.policy import router as policies
+    from app.modules.upload import router as policies
 
     result: PipelineResult = {
         "기본정보": {
@@ -211,17 +227,26 @@ def test_parse_registers_result_under_portfolio_session_without_exposing_rag_tok
         return result
 
     class _Sessions:
-        def add_pipeline_result(
+        def begin_upload(
             self,
             token: str,
-            pipeline_result: PipelineResult,
             *,
             document_id: str,
-        ) -> RegisteredPolicyDocument:
+        ) -> PolicyDocumentReservation:
             seen["token"] = token
-            seen["result"] = pipeline_result
             seen["document_id"] = document_id
-            return RegisteredPolicyDocument(id=document_id)
+            return PolicyDocumentReservation(session_id="portfolio", document_id=document_id)
+
+        def complete_upload(
+            self,
+            reservation: PolicyDocumentReservation,
+            pipeline_result: PipelineResult,
+        ) -> RegisteredPolicyDocument:
+            seen["result"] = pipeline_result
+            return RegisteredPolicyDocument(id=reservation.document_id)
+
+        def release_upload(self, reservation: PolicyDocumentReservation) -> None:
+            pass
 
     monkeypatch.setattr(policies, "run_pipeline", _run)
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
@@ -244,8 +269,90 @@ def test_parse_registers_result_under_portfolio_session_without_exposing_rag_tok
     }
 
 
+def test_parse_reserves_slot_before_running_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.upload import router as policies
+
+    calls: list[str] = []
+
+    def _run(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        calls.append("pipeline")
+        return {
+            "기본정보": {},
+            "보장목록": [],
+            "분석상태": "완료",
+            "문자수": 1,
+        }
+
+    class _Sessions:
+        def begin_upload(
+            self,
+            token: str,
+            *,
+            document_id: str,
+        ) -> PolicyDocumentReservation:
+            calls.append("reserve")
+            raise PortfolioSessionDocumentLimitExceeded
+
+    monkeypatch.setattr(policies, "run_pipeline", _run)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+    try:
+        response = TestClient(app).post(
+            "/policies/parse",
+            files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+            data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
+        )
+    finally:
+        app.dependency_overrides.pop(get_portfolio_session_service, None)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED"
+    assert calls == ["reserve"]
+
+
+def test_parse_releases_reservation_when_pipeline_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.upload import router as policies
+
+    released: list[PolicyDocumentReservation] = []
+    reservation = PolicyDocumentReservation(
+        session_id="portfolio-session",
+        document_id="11111111111141118111111111111111",
+    )
+
+    def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        raise EmptyTextError
+
+    class _Sessions:
+        def begin_upload(
+            self,
+            token: str,
+            *,
+            document_id: str,
+        ) -> PolicyDocumentReservation:
+            return reservation
+
+        def release_upload(self, released_reservation: PolicyDocumentReservation) -> None:
+            released.append(released_reservation)
+
+    monkeypatch.setattr(policies, "run_pipeline", _raise)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+    try:
+        response = TestClient(app).post(
+            "/policies/parse",
+            files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+            data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
+        )
+    finally:
+        app.dependency_overrides.pop(get_portfolio_session_service, None)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "PDF_TEXT_EXTRACTION_FAILED"
+    assert released == [reservation]
+
+
 def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.policy import router as policies
+    from app.modules.upload import router as policies
 
     seen: dict[str, str | None] = {}
     result: PipelineResult = {
@@ -283,7 +390,7 @@ def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) 
 def test_parse_maps_missing_pdf_password_to_422(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.modules.policy import router as policies
+    from app.modules.upload import router as policies
 
     def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
         raise PdfPasswordRequiredError
@@ -305,7 +412,7 @@ def test_parse_maps_missing_pdf_password_to_422(
 def test_parse_maps_wrong_pdf_password_to_422(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.modules.policy import router as policies
+    from app.modules.upload import router as policies
 
     def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
         raise PdfPasswordIncorrectError
@@ -331,7 +438,7 @@ def test_parse_maps_wrong_pdf_password_to_422(
 def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.MonkeyPatch) -> None:
     # The auto-policy skip is gone: every classified policy, including 자동차,
     # now runs through the same pipeline and can return non-empty 보장목록.
-    from app.modules.policy import router as policies
+    from app.modules.upload import router as policies
 
     result: PipelineResult = {
         "기본정보": {
@@ -371,7 +478,7 @@ def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.Monk
 
 
 def test_parse_maps_empty_text_error_to_422(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.policy import router as policies
+    from app.modules.upload import router as policies
 
     def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
         raise EmptyTextError
@@ -392,7 +499,7 @@ def test_parse_maps_empty_text_error_to_422(monkeypatch: pytest.MonkeyPatch) -> 
 def test_parse_maps_reference_data_failure_to_retryable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.modules.policy import router as policies
+    from app.modules.upload import router as policies
 
     def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
         raise ReferenceDataUnavailableError("offline")

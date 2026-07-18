@@ -15,6 +15,7 @@ from app.modules.policy.pipeline import PipelineResult
 from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
     NewPortfolioSession,
+    PolicyDocumentReservation,
     PortfolioSessionSnapshot,
     StoredPolicyDocument,
 )
@@ -108,34 +109,84 @@ class PortfolioSessionService:
         now: datetime | None = None,
     ) -> RegisteredPolicyDocument:
         current = now or datetime.now(UTC)
+        try:
+            reservation = self.begin_upload(
+                token,
+                document_id=document_id,
+                now=current,
+            )
+        except Exception:
+            rag_session_id = rag_session_id_from_result(result, now=current)
+            if rag_session_id is not None:
+                self._delete_rag_session(rag_session_id)
+            raise
+        return self.complete_upload(reservation, result, now=current)
+
+    def begin_upload(
+        self,
+        token: str,
+        *,
+        document_id: str | None = None,
+        now: datetime | None = None,
+    ) -> PolicyDocumentReservation:
+        current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
         resolved_document_id = document_id or uuid.uuid4().hex
+        reserved = self._repository.reserve_document(
+            claims.session_id,
+            resolved_document_id,
+            now=current,
+            max_documents=get_settings().portfolio_session_max_documents,
+        )
+        if reserved == "limit_exceeded":
+            raise PortfolioSessionDocumentLimitExceeded
+        if reserved == "cancelled":
+            raise PortfolioSessionDocumentCancelled
+        if reserved == "missing":
+            raise InvalidPortfolioSessionToken
+        return PolicyDocumentReservation(
+            session_id=claims.session_id,
+            document_id=resolved_document_id,
+        )
+
+    def complete_upload(
+        self,
+        reservation: PolicyDocumentReservation,
+        result: PipelineResult,
+        *,
+        now: datetime | None = None,
+    ) -> RegisteredPolicyDocument:
+        current = now or datetime.now(UTC)
         rag_session_id = rag_session_id_from_result(result, now=current)
         try:
-            policy = policy_for_storage(result, document_id=resolved_document_id)
-            stored = self._repository.add_document(
-                claims.session_id,
+            policy = policy_for_storage(result, document_id=reservation.document_id)
+            stored = self._repository.complete_document(
+                reservation,
                 StoredPolicyDocument(
-                    id=resolved_document_id,
+                    id=reservation.document_id,
                     policy=policy,
                     rag_session_id=rag_session_id,
                 ),
                 now=current,
-                max_documents=get_settings().portfolio_session_max_documents,
             )
         except Exception:
-            if rag_session_id is not None:
-                self._delete_rag_session(rag_session_id)
+            self._discard_upload(reservation, rag_session_id=rag_session_id)
             raise
         if stored != "stored":
-            if rag_session_id is not None:
-                self._delete_rag_session(rag_session_id)
-            if stored == "limit_exceeded":
-                raise PortfolioSessionDocumentLimitExceeded
+            self._discard_upload(reservation, rag_session_id=rag_session_id)
             if stored == "cancelled":
                 raise PortfolioSessionDocumentCancelled
             raise InvalidPortfolioSessionToken
-        return RegisteredPolicyDocument(id=resolved_document_id)
+        return RegisteredPolicyDocument(id=reservation.document_id)
+
+    def release_upload(self, reservation: PolicyDocumentReservation) -> None:
+        try:
+            self._repository.release_document(reservation)
+        except Exception as exc:
+            logger.warning(
+                "Portfolio document reservation release failed with %s",
+                type(exc).__name__,
+            )
 
     def snapshot(
         self,
@@ -261,6 +312,16 @@ class PortfolioSessionService:
                 "Portfolio RAG session deletion failed with %s",
                 type(exc).__name__,
             )
+
+    def _discard_upload(
+        self,
+        reservation: PolicyDocumentReservation,
+        *,
+        rag_session_id: str | None,
+    ) -> None:
+        self.release_upload(reservation)
+        if rag_session_id is not None:
+            self._delete_rag_session(rag_session_id)
 
 
 @lru_cache(maxsize=1)

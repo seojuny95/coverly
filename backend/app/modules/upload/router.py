@@ -1,4 +1,4 @@
-"""HTTP boundary for single-policy parsing and uploaded-text sessions."""
+"""HTTP boundary that composes policy parsing with portfolio sessions."""
 
 import asyncio
 from typing import Annotated, Protocol
@@ -61,6 +61,32 @@ async def _read_pdf(file: UploadFile) -> bytes:
     return data
 
 
+def _portfolio_session_error(
+    error: (
+        InvalidPortfolioSessionToken
+        | PortfolioSessionDocumentLimitExceeded
+        | PortfolioSessionDocumentCancelled
+    ),
+) -> ApiError:
+    if isinstance(error, InvalidPortfolioSessionToken):
+        return ApiError(
+            status_code=403,
+            code="INVALID_PORTFOLIO_SESSION",
+            message="분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
+        )
+    if isinstance(error, PortfolioSessionDocumentLimitExceeded):
+        return ApiError(
+            status_code=422,
+            code="PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
+            message="한 번에 분석할 수 있는 보험증권 수를 초과했어요.",
+        )
+    return ApiError(
+        status_code=409,
+        code="POLICY_UPLOAD_CANCELLED",
+        message="취소된 업로드예요. 파일을 다시 선택해주세요.",
+    )
+
+
 @router.post(
     "/parse",
     response_model=PolicyParseResponse,
@@ -91,58 +117,62 @@ async def parse_policy(
     ),
 ) -> PolicyParseResponse:
     data = await _read_pdf(file)
-    pdf_password = password if password else None
     try:
-        result = await asyncio.to_thread(pipeline, data, password=pdf_password)
-    except PdfPasswordRequiredError:
-        raise ApiError(
-            status_code=422,
-            code="PDF_PASSWORD_REQUIRED",
-            message="PDF 비밀번호를 입력해주세요.",
-        ) from None
-    except PdfPasswordIncorrectError:
-        raise ApiError(
-            status_code=422,
-            code="PDF_PASSWORD_INCORRECT",
-            message="PDF 비밀번호가 맞지 않아요. 다시 입력해주세요.",
-        ) from None
-    except EmptyTextError:
-        raise ApiError(
-            status_code=422,
-            code="PDF_TEXT_EXTRACTION_FAILED",
-            message="PDF에서 텍스트를 추출할 수 없습니다.",
-        ) from None
-    except ReferenceDataUnavailableError as exc:
-        raise ApiError(
-            status_code=503,
-            code="reference_data_unavailable",
-            message="분석 기준 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
-        ) from exc
-    try:
-        document = await asyncio.to_thread(
-            sessions.add_pipeline_result,
+        reservation = await asyncio.to_thread(
+            sessions.begin_upload,
             portfolio_session_token,
-            result,
             document_id=document_id.hex,
         )
-    except InvalidPortfolioSessionToken:
-        raise ApiError(
-            status_code=403,
-            code="INVALID_PORTFOLIO_SESSION",
-            message="분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
-        ) from None
-    except PortfolioSessionDocumentLimitExceeded:
-        raise ApiError(
-            status_code=422,
-            code="PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
-            message="한 번에 분석할 수 있는 보험증권 수를 초과했어요.",
-        ) from None
-    except PortfolioSessionDocumentCancelled:
-        raise ApiError(
-            status_code=409,
-            code="POLICY_UPLOAD_CANCELLED",
-            message="취소된 업로드예요. 파일을 다시 선택해주세요.",
-        ) from None
+    except (
+        InvalidPortfolioSessionToken,
+        PortfolioSessionDocumentLimitExceeded,
+        PortfolioSessionDocumentCancelled,
+    ) as exc:
+        raise _portfolio_session_error(exc) from None
+
+    pdf_password = password if password else None
+    try:
+        try:
+            result = await asyncio.to_thread(pipeline, data, password=pdf_password)
+        except PdfPasswordRequiredError:
+            raise ApiError(
+                status_code=422,
+                code="PDF_PASSWORD_REQUIRED",
+                message="PDF 비밀번호를 입력해주세요.",
+            ) from None
+        except PdfPasswordIncorrectError:
+            raise ApiError(
+                status_code=422,
+                code="PDF_PASSWORD_INCORRECT",
+                message="PDF 비밀번호가 맞지 않아요. 다시 입력해주세요.",
+            ) from None
+        except EmptyTextError:
+            raise ApiError(
+                status_code=422,
+                code="PDF_TEXT_EXTRACTION_FAILED",
+                message="PDF에서 텍스트를 추출할 수 없습니다.",
+            ) from None
+        except ReferenceDataUnavailableError as exc:
+            raise ApiError(
+                status_code=503,
+                code="reference_data_unavailable",
+                message="분석 기준 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
+            ) from exc
+
+        try:
+            document = await asyncio.to_thread(
+                sessions.complete_upload,
+                reservation,
+                result,
+            )
+        except (
+            InvalidPortfolioSessionToken,
+            PortfolioSessionDocumentLimitExceeded,
+            PortfolioSessionDocumentCancelled,
+        ) as exc:
+            raise _portfolio_session_error(exc) from None
+    finally:
+        await asyncio.to_thread(sessions.release_upload, reservation)
 
     client_result = dict(result)
     client_result.pop("문서세션ID", None)

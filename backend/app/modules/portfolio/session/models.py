@@ -22,6 +22,12 @@ class StoredPolicyDocument:
 
 
 @dataclass(frozen=True)
+class PolicyDocumentReservation:
+    session_id: str
+    document_id: str
+
+
+@dataclass(frozen=True)
 class PortfolioSessionSnapshot:
     session_id: str
     version: int

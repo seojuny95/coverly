@@ -10,10 +10,14 @@ from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
     NewPortfolioSession,
+    PolicyDocumentReservation,
     PortfolioSessionSnapshot,
     StoredPolicyDocument,
 )
-from app.modules.portfolio.session.repository import AddDocumentResult
+from app.modules.portfolio.session.repository import (
+    CompleteDocumentResult,
+    ReserveDocumentResult,
+)
 from app.modules.portfolio.session.service import (
     PortfolioSessionDocumentCancelled,
     PortfolioSessionDocumentLimitExceeded,
@@ -30,28 +34,52 @@ class _Repository:
         self.cache: CachedPortfolioAnalysis | None = None
         self.version = 0
         self.cancelled_document_ids: set[str] = set()
+        self.reservations: set[str] = set()
 
     def create(self, session: NewPortfolioSession) -> None:
         self.session = session
 
-    def add_document(
+    def reserve_document(
         self,
         session_id: str,
-        document: StoredPolicyDocument,
+        document_id: str,
         *,
         now: datetime,
         max_documents: int,
-    ) -> AddDocumentResult:
+    ) -> ReserveDocumentResult:
         if self.session is None or self.session.id != session_id:
             return "missing"
-        if document.id in self.cancelled_document_ids:
+        if document_id in self.cancelled_document_ids:
             return "cancelled"
-        if len(self.documents) >= max_documents:
+        if document_id in self.reservations:
+            return "reserved"
+        if len(self.documents) + len(self.reservations) >= max_documents:
             return "limit_exceeded"
+        self.reservations.add(document_id)
+        return "reserved"
+
+    def complete_document(
+        self,
+        reservation: PolicyDocumentReservation,
+        document: StoredPolicyDocument,
+        *,
+        now: datetime,
+    ) -> CompleteDocumentResult:
+        if self.session is None or self.session.id != reservation.session_id:
+            return "missing"
+        if reservation.document_id in self.cancelled_document_ids:
+            self.reservations.discard(reservation.document_id)
+            return "cancelled"
+        if reservation.document_id not in self.reservations:
+            return "missing"
+        self.reservations.remove(reservation.document_id)
         self.documents[document.id] = document
         self.version += 1
         self.cache = None
         return "stored"
+
+    def release_document(self, reservation: PolicyDocumentReservation) -> None:
+        self.reservations.discard(reservation.document_id)
 
     def snapshot(
         self,
@@ -104,6 +132,7 @@ class _Repository:
         if self.session is None or self.session.id != session_id:
             return None
         self.cancelled_document_ids.update(document_ids)
+        self.reservations.difference_update(document_ids)
         deleted = [
             self.documents.pop(document_id)
             for document_id in document_ids
@@ -312,6 +341,69 @@ def test_cancelled_document_cannot_be_stored_after_delete_wins_the_race() -> Non
     assert repository.documents == {}
 
 
+def test_cancellation_after_reservation_removes_late_rag_document() -> None:
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    rag_store = _RagStore()
+    sessions = PortfolioSessionService(repository, rag_store=rag_store)
+    access = sessions.create(now=now)
+    reservation = sessions.begin_upload(
+        access.token,
+        document_id="document-1",
+        now=now,
+    )
+    rag_token = sign_policy_session_id(
+        "late-rag-document",
+        datetime(2026, 7, 18, 1, tzinfo=UTC),
+    )
+    result = _empty_pipeline_result()
+    result["문서세션ID"] = rag_token
+
+    sessions.delete_documents(access.token, ["document-1"], now=now)
+
+    with pytest.raises(PortfolioSessionDocumentCancelled):
+        sessions.complete_upload(reservation, result, now=now)
+
+    assert repository.documents == {}
+    assert repository.reservations == set()
+    assert rag_store.deleted == ["late-rag-document"]
+
+
+def test_failed_completion_releases_slot_and_removes_rag_document() -> None:
+    class _FailingRepository(_Repository):
+        def complete_document(
+            self,
+            reservation: PolicyDocumentReservation,
+            document: StoredPolicyDocument,
+            *,
+            now: datetime,
+        ) -> CompleteDocumentResult:
+            raise RuntimeError("database unavailable")
+
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _FailingRepository()
+    rag_store = _RagStore()
+    sessions = PortfolioSessionService(repository, rag_store=rag_store)
+    access = sessions.create(now=now)
+    reservation = sessions.begin_upload(
+        access.token,
+        document_id="document-1",
+        now=now,
+    )
+    rag_token = sign_policy_session_id(
+        "failed-rag-document",
+        datetime(2026, 7, 18, 1, tzinfo=UTC),
+    )
+    result = _empty_pipeline_result()
+    result["문서세션ID"] = rag_token
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        sessions.complete_upload(reservation, result, now=now)
+
+    assert repository.reservations == set()
+    assert rag_store.deleted == ["failed-rag-document"]
+
+
 def test_document_limit_removes_the_unlinked_rag_document(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -345,6 +437,34 @@ def test_document_limit_removes_the_unlinked_rag_document(
     assert len(repository.documents) == 1
     assert rag_store.deleted == ["rag-over-limit"]
     assert rag_store.expired_cleanup_calls == 1
+
+
+def test_in_progress_upload_counts_toward_document_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.portfolio.session import service
+
+    class _Settings:
+        policy_rag_ttl_seconds = 900
+        policy_rag_max_ttl_seconds = 7200
+        policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
+        database_url = "postgresql://example/test"
+        portfolio_session_max_documents = 1
+
+    monkeypatch.setattr(service, "get_settings", lambda: _Settings())
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+    first = sessions.begin_upload(access.token, document_id="document-1", now=now)
+
+    with pytest.raises(PortfolioSessionDocumentLimitExceeded):
+        sessions.begin_upload(access.token, document_id="document-2", now=now)
+
+    sessions.release_upload(first)
+    second = sessions.begin_upload(access.token, document_id="document-2", now=now)
+
+    assert second.document_id == "document-2"
 
 
 def _empty_policy(document_id: str) -> PolicyInput:
