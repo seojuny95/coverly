@@ -48,7 +48,9 @@ describe("BrandNavigation", () => {
     await user.click(screen.getByRole("link", { name: "Coverly AI 홈" }));
 
     expect(
-      screen.getByRole("dialog", { name: "지금 나가면 분석 내용이 지워져요" }),
+      screen.getByRole("alertdialog", {
+        name: "지금 나가면 분석 내용이 지워져요",
+      }),
     ).toBeInTheDocument();
     expect(navigation.push).not.toHaveBeenCalled();
   });

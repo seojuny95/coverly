@@ -1,7 +1,13 @@
 import { Button } from "../../shared/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../../shared/components/ui/dialog";
 import { InsuranceUploadForm, type UploadInsurance } from "../upload/form";
 import type { AnalyzedInsurance, InsuranceAnalysis } from "./store";
-import { useDialogA11y } from "./use-dialog-a11y";
 
 export function UploadInsuranceModal({
   selectedName,
@@ -16,31 +22,27 @@ export function UploadInsuranceModal({
   onClose: () => void;
   onAnalysisComplete: (analysis: InsuranceAnalysis) => void;
 }) {
-  const dialogRef = useDialogA11y<HTMLDivElement>({ open: true, onClose });
-
   return (
-    <div
-      ref={dialogRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/45 px-5 py-8 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="analysis-upload-modal-title"
-      tabIndex={-1}
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-[12px_12px_0_rgba(232,237,255,0.45)] sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2
-              id="analysis-upload-modal-title"
-              className="text-xl font-semibold tracking-[-0.04em] text-zinc-950"
-            >
-              보험증권 더 올리기
-            </h2>
-          </div>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            닫기
-          </Button>
-        </div>
+      <DialogContent
+        showCloseButton={false}
+        className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-[12px_12px_0_rgba(232,237,255,0.45)] sm:p-6"
+      >
+        <DialogHeader className="flex-row items-start justify-between gap-4 space-y-0">
+          <DialogTitle className="text-xl font-semibold tracking-[-0.04em] text-zinc-950">
+            보험증권 더 올리기
+          </DialogTitle>
+          <DialogClose asChild>
+            <Button type="button" variant="ghost">
+              닫기
+            </Button>
+          </DialogClose>
+        </DialogHeader>
 
         <div className="mt-6">
           <InsuranceUploadForm
@@ -52,7 +54,7 @@ export function UploadInsuranceModal({
             surface="modal"
           />
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
