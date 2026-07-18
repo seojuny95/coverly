@@ -6,33 +6,14 @@ completed age, gender, and life stage needed by the analysis experience.
 """
 
 import re
-from collections.abc import Iterator
 from datetime import date
 
+from app.core.pii import (
+    MASKED_RESIDENT_IDENTIFIER,
+    iter_resident_identifier_matches,
+    mask_resident_identifiers,
+)
 from app.modules.policy.models import InsuredDemographics, InsuredGender, LifeStage
-
-_MASKED_IDENTIFIER = "******-*******"
-
-# A formatted value may have a hyphen or extracted whitespace between the
-# birthdate and the century/gender digit. The compact shape is accepted only
-# when all thirteen positions are present, which avoids treating an arbitrary
-# seven-digit policy value as an identifier.
-_FORMATTED_IDENTIFIER = re.compile(
-    r"(?<!\d)"
-    r"(?P<birth>\d{6})"
-    r"(?:\s*-\s*|\s+)"
-    r"(?P<code>\d)"
-    r"(?P<tail>[\d*]{0,6})"
-    r"(?![\d*])"
-)
-_COMPACT_IDENTIFIER = re.compile(
-    r"(?<!\d)"
-    r"(?P<birth>\d{6})"
-    r"(?P<code>\d)"
-    r"(?P<tail>[\d*]{6})"
-    r"(?![\d*])"
-)
-_IDENTIFIER_PATTERNS = (_FORMATTED_IDENTIFIER, _COMPACT_IDENTIFIER)
 
 _CENTURY_AND_GENDER: dict[str, tuple[int, InsuredGender]] = {
     "1": (1900, "남성"),
@@ -53,10 +34,7 @@ def mask_demographic_identifiers(text: str) -> str:
     identifier with an unsupported century digit or a mistyped date remains
     sensitive and must not be sent to an LLM unchanged.
     """
-    masked = text
-    for pattern in _IDENTIFIER_PATTERNS:
-        masked = pattern.sub(_MASKED_IDENTIFIER, masked)
-    return masked
+    return mask_resident_identifiers(text, replacement=MASKED_RESIDENT_IDENTIFIER)
 
 
 def extract_insured_demographics(
@@ -71,7 +49,7 @@ def extract_insured_demographics(
     identity labels at all, the first valid identifier is used as a safe
     fallback for simple one-person policy layouts.
     """
-    candidates = list(_iter_identifier_matches(text))
+    candidates = list(iter_resident_identifier_matches(text))
     if not candidates:
         return None
 
@@ -89,12 +67,6 @@ def extract_insured_demographics(
         if demographics is not None:
             return demographics
     return None
-
-
-def _iter_identifier_matches(text: str) -> Iterator[re.Match[str]]:
-    matches = [match for pattern in _IDENTIFIER_PATTERNS for match in pattern.finditer(text)]
-    matches.sort(key=lambda match: match.start())
-    yield from matches
 
 
 def _belongs_to_insured(text: str, candidate_start: int) -> bool:
