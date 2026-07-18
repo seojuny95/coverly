@@ -6,13 +6,13 @@ from app.integrations.openai.client import (
     dump_prompt_json,
     structured_completer,
 )
-from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.qa.agent.contracts import (
     AgentCounselorDraft,
     QaAgentDependencies,
     QaOutputSafetyDecision,
     RegisteredToolResult,
 )
+from app.modules.qa.pii import mask_qa_pii
 
 _MAX_TOOL_CONTENT_CHARS = 2_500
 _MAX_EVIDENCE_ITEMS = 12
@@ -29,7 +29,7 @@ def classify_output_safety(
     )
     raw = completer(
         _safety_instructions(),
-        mask_demographic_identifiers(_review_payload(dependencies, draft)),
+        mask_qa_pii(_review_payload(dependencies, draft)),
     )
     return QaOutputSafetyDecision.model_validate(raw)
 
@@ -113,5 +113,7 @@ user_visible_sections가 들어올 수 있습니다.
 - requires_uploaded_policy_terms=true인데 일반 공식자료나 웹자료를 사용자의 실제 계약 조건처럼
   답하면 uses_general_source_as_policy_specific_fact=true입니다. 가입금액 등 구조화 증권 사실을
   설명하면서 정확한 지급 조건은 원문에서 확인하지 못했다고 밝히는 것은 허용합니다.
+- source_requirements.scope=mixed인 경우 candidate_answer는 insurance_request만 답해야 합니다.
+  out_of_scope_request의 정보를 답했다면 unsupported_factual_claims에 기록하세요.
 - 특정 단어의 존재만 보지 말고 부정, 조건, 주의 표현을 포함한 전체 의미를 판단하세요.
 - 결과를 고치거나 새로운 보험 사실을 추가하지 말고 판정 필드만 반환하세요."""

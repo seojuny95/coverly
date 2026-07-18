@@ -16,11 +16,12 @@ from app.modules.qa.agent.definition import create_qa_agent, grounded_output_gua
 from app.modules.qa.agent.grounding import numeric_claims_are_grounded
 from app.modules.qa.agent.input_guardrail import qa_input_guardrail
 from app.modules.qa.agent.output_review import classify_output_safety
+from app.modules.qa.agent.prompt import build_agent_input
 from app.modules.qa.agent.runtime import _unambiguous_tool_fallback
 from app.modules.qa.agent.validation import validated_agent_response
 from app.modules.qa.context import build_qa_context
 from app.modules.qa.contracts import ConsultationEvidence
-from app.modules.qa.schemas import PortfolioQuestionResponse
+from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
 from app.modules.qa.tools.coverages import calculate_coverage_total
 from app.modules.qa.tools.web_search import WebSearchResult
 
@@ -103,6 +104,77 @@ def test_sdk_input_guardrail_blocks_out_of_scope_before_main_agent() -> None:
     )
 
     assert result.tripwire_triggered is True
+
+
+def test_qa_masks_pii_at_every_model_boundary() -> None:
+    question = "950524-1123456 010-1234-5678 test@example.com 보험을 확인해줘"
+    history = [
+        ConversationMessage(
+            role="user",
+            content="이전 연락처는 02-123-4567 old@example.com이야.",
+        )
+    ]
+    context = build_qa_context(question, [], None, history)
+    captured: dict[str, str] = {}
+
+    def classify_input(_system: str, user: str) -> dict[str, object]:
+        captured["input"] = user
+        return {
+            "scope": "insurance",
+            "should_block": True,
+            "requires_fresh_official_source": False,
+            "insurance_request": "보험을 확인해줘",
+            "out_of_scope_request": None,
+            "reason": "보험 질문",
+        }
+
+    dependencies = QaAgentDependencies(
+        context=context,
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+        classify_input=classify_input,
+    )
+    result = cast(
+        GuardrailFunctionOutput,
+        qa_input_guardrail.guardrail_function(
+            RunContextWrapper(dependencies),
+            create_qa_agent("gpt-4.1-mini"),
+            "ignored",
+        ),
+    )
+
+    def classify_output(_system: str, user: str) -> dict[str, object]:
+        captured["output"] = user
+        return {
+            "unsupported_factual_claims": [],
+            "directs_purchase_or_cancellation": False,
+            "asserts_payout_or_coverage_certainty": False,
+            "invents_personal_facts": False,
+            "reason": "안전한 일반 안내",
+        }
+
+    dependencies.classify_output = classify_output
+    classify_output_safety(
+        dependencies,
+        AgentCounselorDraft(answer_mode="general_guidance", answer=question),
+    )
+    captured["agent"] = build_agent_input(context)
+
+    serialized = "\n".join(captured.values())
+    for raw in (
+        "950524-1123456",
+        "010-1234-5678",
+        "test@example.com",
+        "02-123-4567",
+        "old@example.com",
+    ):
+        assert raw not in serialized
+    assert "[전화번호]" in serialized
+    assert "[이메일]" in serialized
+    assert result.tripwire_triggered is False
+    assert dependencies.input_decision is not None
+    assert dependencies.input_decision.should_block is False
 
 
 def test_agent_does_not_force_a_keyword_selected_first_tool() -> None:

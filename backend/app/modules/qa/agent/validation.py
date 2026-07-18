@@ -50,6 +50,8 @@ def validated_agent_response(
     if draft.answer_mode == "general_guidance" and dependencies.tool_results:
         draft = draft.model_copy(update={"answer_mode": "tool_grounded"})
     if draft.answer_mode == "out_of_scope":
+        if decision is not None and decision.scope != "out_of_scope":
+            raise QaAgentUnavailable("Agent answer mode conflicts with the input scope")
         return out_of_scope_response(context)
     if draft.answer_mode == "insufficient_evidence":
         if requires_uploaded_policy_terms(dependencies):
@@ -79,7 +81,7 @@ def validated_agent_response(
     response = selected.response
     answer = response.answer if response.status != "answered" else draft.answer.strip()
     if decision is not None and decision.scope == "mixed":
-        answer = f"{response.answer}\n\n보험 상담 범위 밖의 내용은 여기서 답하기 어려워요."
+        answer = f"{answer}\n\n보험 상담 범위 밖의 내용은 여기서 답하기 어려워요."
     citations = response.citations
     grounded_evidence = selected.evidence
     if selected.kind == "consultation":

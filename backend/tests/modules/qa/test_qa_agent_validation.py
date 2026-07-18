@@ -179,3 +179,59 @@ def test_general_guidance_without_tool_data_remains_available() -> None:
 
     assert result.status == "answered"
     assert result.citations == []
+
+
+def test_mixed_consultation_keeps_the_validated_answer_instead_of_internal_prompt() -> None:
+    dependencies = _dependencies("내 보장을 봐주고 날씨도 알려줘")
+    dependencies.input_decision = QaInputDecision(
+        scope="mixed",
+        should_block=False,
+        requires_fresh_official_source=False,
+        insurance_request="내 보장을 봐줘",
+        out_of_scope_request="날씨도 알려줘",
+        reason="보험과 범위 밖 요청이 함께 있음",
+    )
+    evidence = overlap_evidence(dependencies.context)
+    registered = dependencies.register(
+        "consultation",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="제공된 evidence 중 질문에 필요한 항목만 고르세요.",
+            citations=[],
+            limitations=[],
+        ),
+        evidence=evidence,
+    )
+
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id=registered.result_id,
+            answer="두 증권에 같은 지급 성격의 담보가 있어요.",
+            evidence_ids=[item.id for item in evidence],
+        ),
+        dependencies,
+    )
+
+    assert result.answer.startswith("두 증권에")
+    assert "제공된 evidence" not in result.answer
+    assert "보험 상담 범위 밖" in result.answer
+
+
+def test_insurance_scope_rejects_an_out_of_scope_final_mode() -> None:
+    dependencies = _dependencies("가입한 보험은 몇 개야?")
+    dependencies.input_decision = QaInputDecision(
+        scope="insurance",
+        should_block=False,
+        requires_fresh_official_source=False,
+        insurance_request="가입한 보험은 몇 개야?",
+        out_of_scope_request=None,
+        reason="보험 증권 질문",
+    )
+
+    with pytest.raises(QaAgentUnavailable):
+        validated_agent_response(
+            dependencies.context,
+            AgentCounselorDraft(answer_mode="out_of_scope", answer="보험 상담 범위 밖입니다."),
+            dependencies,
+        )

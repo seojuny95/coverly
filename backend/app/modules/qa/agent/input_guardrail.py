@@ -10,8 +10,8 @@ from agents import (
 
 from app.core.config import get_settings
 from app.integrations.openai.client import dump_prompt_json, structured_completer
-from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.qa.agent.contracts import QaAgentDependencies, QaInputDecision
+from app.modules.qa.pii import mask_qa_pii
 
 
 @input_guardrail(name="coverly_qa_input", run_in_parallel=False)
@@ -27,6 +27,7 @@ def qa_input_guardrail(
     )
     raw = completer(_guardrail_instructions(), _guardrail_input(dependencies))
     decision = QaInputDecision.model_validate(raw)
+    decision = decision.model_copy(update={"should_block": decision.scope == "out_of_scope"})
     dependencies.input_decision = decision
     return GuardrailFunctionOutput(
         output_info=decision.model_dump(mode="json"),
@@ -50,7 +51,7 @@ def _guardrail_input(dependencies: QaAgentDependencies) -> str:
         "question": context.question,
         "history": [message.model_dump(mode="json") for message in context.history[-12:]],
     }
-    return mask_demographic_identifiers(dump_prompt_json(payload))
+    return mask_qa_pii(dump_prompt_json(payload))
 
 
 def _guardrail_instructions() -> str:

@@ -1,8 +1,8 @@
 """Prompt construction for the grounded QA agent."""
 
-from app.modules.policy.demographics import mask_demographic_identifiers
 from app.modules.qa.agent.contracts import QaInputDecision
 from app.modules.qa.context import QaContext
+from app.modules.qa.pii import mask_qa_pii
 
 
 def build_agent_input(context: QaContext) -> str:
@@ -29,7 +29,7 @@ def build_agent_input(context: QaContext) -> str:
         "질문에 맞는 근거 도구를 사용했지만 모두 matched=false라면 같은 도구를 반복하지 말고 "
         "answer_mode=insufficient_evidence로 확인하지 못한 범위만 설명하세요."
     )
-    return mask_demographic_identifiers(prompt)
+    return mask_qa_pii(prompt)
 
 
 def agent_instructions(decision: QaInputDecision | None = None) -> str:
