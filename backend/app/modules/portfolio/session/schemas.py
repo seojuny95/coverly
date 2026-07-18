@@ -1,5 +1,8 @@
 """HTTP contracts for portfolio session lifecycle operations."""
 
+from typing import Literal
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 
@@ -17,4 +20,15 @@ class PortfolioSessionResponse(BaseModel):
 
 
 class PortfolioSessionDeleteResponse(BaseModel):
-    status: str
+    status: Literal["deleted"]
+
+
+class PortfolioSessionDocumentsDeleteRequest(PortfolioSessionRequest):
+    document_ids: list[UUID] = Field(
+        alias="documentIds",
+        min_length=1,
+        max_length=50,
+    )
+
+    def document_id_strings(self) -> list[str]:
+        return [document_id.hex for document_id in self.document_ids]

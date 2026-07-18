@@ -6,7 +6,7 @@ from functools import partial
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.core.errors import api_error_responses
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
@@ -17,6 +17,13 @@ from app.modules.qa.schemas import PortfolioQuestionRequest
 from app.modules.qa.streaming import QaStreamEvent
 
 router = APIRouter(tags=["qa"])
+
+
+class EventStreamOpenAPIResponse(JSONResponse):
+    """Declare the event media type while runtime delivery remains streaming."""
+
+    media_type = "text/event-stream"
+
 
 PortfolioAnswerStreamer = Callable[..., Iterator[QaStreamEvent]]
 
@@ -33,7 +40,14 @@ PortfolioAnswerStreamerDep = Annotated[
 
 @router.post(
     "/qa/stream",
-    responses=api_error_responses(403, 503),
+    response_class=EventStreamOpenAPIResponse,
+    responses={
+        200: {
+            "model": QaStreamEvent,
+            "description": "Server-Sent Events: progress* → meta → delta* → end",
+        },
+        **api_error_responses(403, 503, response_media_type="application/json"),
+    },
 )
 def ask_portfolio_question_stream(
     request: PortfolioQuestionRequest,
@@ -52,7 +66,7 @@ def ask_portfolio_question_stream(
             history=request.history,
             policy_rag_session_ids=snapshot.rag_session_ids,
         ):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps(event.model_dump(mode='json'), ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         events(),

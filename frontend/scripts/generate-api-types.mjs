@@ -14,6 +14,10 @@ const outputPath = path.resolve(
   frontendDirectory,
   "src/shared/api/generated.ts",
 );
+const runtimeOutputPath = path.resolve(
+  frontendDirectory,
+  "src/shared/api/generated-runtime.ts",
+);
 
 const schema = JSON.parse(
   execFileSync(
@@ -32,12 +36,122 @@ const generated = await format(`${COMMENT_HEADER}${astToString(nodes)}`, {
   filepath: outputPath,
 });
 
+function enumValues(value, label) {
+  if (
+    !Array.isArray(value) ||
+    !value.every((item) => typeof item === "string")
+  ) {
+    throw new Error(`OpenAPI ${label} must be a string enum.`);
+  }
+  return value;
+}
+
+const schemas = schema.components?.schemas;
+const apiErrorCodes = enumValues(schemas?.ApiErrorCode?.enum, "ApiErrorCode");
+const qaAnswerStatuses = enumValues(
+  schemas?.QaAnswerStatus?.enum,
+  "QaAnswerStatus",
+);
+const qaGenerationModes = enumValues(
+  schemas?.QaMetaEvent?.properties?.generation?.enum,
+  "QaMetaEvent.generation",
+);
+const policyClassifications = enumValues(
+  schemas?.PolicySummary?.properties?.["보험분류"]?.enum,
+  "PolicySummary.보험분류",
+);
+const qaStreamSchema =
+  schema.paths?.["/qa/stream"]?.post?.responses?.["200"]?.content?.[
+    "text/event-stream"
+  ]?.schema;
+if (!qaStreamSchema || typeof qaStreamSchema !== "object") {
+  throw new Error("OpenAPI /qa/stream response schema is missing.");
+}
+
+function referencedComponentSchemas(rootSchema) {
+  const referenced = new Set();
+
+  function visit(value) {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+
+    if (typeof value.$ref === "string") {
+      const prefix = "#/components/schemas/";
+      if (!value.$ref.startsWith(prefix)) {
+        throw new Error(`Unsupported OpenAPI schema reference: ${value.$ref}`);
+      }
+      const name = value.$ref.slice(prefix.length);
+      if (!referenced.has(name)) {
+        const component = schemas?.[name];
+        if (!component) {
+          throw new Error(`Missing OpenAPI component schema: ${name}`);
+        }
+        referenced.add(name);
+        visit(component);
+      }
+    }
+
+    Object.values(value).forEach(visit);
+  }
+
+  visit(rootSchema);
+  return Object.fromEntries(
+    [...referenced].sort().map((name) => [name, schemas[name]]),
+  );
+}
+
+const qaStreamComponentSchemas = referencedComponentSchemas(qaStreamSchema);
+const runtimeGenerated = await format(
+  `${COMMENT_HEADER}
+import type { components } from "./generated";
+
+type ApiErrorCode = components["schemas"]["ApiErrorCode"];
+type QaAnswerStatus = components["schemas"]["QaAnswerStatus"];
+type QaGenerationMode = components["schemas"]["QaMetaEvent"]["generation"];
+type PolicyClassification = components["schemas"]["PolicySummary"]["보험분류"];
+
+export const API_ERROR_CODES = ${JSON.stringify(apiErrorCodes)} as const satisfies readonly ApiErrorCode[];
+export const QA_ANSWER_STATUSES = ${JSON.stringify(qaAnswerStatuses)} as const satisfies readonly QaAnswerStatus[];
+export const QA_GENERATION_MODES = ${JSON.stringify(qaGenerationModes)} as const satisfies readonly QaGenerationMode[];
+export const POLICY_CLASSIFICATIONS = ${JSON.stringify(policyClassifications)} as const satisfies readonly PolicyClassification[];
+
+export const QA_STREAM_JSON_SCHEMA = ${JSON.stringify({
+    schema: qaStreamSchema,
+    components: { schemas: qaStreamComponentSchemas },
+  })} as const;
+
+const apiErrorCodeSet: ReadonlySet<string> = new Set(API_ERROR_CODES);
+const qaAnswerStatusSet: ReadonlySet<string> = new Set(QA_ANSWER_STATUSES);
+const qaGenerationModeSet: ReadonlySet<string> = new Set(QA_GENERATION_MODES);
+
+export function isApiErrorCode(value: unknown): value is ApiErrorCode {
+  return typeof value === "string" && apiErrorCodeSet.has(value);
+}
+
+export function isQaAnswerStatus(value: unknown): value is QaAnswerStatus {
+  return typeof value === "string" && qaAnswerStatusSet.has(value);
+}
+
+export function isQaGenerationMode(value: unknown): value is QaGenerationMode {
+  return typeof value === "string" && qaGenerationModeSet.has(value);
+}
+`,
+  { filepath: runtimeOutputPath },
+);
+
 if (process.argv.includes("--check")) {
   const current = await readFile(outputPath, "utf8").catch(() => "");
-  if (current !== generated) {
+  const currentRuntime = await readFile(runtimeOutputPath, "utf8").catch(
+    () => "",
+  );
+  if (current !== generated || currentRuntime !== runtimeGenerated) {
     throw new Error("API types are stale. Run `pnpm api:generate`.");
   }
 } else {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, generated);
+  await writeFile(runtimeOutputPath, runtimeGenerated);
 }

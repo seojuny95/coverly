@@ -72,6 +72,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/portfolio/sessions/documents/delete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Delete Portfolio Session Documents */
+    post: operations["delete_portfolio_session_documents_portfolio_sessions_documents_delete_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/portfolio/summary": {
     parameters: {
       query?: never;
@@ -171,10 +188,50 @@ export interface components {
        */
       major_category: string;
     };
+    /** AnswerCitation */
+    AnswerCitation: {
+      /** Evidence Id */
+      evidence_id?: string | null;
+      /** Policy Id */
+      policy_id: string | null;
+      /** Insurer */
+      insurer: string | null;
+      /** Product Name */
+      product_name: string | null;
+      /** Coverage Name */
+      coverage_name?: string | null;
+      /** Source Id */
+      source_id?: string | null;
+      /** Source Title */
+      source_title?: string | null;
+      /** Source Category */
+      source_category?: string | null;
+      /** Source Url */
+      source_url?: string | null;
+      /** Source Page */
+      source_page?: number | null;
+      /** Source Version */
+      source_version?: string | null;
+    };
+    /** @enum {string} */
+    ApiErrorCode:
+      | "PDF_TOO_LARGE"
+      | "INVALID_PDF"
+      | "PDF_PASSWORD_REQUIRED"
+      | "PDF_PASSWORD_INCORRECT"
+      | "PDF_TEXT_EXTRACTION_FAILED"
+      | "reference_data_unavailable"
+      | "INVALID_PORTFOLIO_SESSION"
+      | "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED"
+      | "POLICY_UPLOAD_CANCELLED"
+      | "portfolio_session_unavailable"
+      | "portfolio_overview_unavailable"
+      | "INVALID_POLICY_SELECTION"
+      | "REQUEST_VALIDATION_ERROR"
+      | "INVALID_MULTIPART_REQUEST";
     /** ApiErrorDetail */
     ApiErrorDetail: {
-      /** Code */
-      code: string;
+      code: components["schemas"]["ApiErrorCode"];
       /** Message */
       message: string;
       /** Request Id */
@@ -186,8 +243,17 @@ export interface components {
     };
     /** Body_parse_policy_policies_parse_post */
     Body_parse_policy_policies_parse_post: {
-      /** File */
+      /**
+       * File
+       * Format: binary
+       * @description PDF document only. The server verifies the %PDF signature and accepts at most 10 MiB.
+       */
       file: string;
+      /**
+       * Documentid
+       * Format: uuid
+       */
+      documentId: string;
       /** Password */
       password?: string | null;
       /** Portfoliosessiontoken */
@@ -241,25 +307,34 @@ export interface components {
     };
     /**
      * Coverage
-     * @description One coverage (담보) row for the /policies/parse response.
-     *
-     *     보장내용 is the policy's own wording (authoritative); 해설 is a generated
-     *     general explanation, filled only when 보장내용 is absent.
+     * @description Public coverage contract with explicit verification and row type state.
      */
     Coverage: {
       /** 담보명 */
       "\uB2F4\uBCF4\uBA85": string;
       /** 가입금액 */
       "\uAC00\uC785\uAE08\uC561": string;
+      /**
+       * 가입금액상태
+       * @enum {string}
+       */
+      "\uAC00\uC785\uAE08\uC561\uC0C1\uD0DC":
+        "confirmed" | "needs_review" | "not_applicable";
       /** 보장내용 */
       "\uBCF4\uC7A5\uB0B4\uC6A9": string | null;
       /** 해설 */
       "\uD574\uC124": string | null;
       /**
+       * 설명근거
+       * @enum {string}
+       */
+      "\uC124\uBA85\uADFC\uAC70":
+        "policy_wording" | "generated_guidance" | "none";
+      /**
        * 유형
        * @enum {string}
        */
-      "\uC720\uD615"?: "담보" | "부가";
+      "\uC720\uD615": "담보" | "부가";
     };
     /** CoverageGroup */
     CoverageGroup: {
@@ -431,11 +506,6 @@ export interface components {
        */
       major_category: string;
     };
-    /** HTTPValidationError */
-    HTTPValidationError: {
-      /** Detail */
-      detail?: components["schemas"]["ValidationError"][];
-    };
     /**
      * InsuredDemographics
      * @description Minimal non-identifying insured context used for personalization.
@@ -492,7 +562,10 @@ export interface components {
        * @constant
        */
       status: "accepted";
-      /** Documentid */
+      /**
+       * Documentid
+       * Format: uuid
+       */
       documentId: string;
       /** 문자수 */
       "\uBB38\uC790\uC218": number;
@@ -505,30 +578,39 @@ export interface components {
        */
       "\uBD84\uC11D\uC0C1\uD0DC": "완료" | "부분";
     };
-    /** PolicySummary */
+    /**
+     * PolicySummary
+     * @description Public policy summary with canonical classification metadata.
+     */
     PolicySummary: {
-      /** 보험사 */
-      "\uBCF4\uD5D8\uC0AC"?: string;
-      /** 상품명 */
-      "\uC0C1\uD488\uBA85"?: string;
-      /** 증권번호 */
-      "\uC99D\uAD8C\uBC88\uD638"?: string;
-      /** 계약자 */
-      "\uACC4\uC57D\uC790"?: string;
-      /** 피보험자 */
-      "\uD53C\uBCF4\uD5D8\uC790"?: string;
-      "\uBCF4\uD5D8\uAE30\uAC04"?: components["schemas"]["CoveragePeriod"];
-      /** 만기일 */
-      "\uB9CC\uAE30\uC77C"?: string;
-      /** 납입기간 */
-      "\uB0A9\uC785\uAE30\uAC04"?: string;
-      "\uBCF4\uD5D8\uB8CC"?: components["schemas"]["PremiumSummary"];
-      "\uD53C\uBCF4\uD5D8\uC790\uC815\uBCF4"?: components["schemas"]["InsuredDemographics-Output"];
-      "\uCC28\uB7C9\uC815\uBCF4"?: components["schemas"]["VehicleInfo"];
-      /** 보험분류 */
-      "\uBCF4\uD5D8\uBD84\uB958"?: string;
+      /**
+       * 보험분류
+       * @enum {string}
+       */
+      "\uBCF4\uD5D8\uBD84\uB958":
+        "생명보험" | "제3보험" | "손해보험" | "미분류";
       /** 상품태그 */
-      "\uC0C1\uD488\uD0DC\uADF8"?: string[];
+      "\uC0C1\uD488\uD0DC\uADF8": string[];
+      /** 보험사 */
+      "\uBCF4\uD5D8\uC0AC"?: string | null;
+      /** 상품명 */
+      "\uC0C1\uD488\uBA85"?: string | null;
+      /** 증권번호 */
+      "\uC99D\uAD8C\uBC88\uD638"?: string | null;
+      /** 계약자 */
+      "\uACC4\uC57D\uC790"?: string | null;
+      /** 피보험자 */
+      "\uD53C\uBCF4\uD5D8\uC790"?: string | null;
+      "\uBCF4\uD5D8\uAE30\uAC04"?:
+        components["schemas"]["CoveragePeriod"] | null;
+      /** 만기일 */
+      "\uB9CC\uAE30\uC77C"?: string | null;
+      /** 납입기간 */
+      "\uB0A9\uC785\uAE30\uAC04"?: string | null;
+      "\uBCF4\uD5D8\uB8CC"?: components["schemas"]["PremiumSummary"] | null;
+      "\uD53C\uBCF4\uD5D8\uC790\uC815\uBCF4"?:
+        components["schemas"]["InsuredDemographics-Output"] | null;
+      "\uCC28\uB7C9\uC815\uBCF4"?: components["schemas"]["VehicleInfo"] | null;
     };
     /** PortfolioCoverageSummary */
     PortfolioCoverageSummary: {
@@ -587,8 +669,18 @@ export interface components {
     };
     /** PortfolioSessionDeleteResponse */
     PortfolioSessionDeleteResponse: {
-      /** Status */
-      status: string;
+      /**
+       * Status
+       * @constant
+       */
+      status: "deleted";
+    };
+    /** PortfolioSessionDocumentsDeleteRequest */
+    PortfolioSessionDocumentsDeleteRequest: {
+      /** Portfoliosessiontoken */
+      portfolioSessionToken: string;
+      /** Documentids */
+      documentIds: string[];
     };
     /** PortfolioSessionRequest */
     PortfolioSessionRequest: {
@@ -628,29 +720,8 @@ export interface components {
       suggested_min_premium: number;
       /** Suggested Max Premium */
       suggested_max_premium: number;
-      income_source: components["schemas"]["PremiumBenchmarkSource"];
-      guide_source: components["schemas"]["PremiumBenchmarkSource"];
-    };
-    /** PremiumBenchmarkSource */
-    PremiumBenchmarkSource: {
-      /** Label */
-      label: string;
-      /** Url */
-      url: string;
-      /** Published At */
-      published_at: string;
-      /**
-       * Reliability
-       * @enum {string}
-       */
-      reliability:
-        | "official"
-        | "public_research"
-        | "industry"
-        | "large_private_analysis"
-        | "private_guidance";
-      /** Caveat */
-      caveat: string;
+      income_source: components["schemas"]["ReferenceSource"];
+      guide_source: components["schemas"]["ReferenceSource"];
     };
     /** PremiumOverview */
     PremiumOverview: {
@@ -683,6 +754,65 @@ export interface components {
       /** 납입주기 */
       "\uB0A9\uC785\uC8FC\uAE30"?: string;
     };
+    /** @enum {string} */
+    QaAnswerStatus: "answered" | "refused" | "no_data" | "clarify";
+    /** QaDeltaEvent */
+    QaDeltaEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "delta";
+      /** Text */
+      text: string;
+    };
+    /** QaEndEvent */
+    QaEndEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "end";
+      status: components["schemas"]["QaAnswerStatus"];
+      /**
+       * Generation
+       * @enum {string}
+       */
+      generation: "llm" | "fallback";
+      /** Citations */
+      citations: components["schemas"]["AnswerCitation"][];
+      /** Limitations */
+      limitations: string[];
+      /** Suggestions */
+      suggestions: string[];
+      claim_channels: components["schemas"]["ClaimChannelBlock"] | null;
+    };
+    /** QaMetaEvent */
+    QaMetaEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "meta";
+      status: components["schemas"]["QaAnswerStatus"];
+      /**
+       * Generation
+       * @enum {string}
+       */
+      generation: "llm" | "fallback";
+    };
+    /** QaProgressEvent */
+    QaProgressEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "progress";
+      /** Stage */
+      stage: string;
+      /** Text */
+      text: string;
+    };
     /** ReferenceSource */
     ReferenceSource: {
       /** Label */
@@ -703,22 +833,6 @@ export interface components {
         | "private_guidance";
       /** Caveat */
       caveat: string;
-    };
-    /** RequestValidationErrorDetail */
-    RequestValidationErrorDetail: {
-      /** Loc */
-      loc: (string | number)[];
-      /** Msg */
-      msg: string;
-      /** Type */
-      type: string;
-    } & {
-      [key: string]: unknown;
-    };
-    /** RequestValidationErrorResponse */
-    RequestValidationErrorResponse: {
-      /** Detail */
-      detail: components["schemas"]["RequestValidationErrorDetail"][];
     };
     /** SpecialCoverageCheck */
     SpecialCoverageCheck: {
@@ -755,19 +869,6 @@ export interface components {
       overview: string;
       /** Coverage Checks */
       coverage_checks?: components["schemas"]["SpecialCoverageCheck"][];
-    };
-    /** ValidationError */
-    ValidationError: {
-      /** Location */
-      loc: (string | number)[];
-      /** Message */
-      msg: string;
-      /** Error Type */
-      type: string;
-      /** Input */
-      input?: unknown;
-      /** Context */
-      ctx?: Record<string, never>;
     };
     /**
      * VehicleInfo
@@ -831,6 +932,15 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       413: {
         headers: {
           [name: string]: unknown;
@@ -845,9 +955,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json":
-            | components["schemas"]["ApiErrorResponse"]
-            | components["schemas"]["RequestValidationErrorResponse"];
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
       /** @description Coverly API error */
@@ -877,6 +985,15 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PortfolioSessionResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
       /** @description Coverly API error */
@@ -921,13 +1038,13 @@ export interface operations {
           "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
-      /** @description Validation Error */
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
       /** @description Coverly API error */
@@ -972,13 +1089,64 @@ export interface operations {
           "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
-      /** @description Validation Error */
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+    };
+  };
+  delete_portfolio_session_documents_portfolio_sessions_documents_delete_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PortfolioSessionDocumentsDeleteRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PortfolioSessionDeleteResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
       /** @description Coverly API error */
@@ -1023,13 +1191,13 @@ export interface operations {
           "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
-      /** @description Validation Error */
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
       /** @description Coverly API error */
@@ -1056,13 +1224,17 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Successful Response */
+      /** @description Server-Sent Events: progress* → meta → delta* → end */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": unknown;
+          "text/event-stream":
+            | components["schemas"]["QaProgressEvent"]
+            | components["schemas"]["QaMetaEvent"]
+            | components["schemas"]["QaDeltaEvent"]
+            | components["schemas"]["QaEndEvent"];
         };
       };
       /** @description Coverly API error */
@@ -1074,13 +1246,13 @@ export interface operations {
           "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
-      /** @description Validation Error */
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
       /** @description Coverly API error */

@@ -56,13 +56,13 @@ describe("CoverageSummaryTable", () => {
     render(<CoverageSummaryTable summary={summary} />);
     expect(screen.getByText("암진단비")).toBeInTheDocument();
     expect(screen.getByText("3,000만원")).toBeInTheDocument();
-    expect(screen.getByText("정액보상 · 2개 합산")).toBeInTheDocument();
+    expect(screen.getByText("2개 합산")).toBeInTheDocument();
   });
 
   it("labels actual-loss coverage separately from fixed-benefit totals", () => {
     render(<CoverageSummaryTable summary={summary} />);
     expect(screen.getByText("실손입원")).toBeInTheDocument();
-    expect(screen.getByText("실손보장")).toBeInTheDocument();
+    expect(screen.getByText("별도 표시")).toBeInTheDocument();
     expect(screen.getByText("중복 확인")).toBeInTheDocument();
   });
 
@@ -86,7 +86,7 @@ describe("CoverageSummaryTable", () => {
     );
 
     expect(screen.getByText("일상생활배상책임")).toBeInTheDocument();
-    expect(screen.getByText("실손보장")).toBeInTheDocument();
+    expect(screen.getByText("별도 표시")).toBeInTheDocument();
     expect(screen.queryByText("실손의료비")).not.toBeInTheDocument();
   });
 
@@ -125,6 +125,31 @@ describe("CoverageSummaryTable", () => {
     expect(screen.getByRole("rowgroup", { name: "기타" })).toBeInTheDocument();
   });
 
+  it("preserves the category order returned by the backend", () => {
+    render(
+      <CoverageSummaryTable
+        summary={{
+          ...summary,
+          totals: [
+            { ...summary.totals[0], majorCategory: "기타" },
+            {
+              ...summary.totals[0],
+              category: "사망보험금",
+              normalizedName: "사망보험금",
+              majorCategory: "사망",
+            },
+          ],
+        }}
+      />,
+    );
+
+    const categoryGroups = screen
+      .getAllByRole("rowgroup")
+      .map((group) => group.getAttribute("aria-label"))
+      .filter(Boolean);
+    expect(categoryGroups).toEqual(["기타", "사망", "치료"]);
+  });
+
   it("keeps amount columns top-aligned when a row is expanded", () => {
     render(<CoverageSummaryTable summary={summary} />);
 
@@ -132,8 +157,6 @@ describe("CoverageSummaryTable", () => {
     expect(screen.getByText("3,000만원").closest("td")).toHaveClass(
       "align-top",
     );
-    expect(screen.getByText("정액보상 · 2개 합산").closest("td")).toHaveClass(
-      "align-top",
-    );
+    expect(screen.getByText("2개 합산").closest("td")).toHaveClass("align-top");
   });
 });

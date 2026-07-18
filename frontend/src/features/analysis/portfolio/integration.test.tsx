@@ -28,6 +28,7 @@ function fixture(): InsuranceAnalysis {
           기본정보: {
             상품명: "건강보험",
             보험분류: "제3보험",
+            상품태그: [],
             피보험자정보: {
               나이: 35,
               성별: "여성",
@@ -38,8 +39,11 @@ function fixture(): InsuranceAnalysis {
             {
               담보명: "암 진단비",
               가입금액: "1,000만원",
+              가입금액상태: "confirmed",
               보장내용: null,
               해설: null,
+              설명근거: "none",
+              유형: "담보",
             },
           ],
         },
@@ -123,7 +127,7 @@ describe("portfolio features", () => {
 
     expect(screen.getByText("1억 5,000만원 1천원")).toBeInTheDocument();
     expect(screen.getByText("3천원")).toBeInTheDocument();
-    expect(screen.getByText("정액보상 · 2개 합산")).toBeInTheDocument();
+    expect(screen.getByText("2개 합산")).toBeInTheDocument();
   });
 
   test("groups every amount basis under the same coverage category", async () => {
@@ -193,8 +197,8 @@ describe("portfolio features", () => {
       within(treatmentGroup).getByText(/질병실손의료비/),
     ).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("특정치료비")).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("정액보상")).toBeInTheDocument();
-    expect(within(treatmentGroup).getByText("실손보장")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("합산")).toBeInTheDocument();
+    expect(within(treatmentGroup).getByText("별도 표시")).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("개별 확인")).toBeInTheDocument();
     for (const coverageName of ["암치료비", "질병실손의료비", "특정치료비"]) {
       const disclosure = within(treatmentGroup)
@@ -293,7 +297,7 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
-    await screen.findByText("권장보험");
+    await screen.findByText("핵심 보장 확인");
     expect(fetchMock).not.toHaveBeenCalledWith(
       expect.stringContaining("/portfolio/analysis"),
       expect.anything(),
@@ -403,7 +407,7 @@ describe("portfolio features", () => {
     );
 
     await user.click(screen.getByRole("tab", { name: "보험 분석" }));
-    expect(await screen.findByText("권장보험")).toBeInTheDocument();
+    expect(await screen.findByText("핵심 보장 확인")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "내 보험" }));
     await user.click(screen.getByRole("tab", { name: "보험 분석" }));
 
@@ -435,7 +439,7 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: "보험 분석" }));
-    await screen.findByText("권장보험");
+    await screen.findByText("핵심 보장 확인");
     expect(screen.queryByLabelText("나이")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("성별")).not.toBeInTheDocument();
   });
@@ -471,7 +475,7 @@ describe("portfolio features", () => {
     });
 
     await user.click(await screen.findByRole("tab", { name: /보험 분석/ }));
-    await screen.findByText("권장보험");
+    await screen.findByText("핵심 보장 확인");
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
     >;

@@ -1,4 +1,7 @@
+from fastapi.testclient import TestClient
+
 from app.main import app
+from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 
 
 def test_openapi_exposes_typed_json_api_contracts() -> None:
@@ -13,10 +16,7 @@ def test_openapi_exposes_typed_json_api_contracts() -> None:
         "$ref": "#/components/schemas/ApiErrorResponse"
     }
     unprocessable_schema = parse_responses["422"]["content"]["application/json"]["schema"]
-    assert {item["$ref"] for item in unprocessable_schema["anyOf"]} == {
-        "#/components/schemas/ApiErrorResponse",
-        "#/components/schemas/RequestValidationErrorResponse",
-    }
+    assert unprocessable_schema == {"$ref": "#/components/schemas/ApiErrorResponse"}
 
     session_responses = paths["/portfolio/sessions"]["post"]["responses"]
     assert session_responses["200"]["content"]["application/json"]["schema"] == {
@@ -42,8 +42,48 @@ def test_policy_parse_openapi_schema_matches_public_response() -> None:
         "분석상태",
     }
     assert parse_schema["properties"]["status"]["const"] == "accepted"
+    assert parse_schema["properties"]["documentId"]["format"] == "uuid"
     assert set(parse_schema["properties"]["분석상태"]["enum"]) == {"완료", "부분"}
     assert "문서세션ID" not in parse_schema["properties"]
+
+    upload_body_ref = app.openapi()["paths"]["/policies/parse"]["post"]["requestBody"]["content"][
+        "multipart/form-data"
+    ]["schema"]["$ref"]
+    upload_body = schemas[upload_body_ref.rsplit("/", maxsplit=1)[-1]]
+    assert "documentId" in upload_body["required"]
+    assert upload_body["properties"]["documentId"]["format"] == "uuid"
+    assert upload_body["properties"]["file"] == {
+        "type": "string",
+        "format": "binary",
+        "contentMediaType": "application/pdf",
+        "title": "File",
+        "description": (
+            "PDF document only. The server verifies the %PDF signature and accepts at most 10 MiB."
+        ),
+        "x-maxBytes": 10 * 1024 * 1024,
+    }
+
+    coverage_schema = schemas["Coverage"]
+    assert {"가입금액상태", "설명근거", "유형"} <= set(coverage_schema["required"])
+    assert set(coverage_schema["properties"]["가입금액상태"]["enum"]) == {
+        "confirmed",
+        "needs_review",
+        "not_applicable",
+    }
+    assert set(coverage_schema["properties"]["설명근거"]["enum"]) == {
+        "policy_wording",
+        "generated_guidance",
+        "none",
+    }
+    assert set(coverage_schema["properties"]["유형"]["enum"]) == {"담보", "부가"}
+    policy_summary_schema = schemas["PolicySummary"]
+    assert {"보험분류", "상품태그"} <= set(policy_summary_schema["required"])
+    assert set(policy_summary_schema["properties"]["보험분류"]["enum"]) == {
+        "생명보험",
+        "제3보험",
+        "손해보험",
+        "미분류",
+    }
 
 
 def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
@@ -54,6 +94,62 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
         "code",
         "message",
         "request_id",
+    }
+    assert set(schemas["ApiErrorCode"]["enum"]) == {
+        "PDF_TOO_LARGE",
+        "INVALID_PDF",
+        "PDF_PASSWORD_REQUIRED",
+        "PDF_PASSWORD_INCORRECT",
+        "PDF_TEXT_EXTRACTION_FAILED",
+        "reference_data_unavailable",
+        "INVALID_PORTFOLIO_SESSION",
+        "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
+        "POLICY_UPLOAD_CANCELLED",
+        "portfolio_session_unavailable",
+        "portfolio_overview_unavailable",
+        "INVALID_POLICY_SELECTION",
+        "REQUEST_VALIDATION_ERROR",
+        "INVALID_MULTIPART_REQUEST",
+    }
+
+
+def test_openapi_exposes_discriminated_sse_events_and_json_errors() -> None:
+    responses = app.openapi()["paths"]["/qa/stream"]["post"]["responses"]
+
+    assert set(responses["200"]["content"]) == {"text/event-stream"}
+    stream_schema = responses["200"]["content"]["text/event-stream"]["schema"]
+    assert {item["$ref"] for item in stream_schema["oneOf"]} == {
+        "#/components/schemas/QaProgressEvent",
+        "#/components/schemas/QaMetaEvent",
+        "#/components/schemas/QaDeltaEvent",
+        "#/components/schemas/QaEndEvent",
+    }
+    assert stream_schema["discriminator"]["propertyName"] == "type"
+    assert set(responses["422"]["content"]) == {"application/json"}
+
+
+def test_request_validation_uses_common_error_envelope() -> None:
+    app.dependency_overrides[get_portfolio_session_service] = lambda: object()
+    try:
+        response = TestClient(app).post(
+            "/qa/stream",
+            headers={"x-request-id": "validation-request"},
+            json={
+                "question": "",
+                "portfolioSessionToken": "portfolio-token",
+                "policyIds": ["00000000-0000-0000-0000-000000000001"],
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_portfolio_session_service, None)
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "REQUEST_VALIDATION_ERROR",
+            "message": "요청 내용을 확인해주세요.",
+            "request_id": "validation-request",
+        }
     }
 
 

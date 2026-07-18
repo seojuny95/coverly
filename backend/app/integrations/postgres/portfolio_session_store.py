@@ -71,6 +71,13 @@ class PgPortfolioSessionRepository:
             ).fetchone()
             if session is None:
                 return "missing"
+            cancelled = connection.execute(
+                """SELECT 1 FROM private.policy_document_tombstones
+                   WHERE portfolio_session_id = %s AND document_id = %s""",
+                (session_id, document.id),
+            ).fetchone()
+            if cancelled is not None:
+                return "cancelled"
             document_count = connection.execute(
                 """SELECT count(*) FROM private.policy_documents
                    WHERE portfolio_session_id = %s""",
@@ -180,6 +187,51 @@ class PgPortfolioSessionRepository:
         if deleted is None:
             return None
         return tuple(str(row["rag_session_id"]) for row in rows)
+
+    def delete_documents(
+        self,
+        session_id: str,
+        document_ids: tuple[str, ...],
+        *,
+        now: datetime,
+    ) -> tuple[str, ...] | None:
+        with self._pool.connection() as connection:
+            session = connection.execute(
+                """SELECT id FROM private.portfolio_sessions
+                   WHERE id = %s AND expires_at > %s
+                   FOR UPDATE""",
+                (session_id, now),
+            ).fetchone()
+            if session is None:
+                return None
+            connection.execute(
+                """INSERT INTO private.policy_document_tombstones (
+                       portfolio_session_id, document_id
+                   )
+                   SELECT %s, requested.document_id
+                   FROM unnest(%s::uuid[]) AS requested(document_id)
+                   ON CONFLICT DO NOTHING""",
+                (session_id, list(document_ids)),
+            )
+            rows = connection.execute(
+                """DELETE FROM private.policy_documents
+                   WHERE portfolio_session_id = %s AND id = ANY(%s)
+                   RETURNING rag_session_id""",
+                (session_id, list(document_ids)),
+            ).fetchall()
+            if rows:
+                connection.execute(
+                    """UPDATE private.portfolio_sessions
+                       SET version = version + 1,
+                           analysis_context_hash = null,
+                           analysis_version = null,
+                           analysis_result = null
+                       WHERE id = %s""",
+                    (session_id,),
+                )
+        return tuple(
+            str(row["rag_session_id"]) for row in rows if row["rag_session_id"] is not None
+        )
 
     def load_cached_analysis(
         self,

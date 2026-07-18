@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.generation import GenerationMode
 from app.modules.portfolio.schemas import ClaimChannelBlock, PortfolioSelectionInput
@@ -17,10 +17,37 @@ class ConversationMessage(BaseModel):
     content: str = Field(min_length=1, max_length=1_000)
 
 
+QA_HISTORY_LIMIT = 12
+QA_HISTORY_CONTENT_LIMIT = 1_000
+type QaAnswerStatus = Literal["answered", "refused", "no_data", "clarify"]
+
+
 class PortfolioQuestionRequest(PortfolioSelectionInput):
     question: str = Field(min_length=1, max_length=500)
     demographics: InsuredDemographics = Field(default_factory=InsuredDemographics)
-    history: list[ConversationMessage] = Field(default_factory=list, max_length=30)
+    history: list[ConversationMessage] = Field(default_factory=list)
+
+    @field_validator("history", mode="before")
+    @classmethod
+    def keep_recent_history(cls, value: object) -> object:
+        if not isinstance(value, list):
+            return value
+
+        normalized: list[object] = []
+        for item in value[-QA_HISTORY_LIMIT:]:
+            if not isinstance(item, dict) or not isinstance(item.get("content"), str):
+                normalized.append(item)
+                continue
+            message = dict(item)
+            message["content"] = item["content"][:QA_HISTORY_CONTENT_LIMIT]
+            normalized.append(message)
+        return normalized
+
+
+def recent_history(
+    history: list[ConversationMessage] | None,
+) -> list[ConversationMessage]:
+    return (history or [])[-QA_HISTORY_LIMIT:]
 
 
 class AnswerCitation(BaseModel):
@@ -38,7 +65,7 @@ class AnswerCitation(BaseModel):
 
 
 class PortfolioQuestionResponse(BaseModel):
-    status: Literal["answered", "refused", "no_data", "clarify"]
+    status: QaAnswerStatus
     answer: str
     sections: list[AnswerSection] = Field(default_factory=list)
     citations: list[AnswerCitation]

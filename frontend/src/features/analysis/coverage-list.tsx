@@ -1,8 +1,5 @@
 import type { InsuranceCoverage, InsurancePolicyResult } from "../upload/api";
 
-const GENERATED_NOTICE =
-  "증권에 설명이 없어 표준약관을 참고해 만든 안내예요. 정확한 내용은 가입한 상품의 약관에서 확인해 주세요.";
-
 type InsuranceCoverageListProps = {
   coverages?: InsuranceCoverage[];
   status?: InsurancePolicyResult["분석상태"];
@@ -29,9 +26,8 @@ export function InsuranceCoverageList({
     );
   }
 
-  // Absent 유형 defaults to 담보 (existing non-auto documents never set it).
   const mainCoverages = coverages.filter(
-    (coverage) => (coverage.유형 ?? "담보") === "담보",
+    (coverage) => coverage.유형 === "담보",
   );
   const riderCoverages = coverages.filter(
     (coverage) => coverage.유형 === "부가",
@@ -54,30 +50,11 @@ export function InsuranceCoverageList({
               <p className="text-sm font-semibold break-words text-[#111827]">
                 {coverage.담보명}
               </p>
-              {coverage.보장내용 ? (
-                <p className="mt-1.5 text-sm leading-6 break-words whitespace-pre-line text-[#111827]/75">
-                  {coverage.보장내용}
-                </p>
-              ) : coverage.해설 ? (
-                <>
-                  <p className="mt-1.5 text-sm leading-6 break-words whitespace-pre-line text-[#111827]/75">
-                    {coverage.해설}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[#111827]/50">
-                    {GENERATED_NOTICE}
-                  </p>
-                </>
-              ) : null}
-              <p className="mt-2 text-sm">
-                {coverage.가입금액 === "확인필요" ? (
-                  <span className="text-[#111827]/60">
-                    보장 금액은 가입하신 상품의 약관에서 자세히 확인할 수 있어요
-                  </span>
-                ) : (
-                  <span className="font-medium text-[#111827]">
-                    {coverage.가입금액}
-                  </span>
-                )}
+              <CoverageDescription coverage={coverage} />
+              <p className="mt-2 text-sm font-medium text-[#111827]">
+                {coverage.가입금액상태 === "needs_review"
+                  ? "가입금액을 확인해 주세요."
+                  : coverage.가입금액}
               </p>
             </li>
           ))}
@@ -102,4 +79,27 @@ export function InsuranceCoverageList({
       ) : null}
     </>
   );
+}
+
+function CoverageDescription({ coverage }: { coverage: InsuranceCoverage }) {
+  if (coverage.설명근거 === "policy_wording" && coverage.보장내용) {
+    return (
+      <p className="mt-1.5 text-sm leading-6 break-words whitespace-pre-line text-[#111827]/75">
+        {coverage.보장내용}
+      </p>
+    );
+  }
+
+  if (coverage.설명근거 === "generated_guidance" && coverage.해설) {
+    return (
+      <div className="mt-1.5">
+        <p className="text-xs font-medium text-[#111827]/50">일반 안내</p>
+        <p className="mt-1 text-sm leading-6 break-words whitespace-pre-line text-[#111827]/75">
+          {coverage.해설}
+        </p>
+      </div>
+    );
+  }
+
+  return null;
 }

@@ -14,7 +14,7 @@ from app.modules.qa.context import build_qa_context
 from app.modules.qa.contracts import InsuredDemographics
 from app.modules.qa.response_support import agent_unavailable_response
 from app.modules.qa.schemas import ConversationMessage
-from app.modules.qa.streaming import QaStreamEvent, stream_response
+from app.modules.qa.streaming import QaProgressEvent, QaStreamEvent, stream_response
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,11 @@ def stream_answer_with_agent(
         if callable(stream_agent):
             for item in stream_agent(context):
                 if isinstance(item, QaAgentProgress):
-                    yield {"type": "progress", "stage": item.stage, "text": item.text}
+                    yield QaProgressEvent(
+                        type="progress",
+                        stage=item.stage,
+                        text=item.text,
+                    )
                 elif isinstance(item, QaAgentCompleted):
                     yield from stream_response(item.response)
                     return

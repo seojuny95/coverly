@@ -6,7 +6,6 @@ import {
   forwardRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -14,6 +13,7 @@ import {
 
 import { SectionLabel } from "../../shared/components/section-label";
 import { Button } from "../../shared/components/ui/button";
+import { POLICY_CLASSIFICATIONS } from "../../shared/api/generated-runtime";
 
 import { UploadInsuranceModal } from "./upload-modal";
 import { InsurerLogo, InsuranceDetail, TagBadge } from "./policy-detail";
@@ -27,10 +27,8 @@ import { useBeforeUnloadGuard } from "./use-leave-guard";
 import type { UploadInsurance } from "../upload/form";
 import { CoverageTotalTable } from "./portfolio/total-table";
 import { PortfolioAnalysisPanel } from "./portfolio/panel";
-import { emptyReasonFor } from "./portfolio/eligibility";
 import { usePortfolioSummary } from "./portfolio/use-summary";
 import type { DeathBenefitGuideInput } from "./portfolio/api";
-import { displayClassification } from "./classification";
 
 // Lazy-load the chatbot (and its react-markdown dependency) so they stay out of
 // the initial /analysis bundle — it only mounts after the user opens it.
@@ -38,26 +36,6 @@ const InsuranceChatbot = dynamic(
   () => import("./portfolio/chatbot").then((m) => m.InsuranceChatbot),
   { ssr: false },
 );
-
-const CLASSIFICATION_ORDER = ["생명보험", "제3보험", "손해보험", "미분류"];
-
-const CLASSIFICATION_HELP: Record<string, string> = {
-  생명보험:
-    "사망이나 노후처럼 사람의 생명과 긴 기간의 생활을 준비하는 보험이에요. 종신보험, 정기보험, 연금보험이 여기에 가까워요.",
-  제3보험:
-    "질병, 상해, 간병처럼 사람의 몸과 건강에 생기는 일을 보장하는 보험이에요. 암보험, 상해보험, 간병보험이 대표적이에요.",
-  손해보험:
-    "갑작스러운 사고로 생긴 재산 손해나 책임을 보상하는 보험이에요. 자동차보험, 운전자보험, 화재보험이 여기에 들어가요.",
-  미분류:
-    "증권에서 보험 종류를 확실히 판단할 단서가 부족한 경우예요. 상품명이나 보장 내용을 다시 확인해 주세요.",
-};
-
-const CLASSIFICATION_SUMMARY: Record<string, string> = {
-  생명보험: "사망·노후 보장",
-  제3보험: "질병·상해·간병 보장",
-  손해보험: "재산 손해·책임 보장",
-  미분류: "종류 확인 필요",
-};
 
 type InsuranceAnalysisPageProps = {
   uploadInsurance?: UploadInsurance;
@@ -82,10 +60,6 @@ export function InsuranceAnalysisPage({
   const insuranceTabRef = useRef<HTMLButtonElement>(null);
   const analysisTabRef = useRef<HTMLButtonElement>(null);
   const chatTabRef = useRef<HTMLButtonElement>(null);
-  const classificationHelpRef = useRef<HTMLDListElement>(null);
-  const [openClassificationHelp, setOpenClassificationHelp] = useState<
-    string | null
-  >(null);
   const [deathBenefitContext, setDeathBenefitContext] =
     useState<DeathBenefitGuideInput>({
       has_dependent_family: false,
@@ -115,33 +89,6 @@ export function InsuranceAnalysisPage({
     () => new Set(),
   );
 
-  useEffect(() => {
-    if (!openClassificationHelp) return;
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpenClassificationHelp(null);
-      }
-    };
-    const closeOnOutsidePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (
-        target instanceof Node &&
-        classificationHelpRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setOpenClassificationHelp(null);
-    };
-
-    document.addEventListener("keydown", closeOnEscape);
-    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-      document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
-    };
-  }, [openClassificationHelp]);
-
   const insuranceDocuments = useMemo(
     () => analysis?.insuranceDocuments ?? [],
     [analysis],
@@ -166,7 +113,7 @@ export function InsuranceAnalysisPage({
     () => groupInsuranceDocuments(insuranceDocuments),
     [insuranceDocuments],
   );
-  const classificationTypeCount = CLASSIFICATION_ORDER.length;
+  const classificationTypeCount = POLICY_CLASSIFICATIONS.length;
   const portfolioSummary = usePortfolioSummary(
     insuranceDocuments,
     deathBenefitContext,
@@ -293,56 +240,20 @@ export function InsuranceAnalysisPage({
               </div>
             </div>
 
-            <dl
-              ref={classificationHelpRef}
-              className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-            >
-              {CLASSIFICATION_ORDER.map((classification) => {
-                const isHelpOpen = openClassificationHelp === classification;
-
-                return (
-                  <div
-                    key={classification}
-                    className="relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
-                  >
-                    <dt className="flex items-start justify-between gap-3 text-xs font-medium text-zinc-500">
-                      <span>{classification}</span>
-                      <span className="relative inline-flex">
-                        <button
-                          type="button"
-                          aria-label={`${classification} 설명 보기`}
-                          aria-haspopup="dialog"
-                          aria-controls={`classification-help-${classification}`}
-                          aria-expanded={isHelpOpen}
-                          onClick={() =>
-                            setOpenClassificationHelp((current) =>
-                              current === classification
-                                ? null
-                                : classification,
-                            )
-                          }
-                          className="flex size-5 items-center justify-center rounded-full border border-zinc-200 text-[11px] font-semibold text-zinc-400 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                        >
-                          ?
-                        </button>
-                        {isHelpOpen ? (
-                          <span
-                            id={`classification-help-${classification}`}
-                            role="dialog"
-                            aria-label={`${classification} 설명`}
-                            className="absolute right-0 bottom-7 z-10 w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left text-xs leading-5 font-normal text-zinc-600 shadow-lg"
-                          >
-                            {CLASSIFICATION_HELP[classification]}
-                          </span>
-                        ) : null}
-                      </span>
-                    </dt>
-                    <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
-                      {groupedInsuranceDocuments[classification]?.length ?? 0}
-                    </dd>
-                  </div>
-                );
-              })}
+            <dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {POLICY_CLASSIFICATIONS.map((classification) => (
+                <div
+                  key={classification}
+                  className="relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
+                >
+                  <dt className="text-xs font-medium text-zinc-500">
+                    {classification}
+                  </dt>
+                  <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
+                    {groupedInsuranceDocuments[classification]?.length ?? 0}
+                  </dd>
+                </div>
+              ))}
             </dl>
 
             <CoverageTotalTable
@@ -356,7 +267,7 @@ export function InsuranceAnalysisPage({
             />
 
             <div className="mt-8 space-y-5">
-              {CLASSIFICATION_ORDER.map((classification) => {
+              {POLICY_CLASSIFICATIONS.map((classification) => {
                 const classificationInsuranceDocuments =
                   groupedInsuranceDocuments[classification] ?? [];
                 if (classificationInsuranceDocuments.length === 0) return null;
@@ -367,11 +278,8 @@ export function InsuranceAnalysisPage({
                     className="overflow-hidden rounded-2xl border border-zinc-200 bg-white"
                   >
                     <div className="border-b border-zinc-100 bg-zinc-50/60 px-5 py-4">
-                      <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-[-0.03em]">
-                        <span>{classification}</span>
-                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium tracking-normal text-zinc-500 ring-1 ring-zinc-200">
-                          {CLASSIFICATION_SUMMARY[classification]}
-                        </span>
+                      <h2 className="text-lg font-semibold tracking-[-0.03em]">
+                        {classification}
                       </h2>
                       <p className="mt-1 text-sm text-zinc-500">
                         보험 {classificationInsuranceDocuments.length}개
@@ -398,7 +306,7 @@ export function InsuranceAnalysisPage({
                               >
                                 <span className="flex min-w-0 items-start gap-3">
                                   <InsurerLogo
-                                    insurerName={basicInfo?.보험사}
+                                    insurerName={basicInfo?.보험사 ?? undefined}
                                   />
                                   <span className="min-w-0 flex-1">
                                     <span className="flex min-w-0 items-center gap-2">
@@ -475,8 +383,7 @@ export function InsuranceAnalysisPage({
               deathBenefitContext={deathBenefitContext}
               onDeathBenefitContextChange={setDeathBenefitContext}
               isDeathBenefitRefreshing={portfolioSummary.isRefreshing}
-              eligibleCount={insuranceDocuments.length}
-              emptyReason={emptyReasonFor(insuranceDocuments)}
+              policyCount={insuranceDocuments.length}
               onRetry={portfolioSummary.retry}
             />
           </div>
@@ -569,9 +476,7 @@ function PolicySessionExpiredNotice() {
 function groupInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
   return insuranceDocuments.reduce<Record<string, AnalyzedInsurance[]>>(
     (groups, insuranceDocument) => {
-      const classification = displayClassification(
-        insuranceDocument.result.기본정보?.보험분류,
-      );
+      const classification = insuranceDocument.result.기본정보.보험분류;
       groups[classification] = [
         ...(groups[classification] ?? []),
         insuranceDocument,

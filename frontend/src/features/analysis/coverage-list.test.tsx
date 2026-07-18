@@ -4,28 +4,34 @@ import { describe, expect, test } from "vitest";
 import { InsuranceCoverageList } from "./coverage-list";
 import type { InsuranceCoverage } from "../upload/api";
 
-const GENERATED_NOTICE =
-  "증권에 설명이 없어 표준약관을 참고해 만든 안내예요. 정확한 내용은 가입한 상품의 약관에서 확인해 주세요.";
-
 const withDetail: InsuranceCoverage = {
   담보명: "암진단비",
   가입금액: "3,000만원",
+  가입금액상태: "confirmed",
   보장내용: "암 진단 확정 시 최초 1회 지급",
   해설: null,
+  설명근거: "policy_wording",
+  유형: "담보",
 };
 
 const withExplanation: InsuranceCoverage = {
   담보명: "교통사고처리지원금",
   가입금액: "5,000만원",
+  가입금액상태: "confirmed",
   보장내용: null,
   해설: "교통사고 형사합의금을 지원해요.",
+  설명근거: "generated_guidance",
+  유형: "담보",
 };
 
 const unverifiedAmount: InsuranceCoverage = {
   담보명: "긴급출동서비스",
   가입금액: "확인필요",
+  가입금액상태: "needs_review",
   보장내용: null,
   해설: null,
+  설명근거: "none",
+  유형: "담보",
 };
 
 describe("InsuranceCoverageList", () => {
@@ -53,29 +59,20 @@ describe("InsuranceCoverageList", () => {
     expect(screen.getByText(/지급 사유/)).toHaveClass("whitespace-pre-line");
   });
 
-  test("does not show the generated notice for insurance wording", () => {
-    render(<InsuranceCoverageList coverages={[withDetail]} />);
-
-    expect(screen.queryByText(GENERATED_NOTICE)).not.toBeInTheDocument();
-  });
-
-  test("shows generated explanation with the honest notice", () => {
+  test("shows the explanation supplied by the server", () => {
     render(<InsuranceCoverageList coverages={[withExplanation]} />);
 
     expect(
       screen.getByText("교통사고 형사합의금을 지원해요."),
     ).toBeInTheDocument();
-    expect(screen.getByText(GENERATED_NOTICE)).toBeInTheDocument();
+    expect(screen.getByText("일반 안내")).toBeInTheDocument();
+    expect(screen.queryByText(/표준약관/)).not.toBeInTheDocument();
   });
 
-  test("renders unverified amounts as a soft ask instead of 확인필요", () => {
+  test("uses the server verification state instead of an amount sentinel", () => {
     render(<InsuranceCoverageList coverages={[unverifiedAmount]} />);
 
-    expect(
-      screen.getByText(
-        "보장 금액은 가입하신 상품의 약관에서 자세히 확인할 수 있어요",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("가입금액을 확인해 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("확인필요")).not.toBeInTheDocument();
   });
 
@@ -129,8 +126,10 @@ describe("InsuranceCoverageList", () => {
     const rider: InsuranceCoverage = {
       담보명: "마일리지 특약",
       가입금액: "",
+      가입금액상태: "not_applicable",
       보장내용: null,
       해설: null,
+      설명근거: "none",
       유형: "부가",
     };
 
@@ -146,18 +145,14 @@ describe("InsuranceCoverageList", () => {
     ).not.toBeInTheDocument();
   });
 
-  test("treats missing 유형 as 담보, unaffected by rider grouping", () => {
-    render(<InsuranceCoverageList coverages={[withDetail]} />);
-
-    expect(screen.queryByText("부가 특약·요율")).not.toBeInTheDocument();
-  });
-
   test("renders only the rider group when every coverage is 부가", () => {
     const rider: InsuranceCoverage = {
       담보명: "긴급출동 요율",
       가입금액: "",
+      가입금액상태: "not_applicable",
       보장내용: null,
       해설: null,
+      설명근거: "none",
       유형: "부가",
     };
 

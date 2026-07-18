@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createPortfolioSession,
+  deletePortfolioSessionDocuments,
   deletePortfolioSession,
   refreshPortfolioSession,
 } from "./session-api";
@@ -55,5 +56,29 @@ describe("portfolio session API", () => {
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
       body: JSON.stringify({ portfolioSessionToken: "next-token" }),
     });
+  });
+
+  it("deletes selected documents from a valid portfolio session", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ status: "deleted" }), { status: 200 }),
+      );
+
+    await deletePortfolioSessionDocuments("portfolio-token", [
+      "document-1",
+      "document-2",
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/portfolio/sessions/documents/delete",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          portfolioSessionToken: "portfolio-token",
+          documentIds: ["document-1", "document-2"],
+        }),
+      }),
+    );
   });
 });

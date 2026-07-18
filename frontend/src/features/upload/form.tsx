@@ -5,6 +5,7 @@ import type { AnalyzedInsurance, InsuranceAnalysis } from "../analysis/store";
 import { uploadInsurance as uploadInsuranceRequest } from "./api";
 import {
   createPortfolioSession,
+  deletePortfolioSessionDocuments,
   type PortfolioSessionResult,
 } from "../analysis/session-api";
 import { Button } from "../../shared/components/ui/button";
@@ -27,6 +28,10 @@ type InsuranceUploadFormProps = {
   existingDocuments?: AnalyzedInsurance[];
   surface?: "page" | "modal";
   createSession?: () => Promise<PortfolioSessionResult>;
+  deleteSessionDocuments?: (
+    portfolioSessionToken: string,
+    documentIds: string[],
+  ) => Promise<void>;
 };
 
 export function InsuranceUploadForm({
@@ -40,6 +45,7 @@ export function InsuranceUploadForm({
   existingDocuments = [],
   surface = "page",
   createSession = createPortfolioSession,
+  deleteSessionDocuments = deletePortfolioSessionDocuments,
 }: InsuranceUploadFormProps) {
   const activeUploadInsurance = uploadInsurance ?? uploadInsuranceRequest;
   const {
@@ -63,6 +69,7 @@ export function InsuranceUploadForm({
     fixedSelectedName,
     existingDocuments,
     createSession,
+    deleteSessionDocuments,
   });
 
   // Drag-hover styling is purely presentational, so it stays local; the drop
@@ -81,7 +88,7 @@ export function InsuranceUploadForm({
   const fileSizeLabel =
     selectedFiles.length > 0
       ? `${selectedFiles.length}개 · ${(selectedBytes / 1024 / 1024).toFixed(2)} MB`
-      : "파일당 최대 10MB";
+      : "PDF";
   const isModal = surface === "modal";
   const passwordRetryFiles = selectedUploadFiles.filter((selectedFile) =>
     isPasswordRetryFile(selectedFile.errorCode),
@@ -94,7 +101,7 @@ export function InsuranceUploadForm({
   const dropzoneTitle = fixedSelectedName
     ? `${fixedSelectedName}(피보험자)의 보험증권 PDF만 올릴 수 있어요`
     : "보험증권 PDF를 올려주세요";
-  const dropzoneDescription = isModal ? "" : `PDF · ${fileSizeLabel}`;
+  const dropzoneDescription = isModal ? "" : fileSizeLabel;
 
   if (isAnalyzing) {
     return (
@@ -175,6 +182,7 @@ export function InsuranceUploadForm({
               type="file"
               accept="application/pdf,.pdf"
               multiple
+              disabled={isAnalyzing || Boolean(pendingAnalysis)}
               aria-label="PDF 파일 선택"
               onChange={(event) => {
                 if (event.target.files) selectFiles(event.target.files);
@@ -183,6 +191,7 @@ export function InsuranceUploadForm({
             <Button
               type="button"
               variant="outline"
+              disabled={isAnalyzing || Boolean(pendingAnalysis)}
               onClick={() => inputRef.current?.click()}
               className="relative mt-6"
             >
@@ -213,13 +222,14 @@ export function InsuranceUploadForm({
               surface={surface}
               onRemove={removeSelectedFile}
               onPasswordChange={updateSelectedFilePassword}
-              disableRemove={isAnalyzing}
+              disableRemove={isAnalyzing || Boolean(pendingAnalysis)}
             />
             <Button
               type="submit"
               disabled={
                 selectedUploadFiles.length === 0 ||
                 isAnalyzing ||
+                Boolean(pendingAnalysis) ||
                 (hasPasswordRetryFiles && hasMissingPasswords)
               }
               className={`self-stretch ${isModal ? "" : "sm:self-end"}`}

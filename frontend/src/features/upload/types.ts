@@ -2,6 +2,7 @@ import type { InsuranceUploadResult } from "./api";
 
 export type UploadInsuranceInput = {
   file: File;
+  documentId: string;
   password?: string;
   portfolioSessionToken: string;
 };

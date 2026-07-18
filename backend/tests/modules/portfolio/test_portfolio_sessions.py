@@ -15,6 +15,7 @@ from app.modules.portfolio.session.models import (
 )
 from app.modules.portfolio.session.repository import AddDocumentResult
 from app.modules.portfolio.session.service import (
+    PortfolioSessionDocumentCancelled,
     PortfolioSessionDocumentLimitExceeded,
     PortfolioSessionService,
 )
@@ -27,6 +28,8 @@ class _Repository:
         self.session: NewPortfolioSession | None = None
         self.documents: dict[str, StoredPolicyDocument] = {}
         self.cache: CachedPortfolioAnalysis | None = None
+        self.version = 0
+        self.cancelled_document_ids: set[str] = set()
 
     def create(self, session: NewPortfolioSession) -> None:
         self.session = session
@@ -41,9 +44,13 @@ class _Repository:
     ) -> AddDocumentResult:
         if self.session is None or self.session.id != session_id:
             return "missing"
+        if document.id in self.cancelled_document_ids:
+            return "cancelled"
         if len(self.documents) >= max_documents:
             return "limit_exceeded"
         self.documents[document.id] = document
+        self.version += 1
+        self.cache = None
         return "stored"
 
     def snapshot(
@@ -60,7 +67,7 @@ class _Repository:
             documents = [document for document in documents if document.id in policy_ids]
         return PortfolioSessionSnapshot(
             session_id=session_id,
-            version=len(self.documents),
+            version=self.version,
             policies=tuple(document.policy for document in documents),
             rag_session_ids=tuple(
                 document.rag_session_id
@@ -86,6 +93,28 @@ class _Repository:
         self.session = None
         self.documents.clear()
         return snapshot.rag_session_ids
+
+    def delete_documents(
+        self,
+        session_id: str,
+        document_ids: tuple[str, ...],
+        *,
+        now: datetime,
+    ) -> tuple[str, ...] | None:
+        if self.session is None or self.session.id != session_id:
+            return None
+        self.cancelled_document_ids.update(document_ids)
+        deleted = [
+            self.documents.pop(document_id)
+            for document_id in document_ids
+            if document_id in self.documents
+        ]
+        if deleted:
+            self.version += 1
+            self.cache = None
+        return tuple(
+            document.rag_session_id for document in deleted if document.rag_session_id is not None
+        )
 
     def load_cached_analysis(
         self,
@@ -228,6 +257,59 @@ def test_refresh_and_delete_apply_to_every_linked_rag_document() -> None:
 
     assert rag_store.extended == ["rag-1", "rag-2"]
     assert rag_store.deleted == ["rag-1", "rag-2"]
+
+
+def test_delete_documents_invalidates_analysis_and_removes_linked_rag_sessions() -> None:
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    rag_store = _RagStore()
+    sessions = PortfolioSessionService(repository, rag_store=rag_store)
+    access = sessions.create(now=now)
+    repository.documents["document-1"] = StoredPolicyDocument(
+        id="document-1",
+        policy=_empty_policy("document-1"),
+        rag_session_id="rag-1",
+    )
+    repository.documents["document-2"] = StoredPolicyDocument(
+        id="document-2",
+        policy=_empty_policy("document-2"),
+        rag_session_id="rag-2",
+    )
+    repository.cache = CachedPortfolioAnalysis(
+        version=0,
+        context_hash="context",
+        result={},
+    )
+
+    sessions.delete_documents(
+        access.token,
+        ["document-1", "document-1", "missing-document"],
+        now=now,
+    )
+
+    assert set(repository.documents) == {"document-2"}
+    assert repository.version == 1
+    assert repository.cache is None
+    assert rag_store.deleted == ["rag-1"]
+
+
+def test_cancelled_document_cannot_be_stored_after_delete_wins_the_race() -> None:
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+
+    sessions.delete_documents(access.token, ["document-1"], now=now)
+
+    with pytest.raises(PortfolioSessionDocumentCancelled):
+        sessions.add_pipeline_result(
+            access.token,
+            _empty_pipeline_result(),
+            document_id="document-1",
+            now=now,
+        )
+
+    assert repository.documents == {}
 
 
 def test_document_limit_removes_the_unlinked_rag_document(

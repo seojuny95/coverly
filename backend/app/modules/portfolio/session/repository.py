@@ -10,7 +10,7 @@ from app.modules.portfolio.session.models import (
     StoredPolicyDocument,
 )
 
-AddDocumentResult = Literal["stored", "missing", "limit_exceeded"]
+AddDocumentResult = Literal["stored", "missing", "limit_exceeded", "cancelled"]
 
 
 class PortfolioPolicySelectionNotFound(Exception):
@@ -46,6 +46,14 @@ class PortfolioSessionRepository(Protocol):
     ) -> tuple[str, ...] | None: ...
 
     def delete(self, session_id: str) -> tuple[str, ...] | None: ...
+
+    def delete_documents(
+        self,
+        session_id: str,
+        document_ids: tuple[str, ...],
+        *,
+        now: datetime,
+    ) -> tuple[str, ...] | None: ...
 
     def load_cached_analysis(
         self,

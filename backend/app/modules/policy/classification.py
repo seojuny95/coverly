@@ -25,21 +25,19 @@ determination of insurance category.
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 from pydantic import BaseModel
 
 from app.integrations.openai import JsonCompleter, structured_completer
-from app.modules.policy.models import PolicyClassification
+from app.modules.policy.models import PolicyClassification, PolicyClassificationName
 from app.modules.reference_data import REFERENCE_DATA_DIR, load_reference_data
 
-CLASSIFICATION_UNKNOWN = "미분류"
+CLASSIFICATION_UNKNOWN: PolicyClassificationName = "미분류"
 
 _HEAD_CHARS = 3_000
 
 _RULES_PATH = REFERENCE_DATA_DIR / "classification_rules.json"
-
-_ClassificationLiteral = Literal["생명보험", "제3보험", "손해보험", "미분류"]
 
 _SYSTEM = (
     "# 역할\n"
@@ -77,7 +75,7 @@ _SYSTEM = (
 
 
 class _ClassificationResult(BaseModel):
-    보험분류: _ClassificationLiteral
+    보험분류: PolicyClassificationName
 
 
 def _normalize_text(value: str) -> str:
@@ -90,7 +88,7 @@ def _normalize_terms(terms: list[str]) -> list[str]:
 
 @dataclass(frozen=True)
 class _Category:
-    classification: str
+    classification: PolicyClassificationName
     tags: list[str]
     terms: list[str]
 
@@ -109,9 +107,17 @@ def _validate_rules_payload(value: object) -> dict[str, Any]:
 
 _RAW_RULES = load_reference_data("classification_rules", _RULES_PATH, _validate_rules_payload)
 TAG_ORDER: list[str] = _RAW_RULES["tag_order"]
+
+
+def _classification_name(value: object) -> PolicyClassificationName:
+    if value not in {"생명보험", "제3보험", "손해보험", "미분류"}:
+        raise ValueError(f"unsupported policy classification: {value!r}")
+    return value
+
+
 _CATEGORIES = [
     _Category(
-        classification=category["classification"],
+        classification=_classification_name(category["classification"]),
         tags=category["tags"],
         terms=_normalize_terms(category["terms"]),
     )
@@ -140,7 +146,7 @@ def _search_space(text: str, product_name: str | None) -> str:
 
 
 def _enrich_tags(
-    classification: str,
+    classification: PolicyClassificationName,
     tag_space: str,
     seed_tags: list[str] | None = None,
 ) -> PolicyClassification:
@@ -191,7 +197,10 @@ def _default_completer() -> JsonCompleter:
     return structured_completer(_ClassificationResult)
 
 
-def _classify_with_llm(source: str, complete: JsonCompleter | None) -> str:
+def _classify_with_llm(
+    source: str,
+    complete: JsonCompleter | None,
+) -> PolicyClassificationName:
     completer = complete or _default_completer()
     try:
         payload = completer(_SYSTEM, _classification_user_prompt(source))

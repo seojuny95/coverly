@@ -2,11 +2,52 @@
 
 import re
 from collections.abc import Iterator
+from typing import Annotated, Literal
 
-from app.modules.qa.schemas import PortfolioQuestionResponse
+from pydantic import BaseModel, Field
 
-QaStreamEvent = dict[str, object]
+from app.core.generation import GenerationMode
+from app.modules.portfolio.schemas import ClaimChannelBlock
+from app.modules.qa.schemas import (
+    AnswerCitation,
+    PortfolioQuestionResponse,
+    QaAnswerStatus,
+)
+
 _STREAM_CHUNK_SIZE = 16
+
+
+class QaProgressEvent(BaseModel):
+    type: Literal["progress"]
+    stage: str
+    text: str
+
+
+class QaMetaEvent(BaseModel):
+    type: Literal["meta"]
+    status: QaAnswerStatus
+    generation: GenerationMode
+
+
+class QaDeltaEvent(BaseModel):
+    type: Literal["delta"]
+    text: str
+
+
+class QaEndEvent(BaseModel):
+    type: Literal["end"]
+    status: QaAnswerStatus
+    generation: GenerationMode
+    citations: list[AnswerCitation]
+    limitations: list[str]
+    suggestions: list[str]
+    claim_channels: ClaimChannelBlock | None
+
+
+QaStreamEvent = Annotated[
+    QaProgressEvent | QaMetaEvent | QaDeltaEvent | QaEndEvent,
+    Field(discriminator="type"),
+]
 
 
 def answer_text_chunks(text: str) -> Iterator[str]:
@@ -29,17 +70,19 @@ def answer_text_chunks(text: str) -> Iterator[str]:
 
 
 def stream_response(response: PortfolioQuestionResponse) -> Iterator[QaStreamEvent]:
-    yield {"type": "meta", "status": response.status, "generation": response.generation}
+    yield QaMetaEvent(
+        type="meta",
+        status=response.status,
+        generation=response.generation,
+    )
     for chunk in answer_text_chunks(response.answer):
-        yield {"type": "delta", "text": chunk}
-    yield {
-        "type": "end",
-        "status": response.status,
-        "generation": response.generation,
-        "citations": [citation.model_dump(mode="json") for citation in response.citations],
-        "limitations": response.limitations,
-        "suggestions": response.suggestions,
-        "claim_channels": (
-            response.claim_channels.model_dump(mode="json") if response.claim_channels else None
-        ),
-    }
+        yield QaDeltaEvent(type="delta", text=chunk)
+    yield QaEndEvent(
+        type="end",
+        status=response.status,
+        generation=response.generation,
+        citations=response.citations,
+        limitations=response.limitations,
+        suggestions=response.suggestions,
+        claim_channels=response.claim_channels,
+    )

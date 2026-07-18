@@ -47,4 +47,20 @@ describe("shared API client", () => {
       status: 502,
     });
   });
+
+  it("rejects an unknown error code outside the generated contract", async () => {
+    const result = await readApiErrorPayload(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "UNDECLARED_BACKEND_ERROR",
+            message: "내부 세부 정보",
+            request_id: "request-3",
+          },
+        }),
+      ),
+    );
+
+    expect(result).toEqual({ detail: null, isJson: true });
+  });
 });

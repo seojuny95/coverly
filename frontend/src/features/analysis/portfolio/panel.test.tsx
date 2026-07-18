@@ -320,8 +320,7 @@ function baseProps() {
       has_major_debt: false,
     },
     onDeathBenefitContextChange: vi.fn(),
-    eligibleCount: 1,
-    emptyReason: "no-coverage" as const,
+    policyCount: 1,
     onRetry: noop,
   };
 }
@@ -343,18 +342,6 @@ function StatefulPortfolioAnalysisPanel() {
   );
 }
 
-test("shows an empty state only when there are no insurance documents", () => {
-  render(
-    <PortfolioAnalysisPanel
-      {...baseProps()}
-      eligibleCount={0}
-      emptyReason="auto-only"
-    />,
-  );
-
-  expect(screen.getByText("확인할 보험 정보가 없어요")).toBeInTheDocument();
-});
-
 test("shows all-policy core, special-policy, and claim checks", async () => {
   const user = userEvent.setup();
   render(<PortfolioAnalysisPanel {...baseProps()} />);
@@ -370,20 +357,21 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
     screen.getByText("현재 보장 구성을 바탕으로 확인한 내용을 정리했어요."),
   ).toBeInTheDocument();
   expect(screen.getByText("진단비 공백")).toBeInTheDocument();
-  expect(screen.getByText("권장보험을 점검해보세요")).toBeInTheDocument();
+  expect(screen.getByText("현재 월 보험료")).toBeInTheDocument();
+  expect(screen.getByText("20~30대 참고 구간")).toBeInTheDocument();
   expect(screen.getByText("월 보험료 98,000원")).toBeInTheDocument();
-  expect(screen.getByText("권장보험")).toBeInTheDocument();
-  expect(screen.getByText("사망보험")).toBeInTheDocument();
-  expect(screen.getByText("3대 진단보험")).toBeInTheDocument();
+  expect(screen.getByText("핵심 보장 확인")).toBeInTheDocument();
+  expect(screen.getAllByText("사망 보장").length).toBeGreaterThan(0);
+  expect(screen.getByText("진단 보장")).toBeInTheDocument();
   expect(screen.getByText("실손의료보험")).toBeInTheDocument();
   expect(
     screen.getByRole("radio", { name: "부양가족이나 큰 부채가 없어요" }),
   ).toBeChecked();
   expect(
-    screen.getByText(/피보험자가 사망했을 때 남은 가족에게/),
+    screen.getByText("부양가족이나 큰 부채가 없는 경우"),
   ).toBeInTheDocument();
   expect(
-    screen.queryByText("부양가족이나 큰 부채가 없는 경우"),
+    screen.queryByText(/피보험자가 사망했을 때 남은 가족에게/),
   ).not.toBeInTheDocument();
   expect(screen.queryByText("사망 담보가 확인돼요.")).not.toBeInTheDocument();
   expect(screen.getByText("기본 사망 보장")).toBeInTheDocument();
@@ -391,7 +379,7 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(
     screen.queryByText("업로드한 전체 보험에서 사망 보장이 확인돼요."),
   ).not.toBeInTheDocument();
-  expect(screen.getAllByText("적정 진단비 감").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("참고 금액").length).toBeGreaterThan(0);
   expect(screen.getAllByText(/공식 출처:/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/아티클·블로그 출처:/).length).toBeGreaterThan(0);
   expect(screen.getByText(/생활비 공백/)).toBeInTheDocument();
@@ -426,8 +414,14 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.getByText("운전자보험")).toBeInTheDocument();
   expect(screen.getByText("여행자보험")).toBeInTheDocument();
   expect(screen.getByText("화재보험")).toBeInTheDocument();
-  expect(screen.getByText("보험금 청구 방법")).toBeInTheDocument();
-  expect(screen.getByText("접수까지 네 단계로 준비해요")).toBeInTheDocument();
+  expect(screen.getByText("보험금 청구 채널")).toBeInTheDocument();
+  expect(screen.getByText("확인된 접수 채널을 모았어요")).toBeInTheDocument();
+  expect(screen.queryByText(/청구권은 일반적으로/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/공통으로 청구서와 신분증/),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/가입 당시 알린 내용/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/참여 병원이라면/)).not.toBeInTheDocument();
   expect(screen.queryByText("최근 제도 변화")).not.toBeInTheDocument();
   expect(screen.getByText("상대방의 신체 피해")).toBeInTheDocument();
   expect(screen.getByText("내 차량 손해")).toBeInTheDocument();
@@ -436,10 +430,10 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
     "https://www.silson24.or.kr/claim/web/",
   );
   const insurerChannels = screen
-    .getByText("가입한 보험사 청구 채널 보기")
+    .getByText("보험사별 청구 채널")
     .closest("details");
   expect(insurerChannels).not.toHaveAttribute("open");
-  await user.click(screen.getByText("가입한 보험사 청구 채널 보기"));
+  await user.click(screen.getByText("보험사별 청구 채널"));
   expect(insurerChannels).toHaveAttribute("open");
   expect(screen.getByText("삼성화재")).toBeInTheDocument();
   expect(screen.getByText("메리츠화재")).toBeInTheDocument();
@@ -488,8 +482,9 @@ test("shows a skeleton for the death benefit amount while refreshing", () => {
     <PortfolioAnalysisPanel {...baseProps()} isDeathBenefitRefreshing={true} />,
   );
 
-  expect(screen.getByText("안내금액 계산 중")).toBeInTheDocument();
-  expect(screen.queryByText("안내금액 업데이트 중...")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("status", { name: "참고 금액을 다시 확인하고 있어요" }),
+  ).toHaveAttribute("aria-busy", "true");
 });
 
 test("groups limited death coverages separately from basic death coverage", () => {
@@ -525,7 +520,7 @@ test("groups limited death coverages separately from basic death coverage", () =
   );
 
   const deathCard = screen
-    .getByRole("heading", { name: "사망보험" })
+    .getByRole("heading", { name: "사망 보장" })
     .closest("section");
 
   expect(within(deathCard!).getByText("점검 필요")).toBeInTheDocument();
@@ -612,7 +607,7 @@ test("shows a multiple-medical-indemnity review directly in the coverage map", (
   render(<PortfolioAnalysisPanel {...baseProps()} summary={reviewSummary} />);
 
   expect(screen.queryByText("한 번 더 볼 항목")).not.toBeInTheDocument();
-  expect(screen.getByText("중복 가능성 확인")).toBeInTheDocument();
+  expect(screen.getByText("추가 확인")).toBeInTheDocument();
 });
 
 test("shows insurer claim channels even without the medical indemnity channel", () => {
@@ -634,12 +629,12 @@ test("shows insurer claim channels even without the medical indemnity channel", 
   );
 
   expect(screen.queryByText("실손24")).not.toBeInTheDocument();
-  expect(screen.getByText("가입한 보험사 청구 채널 보기")).toBeInTheDocument();
+  expect(screen.getByText("보험사별 청구 채널")).toBeInTheDocument();
   expect(
-    screen.getByText(
+    screen.queryByText(
       "가입한 보험사의 앱이나 홈페이지에서 직접 청구할 수 있어요.",
     ),
-  ).toBeInTheDocument();
+  ).not.toBeInTheDocument();
 });
 
 test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
@@ -678,7 +673,7 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
   render(<PortfolioAnalysisPanel {...baseProps()} summary={reviewSummary} />);
 
   const actualLossReview = screen
-    .getByRole("heading", { name: "실손형 보장 중복 점검" })
+    .getByRole("heading", { name: "여러 계약에 표시된 담보" })
     .closest("article");
   const medicalIndemnityCard = screen
     .getByRole("heading", { name: "실손의료보험" })
@@ -688,9 +683,14 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
   expect(medicalIndemnityCard).not.toBeNull();
   expect(
     within(actualLossReview!).getByText(
-      /여러 계약에서 확인된 실손형 담보: 자동차사고벌금/,
+      /여러 계약에 표시된 담보: 자동차사고벌금/,
     ),
   ).toBeInTheDocument();
+  expect(
+    within(actualLossReview!).queryByText(
+      /실손형 지급 방식|중복 보상 제한|실제 발생한 손해/,
+    ),
+  ).not.toBeInTheDocument();
   expect(
     within(medicalIndemnityCard!).queryByText(/자동차사고벌금/),
   ).not.toBeInTheDocument();

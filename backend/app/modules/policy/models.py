@@ -6,6 +6,9 @@ from typing import Literal, NotRequired, TypedDict
 # A pdfplumber table: rows of cells (None = empty cell), immutable for ParsedDocument.
 Table = tuple[tuple[str | None, ...], ...]
 CoverageType = Literal["담보", "부가"]
+AmountVerificationStatus = Literal["confirmed", "needs_review", "not_applicable"]
+CoverageExplanationBasis = Literal["policy_wording", "generated_guidance", "none"]
+PolicyClassificationName = Literal["생명보험", "제3보험", "손해보험", "미분류"]
 
 
 @dataclass(frozen=True)
@@ -33,10 +36,10 @@ class Coverage(TypedDict):
 
     담보명: str
     가입금액: str
+    가입금액상태: NotRequired[AmountVerificationStatus]
     보장내용: str | None
     해설: str | None
     유형: NotRequired[CoverageType]
-    # 유형 absent defaults to "담보"; "부가" marks name-only riders or rate rows.
 
 
 class VehicleInfo(TypedDict, total=False):
@@ -85,10 +88,10 @@ class PolicyCoreSummary(TypedDict, total=False):
 
 
 class PolicySummary(PolicyCoreSummary, total=False):
-    보험분류: str
+    보험분류: PolicyClassificationName
     상품태그: list[str]
 
 
 class PolicyClassification(TypedDict):
-    보험분류: str
+    보험분류: PolicyClassificationName
     상품태그: list[str]
