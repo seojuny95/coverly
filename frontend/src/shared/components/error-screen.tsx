@@ -7,12 +7,17 @@ import { Button } from "./ui/button";
 type ErrorScreenProps = {
   digest?: string;
   onRetry?: () => void;
+  showBrand?: boolean;
 };
 
-export function ErrorScreen({ digest, onRetry }: ErrorScreenProps) {
+export function ErrorScreen({
+  digest,
+  onRetry,
+  showBrand = false,
+}: ErrorScreenProps) {
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-white px-5 py-12 text-zinc-950">
-      <BrandLink className="absolute top-6 left-6" />
+      {showBrand ? <BrandLink className="absolute top-6 left-6" /> : null}
       <section className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white px-6 py-8 shadow-[10px_10px_0_#e8edff] sm:px-8">
         <SectionLabel>SYSTEM MESSAGE</SectionLabel>
         <h1 className="mt-5 text-2xl leading-8 font-semibold tracking-[-0.04em]">

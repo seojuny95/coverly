@@ -1,12 +1,10 @@
 import { InsuranceUploadForm } from "@/features/upload/form";
 import { SectionLabel } from "@/shared/components/section-label";
-import { BrandLink } from "@/shared/components/brand";
 
 export default function UploadPage() {
   return (
     <main className="flex min-h-screen flex-col bg-white px-5 py-6 text-zinc-950 sm:px-6">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between">
-        <BrandLink />
+      <header className="mx-auto flex min-h-6 w-full max-w-5xl items-center justify-end">
         <p className="font-mono text-[10px] tracking-[0.08em] text-zinc-400">
           CONNECT INSURANCE
         </p>

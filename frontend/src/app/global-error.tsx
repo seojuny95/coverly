@@ -22,7 +22,7 @@ export default function GlobalError({
   return (
     <html lang="ko">
       <body>
-        <ErrorScreen digest={error.digest} onRetry={reset} />
+        <ErrorScreen digest={error.digest} onRetry={reset} showBrand />
       </body>
     </html>
   );

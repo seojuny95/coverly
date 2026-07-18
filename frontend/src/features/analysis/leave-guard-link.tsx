@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState, type ReactNode } from "react";
+import { Button } from "../../shared/components/ui/button";
 import { useDialogA11y } from "./use-dialog-a11y";
 
 // In-app navigation guard: when `enabled`, intercepts the click and shows a
@@ -61,20 +62,16 @@ export function LeaveGuardLink({
               사라져요.
             </p>
             <div className="mt-5 flex justify-center gap-2">
-              <button
-                type="button"
-                className="rounded-xl border px-4 py-2 text-sm"
-                onClick={closeDialog}
-              >
+              <Button type="button" variant="outline" onClick={closeDialog}>
                 닫기
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="rounded-xl bg-blue-600 px-4 py-2 text-sm text-white"
+                className="bg-blue-600 hover:bg-blue-700"
                 onClick={go}
               >
                 나가기
-              </button>
+              </Button>
             </div>
           </div>
         </div>

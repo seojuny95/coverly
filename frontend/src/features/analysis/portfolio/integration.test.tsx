@@ -2,8 +2,6 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-// InsuranceAnalysisPage's header logo now guards leaving via LeaveGuardLink,
-// which calls useRouter — mock it so it doesn't need a real App Router.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
 }));

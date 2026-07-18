@@ -29,7 +29,8 @@ src/
 │   ├── page.tsx                 # 랜딩
 │   ├── upload/page.tsx          # 업로드
 │   ├── analysis/page.tsx        # 분석 결과
-│   ├── layout.tsx / globals.css
+│   ├── layout.tsx / globals.css # 전역 레이아웃, 공통 브랜드 내비게이션
+│   ├── brand-navigation.tsx / providers.tsx
 │   └── error.tsx / global-error.tsx / not-found.tsx
 ├── features/
 │   ├── upload/                  # 업로드 폼, 진행 화면, 업로드 API

@@ -13,11 +13,6 @@ import {
 } from "react";
 
 import { SectionLabel } from "../../shared/components/section-label";
-import {
-  BrandLink,
-  BrandMark,
-  brandLinkClassName,
-} from "../../shared/components/brand";
 import { Button } from "../../shared/components/ui/button";
 
 import { UploadInsuranceModal } from "./upload-modal";
@@ -27,7 +22,6 @@ import {
   type InsuranceAnalysis,
   useInsuranceData,
 } from "./store";
-import { LeaveGuardLink } from "./leave-guard-link";
 import { usePortfolioSessionRefresh } from "./use-session-refresh";
 import { useBeforeUnloadGuard } from "./use-leave-guard";
 import type { UploadInsurance } from "../upload/form";
@@ -218,7 +212,6 @@ export function InsuranceAnalysisPage({
   if (!analysis || insuranceDocuments.length === 0) {
     return (
       <main className="relative flex min-h-screen items-center justify-center bg-white px-5 text-zinc-950">
-        <BrandLink className="absolute top-6 left-6" />
         <section className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white px-6 py-8 text-center shadow-[10px_10px_0_#e8edff]">
           <div className="mb-5 flex justify-center">
             <SectionLabel>분석 결과</SectionLabel>
@@ -241,17 +234,6 @@ export function InsuranceAnalysisPage({
     <main
       className={`flex min-h-dvh flex-col bg-white px-5 py-6 text-zinc-950 sm:px-6 ${activeTab === "chat" ? "h-dvh overflow-hidden" : ""}`}
     >
-      <header className="mx-auto flex w-full max-w-6xl items-center gap-4">
-        <LeaveGuardLink
-          href="/"
-          enabled={hasData}
-          className={brandLinkClassName}
-          ariaLabel="Coverly AI 홈"
-        >
-          <BrandMark />
-        </LeaveGuardLink>
-      </header>
-
       <section className="mx-auto mt-10 flex min-h-0 w-full max-w-6xl flex-1 flex-col">
         <nav
           role="tablist"
