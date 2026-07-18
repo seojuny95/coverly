@@ -24,6 +24,7 @@ from app.rag.policy.models import PolicyRetrievalHit, PolicyVectorRecord
 from app.rag.policy.retrieval import retrieve_policy_context
 from app.rag.policy.session_tokens import sign_policy_session_id
 from app.rag.policy.store import PolicyRagStore
+from app.rag.scoring import cosine_similarity as _cosine
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "retrieval_dataset.json"
 _SAMPLE_DIR_ENV = "POLICY_RAG_EVAL_SAMPLE_DIR"
@@ -527,10 +528,6 @@ def _candidate_roots() -> tuple[Path, ...]:
         if root not in roots:
             roots.append(root)
     return tuple(roots)
-
-
-def _cosine(left: tuple[float, ...], right: tuple[float, ...]) -> float:
-    return sum(a * b for a, b in zip(left, right, strict=True))
 
 
 def _parse_args() -> tuple[bool, int]:

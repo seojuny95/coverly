@@ -23,6 +23,8 @@ from app.rag.official.answer import RagAnswerStatus, answer_official_question
 from app.rag.official.loaders import load_official_chunks
 from app.rag.official.models import RagChunk
 from app.rag.official.retrieval import retrieve
+from evals.rag.data import string_groups as _string_groups
+from evals.rag.data import string_tuple as _string_tuple
 from evals.rag.official.generation import (
     EVAL_FIXTURE as GENERATION_FIXTURE,
 )
@@ -33,6 +35,9 @@ from evals.rag.official.generation import (
     load_generation_eval_cases,
 )
 from evals.rag.official.retrieval import RetrievalEvalCase, load_retrieval_eval_cases
+from evals.rag.text import missing_term_groups as _missing_term_groups
+from evals.rag.text import normalize_whitespace as _normalize
+from evals.rag.text import present_terms as _present_terms
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "e2e_dataset.json"
 _OFFLINE_ANSWER_CHARS = 850
@@ -419,20 +424,6 @@ def _scenario_id(case_id: str) -> str:
     return case_id.split("__q", maxsplit=1)[0]
 
 
-def _missing_term_groups(groups: tuple[tuple[str, ...], ...], text: str) -> tuple[str, ...]:
-    normalized = _normalize(text)
-    return tuple(
-        " / ".join(group)
-        for group in groups
-        if not any(_normalize(term) in normalized for term in group)
-    )
-
-
-def _present_terms(terms: tuple[str, ...], text: str) -> tuple[str, ...]:
-    normalized = _normalize(text)
-    return tuple(term for term in terms if _normalize(term) in normalized)
-
-
 def _required_citation_groups(
     case: GenerationEvalCase,
     chunks_by_id: dict[str, RagChunk],
@@ -492,18 +483,6 @@ def _label_title(label: str | None) -> str:
     if match is None:
         return ""
     return _normalize(match.group(1)).replace(" ", "")
-
-
-def _normalize(text: str) -> str:
-    return " ".join(text.split())
-
-
-def _string_tuple(value: object) -> tuple[str, ...]:
-    return tuple(str(item) for item in cast(list[object], value))
-
-
-def _string_groups(value: object) -> tuple[tuple[str, ...], ...]:
-    return tuple(_string_tuple(group) for group in cast(list[object], value))
 
 
 def _rate(values: Iterable[bool]) -> float:

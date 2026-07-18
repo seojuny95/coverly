@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,19 @@ from evals.rag.official import (
 )
 from evals.rag.official.extraction import EVAL_FIXTURE as EXTRACTION_EVAL_FIXTURE
 from evals.rag.official.retrieval import EVAL_FIXTURE
+
+
+def _retriever_returning(hits: list[RetrievalHit]) -> Callable[..., list[RetrievalHit]]:
+    def retrieve(
+        *,
+        query: str,
+        chunks: tuple[RagChunk, ...] | None = None,
+        embedder: object | None = None,
+        final_k: int = 5,
+    ) -> list[RetrievalHit]:
+        return hits
+
+    return retrieve
 
 
 def test_rag_sources_are_verified_and_small() -> None:
@@ -479,16 +493,7 @@ def test_retrieval_eval_reports_first_passing_rank_and_mrr(
         ),
     ]
 
-    def _fake_retrieve(
-        *,
-        query: str,
-        chunks: tuple[RagChunk, ...] | None = None,
-        embedder: object | None = None,
-        final_k: int = 5,
-    ) -> list[RetrievalHit]:
-        return hits
-
-    monkeypatch.setattr("evals.rag.official.retrieval.retrieve", _fake_retrieve)
+    monkeypatch.setattr("evals.rag.official.retrieval.retrieve", _retriever_returning(hits))
     cases = (
         RetrievalEvalCase(
             id="case",
@@ -533,16 +538,7 @@ def test_retrieval_eval_uses_exact_relevant_chunk_ids(
         ),
     ]
 
-    def _fake_retrieve(
-        *,
-        query: str,
-        chunks: tuple[RagChunk, ...] | None = None,
-        embedder: object | None = None,
-        final_k: int = 5,
-    ) -> list[RetrievalHit]:
-        return hits
-
-    monkeypatch.setattr("evals.rag.official.retrieval.retrieve", _fake_retrieve)
+    monkeypatch.setattr("evals.rag.official.retrieval.retrieve", _retriever_returning(hits))
     cases = (
         RetrievalEvalCase(
             id="case",
@@ -582,16 +578,7 @@ def test_retrieval_eval_accepts_semantic_official_evidence(
         ),
     ]
 
-    def _fake_retrieve(
-        *,
-        query: str,
-        chunks: tuple[RagChunk, ...] | None = None,
-        embedder: object | None = None,
-        final_k: int = 5,
-    ) -> list[RetrievalHit]:
-        return hits
-
-    monkeypatch.setattr("evals.rag.official.retrieval.retrieve", _fake_retrieve)
+    monkeypatch.setattr("evals.rag.official.retrieval.retrieve", _retriever_returning(hits))
     cases = (
         RetrievalEvalCase(
             id="case",

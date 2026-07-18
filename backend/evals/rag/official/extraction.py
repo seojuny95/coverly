@@ -17,6 +17,7 @@ from typing import Literal, cast
 
 from app.rag.official.loaders import load_official_chunks
 from app.rag.official.models import RagChunk, chunk_embedding_text
+from evals.rag.data import string_tuple as _string_tuple
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "extraction_dataset.json"
 ExtractionCaseType = Literal["curated", "broad_regression"]
@@ -215,10 +216,6 @@ def _chunk_for_case(
     if not matches:
         return None
     return matches[0]
-
-
-def _string_tuple(value: object) -> tuple[str, ...]:
-    return tuple(str(item) for item in cast(list[object], value))
 
 
 def _int_value(value: object) -> int:
