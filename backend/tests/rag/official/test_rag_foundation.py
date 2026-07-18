@@ -53,7 +53,28 @@ def test_standard_clause_chunking_preserves_article_citations() -> None:
     assert len(chunks) == 2
     assert chunks[1].label == "제2조(계약 전 알릴 의무)"
     assert chunks[1].citation_label is not None
+    assert "질병·상해보험 표준약관" in chunks[1].citation_label
     assert "계약 전 알릴 의무" in chunks[1].citation_label
+
+
+def test_standard_clause_chunking_keeps_section_context_for_split_blocks() -> None:
+    source = next(source for source in rag_sources() if source.category == "standard_clause")
+    huge_body = "첫 문장입니다.\n" + "\n".join(
+        f"{index}. 반복 내용입니다." for index in range(1, 140)
+    )
+
+    chunks = build_chunks(
+        source,
+        [
+            "질병·상해보험 표준약관 ··· 2",
+            f"제9조(긴 표 조항) {huge_body}",
+        ],
+    )
+
+    assert len(chunks) > 1
+    assert chunks[1].text.splitlines()[0] == "[질병·상해보험 표준약관 > 제9조(긴 표 조항)]"
+    assert chunks[1].citation_label is not None
+    assert "질병·상해보험 표준약관" in chunks[1].citation_label
 
 
 def test_standard_clause_chunking_caps_articles_without_paragraph_breaks() -> None:
@@ -74,6 +95,33 @@ def test_standard_clause_chunking_caps_articles_without_paragraph_breaks() -> No
     assert len(chunks) > 1
     assert all(len(chunk.text) <= 1500 for chunk in chunks)
     assert all(chunk.label == "제99조(장기 무중단 조항)" for chunk in chunks)
+
+
+def test_product_explanation_chunking_uses_document_sections() -> None:
+    source = next(
+        source
+        for source in rag_sources()
+        if source.id == "knia_auto_insurance_product_explanation_2024_04_01"
+    )
+
+    chunks = build_chunks(
+        source,
+        [
+            "자동차보험 설명서",
+            "주 의! 실손 담보 중복가입 시 불이익\n"
+            "실제 손해액을 보상하는 담보는 여러 개 중복 가입할 필요가 없습니다.\n"
+            "발생한 손해액을 초과하여 보험금을 지급하지 않기 때문입니다.\n"
+            "주 의! 예금자보호 관련 유의사항\n"
+            "이 상품은 예금자보호법에 따라 보호되는 상품입니다.",
+        ],
+    )
+
+    assert [chunk.label for chunk in chunks] == [
+        "주 의! 실손 담보 중복가입 시 불이익",
+        "주 의! 예금자보호 관련 유의사항",
+    ]
+    assert "발생한 손해액을 초과하여 보험금을 지급하지" in chunks[0].text
+    assert "예금자보호법" in chunks[1].text
 
 
 def test_build_vector_records_embeds_chunks() -> None:

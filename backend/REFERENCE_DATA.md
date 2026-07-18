@@ -18,12 +18,12 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 
 | 테이블 | 상태 | 용도와 경계 |
 | --- | --- | --- |
-| `official_rag_chunks` | current | 현재 서버 설정(`RAG_PG_TABLE`)이 읽는 공식 약관·제도 RAG 청크 |
+| `data_official_rag_chunks` | current | 현재 서버 설정(`RAG_PG_TABLE=official_rag_chunks`)을 LlamaIndex PGVectorStore가 물리 테이블로 변환해 읽는 공식 약관·제도 RAG 청크 |
 | `policy_rag_chunks` | current ephemeral | 업로드 세션별 RAG 청크. 만료·삭제를 전제로 한다. |
-| `data_official_rag_chunks` | legacy candidate | 과거 후보 테이블. 현재 서버 설정의 읽기 경로가 아니므로 이전·정리 대상을 식별한다. |
 | `reference.reference_data` | current | `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides` 운영 참조 데이터의 DB 원본 |
 | `reference.sources` | current | 구조화된 참조 테이블이 공유하는 출처 메타데이터 |
 | `reference.premium_burden_guides` | current | 보험료 부담 가이드의 운영 기준. 스키마·기준일을 함께 관리한다. |
+| `official_rag_chunks` | removed | 중복된 legacy official RAG 테이블. 현재 runtime은 `data_official_rag_chunks`만 사용하므로 cleanup migration으로 제거했다. |
 | `coverly.reference_data` | removed | `reference.reference_data`로 이전했다. |
 | `premium_benchmarks` | removed | 현재 계약과 달랐던 기존 보험료 벤치마크 테이블. cleanup migration으로 제거했다. |
 | `policy_change_notes` | removed | 제거된 구 분석 API 전용 제도 변경 메모. cleanup migration으로 제거했다. |
@@ -50,6 +50,8 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 
 - 참조 사실에는 출처와 기준일을 저장하고 응답 근거에 연결한다.
 - RAG 검색 결과가 없거나 근거가 부족하면 서버는 확인 불가로 degrade한다.
+- 공식 RAG는 문서 타입별 chunker를 사용한다. 법령 XML은 조문 단위, 표준약관은 상품/특약 섹션과 조항 단위, 자동차보험 표준상품설명서는 설명서 섹션 단위, 일반 소비자 안내자료는 페이지/제목 단위로 나눈 뒤 공통 `RagChunk` 형식으로 저장한다.
+- 공식 RAG 운영 index는 `app.rag.official.indexing`으로 staging table에 재적재한 뒤 serving table로 swap한다. swap 이후 live table의 PK/index 이름은 `data_official_rag_chunks_*` 형태로 정규화한다.
 - Supabase 소유 참조 데이터에는 서버 bundled fallback을 두지 않는다.
 - `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides`가 없거나 읽히지 않으면 전체 분석을 실패시킨다.
 - 참조 데이터 스키마 변경은 새 migration과 검증 코드를 함께 추가한다.

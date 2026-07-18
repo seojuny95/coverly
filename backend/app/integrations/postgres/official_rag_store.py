@@ -10,6 +10,7 @@ from llama_index.core.vector_stores import VectorStoreQuery
 from llama_index.core.vector_stores.types import VectorStoreQueryMode
 from llama_index.vector_stores.postgres import PGVectorStore
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Connection
 
 from app.core.config import get_settings
 from app.rag.official.models import (
@@ -98,7 +99,33 @@ class PgVectorRagStore:
             )
             connection.execute(text(f'ALTER TABLE "{staging_table}" RENAME TO "{live_table}"'))
             connection.execute(text(f'DROP TABLE IF EXISTS "{backup_table}"'))
+            self._normalize_live_index_names(connection, staging_table_name)
         engine.dispose()
+
+    def _normalize_live_index_names(self, connection: Connection, staging_table_name: str) -> None:
+        live_table = f"data_{self._table_name}"
+        staging_table = f"data_{staging_table_name}"
+        statements = (
+            (
+                f'ALTER TABLE IF EXISTS "{live_table}" '
+                f'RENAME CONSTRAINT "data_{staging_table_name}_pkey" '
+                f'TO "{live_table}_pkey"'
+            ),
+            (
+                f'ALTER INDEX IF EXISTS "{staging_table}_embedding_idx" '
+                f'RENAME TO "{live_table}_embedding_idx"'
+            ),
+            (
+                f'ALTER INDEX IF EXISTS "{staging_table_name}_idx" '
+                f'RENAME TO "{live_table}_text_search_tsv_idx"'
+            ),
+            (
+                f'ALTER INDEX IF EXISTS "{staging_table_name}_idx_1" '
+                f'RENAME TO "{live_table}_ref_doc_id_idx"'
+            ),
+        )
+        for statement in statements:
+            connection.execute(text(statement))
 
     def _drop_table_if_exists(self, table_name: str) -> None:
         engine = create_engine(self._database_url)
