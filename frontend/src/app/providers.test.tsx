@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { Providers } from "./providers";
 import { useInsuranceData } from "../features/analysis/store";
+import { POLICY_RESULT_DEFAULTS } from "../test/api-fixtures";
 
 const navigation = vi.hoisted(() => ({ pathname: "/upload" }));
 
@@ -34,6 +35,7 @@ function InsuranceDataProbe() {
                 id: "policy-1",
                 fileName: "policy.pdf",
                 result: {
+                  ...POLICY_RESULT_DEFAULTS,
                   status: "accepted",
                   문자수: 1,
                 },

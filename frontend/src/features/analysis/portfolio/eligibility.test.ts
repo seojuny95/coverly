@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyzedInsurance } from "../store";
 import type { InsurancePolicyResult } from "../../upload/api";
+import { POLICY_RESULT_DEFAULTS } from "../../../test/api-fixtures";
 import {
   emptyReasonFor,
   hasAnalyzableCoverage,
@@ -12,7 +13,7 @@ import {
 function makeResult(
   overrides: Partial<InsurancePolicyResult> = {},
 ): InsurancePolicyResult {
-  return { status: "accepted", 문자수: 100, ...overrides };
+  return { ...POLICY_RESULT_DEFAULTS, 문자수: 100, ...overrides };
 }
 
 function makeDoc(result: InsurancePolicyResult, id = "1"): AnalyzedInsurance {

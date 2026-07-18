@@ -27,7 +27,7 @@ export function SpecialPolicySections({
                 </span>
               </div>
               <p className="mt-2 text-xs font-medium text-zinc-500">
-                {analysis.product_names.join(" · ")}
+                {analysis.product_names?.join(" · ")}
               </p>
               <p className="mt-3 text-sm leading-6 text-zinc-700">
                 {analysis.overview}
@@ -35,7 +35,7 @@ export function SpecialPolicySections({
             </div>
 
             <ul className="divide-y divide-zinc-100 px-5">
-              {analysis.coverage_checks.map((check) => (
+              {(analysis.coverage_checks ?? []).map((check) => (
                 <li key={check.label} className="py-4">
                   <div className="flex items-start gap-3">
                     <span
@@ -66,7 +66,7 @@ export function SpecialPolicySections({
                       <p className="mt-1 text-xs leading-5 text-zinc-500">
                         {check.detail}
                       </p>
-                      {check.matched_coverage_names.length > 0 ? (
+                      {check.matched_coverage_names?.length ? (
                         <p className="mt-1.5 truncate text-xs text-blue-700">
                           {check.matched_coverage_names.join(" · ")}
                         </p>

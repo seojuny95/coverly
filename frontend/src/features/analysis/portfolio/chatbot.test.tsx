@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "../../../test/render-with-providers";
+import { POLICY_RESULT_DEFAULTS } from "../../../test/api-fixtures";
 import type { AnalyzedInsurance } from "../store";
 import { InsuranceChatbot } from "./chatbot";
 import * as api from "./api";
@@ -10,7 +11,7 @@ import * as api from "./api";
 type StreamHandlers = Parameters<typeof api.streamPortfolioQuestion>[3];
 
 const docs: AnalyzedInsurance[] = [
-  { id: "1", fileName: "1.pdf", result: { status: "accepted", 문자수: 1 } },
+  { id: "1", fileName: "1.pdf", result: POLICY_RESULT_DEFAULTS },
 ];
 
 async function openChat() {

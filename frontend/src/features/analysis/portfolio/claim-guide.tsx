@@ -55,7 +55,7 @@ export function ClaimGuide({
                   </p>
                   {index === 2 &&
                   (claimChannels?.medical_indemnity ||
-                    claimChannels?.insurers.length) ? (
+                    claimChannels?.insurers?.length) ? (
                     <ClaimChannelOptions claimChannels={claimChannels} />
                   ) : null}
                 </div>
@@ -106,13 +106,13 @@ function ClaimChannelOptions({
             </p>
           ) : null}
           <ChannelLinkList
-            links={claimChannels.medical_indemnity.links}
+            links={claimChannels.medical_indemnity.links ?? []}
             className="mt-2"
           />
         </div>
       ) : null}
 
-      {claimChannels.insurers.length ? (
+      {claimChannels.insurers?.length ? (
         <details className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
             <span>
@@ -140,7 +140,7 @@ function ClaimChannelOptions({
                 {insurer.note ? (
                   <p className="mt-1 text-zinc-500">{insurer.note}</p>
                 ) : null}
-                <ChannelLinkList links={insurer.links} className="mt-2" />
+                <ChannelLinkList links={insurer.links ?? []} className="mt-2" />
               </li>
             ))}
           </ul>
@@ -154,7 +154,9 @@ function ChannelLinkList({
   links,
   className,
 }: {
-  links: ClaimChannelBlock["insurers"][number]["links"];
+  links: NonNullable<
+    NonNullable<ClaimChannelBlock["insurers"]>[number]["links"]
+  >;
   className?: string;
 }) {
   if (!links.length) return null;

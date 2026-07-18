@@ -60,8 +60,20 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up backend contract environment
+        working-directory: backend
+        run: |
+          uv python install 3.12
+          uv sync --locked
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Check generated API types
+        run: pnpm api:check
 
       - name: Lint
         run: pnpm lint

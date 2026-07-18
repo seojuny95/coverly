@@ -2,12 +2,13 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTestQueryClient } from "../../../test/render-with-providers";
+import { POLICY_RESULT_DEFAULTS } from "../../../test/api-fixtures";
 import type { AnalyzedInsurance } from "../store";
 import { usePortfolioSummary } from "./use-summary";
 import * as api from "./api";
 
 const docs: AnalyzedInsurance[] = [
-  { id: "1", fileName: "1.pdf", result: { status: "accepted", 문자수: 1 } },
+  { id: "1", fileName: "1.pdf", result: POLICY_RESULT_DEFAULTS },
 ];
 const deathBenefitContext: api.DeathBenefitGuideInput = {
   has_dependent_family: false,
@@ -96,7 +97,7 @@ describe("usePortfolioSummary", () => {
         {
           id: "2",
           fileName: "2.pdf",
-          result: { status: "accepted", 문자수: 2 },
+          result: { ...POLICY_RESULT_DEFAULTS, 문자수: 2 },
         } satisfies AnalyzedInsurance,
       ],
     });

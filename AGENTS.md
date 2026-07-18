@@ -30,7 +30,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run p
 
 # 프론트엔드 (Next.js, pnpm)
 cd frontend && pnpm dev
-pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
+pnpm api:check && pnpm test && pnpm lint && pnpm typecheck && pnpm format:check && pnpm build
 ```
 
 ## Project Structure

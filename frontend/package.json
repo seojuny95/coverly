@@ -2,7 +2,10 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.5.3",
   "scripts": {
+    "api:generate": "node scripts/generate-api-types.mjs",
+    "api:check": "node scripts/generate-api-types.mjs --check",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -36,6 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "jsdom": "^29.1.1",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.4",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4",

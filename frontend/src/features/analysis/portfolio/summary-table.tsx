@@ -126,8 +126,11 @@ function SummedCoverage({ row }: { row: SummedCoverageRow }) {
           <ul className="mt-3 space-y-1.5 text-xs font-normal break-words text-zinc-500">
             {row.composition.map((source, index) => (
               <li key={`${source.policy_id ?? "policy"}-${index}`}>
-                {coverageSourceLabel(source)} · {source.coverage_name} ·{" "}
-                {source.original_amount}
+                {coverageSourceLabel({
+                  insurer: source.insurer ?? undefined,
+                  product_name: source.product_name ?? undefined,
+                })}{" "}
+                · {source.coverage_name} · {source.original_amount}
               </li>
             ))}
           </ul>
@@ -285,8 +288,8 @@ function buildCoverageGroups(summary: PortfolioSummary): CoverageGroup[] {
         key: `actual-loss-${coverage.policy_id ?? "policy"}-${coverage.coverage_name}-${index}`,
         displayName: coverage.coverage_name,
         originalAmount: coverage.original_amount,
-        insurer: coverage.insurer,
-        productName: coverage.product_name,
+        insurer: coverage.insurer ?? undefined,
+        productName: coverage.product_name ?? undefined,
         duplicateAcrossContracts: coverage.duplicate_across_contracts,
       });
     });
@@ -297,8 +300,8 @@ function buildCoverageGroups(summary: PortfolioSummary): CoverageGroup[] {
       key: `individual-${coverage.policy_id ?? "policy"}-${coverage.coverage_name}-${index}`,
       displayName: coverage.coverage_name,
       originalAmount: coverage.original_amount,
-      insurer: coverage.insurer,
-      productName: coverage.product_name,
+      insurer: coverage.insurer ?? undefined,
+      productName: coverage.product_name ?? undefined,
       reason: coverage.reason,
     });
   });

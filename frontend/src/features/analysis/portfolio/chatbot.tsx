@@ -114,7 +114,7 @@ export function InsuranceChatbot({
   }
 
   async function sendQuestion(rawQuestion: string) {
-    const text = rawQuestion.trim().slice(0, 500);
+    const text = rawQuestion.trim();
     if (!text || streaming || sessionExpired) return;
     const userId = nextMessageId.current;
     const assistantId = userId + 1;
@@ -254,7 +254,6 @@ export function InsuranceChatbot({
             <input
               ref={inputRef}
               id="insurance-question"
-              maxLength={500}
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               disabled={sessionExpired}

@@ -68,11 +68,13 @@ describe("CoverageTotalTable", () => {
               insurance_type: "자동차보험",
               policies: [
                 {
+                  policy_id: null,
                   product_name: "개인용자동차보험",
                   coverages: [
                     {
                       coverage_name: "대인배상Ⅰ",
                       original_amount: "무한",
+                      major_category: "자동차",
                     },
                   ],
                 },
@@ -112,8 +114,13 @@ describe("CoverageTotalTable", () => {
           ...emptySummary,
           actual_loss_coverages: [
             {
+              policy_id: null,
+              insurer: null,
+              product_name: null,
               coverage_name: "일상생활배상책임",
               normalized_name: "일상생활배상책임",
+              original_amount: "",
+              major_category: "배상책임",
               coverage_domain: "liability",
               is_medical_indemnity: false,
               is_damage_policy: false,
@@ -137,8 +144,13 @@ describe("CoverageTotalTable", () => {
           ...emptySummary,
           actual_loss_coverages: [
             {
+              policy_id: null,
+              insurer: null,
+              product_name: null,
               coverage_name: "자동차사고벌금",
               normalized_name: "자동차사고벌금",
+              original_amount: "",
+              major_category: "운전자",
               coverage_domain: "legal_cost",
               is_medical_indemnity: false,
               is_damage_policy: true,

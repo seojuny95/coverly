@@ -9,6 +9,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { renderWithProviders } from "../../test/render-with-providers";
+import {
+  POLICY_PARSE_RESPONSE_DEFAULTS,
+  POLICY_RESULT_DEFAULTS,
+} from "../../test/api-fixtures";
 import { InsuranceAnalysisPage } from "./screen";
 import type { InsuranceAnalysis } from "./store";
 import { PORTFOLIO_SESSION_REFRESH_FALLBACK_MS } from "./use-session-refresh";
@@ -64,6 +68,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "insurance-1",
           fileName: "health.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
             기본정보: {
@@ -79,6 +84,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "insurance-2",
           fileName: "auto.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 80,
             기본정보: {
@@ -159,6 +165,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "legacy-third",
           fileName: "legacy-health.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
             기본정보: {
@@ -173,6 +180,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "legacy-fire",
           fileName: "legacy-fire.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 80,
             기본정보: {
@@ -214,6 +222,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "insurance-1",
           fileName: "health.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
             기본정보: {
@@ -270,6 +279,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "insurance-full",
           fileName: "db-driver.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 200,
             기본정보: {
@@ -343,6 +353,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "auto-insurance",
           fileName: "auto.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 150,
             기본정보: {
@@ -407,6 +418,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "db-driver-insurance",
           fileName: "DB운전자보험증권.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 200,
             기본정보: {
@@ -499,6 +511,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "insurance-1",
           fileName: "health.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
           },
@@ -553,6 +566,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "insurance-1",
           fileName: "health.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
           },
@@ -584,6 +598,7 @@ describe("InsuranceAnalysisPage", () => {
   test("opens an upload modal and merges uploaded insuranceDocuments into the current analysis", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
       status: "accepted",
       documentId: "new-document-id",
       문자수: 80,
@@ -606,6 +621,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "insurance-1",
           fileName: "health.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
             기본정보: {
@@ -662,6 +678,7 @@ describe("InsuranceAnalysisPage", () => {
   test("keeps duplicate policy uploads out of the current analysis", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
       status: "accepted",
       documentId: "duplicate-document-id",
       문자수: 80,
@@ -685,6 +702,7 @@ describe("InsuranceAnalysisPage", () => {
           id: "insurance-1",
           fileName: "health.pdf",
           result: {
+            ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
             문자수: 100,
             기본정보: {

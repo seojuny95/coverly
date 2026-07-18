@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { findByteIdenticalDuplicateIndexes } from "./policy-identity";
 import type { AnalyzedInsurance } from "./store";
+import { POLICY_RESULT_DEFAULTS } from "../../test/api-fixtures";
 
 function documentWithFingerprint(fileFingerprint?: string): AnalyzedInsurance {
   return {
@@ -9,6 +10,7 @@ function documentWithFingerprint(fileFingerprint?: string): AnalyzedInsurance {
     fileName: "policy.pdf",
     fileFingerprint,
     result: {
+      ...POLICY_RESULT_DEFAULTS,
       status: "accepted",
       문자수: 10,
       기본정보: { 보험분류: "미분류", 상품태그: [] },
