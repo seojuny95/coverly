@@ -15,6 +15,14 @@ from typing import Any
 
 DATA_ROOT = Path(__file__).resolve().parents[3] / "data"
 REGISTRY_PATH = DATA_ROOT / "official-sources/source_registry.json"
+DOCUMENT_TYPES = frozenset(
+    {
+        "consumer_guide",
+        "law",
+        "product_explanation",
+        "standard_terms",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -22,6 +30,7 @@ class OfficialSource:
     id: str
     title: str
     category: str
+    document_type: str
     publisher: str
     status: str
     rag_enabled: bool
@@ -75,10 +84,18 @@ def verify_downloaded_sources() -> list[str]:
 
 
 def _parse_source(raw: dict[str, Any]) -> OfficialSource:
+    source_id = str(raw.get("id", "unknown"))
+    document_type = raw.get("document_type")
+    if not isinstance(document_type, str) or not document_type:
+        raise ValueError(f"{source_id}: official source document_type is required")
+    if document_type not in DOCUMENT_TYPES:
+        raise ValueError(f"{source_id}: unsupported official source document_type {document_type}")
+
     return OfficialSource(
         id=str(raw["id"]),
         title=str(raw["title"]),
         category=str(raw["category"]),
+        document_type=document_type,
         publisher=str(raw["publisher"]),
         status=str(raw["status"]),
         rag_enabled=bool(raw.get("rag_enabled", False)),

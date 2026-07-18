@@ -30,7 +30,7 @@ def _iter_official_chunks() -> Iterable[RagChunk]:
             continue
         if not source.absolute_path.exists():
             continue
-        if source.absolute_path.suffix.casefold() == ".xml":
+        if source.document_type == "law":
             yield from _load_law_xml_chunks(source)
         else:
             yield from _load_pdf_chunks(source)

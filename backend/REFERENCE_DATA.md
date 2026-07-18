@@ -50,7 +50,7 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 
 - 참조 사실에는 출처와 기준일을 저장하고 응답 근거에 연결한다.
 - RAG 검색 결과가 없거나 근거가 부족하면 서버는 확인 불가로 degrade한다.
-- 공식 RAG는 문서 타입별 chunker를 사용한다. 법령 XML은 조문 단위, 표준약관은 상품/특약 섹션과 조항 단위, 자동차보험 표준상품설명서는 설명서 섹션 단위, 일반 소비자 안내자료는 페이지/제목 단위로 나눈 뒤 공통 `RagChunk` 형식으로 저장한다.
+- 공식 RAG는 `official-sources/source_registry.json`의 `document_type`에 따라 문서 타입별 chunker를 사용한다. 법령 XML은 조문 단위, 표준약관은 상품/특약 섹션과 조항 단위, 자동차보험 표준상품설명서는 설명서 섹션 단위, 일반 소비자 안내자료는 페이지/제목 단위로 나눈 뒤 공통 `RagChunk` 형식으로 저장한다.
 - 공식 RAG 운영 index는 `app.rag.official.indexing`으로 staging table에 재적재한 뒤 serving table로 swap한다. swap 이후 live table의 PK/index 이름은 `data_official_rag_chunks_*` 형태로 정규화한다.
 - Supabase 소유 참조 데이터에는 서버 bundled fallback을 두지 않는다.
 - `claim_channels`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides`가 없거나 읽히지 않으면 전체 분석을 실패시킨다.

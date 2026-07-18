@@ -9,7 +9,12 @@ from app.rag.official.indexing import build_vector_records
 from app.rag.official.loaders import _load_law_xml_chunks, load_official_chunks
 from app.rag.official.models import RagChunk, RetrievalHit
 from app.rag.official.retrieval import retrieve, transform_query
-from app.rag.official.sources import OfficialSource, rag_sources, verify_downloaded_sources
+from app.rag.official.sources import (
+    OfficialSource,
+    _parse_source,
+    rag_sources,
+    verify_downloaded_sources,
+)
 from evals.rag.official import (
     AcceptedEvidence,
     ExtractionEvalCase,
@@ -34,7 +39,45 @@ def test_rag_sources_are_verified_and_small() -> None:
         "insurance_business_act",
         "financial_consumer_protection_act",
     }
+    assert {source.id: source.document_type for source in sources} == {
+        "standard_terms_annex_15_2026_06_30": "standard_terms",
+        "fsc_policy_terms_roadmap_2019_10_22": "consumer_guide",
+        "knia_auto_insurance_product_explanation_2024_04_01": "product_explanation",
+        "easylaw_insurance_policyholder_2026_06_15": "consumer_guide",
+        "insurance_business_act": "law",
+        "financial_consumer_protection_act": "law",
+    }
     assert verify_downloaded_sources() == []
+
+
+def test_official_source_document_type_is_required() -> None:
+    with pytest.raises(ValueError, match="test_source: official source document_type is required"):
+        _parse_source(
+            {
+                "id": "test_source",
+                "title": "테스트 문서",
+                "category": "consumer_guide",
+                "publisher": "테스트",
+                "status": "downloaded",
+            }
+        )
+
+
+def test_official_source_document_type_must_be_supported() -> None:
+    with pytest.raises(
+        ValueError,
+        match="test_source: unsupported official source document_type unknown",
+    ):
+        _parse_source(
+            {
+                "id": "test_source",
+                "title": "테스트 문서",
+                "category": "consumer_guide",
+                "document_type": "unknown",
+                "publisher": "테스트",
+                "status": "downloaded",
+            }
+        )
 
 
 def test_standard_clause_chunking_preserves_article_citations() -> None:
@@ -667,6 +710,7 @@ def test_law_xml_branch_articles_get_distinct_ids_and_labels(tmp_path: Path) -> 
         id="test_law",
         title="테스트 법률",
         category="law",
+        document_type="law",
         publisher="법제처",
         status="downloaded",
         rag_enabled=True,
