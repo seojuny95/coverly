@@ -12,21 +12,19 @@ from typing import Literal, cast
 
 from app.modules.evidence.catalog import citation_from_evidence
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.agent import build_qa_agent_runner
-from app.modules.qa.agent_contracts import AgentCounselorDraft, QaAgentDependencies, QaAgentRunner
-from app.modules.qa.agent_evidence import consultation_evidence, portfolio_snapshot_evidence
-from app.modules.qa.agent_validation import validated_agent_response
+from app.modules.qa.agent.contracts import AgentCounselorDraft, QaAgentDependencies, QaAgentRunner
+from app.modules.qa.agent.runtime import build_qa_agent_runner
+from app.modules.qa.agent.service import stream_answer_with_agent
+from app.modules.qa.agent.validation import validated_agent_response
 from app.modules.qa.context import QaContext
-from app.modules.qa.resolvers import context_fallback, resolve_precomputed_answer
+from app.modules.qa.response_support import out_of_scope_response
 from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse
-from app.modules.qa.service import stream_portfolio_answer
-from app.modules.qa.web_search import WebSearchResult
-from app.rag.official.answer import answer_official_question
-from app.rag.policy import generate_policy_answer
+from app.modules.qa.tools.evidence import portfolio_snapshot_evidence
+from app.modules.qa.tools.web_search import WebSearchResult
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "dataset.json"
 POLICY_FIXTURE = Path(__file__).resolve().parent / "fixture_policies.json"
-EvalRoute = Literal["fast", "agent", "agent_no_tool", "planned", "scope"]
+EvalRoute = Literal["agent", "agent_no_tool", "input_guardrail"]
 
 _UNIVERSAL_FORBIDDEN = (
     "안심하세요",
@@ -103,6 +101,9 @@ class _ProbeAgent:
         if self.delegate is not None:
             return self.delegate.run(context)
 
+        if self.expected_route == "input_guardrail":
+            return out_of_scope_response(context)
+
         if self.expected_route == "agent_no_tool":
             dependencies = QaAgentDependencies(
                 context=context,
@@ -124,26 +125,11 @@ class _ProbeAgent:
                 dependencies,
             )
 
-        deterministic = resolve_precomputed_answer(
-            context,
-            try_official=False,
-            official_answer=None,
-            default_official_answer=answer_official_question,
-            complete=None,
-            pass_complete=False,
-            retrieve_policy=lambda _ids, _question: [],
-            generate_policy=generate_policy_answer,
-        )
-        if deterministic is not None:
-            return deterministic
-
-        evidence = consultation_evidence(context)
+        evidence = portfolio_snapshot_evidence(context)
         citations = [citation_from_evidence(item) for item in evidence[:3]]
-        if not citations:
-            return context_fallback(context)
         return PortfolioQuestionResponse(
             status="answered",
-            answer="복합 상담은 Agent 경로에서 관련 근거를 사용해 답합니다.",
+            answer="Agent가 요청한 도구에서 업로드 증권 근거를 확인할 수 있습니다.",
             citations=citations,
             limitations=[],
         )
@@ -216,7 +202,7 @@ def _evaluate_case(
     started = perf_counter()
     try:
         events = list(
-            stream_portfolio_answer(
+            stream_answer_with_agent(
                 case.question,
                 fixture_policies(),
                 history=list(case.history),
@@ -250,9 +236,9 @@ def _evaluate_case(
             failures=(f"{type(exc).__name__}: {exc}",),
         )
 
-    expected_calls = 0 if case.expected_route in {"planned", "scope"} else 1
+    expected_calls = 1
     route_passed = probe.calls == expected_calls
-    answer_evaluated = live or case.expected_route != "agent"
+    answer_evaluated = live or case.expected_route in {"agent_no_tool", "input_guardrail"}
     include_passed = all(
         any(term in rendered_output for term in group) for group in case.must_include_groups
     )
@@ -260,7 +246,10 @@ def _evaluate_case(
     forbidden_passed = all(term not in answer for term in forbidden)
     status_passed = status == case.expected_status
     citations_passed = not case.require_citations or bool(citations)
-    generation_passed = not (live and case.expected_route == "agent") or generation == "llm"
+    generation_passed = (
+        not (live and case.expected_route == "agent" and case.expected_status == "answered")
+        or generation == "llm"
+    )
     limitations = cast(list[object], end.get("limitations", []))
     no_tool_passed = case.expected_route != "agent_no_tool" or (
         generation == "llm"
@@ -278,9 +267,7 @@ def _evaluate_case(
 
     evidence_text = ""
     if probe.last_context is not None:
-        evidence = consultation_evidence(probe.last_context) or portfolio_snapshot_evidence(
-            probe.last_context
-        )
+        evidence = portfolio_snapshot_evidence(probe.last_context)
         evidence_text = "\n".join(item.fact for item in evidence)
     evidence_passed = all(term in evidence_text for term in case.required_evidence_terms)
     if case.expected_route != "agent":
@@ -343,7 +330,7 @@ def _render_eval_output(answer: str, end_event: dict[str, object]) -> str:
 
 def _case_from_json(row: dict[str, object]) -> QaEvalCase:
     route = str(row["expected_route"])
-    if route not in {"fast", "agent", "agent_no_tool", "planned", "scope"}:
+    if route not in {"agent", "agent_no_tool", "input_guardrail"}:
         raise ValueError(f"unknown expected route: {route}")
     history = tuple(
         ConversationMessage.model_validate(item)

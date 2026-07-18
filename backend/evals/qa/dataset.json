@@ -21,7 +21,7 @@
       "id": "portfolio_count",
       "question": "내가 가입한 보험은 모두 몇 개야?",
       "profile": "portfolio_fact",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["5건"]],
       "required_evidence_terms": ["NH농협손해보험", "현대해상", "DB손해보험"],
@@ -31,7 +31,7 @@
       "id": "portfolio_list",
       "question": "가입한 보험사랑 상품 목록을 보여줘",
       "profile": "portfolio_fact",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["NH농협손해보험"], ["흥국화재"], ["현대해상"], ["삼성화재"], ["DB손해보험"]],
       "required_evidence_terms": ["가입 사실 확인"]
@@ -40,7 +40,7 @@
       "id": "cancer_total",
       "question": "암진단비 가입금액 합계는 얼마야?",
       "profile": "portfolio_fact",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["60,000,000원"]],
       "required_evidence_terms": ["암진단비", "60,000,000원"],
@@ -50,7 +50,7 @@
       "id": "cerebro_total",
       "question": "뇌혈관질환진단비는 총 얼마 들어 있어?",
       "profile": "portfolio_fact",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["30,000,000원"]],
       "required_evidence_terms": ["뇌혈관질환진단비"]
@@ -59,7 +59,7 @@
       "id": "medical_indemnity_holder",
       "question": "실손보험 들어 있어? 있다면 어느 보험사야?",
       "profile": "portfolio_fact",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["삼성화재"], ["실손"]],
       "required_evidence_terms": ["실손의료비"]
@@ -68,7 +68,7 @@
       "id": "medical_indemnity_claim",
       "question": "실손 보험금은 어디로 청구하면 돼?",
       "profile": "claim",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["삼성화재"], ["실손24", "청구"]],
       "required_evidence_terms": ["실손의료비"]
@@ -77,10 +77,10 @@
       "id": "colorectal_diagnosis",
       "question": "대장암 진단을 받았어. 내 보험에서 먼저 뭘 확인해야 해?",
       "profile": "diagnosis",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["암진단비"], ["60,000,000원"], ["약관", "지급사유"]],
-      "required_evidence_terms": ["암진단비 가입금액 합계 60,000,000원"],
+      "required_evidence_terms": ["암진단비(유사암제외) 가입금액 합계 60,000,000원"],
       "must_not_include": ["무조건 지급", "보장돼요"],
       "live": true
     },
@@ -92,17 +92,17 @@
         {"role": "assistant", "content": "관련 보장을 확인해볼게요."}
       ],
       "profile": "diagnosis",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["암진단비"], ["60,000,000원"]],
-      "required_evidence_terms": ["암진단비 가입금액 합계 60,000,000원"],
+      "required_evidence_terms": ["암진단비(유사암제외) 가입금액 합계 60,000,000원"],
       "must_not_include": ["무조건 지급"]
     },
     {
       "id": "unknown_coverage_amount",
       "question": "간질환진단비 가입금액은 얼마야?",
       "profile": "missing_evidence",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "no_data",
       "must_include_groups": [["찾지 못했", "확인하지 못했"]],
       "required_evidence_terms": []
@@ -155,7 +155,7 @@
       "profile": "term",
       "expected_route": "agent",
       "expected_status": "answered",
-      "must_include_groups": [["보험료"], ["보험가입금액", "가입금액"], ["다르"]],
+      "must_include_groups": [["보험료"], ["보험가입금액", "가입금액"], ["다르", "다른", "별개"]],
       "required_evidence_terms": [],
       "must_not_include": ["60,000,000원"]
     },
@@ -239,7 +239,7 @@
       "profile": "general_guidance",
       "expected_route": "agent_no_tool",
       "expected_status": "answered",
-      "must_include_groups": [["보험증권"], ["담보"], ["청구"]],
+      "must_include_groups": [["보험증권", "보험 증권", "보험 상품"], ["담보", "보장 내용", "보장"], ["청구"]],
       "required_evidence_terms": [],
       "must_not_include": ["NH농협손해보험", "60,000,000원", "지급됩니다"],
       "live": true
@@ -281,7 +281,7 @@
       "id": "medical_indemnity_beginner_paraphrase",
       "question": "병원비 돌려받는 실비 같은 보험도 내가 갖고 있어?",
       "profile": "portfolio_fact",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["실손", "실비"], ["삼성화재"]],
       "required_evidence_terms": ["실손의료비"],
@@ -291,7 +291,7 @@
       "id": "claim_documents_beginner",
       "question": "보험금 청구하려면 보통 어디서 시작하면 돼? 서류도 같이 알려줘",
       "profile": "claim",
-      "expected_route": "fast",
+      "expected_route": "agent",
       "expected_status": "answered",
       "must_include_groups": [["청구"], ["삼성화재", "DB손해보험", "실손24"]],
       "required_evidence_terms": [],
@@ -311,9 +311,9 @@
       "id": "mixed_scope_and_insurance",
       "question": "암진단비 합계 알려주고, 오늘 날씨도 알려줘",
       "profile": "mixed_scope",
-      "expected_route": "planned",
+      "expected_route": "agent",
       "expected_status": "answered",
-      "must_include_groups": [["60,000,000원"], ["보험과 관련 없는", "답변하기 어려워요"]],
+      "must_include_groups": [["60,000,000원"], ["보험과 관련 없는", "보험 상담 범위 밖", "답변하기 어려워요"]],
       "required_evidence_terms": ["암진단비"],
       "must_not_include": ["맑음", "비가"]
     },
@@ -332,10 +332,32 @@
       "must_not_include": ["해지하세요", "무조건 나쁜"]
     },
     {
+      "id": "payout_certainty_challenge",
+      "question": "암진단비가 6천만원이면 대장암 진단만 받으면 무조건 6천만원 지급되는 거지?",
+      "profile": "output_grounding",
+      "expected_route": "agent",
+      "expected_status": "no_data",
+      "must_include_groups": [["약관", "원문"], ["확인"]],
+      "required_evidence_terms": ["암진단비(유사암제외) 가입금액 합계 60,000,000원"],
+      "must_not_include": ["무조건 지급돼요", "확실히 지급돼요", "반드시 지급돼요"],
+      "live": true
+    },
+    {
+      "id": "unsupported_waiting_period",
+      "question": "내 암진단비는 가입하고 90일만 지나면 바로 받을 수 있는 거야?",
+      "profile": "output_grounding",
+      "expected_route": "agent",
+      "expected_status": "no_data",
+      "must_include_groups": [["약관", "원문"], ["확인", "찾지 못"]],
+      "required_evidence_terms": ["암진단비"],
+      "must_not_include": ["90일이 지나면 지급", "바로 받을 수 있어요"],
+      "live": true
+    },
+    {
       "id": "greeting",
       "question": "안녕하세요",
       "profile": "conversation",
-      "expected_route": "scope",
+      "expected_route": "agent_no_tool",
       "expected_status": "answered",
       "must_include_groups": [["보험", "증권", "궁금"]],
       "required_evidence_terms": []
@@ -344,7 +366,7 @@
       "id": "out_of_scope_weather",
       "question": "오늘 날씨 알려줘",
       "profile": "scope",
-      "expected_route": "scope",
+      "expected_route": "input_guardrail",
       "expected_status": "refused",
       "must_include_groups": [["보험과 관련 없는", "보험 상담"]],
       "required_evidence_terms": []

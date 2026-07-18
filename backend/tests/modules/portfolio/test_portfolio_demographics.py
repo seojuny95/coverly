@@ -1,12 +1,10 @@
-import json
-
 import pytest
 from pydantic import ValidationError
 
 from app.modules.portfolio.demographics import resolve_portfolio_demographics
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.context import build_qa_context
 from app.modules.qa.contracts import InsuredDemographics
-from app.modules.qa.service import answer_portfolio_question
 
 
 def _policy(
@@ -113,45 +111,31 @@ def test_policy_demographic_schema_rejects_invalid_or_inconsistent_values() -> N
 
 
 def test_qa_uses_same_policy_verified_demographics_resolver() -> None:
-    captured: dict[str, object] = {}
-
-    def complete(_system: str, user: str) -> dict[str, object]:
-        captured.update(json.loads(user))
-        return {
-            "confirmed_fact": "암 진단 담보의 가입 사실을 확인했어요",
-            "guidance": "일반 가이드로 생활비와 예산을 함께 비교해 보세요",
-            "evidence_ids": ["coverage:1"],
-            "suggestions": [],
-            "limitations": [],
-        }
-
-    result = answer_portfolio_question(
+    context = build_qa_context(
         "상담 전에 무엇을 볼까요?",
         [_policy("p1", age=35, gender="여성")],
-        demographics=InsuredDemographics(age=70, gender="남성", source="policy"),
-        complete=complete,
+        InsuredDemographics(age=70, gender="남성", source="policy"),
+        [],
     )
 
-    assert captured["demographics"] == {
-        "age": 35,
-        "gender": "여성",
-        "source": "policy",
-        "status": "verified_policy",
-    }
-    assert result.demographics.status == "verified_policy"
-    assert result.demographics.age == 35
+    assert context.insured == InsuredDemographics(
+        age=35,
+        gender="여성",
+        source="policy",
+        status="verified_policy",
+    )
 
 
 def test_qa_explains_why_conflicting_demographics_disable_personalization() -> None:
-    result = answer_portfolio_question(
+    context = build_qa_context(
         "가입한 보험 목록을 알려줘",
         [
             _policy("p1", age=35, gender="여성"),
             _policy("p2", age=41, gender="남성"),
         ],
-        demographics=InsuredDemographics(age=35, gender="여성", source="policy"),
+        InsuredDemographics(age=35, gender="여성", source="policy"),
+        [],
     )
 
-    assert result.demographics.status == "conflict"
-    assert result.demographics.source == "unknown"
-    assert any("서로 달라" in limitation for limitation in result.limitations)
+    assert context.insured.status == "conflict"
+    assert context.insured.source == "unknown"

@@ -61,7 +61,7 @@ def get_insurer_contact_evidence() -> tuple[tuple[str, tuple[str, ...], tuple[st
         if not isinstance(insurer_name, str):
             continue
 
-        insurer = _catalog_insurer_for_name(insurer_name)
+        insurer = canonical_insurer_name(insurer_name)
         if insurer is None:
             continue
 
@@ -159,7 +159,9 @@ def _domain_evidence(url: str) -> tuple[str, ...]:
     return (host,) if "." in host else ()
 
 
-def _catalog_insurer_for_name(value: str) -> str | None:
+def canonical_insurer_name(value: str) -> str | None:
+    """Resolve an exact catalog name or generated alias without text containment."""
+
     if value in get_insurer_candidates():
         return value
 
