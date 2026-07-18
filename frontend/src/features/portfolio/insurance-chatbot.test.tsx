@@ -25,6 +25,21 @@ async function openChat() {
 describe("InsuranceChatbot", () => {
   beforeEach(() => vi.restoreAllMocks());
 
+  it("keeps the full-tab conversation inside a scrollable panel", () => {
+    renderWithProviders(<InsuranceChatbot documents={docs} mode="full" />);
+
+    expect(
+      screen.queryByRole("heading", { name: "AI 보험 상담" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("올려주신 증권을 바탕으로 함께 살펴봐요"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("log", { name: "보험 상담 대화" })).toHaveClass(
+      "min-h-0",
+      "overflow-y-auto",
+    );
+  });
+
   it("shows the analysis limitations in the initial message", async () => {
     await openChat();
 

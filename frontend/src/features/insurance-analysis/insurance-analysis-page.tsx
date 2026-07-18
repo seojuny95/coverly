@@ -229,7 +229,9 @@ export function InsuranceAnalysisPage({
   }
 
   return (
-    <main className="flex min-h-dvh flex-col bg-white px-5 py-6 text-zinc-950 sm:px-6">
+    <main
+      className={`flex min-h-dvh flex-col bg-white px-5 py-6 text-zinc-950 sm:px-6 ${activeTab === "chat" ? "h-dvh overflow-hidden" : ""}`}
+    >
       <header className="mx-auto flex w-full max-w-6xl items-center gap-4">
         <LeaveGuardLink
           href="/"

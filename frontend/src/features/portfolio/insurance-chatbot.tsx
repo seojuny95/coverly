@@ -172,18 +172,14 @@ export function InsuranceChatbot({
 
   const chat = (
     <>
-      <header className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
-        <div>
-          <h2
-            className={isFloating ? "font-semibold" : "text-xl font-semibold"}
-          >
-            AI 보험 상담
-          </h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            올려주신 증권을 바탕으로 함께 살펴봐요
-          </p>
-        </div>
-        {isFloating ? (
+      {isFloating ? (
+        <header className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+          <div>
+            <h2 className="font-semibold">AI 보험 상담</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              올려주신 증권을 바탕으로 함께 살펴봐요
+            </p>
+          </div>
           <div className="flex items-center gap-1">
             {onExpand ? (
               <button
@@ -203,12 +199,14 @@ export function InsuranceChatbot({
               닫기
             </button>
           </div>
-        ) : null}
-      </header>
+        </header>
+      ) : null}
 
       <div
+        role="log"
+        aria-label="보험 상담 대화"
         aria-live="polite"
-        className="flex-1 space-y-3 overflow-y-auto bg-zinc-50/60 p-4 sm:p-5"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-zinc-50/60 p-4 sm:p-5"
       >
         {messages.map((message) => (
           <ChatMessage key={message.id} message={message} />
@@ -278,7 +276,7 @@ export function InsuranceChatbot({
         role="tabpanel"
         aria-labelledby="chat-tab"
         tabIndex={0}
-        className="mb-4 flex min-h-[28rem] flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-[8px_8px_0_#eef2ff] sm:mb-6"
+        className="mb-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-[8px_8px_0_#eef2ff] sm:mb-6"
       >
         {chat}
       </div>

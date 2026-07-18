@@ -318,6 +318,7 @@ describe("portfolio features", () => {
       "aria-selected",
       "true",
     );
+    expect(screen.getByRole("main")).toHaveClass("h-dvh", "overflow-hidden");
     expect(
       screen.queryByRole("button", { name: "AI 보험 상담 탭에서 크게 보기" }),
     ).not.toBeInTheDocument();
@@ -326,6 +327,10 @@ describe("portfolio features", () => {
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "내 보험" }));
+    expect(screen.getByRole("main")).not.toHaveClass(
+      "h-dvh",
+      "overflow-hidden",
+    );
     expect(
       screen.getByText("암 진단비는 1,000만원이에요."),
     ).toBeInTheDocument();
