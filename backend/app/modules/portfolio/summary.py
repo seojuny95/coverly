@@ -16,6 +16,11 @@ from app.modules.coverage.matching import (
     choose_display_name,
 )
 from app.modules.portfolio.amounts import parse_amount
+from app.modules.portfolio.damage_classification import (
+    DAMAGE_INSURANCE_TYPE_ORDER,
+    damage_insurance_type,
+    is_auto_policy,
+)
 from app.modules.portfolio.essential_coverage import build_essential_coverage_check
 from app.modules.portfolio.premium import summarize_premiums
 from app.modules.portfolio.schemas import (
@@ -39,44 +44,6 @@ from app.modules.portfolio.special_policies import build_special_policy_analyses
 from app.modules.qa.claim_channels import claim_channel_block
 from app.modules.reference_data.premium_benchmark import premium_benchmark_for_age
 
-_AUTO_TAG_TERMS = ("자동차", "자동차보험")
-_AUTO_COVERAGE_TERMS = (
-    "대인배상",
-    "대물배상",
-    "자기차량손해",
-    "자기차량",
-    "자차",
-    "자기신체사고",
-    "자동차상해",
-    "무보험자동차",
-    "무보험차상해",
-    "무보험차에의한상해",
-)
-_AUTO_PRODUCT_TERMS = (
-    "자동차보험",
-    "개인용자동차",
-    "업무용자동차",
-    "영업용자동차",
-    "다이렉트자동차",
-    "하이카",
-)
-_FIRE_PRODUCT_TERMS = (
-    "화재보험",
-    "주택화재보험",
-    "주택종합보험",
-    "재물보험",
-)
-_FIRE_COVERAGE_TERMS = (
-    "화재손해",
-    "건물화재",
-    "가재화재",
-    "주택화재",
-    "화재배상책임",
-    "화재대물배상",
-    "화재대인배상",
-    "폭발포함배상책임",
-    "화재폭발",
-)
 _SAFE_FIXED_NAME_TERMS = (
     "진단비",
     "수술비",
@@ -95,15 +62,6 @@ MAJOR_CATEGORY_ORDER = (
     "수술",
     "치료",
     "기타",
-)
-_DAMAGE_INSURANCE_TYPE_ORDER = (
-    "자동차보험",
-    "운전자보험",
-    "여행자보험",
-    "화재보험",
-    "배상책임보험",
-    "보증보험",
-    "손해보험",
 )
 
 
@@ -158,12 +116,6 @@ def is_damage_policy(policy: PolicyInput) -> bool:
     return is_damage_policy_context(policy)
 
 
-def is_auto_policy(policy: PolicyInput) -> bool:
-    """Return whether a policy is an auto policy inside the damage branch."""
-
-    return any(term in _damage_insurance_type(policy) for term in _AUTO_TAG_TERMS)
-
-
 def _summary_payment_basis(
     coverage: CoverageInput,
     classification: IndemnityClassification,
@@ -212,7 +164,7 @@ def summarize_portfolio_coverages(
             )
 
         if is_damage_policy(policy):
-            damage_rows[_damage_insurance_type(policy)].append(_damage_policy_group(policy))
+            damage_rows[damage_insurance_type(policy)].append(_damage_policy_group(policy))
             if is_auto_policy(policy):
                 auto_count += 1
             continue
@@ -352,68 +304,6 @@ def _excluded(policy: PolicyInput, coverage: CoverageInput, reason: str) -> Excl
     )
 
 
-def _damage_insurance_type(policy: PolicyInput) -> str:
-    category = policy.기본정보.보험분류 or ""
-    if category in {"자동차", "자동차보험"}:
-        return "자동차보험"
-    if category in {"운전자보험", "운전자상해보험"}:
-        return "운전자보험"
-    if category == "여행자보험":
-        return "여행자보험"
-    if category in {"화재보험", "주택화재보험"}:
-        return "화재보험"
-    if category == "배상책임보험":
-        return "배상책임보험"
-    if category == "보증보험":
-        return "보증보험"
-
-    tags = policy.기본정보.상품태그
-    for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:
-        if insurance_type in tags:
-            return insurance_type
-
-    if _has_auto_insurance_coverages(policy):
-        return "자동차보험"
-
-    product_name = policy.기본정보.상품명 or ""
-    normalized_product = normalize_coverage_name(product_name)
-    if any(term in normalized_product for term in _normalized_terms(_AUTO_PRODUCT_TERMS)):
-        return "자동차보험"
-    if any(term in normalized_product for term in _normalized_terms(_FIRE_PRODUCT_TERMS)):
-        return "화재보험"
-    if _has_fire_insurance_coverages(policy):
-        return "화재보험"
-    for insurance_type in _DAMAGE_INSURANCE_TYPE_ORDER:
-        if normalize_coverage_name(insurance_type) in normalized_product:
-            return insurance_type
-
-    return "손해보험"
-
-
-def _has_auto_insurance_coverages(policy: PolicyInput) -> bool:
-    """Infer auto insurance from auto-policy-specific coverage names only."""
-
-    normalized_terms = tuple(normalize_coverage_name(term) for term in _AUTO_COVERAGE_TERMS)
-    return any(
-        any(term in normalize_coverage_name(coverage.담보명) for term in normalized_terms)
-        for coverage in policy.보장목록
-    )
-
-
-def _has_fire_insurance_coverages(policy: PolicyInput) -> bool:
-    """Infer fire insurance from fire/property-specific coverage names."""
-
-    normalized_terms = _normalized_terms(_FIRE_COVERAGE_TERMS)
-    return any(
-        any(term in normalize_coverage_name(coverage.담보명) for term in normalized_terms)
-        for coverage in policy.보장목록
-    )
-
-
-def _normalized_terms(terms: tuple[str, ...]) -> tuple[str, ...]:
-    return tuple(normalize_coverage_name(term) for term in terms)
-
-
 def _damage_policy_group(policy: PolicyInput) -> DamagePolicyCoverageGroup:
     return DamagePolicyCoverageGroup(
         policy_id=policy.id,
@@ -448,9 +338,9 @@ def _build_damage_groups(
 
 def _damage_insurance_type_rank(insurance_type: str) -> tuple[int, str]:
     try:
-        return (_DAMAGE_INSURANCE_TYPE_ORDER.index(insurance_type), insurance_type)
+        return (DAMAGE_INSURANCE_TYPE_ORDER.index(insurance_type), insurance_type)
     except ValueError:
-        return (len(_DAMAGE_INSURANCE_TYPE_ORDER), insurance_type)
+        return (len(DAMAGE_INSURANCE_TYPE_ORDER), insurance_type)
 
 
 def _damage_policy_sort_key(

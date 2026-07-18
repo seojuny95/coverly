@@ -3,7 +3,7 @@
 from agents import RunContextWrapper, function_tool
 
 from app.modules.coverage.matching import canonicalize_coverage_name
-from app.modules.portfolio.summary import is_auto_policy
+from app.modules.portfolio.damage_classification import is_auto_policy
 from app.modules.qa.agent.contracts import GroundedToolAnswer, QaAgentDependencies
 from app.modules.qa.claim_channels import claim_channel_block
 from app.modules.qa.context import QaContext

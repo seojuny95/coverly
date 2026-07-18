@@ -2,7 +2,20 @@
 
 from dataclasses import dataclass
 
-from app.modules.portfolio.amounts import normalize, normalized_terms
+from app.modules.coverage.indemnity import is_damage_policy_context
+from app.modules.portfolio.amounts import normalize
+from app.modules.portfolio.damage_classification import (
+    AUTO_LIABILITY_INJURY_TERMS,
+    AUTO_LIABILITY_PROPERTY_TERMS,
+    AUTO_OCCUPANT_INJURY_TERMS,
+    AUTO_UNINSURED_INJURY_TERMS,
+    AUTO_VEHICLE_DAMAGE_TERMS,
+    FIRE_LIABILITY_TERMS,
+    FIRE_PROPERTY_DAMAGE_TERMS,
+    FIRE_RECOVERY_COST_TERMS,
+    auto_policy_match_source,
+    is_fire_policy,
+)
 from app.modules.portfolio.schemas import (
     PolicyInput,
     SpecialCoverageCheck,
@@ -17,54 +30,27 @@ _SPECIAL_POLICY_LABELS: dict[SpecialPolicyKind, str] = {
     "fire": "화재보험",
 }
 
-_AUTO_POLICY_COVERAGE_TERMS = (
-    "대인배상",
-    "대물배상",
-    "자기차량손해",
-    "자기차량",
-    "자차",
-    "자기신체사고",
-    "자동차상해",
-    "무보험자동차",
-    "무보험차상해",
-    "무보험차에의한상해",
-)
-_AUTO_PRODUCT_TERMS = (
-    "자동차보험",
-    "개인용자동차",
-    "업무용자동차",
-    "영업용자동차",
-    "다이렉트자동차",
-    "하이카",
-)
-_FIRE_PRODUCT_TERMS = (
-    "화재보험",
-    "주택화재보험",
-    "주택종합보험",
-    "재물보험",
-)
-
 _SPECIAL_COVERAGE_RULES: dict[SpecialPolicyKind, tuple[tuple[str, tuple[str, ...], str], ...]] = {
     "auto": (
         (
             "상대방의 신체 피해",
-            ("대인배상",),
+            AUTO_LIABILITY_INJURY_TERMS,
             "사고로 다른 사람이 다치거나 사망했을 때의 배상 담보예요.",
         ),
         (
             "상대방의 재물 피해",
-            ("대물배상",),
+            AUTO_LIABILITY_PROPERTY_TERMS,
             "사고로 다른 사람의 차량이나 재물에 생긴 손해를 배상하는 담보예요.",
         ),
         (
             "운전자·탑승자 상해",
-            ("자동차상해", "자기신체사고", "자손"),
+            AUTO_OCCUPANT_INJURY_TERMS,
             "운전자나 탑승자가 다쳤을 때를 위한 담보예요.",
         ),
-        ("내 차량 손해", ("자기차량손해", "자차"), "가입 차량에 생긴 손해를 위한 담보예요."),
+        ("내 차량 손해", AUTO_VEHICLE_DAMAGE_TERMS, "가입 차량에 생긴 손해를 위한 담보예요."),
         (
             "무보험차 사고 상해",
-            ("무보험자동차", "무보험차상해", "무보험차에의한상해"),
+            AUTO_UNINSURED_INJURY_TERMS,
             "무보험 차량과의 사고로 다쳤을 때를 위한 담보예요.",
         ),
     ),
@@ -106,17 +92,17 @@ _SPECIAL_COVERAGE_RULES: dict[SpecialPolicyKind, tuple[tuple[str, tuple[str, ...
     "fire": (
         (
             "건물·가재 화재 손해",
-            ("화재손해", "건물화재", "가재화재", "주택화재"),
+            FIRE_PROPERTY_DAMAGE_TERMS,
             "화재로 건물이나 가재도구에 생긴 직접 손해를 위한 담보예요.",
         ),
         (
             "화재 배상책임",
-            ("화재배상책임", "화재대물배상", "화재대인배상", "폭발포함배상책임"),
+            FIRE_LIABILITY_TERMS,
             "화재로 다른 사람이나 재물에 입힌 손해를 위한 담보예요.",
         ),
         (
             "임시 거주·복구 비용",
-            ("임시거주", "잔존물제거", "화재복구", "복구비용"),
+            FIRE_RECOVERY_COST_TERMS,
             "화재 뒤 임시 거주나 잔존물 제거·복구 비용을 위한 담보예요.",
         ),
     ),
@@ -226,28 +212,24 @@ def _special_policy_matches(policy: PolicyInput) -> tuple[_SpecialPolicyMatch, .
     tags = tuple(normalize(tag) for tag in _product_tags(policy))
     tags_text = " ".join(tags)
     identity = f"{category} {product} {tags_text}"
-    coverage_names = [normalize(coverage.담보명) for coverage in policy.보장목록]
 
     matches: list[_SpecialPolicyMatch] = []
-    if (
-        normalize("자동차보험") in category
-        or any(term in product for term in normalized_terms(_AUTO_PRODUCT_TERMS))
-        or any(normalize("자동차") in tag or normalize("자동차보험") in tag for tag in tags)
-    ):
+    auto_match_source = auto_policy_match_source(policy)
+    if auto_match_source == "identity":
         matches.append(
             _SpecialPolicyMatch(
                 "auto",
                 "보험분류, 상품명 또는 상품태그에서 자동차보험 성격이 확인돼요.",
             )
         )
-    elif _has_auto_policy_coverages(category, tags, coverage_names):
+    elif auto_match_source == "coverage":
         matches.append(
             _SpecialPolicyMatch(
                 "auto",
                 "손해보험 증권 안에서 대인배상, 대물배상, 자차처럼 자동차보험 담보명이 확인돼요.",
             )
         )
-    if "운전자" in identity and _is_damage_policy_identity(category, tags):
+    if "운전자" in identity and is_damage_policy_context(policy):
         matches.append(
             _SpecialPolicyMatch(
                 "driver",
@@ -256,14 +238,14 @@ def _special_policy_matches(policy: PolicyInput) -> tuple[_SpecialPolicyMatch, .
         )
     if (
         "여행자" in identity or "여행보험" in identity or "해외여행" in identity
-    ) and _is_damage_policy_identity(category, tags):
+    ) and is_damage_policy_context(policy):
         matches.append(
             _SpecialPolicyMatch(
                 "travel",
                 "손해보험 증권 안에서 여행자보험 상품명 또는 태그가 확인돼요.",
             )
         )
-    if _is_fire_policy(category, product, tags, coverage_names):
+    if is_fire_policy(policy):
         matches.append(
             _SpecialPolicyMatch(
                 "fire",
@@ -271,46 +253,6 @@ def _special_policy_matches(policy: PolicyInput) -> tuple[_SpecialPolicyMatch, .
             )
         )
     return tuple(dict.fromkeys(matches))
-
-
-def _has_auto_policy_coverages(
-    category: str,
-    tags: tuple[str, ...],
-    coverage_names: list[str],
-) -> bool:
-    """Infer auto insurance from auto-policy-specific coverage names only.
-
-    Driver policies often contain words like "자동차사고" in fine/legal-cost
-    coverages, so this intentionally uses mandatory/typical auto insurance
-    coverage names instead of the broad word "자동차".
-    """
-
-    if not _is_damage_policy_identity(category, tags):
-        return False
-    terms = tuple(normalize(term) for term in _AUTO_POLICY_COVERAGE_TERMS)
-    return any(any(term in name for term in terms) for name in coverage_names)
-
-
-def _is_fire_policy(
-    category: str,
-    product: str,
-    tags: tuple[str, ...],
-    coverage_names: list[str],
-) -> bool:
-    if category in {normalize("화재보험"), normalize("주택화재보험")}:
-        return True
-    if any(tag in {normalize("화재보험"), normalize("주택화재보험")} for tag in tags):
-        return True
-    if any(term in product for term in normalized_terms(_FIRE_PRODUCT_TERMS)):
-        return True
-    if not _is_damage_policy_identity(category, tags):
-        return False
-    fire_terms = tuple(
-        normalize(term)
-        for _label, terms, _detail in _SPECIAL_COVERAGE_RULES["fire"]
-        for term in terms
-    )
-    return any(any(term in name for term in fire_terms) for name in coverage_names)
 
 
 def _classification_reasons_for(kind: SpecialPolicyKind, policies: list[PolicyInput]) -> list[str]:
@@ -321,30 +263,6 @@ def _classification_reasons_for(kind: SpecialPolicyKind, policies: list[PolicyIn
         if match.kind == kind
     ]
     return list(dict.fromkeys(reasons))
-
-
-def _is_damage_policy_identity(category: str, tags: tuple[str, ...]) -> bool:
-    damage_categories = {
-        normalize("손해보험"),
-        normalize("자동차보험"),
-        normalize("운전자보험"),
-        normalize("운전자상해보험"),
-        normalize("여행자보험"),
-        normalize("화재보험"),
-        normalize("주택화재보험"),
-        normalize("배상책임보험"),
-        normalize("보증보험"),
-    }
-    damage_tags = {
-        normalize("자동차보험"),
-        normalize("운전자보험"),
-        normalize("여행자보험"),
-        normalize("화재보험"),
-        normalize("주택화재보험"),
-        normalize("배상책임보험"),
-        normalize("보증보험"),
-    }
-    return category in damage_categories or any(tag in damage_tags for tag in tags)
 
 
 def _product_tags(policy: PolicyInput) -> list[str]:

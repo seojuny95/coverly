@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 
 from app.modules.coverage.indemnity import is_medical_indemnity_name
+from app.modules.policy.life_stage import life_stage_for_age as life_stage_for
 
 CANCER = "암 진단"
 CEREBRO = "뇌혈관 진단"
@@ -32,14 +33,6 @@ class LifeStageCheck:
     life_stage: str
     held: tuple[str, ...]
     missing: tuple[str, ...]
-
-
-def life_stage_for(age: int) -> str:
-    if age < 19:
-        return "어린이"
-    if age >= 65:
-        return "시니어"
-    return "성인"
 
 
 def classify_coverage(name: str) -> str | None:

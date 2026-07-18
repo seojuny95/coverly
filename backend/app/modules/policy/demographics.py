@@ -13,7 +13,8 @@ from app.core.pii import (
     iter_resident_identifier_matches,
     mask_resident_identifiers,
 )
-from app.modules.policy.models import InsuredDemographics, InsuredGender, LifeStage
+from app.modules.policy.life_stage import life_stage_for_age
+from app.modules.policy.models import InsuredDemographics, InsuredGender
 
 _CENTURY_AND_GENDER: dict[str, tuple[int, InsuredGender]] = {
     "1": (1900, "남성"),
@@ -104,7 +105,7 @@ def _safe_demographics(
     return {
         "나이": age,
         "성별": gender,
-        "생애단계": _life_stage(age),
+        "생애단계": life_stage_for_age(age),
     }
 
 
@@ -114,11 +115,3 @@ def _completed_age(birth_date: date, reference_date: date) -> int:
         birth_date.day,
     )
     return reference_date.year - birth_date.year - (not birthday_has_passed)
-
-
-def _life_stage(age: int) -> LifeStage:
-    if age < 19:
-        return "어린이"
-    if age >= 65:
-        return "시니어"
-    return "성인"
