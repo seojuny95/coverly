@@ -24,6 +24,60 @@ def _res(answer: str, *ev: ConsultationEvidence) -> RegisteredToolResult:
     )
 
 
+def test_situational_flag_reaches_compose_prompt() -> None:
+    validated = PortfolioQuestionResponse(
+        status="answered",
+        answer="암진단비와 암수술비가 확인돼요.",
+        citations=[],
+        limitations=[],
+        generation="llm",
+    )
+    captured: dict[str, str] = {}
+
+    def capturing_streamer(system: str, user: str) -> Iterator[str]:
+        captured["user"] = user
+        yield "확인된 관련 보장을 안내드려요."
+
+    list(
+        answer_stream_items(
+            validated,
+            [],
+            "대장암에 걸렸는데 어떻게 해?",
+            streamer=capturing_streamer,
+            situational=True,
+        )
+    )
+
+    assert "되묻" in captured["user"]  # 상황형 되묻기 규정이 compose 프롬프트까지 전달됨
+    assert "보유" in captured["user"]
+
+
+def test_non_situational_flag_keeps_plain_compose_prompt() -> None:
+    validated = PortfolioQuestionResponse(
+        status="answered",
+        answer="암진단비가 확인돼요.",
+        citations=[],
+        limitations=[],
+        generation="llm",
+    )
+    captured: dict[str, str] = {}
+
+    def capturing_streamer(system: str, user: str) -> Iterator[str]:
+        captured["user"] = user
+        yield "암진단비가 확인돼요."
+
+    list(
+        answer_stream_items(
+            validated,
+            [],
+            "암진단비 알려줘",
+            streamer=capturing_streamer,
+        )
+    )
+
+    assert "되묻" not in captured["user"]
+
+
 def test_grounded_streams_meta_then_verified_deltas_then_completed() -> None:
     r = _res(
         "암진단비 30,000,000원",

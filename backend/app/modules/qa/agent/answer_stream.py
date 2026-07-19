@@ -37,6 +37,7 @@ def answer_stream_items(
     *,
     streamer: TextStreamer,
     compose: bool = True,
+    situational: bool = False,
 ) -> Iterator[QaAgentStreamItem]:
     """Yield ``QaAgentMeta`` → ``QaAgentDelta``* (real-token sentences) →
     ``QaAgentCompleted``.
@@ -50,7 +51,7 @@ def answer_stream_items(
 
     yield QaAgentMeta(status=validated.status, generation=validated.generation)
 
-    spec = build_answer_spec(validated, results)
+    spec = build_answer_spec(validated, results, situational=situational)
 
     if compose and spec.mode in _COMPOSABLE:
         tokens = compose_answer_stream(spec, question, streamer=streamer)
@@ -71,6 +72,7 @@ def safe_answer_stream_items(
     *,
     streamer: TextStreamer,
     compose: bool = True,
+    situational: bool = False,
 ) -> Iterator[QaAgentStreamItem]:
     """Wrap ``answer_stream_items`` so the stream always terminates.
 
@@ -92,7 +94,12 @@ def safe_answer_stream_items(
     delta_emitted = False
     try:
         for item in answer_stream_items(
-            validated, results, question, streamer=streamer, compose=compose
+            validated,
+            results,
+            question,
+            streamer=streamer,
+            compose=compose,
+            situational=situational,
         ):
             if isinstance(item, QaAgentDelta):
                 delta_emitted = True

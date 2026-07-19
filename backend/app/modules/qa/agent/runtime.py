@@ -29,6 +29,7 @@ from app.modules.qa.agent.contracts import (
     RegisteredToolResult,
 )
 from app.modules.qa.agent.definition import create_qa_agent
+from app.modules.qa.agent.input_guardrail import is_situational_turn
 from app.modules.qa.agent.progress import (
     AsyncProgressHooks,
     ProgressHooks,
@@ -311,6 +312,7 @@ async def _run_streamed_agent(
         list(dependencies.tool_results.values()),
         context,
         compose_streamer,
+        situational=is_situational_turn(dependencies),
     )
 
 
@@ -356,6 +358,7 @@ async def _run_async_streamed_agent(
         list(dependencies.tool_results.values()),
         context,
         compose_streamer,
+        situational=is_situational_turn(dependencies),
     )
 
 
@@ -368,17 +371,24 @@ def _enqueue_answer_items(
     compose_streamer: TextStreamer,
     *,
     compose: bool = True,
+    situational: bool = False,
 ) -> None:
     """Compose the validated answer into stream items and enqueue them in order.
 
     Stops early if the consumer has cancelled — ``enqueue_stream_item`` returns
     ``False`` and no more items are pushed onto the bounded queue. Guardrail
     tripwire fallbacks pass ``compose=False`` to stream the deterministic answer
-    verbatim without re-running the LLM compose.
+    verbatim without re-running the LLM compose. ``situational`` turns on the
+    situational compose guidance (empathy → summary → held-coverage options).
     """
 
     for item in safe_answer_stream_items(
-        validated, results, context.question, streamer=compose_streamer, compose=compose
+        validated,
+        results,
+        context.question,
+        streamer=compose_streamer,
+        compose=compose,
+        situational=situational,
     ):
         if not enqueue_stream_item(queue, cancellation_requested, item):
             return
@@ -407,6 +417,7 @@ async def _put_answer_items(
     compose_streamer: TextStreamer,
     *,
     compose: bool = True,
+    situational: bool = False,
 ) -> None:
     """Compose the validated answer OFF the event loop and put the items on the
     loop queue in ``meta → delta* → completed`` order.
@@ -420,7 +431,12 @@ async def _put_answer_items(
     ``compose=False`` to stream the deterministic answer verbatim."""
 
     items = safe_answer_stream_items(
-        validated, results, context.question, streamer=compose_streamer, compose=compose
+        validated,
+        results,
+        context.question,
+        streamer=compose_streamer,
+        compose=compose,
+        situational=situational,
     )
     while True:
         item = await asyncio.to_thread(_next_stream_item, items)
