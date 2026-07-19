@@ -28,6 +28,44 @@ def coverage_evidence_by_names(
     return tuple(matched)
 
 
+def coverage_explanations(
+    context: QaContext,
+    names: list[str],
+    *,
+    max_items: int = 12,
+) -> tuple[ConsultationEvidence, ...]:
+    """Surface uploaded coverage explanations (보장내용) for the requested coverage names.
+
+    Coverages without a 보장내용 are excluded, and each matched coverage name
+    contributes at most one explanation.
+    """
+
+    requested = {canonicalize_coverage_name(name).normalized_key for name in names if name.strip()}
+    if not requested:
+        return ()
+
+    matched: list[ConsultationEvidence] = []
+    seen_names: set[str] = set()
+    for policy in context.policies:
+        for coverage in policy.보장목록:
+            if not coverage.보장내용 or not coverage.보장내용.strip():
+                continue
+            normalized = canonicalize_coverage_name(coverage.담보명).normalized_key
+            if normalized not in requested or normalized in seen_names:
+                continue
+            seen_names.add(normalized)
+            matched.append(
+                ConsultationEvidence(
+                    id=f"explain:{len(matched)}",
+                    fact=f"{coverage.담보명}: {coverage.보장내용.strip()}",
+                    coverage_name=coverage.담보명,
+                )
+            )
+            if len(matched) == max_items:
+                return tuple(matched)
+    return tuple(matched)
+
+
 def overlap_evidence(context: QaContext) -> tuple[ConsultationEvidence, ...]:
     """Select overlap facts from structured aggregation flags, not question text."""
 

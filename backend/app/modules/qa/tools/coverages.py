@@ -2,10 +2,15 @@
 
 from agents import RunContextWrapper, function_tool
 
+from app.modules.consultation.contracts import ConsultationEvidence
 from app.modules.coverage.matching import canonicalize_coverage_name
 from app.modules.portfolio.schemas import CoverageTotalItem
 from app.modules.qa.agent.contracts import GroundedToolAnswer, QaAgentDependencies
-from app.modules.qa.tools.evidence import coverage_evidence_by_names, overlap_evidence
+from app.modules.qa.tools.evidence import (
+    coverage_evidence_by_names,
+    coverage_explanations,
+    overlap_evidence,
+)
 from app.modules.qa.tools.responses import portfolio_response
 
 
@@ -22,20 +27,45 @@ def find_coverages(
 
     dependencies = wrapper.context
     context = dependencies.context
-    evidence = coverage_evidence_by_names(context, coverage_names)
+    facts_evidence = coverage_evidence_by_names(context, coverage_names)
+    explanations = coverage_explanations(context, coverage_names)
+    existing_ids = {item.id for item in facts_evidence}
+    new_explanations = tuple(item for item in explanations if item.id not in existing_ids)
+    evidence = facts_evidence + new_explanations
     if not evidence:
         return dependencies.unmatched(
             "coverage_lookup",
             "No uploaded-policy identity matched the supplied names.",
         )
-    answer = "업로드 증권에서 다음 내용을 확인했습니다.\n\n" + "\n".join(
-        f"- {item.fact}" for item in evidence
-    )
+    answer = _coverage_lookup_answer(facts_evidence, new_explanations)
     return dependencies.register(
         "coverage_lookup",
         portfolio_response(context, answer, evidence),
         evidence=evidence,
         trust_level="deterministic",
+    )
+
+
+def _coverage_lookup_answer(
+    facts_evidence: tuple[ConsultationEvidence, ...],
+    new_explanations: tuple[ConsultationEvidence, ...],
+) -> str:
+    """Build the find_coverages answer without a dangling empty facts header.
+
+    facts_evidence and new_explanations can each be empty, but not both (the
+    caller returns unmatched before reaching here in that case).
+    """
+
+    if facts_evidence:
+        answer = "업로드 증권에서 다음 내용을 확인했습니다.\n\n" + "\n".join(
+            f"- {item.fact}" for item in facts_evidence
+        )
+        if new_explanations:
+            answer += "\n\n담보 설명:\n" + "\n".join(f"- {item.fact}" for item in new_explanations)
+        return answer
+
+    return "업로드 증권의 담보 설명이에요.\n\n" + "\n".join(
+        f"- {item.fact}" for item in new_explanations
     )
 
 

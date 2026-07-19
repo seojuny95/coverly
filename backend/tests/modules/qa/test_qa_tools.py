@@ -13,6 +13,7 @@ from app.modules.qa.tools.coverages import (
     find_coverages,
     find_overlapping_coverages,
 )
+from app.modules.qa.tools.evidence import coverage_explanations
 from app.modules.qa.tools.policies import inspect_portfolio, list_policies
 from app.modules.qa.tools.web_search import WebSearchResult
 
@@ -107,6 +108,86 @@ def test_coverage_tools_use_model_supplied_entities_and_structured_totals() -> N
     assert len(found.evidence) == 1
     assert total.response is not None
     assert "50,000,000원" in total.response.answer
+
+
+def test_find_coverages_leads_with_explanation_when_no_matching_facts() -> None:
+    """An addon (부가) coverage on an auto policy never lands in the evidence catalog
+
+    (damage groups drop 부가 coverages, and auto policies are excluded from the
+    fixed/actual-loss aggregation), but its 보장내용 is still directly reachable
+    via context.policies. facts_evidence must be empty while explanations aren't.
+    """
+
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {
+                    "보험사": "현대해상",
+                    "상품명": "자동차보험",
+                    "보험분류": "자동차",
+                },
+                "보장목록": [
+                    {
+                        "담보명": "긴급출동서비스",
+                        "지급유형": "정액",
+                        "유형": "부가",
+                        "보장내용": "차량 고장 시 긴급출동을 지원해요.",
+                    }
+                ],
+            }
+        )
+    ]
+    dependencies = QaAgentDependencies(
+        context=build_qa_context("긴급출동서비스가 뭐야?", policies, None, []),
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+    found = _invoke(find_coverages, dependencies, {"coverage_names": ["긴급출동서비스"]})
+
+    assert found.matched is True
+    assert found.response is not None
+    assert "확인했습니다.\n\n\n\n" not in found.response.answer
+    assert "긴급출동을 지원해요" in found.response.answer
+
+
+def test_coverage_explanations_surface_보장내용() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "보험사A", "상품명": "건강-p1", "보험분류": "질병"},
+                "보장목록": [
+                    {
+                        "담보명": "암진단비",
+                        "가입금액숫자": 30000000,
+                        "지급유형": "정액",
+                        "보장내용": "암으로 진단되면 지급되는 목돈이에요.",
+                    }
+                ],
+            }
+        )
+    ]
+    ctx = build_qa_context("암진단비가 무슨 담보야?", policies, None, [])
+    exp = coverage_explanations(ctx, ["암진단비"])
+    assert any("목돈" in e.fact for e in exp)
+    assert any(e.coverage_name == "암진단비" for e in exp)
+
+
+def test_coverage_explanations_skip_when_no_보장내용() -> None:
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "보험사A", "상품명": "건강-p1", "보험분류": "질병"},
+                "보장목록": [{"담보명": "암진단비", "가입금액숫자": 30000000, "지급유형": "정액"}],
+            }
+        )
+    ]
+    ctx = build_qa_context("q", policies, None, [])
+    assert coverage_explanations(ctx, ["암진단비"]) == ()
 
 
 def test_overlap_and_snapshot_tools_use_precomputed_portfolio_facts() -> None:
