@@ -358,6 +358,13 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
     }),
   ).toBeInTheDocument();
   expect(screen.getByText("핵심 보장 확인")).toBeInTheDocument();
+  expect(screen.getByText("실손형 보장 중복 확인")).toBeInTheDocument();
+  expect(screen.getByText("여러 계약에 겹쳐 있는 보장")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "실제로 발생한 손해만큼 보상하는 담보가 여러 계약에 함께 있는지 확인해요.",
+    ),
+  ).toBeInTheDocument();
   expect(screen.getAllByText("사망 보장").length).toBeGreaterThan(0);
   expect(screen.getByText("진단 보장")).toBeInTheDocument();
   expect(screen.getByText("실손의료보험")).toBeInTheDocument();
@@ -732,7 +739,7 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
   render(<PortfolioAnalysisPanel {...baseProps()} summary={reviewSummary} />);
 
   const actualLossReview = screen
-    .getByRole("heading", { name: "여러 계약에 표시된 담보" })
+    .getByRole("heading", { name: "여러 계약에 겹쳐 있는 보장" })
     .closest("article");
   const medicalIndemnityCard = screen
     .getByRole("heading", { name: "실손의료보험" })

@@ -29,11 +29,14 @@ export function ActualLossCoverageReview({
   return (
     <article className="analysis-overview-reveal analysis-overview-delay-2 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
       <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
-        계약별 확인 결과
+        실손형 보장 중복 확인
       </p>
       <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
-        여러 계약에 표시된 담보
+        여러 계약에 겹쳐 있는 보장
       </h3>
+      <p className="mt-2 text-sm leading-6 text-zinc-600">
+        실제로 발생한 손해만큼 보상하는 담보가 여러 계약에 함께 있는지 확인해요.
+      </p>
       {duplicateNames.length > 0 ? (
         <Alert
           variant="warning"
