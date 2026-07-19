@@ -13,7 +13,7 @@ from app.modules.qa.agent.contracts import (
 )
 from app.modules.qa.agent.definition import create_qa_agent, grounded_output_guardrail
 from app.modules.qa.agent.grounding import numeric_claims_are_grounded
-from app.modules.qa.agent.input_guardrail import qa_input_guardrail
+from app.modules.qa.agent.input_guardrail import is_situational_turn, qa_input_guardrail
 from app.modules.qa.agent.prompt import build_agent_input
 from app.modules.qa.agent.runtime import _unambiguous_tool_fallback
 from app.modules.qa.agent.validation import validated_agent_response
@@ -78,6 +78,49 @@ def test_sdk_input_guardrail_stores_structured_freshness_decision() -> None:
     assert result.tripwire_triggered is False
     assert dependencies.input_decision is not None
     assert dependencies.input_decision.requires_fresh_official_source is True
+
+
+def test_sdk_input_guardrail_stores_situational_decision() -> None:
+    dependencies = _dependencies(
+        {
+            "scope": "insurance",
+            "should_block": False,
+            "requires_fresh_official_source": False,
+            "is_situational": True,
+            "insurance_request": "대장암 진단을 받았는데 관련 보장을 봐줘",
+            "out_of_scope_request": None,
+            "reason": "질병을 말하며 열린 도움을 구함",
+        }
+    )
+
+    result = cast(
+        GuardrailFunctionOutput,
+        qa_input_guardrail.guardrail_function(
+            RunContextWrapper(dependencies),
+            create_qa_agent("gpt-4.1-mini"),
+            "ignored",
+        ),
+    )
+
+    assert result.tripwire_triggered is False
+    assert dependencies.input_decision is not None
+    assert dependencies.input_decision.is_situational is True
+    assert is_situational_turn(dependencies) is True
+
+
+def test_situational_turn_false_when_no_decision() -> None:
+    dependencies = _dependencies(
+        {
+            "scope": "insurance",
+            "should_block": False,
+            "requires_fresh_official_source": False,
+            "insurance_request": "암진단비 가입금액만 알려줘",
+            "out_of_scope_request": None,
+            "reason": "특정 담보 금액만 물음",
+        }
+    )
+    # 분류가 실행되기 전에는 상황형 아님
+    assert is_situational_turn(dependencies) is False
 
 
 def test_sdk_input_guardrail_blocks_out_of_scope_before_main_agent() -> None:

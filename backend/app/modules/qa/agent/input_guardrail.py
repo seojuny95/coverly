@@ -45,6 +45,11 @@ def requires_uploaded_policy_terms(dependencies: QaAgentDependencies) -> bool:
     return decision is not None and decision.requires_uploaded_policy_terms
 
 
+def is_situational_turn(dependencies: QaAgentDependencies) -> bool:
+    decision = dependencies.input_decision
+    return decision is not None and decision.is_situational
+
+
 def _guardrail_input(dependencies: QaAgentDependencies) -> str:
     context = dependencies.context
     payload = {
@@ -79,6 +84,9 @@ def _guardrail_instructions() -> str:
 - requires_uploaded_policy_terms는 사용자가 자신이 가입한 보험의 정확한 지급 조건, 면책,
   대기기간, 보장개시일처럼 실제 계약 원문 없이는 확정할 수 없는 내용을 물을 때 true입니다.
 - 일반적인 보험 용어·표준 제도 설명은 requires_uploaded_policy_terms=false입니다.
+- is_situational은 사용자가 질병, 진단, 사고, 부상처럼 자신에게 일어난 일을 말하며
+  "어떻게 해야 하나", "무엇을 받을 수 있나"처럼 열린 도움을 구할 때 true입니다.
+- 특정 담보나 금액만 콕 집어 묻는 질문, 순수 용어·제도 질문은 is_situational=false입니다.
 - 단순 용어 설명, 업로드 증권 사실, 가입금액, 담보 목록은 false입니다.
 - 키워드 존재만으로 정하지 말고 문장 전체 의미와 이전 대화 맥락으로 판단하세요.
 - 보험 사실을 답하거나 추측하지 말고 분류 결과만 반환하세요."""

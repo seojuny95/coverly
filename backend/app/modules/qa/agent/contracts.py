@@ -91,6 +91,7 @@ class QaInputDecision(BaseModel):
     should_block: bool
     requires_fresh_official_source: bool
     requires_uploaded_policy_terms: bool = False
+    is_situational: bool = False
     insurance_request: str | None = Field(max_length=500)
     out_of_scope_request: str | None = Field(max_length=500)
     reason: str = Field(min_length=1, max_length=240)
