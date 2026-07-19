@@ -1,5 +1,4 @@
 import asyncio
-import json
 from typing import cast
 
 from agents import GuardrailFunctionOutput, RunContextWrapper
@@ -15,7 +14,6 @@ from app.modules.qa.agent.contracts import (
 from app.modules.qa.agent.definition import create_qa_agent, grounded_output_guardrail
 from app.modules.qa.agent.grounding import numeric_claims_are_grounded
 from app.modules.qa.agent.input_guardrail import qa_input_guardrail
-from app.modules.qa.agent.output_review import classify_output_safety
 from app.modules.qa.agent.prompt import build_agent_input
 from app.modules.qa.agent.runtime import _unambiguous_tool_fallback
 from app.modules.qa.agent.validation import validated_agent_response
@@ -144,21 +142,6 @@ def test_qa_masks_pii_at_every_model_boundary() -> None:
         ),
     )
 
-    def classify_output(_system: str, user: str) -> dict[str, object]:
-        captured["output"] = user
-        return {
-            "unsupported_factual_claims": [],
-            "directs_purchase_or_cancellation": False,
-            "asserts_payout_or_coverage_certainty": False,
-            "invents_personal_facts": False,
-            "reason": "안전한 일반 안내",
-        }
-
-    dependencies.classify_output = classify_output
-    classify_output_safety(
-        dependencies,
-        AgentCounselorDraft(answer_mode="general_guidance", answer=question),
-    )
     captured["agent"] = build_agent_input(context)
 
     serialized = "\n".join(captured.values())
@@ -195,227 +178,7 @@ def test_agent_does_not_force_a_keyword_selected_first_tool() -> None:
     }
 
 
-def test_output_safety_uses_structured_semantic_verdict() -> None:
-    dependencies = _dependencies(
-        {
-            "scope": "insurance",
-            "should_block": False,
-            "requires_fresh_official_source": False,
-            "insurance_request": "가입금액을 확인해줘",
-            "out_of_scope_request": None,
-            "reason": "보험 질문",
-        }
-    )
-    dependencies.classify_output = lambda _system, _answer: {
-        "unsupported_factual_claims": [],
-        "directs_purchase_or_cancellation": False,
-        "asserts_payout_or_coverage_certainty": False,
-        "invents_personal_facts": False,
-        "reason": "가입 사실만 설명함",
-    }
-
-    decision = classify_output_safety(
-        dependencies,
-        AgentCounselorDraft(
-            answer_mode="general_guidance",
-            answer="가입금액은 약관상 지급액과 달라요.",
-        ),
-    )
-
-    assert decision.is_safe is True
-
-
-def test_output_safety_rejects_semantic_purchase_directive() -> None:
-    dependencies = _dependencies(
-        {
-            "scope": "insurance",
-            "should_block": False,
-            "requires_fresh_official_source": False,
-            "insurance_request": "보장을 검토해줘",
-            "out_of_scope_request": None,
-            "reason": "보험 질문",
-        }
-    )
-    dependencies.classify_output = lambda _system, _answer: {
-        "unsupported_factual_claims": [],
-        "directs_purchase_or_cancellation": True,
-        "asserts_payout_or_coverage_certainty": False,
-        "invents_personal_facts": False,
-        "reason": "가입을 직접 지시함",
-    }
-
-    decision = classify_output_safety(
-        dependencies,
-        AgentCounselorDraft(
-            answer_mode="general_guidance",
-            answer="특정 상품에 가입하라고 지시하는 답변",
-        ),
-    )
-
-    assert decision.is_safe is False
-    assert decision.directs_purchase_or_cancellation is True
-
-
-def test_output_review_receives_selected_tool_evidence() -> None:
-    dependencies = _dependencies(
-        {
-            "scope": "insurance",
-            "should_block": False,
-            "requires_fresh_official_source": False,
-            "insurance_request": "암진단비를 확인해줘",
-            "out_of_scope_request": None,
-            "reason": "보험 질문",
-        }
-    )
-    response = PortfolioQuestionResponse(
-        status="answered",
-        answer="암진단비 가입금액은 3,000만원입니다.",
-        citations=[],
-        limitations=[],
-    )
-    evidence = (
-        ConsultationEvidence(
-            id="coverage:1",
-            fact="암진단비 가입금액 3,000만원 확인",
-            coverage_name="암진단비",
-            amount=30_000_000,
-        ),
-    )
-    registered = dependencies.register(
-        "coverage_total",
-        response,
-        evidence=evidence,
-        trust_level="deterministic",
-    )
-    captured: dict[str, object] = {}
-
-    def classify(_system: str, user: str) -> dict[str, object]:
-        captured.update(json.loads(user))
-        return {
-            "unsupported_factual_claims": [],
-            "directs_purchase_or_cancellation": False,
-            "asserts_payout_or_coverage_certainty": False,
-            "invents_personal_facts": False,
-            "reason": "근거와 일치함",
-        }
-
-    dependencies.classify_output = classify
-    classify_output_safety(
-        dependencies,
-        AgentCounselorDraft(
-            selected_result_id=registered.result_id,
-            answer="암진단비는 3,000만원으로 확인돼요.",
-        ),
-    )
-
-    selected = cast(dict[str, object], captured["selected_tool"])
-    assert selected["trust_level"] == "deterministic"
-    assert selected["evidence"] == ["암진단비 가입금액 3,000만원 확인"]
-
-
-def test_output_review_uses_required_web_result_over_selected_non_web_result() -> None:
-    dependencies = _dependencies(
-        {
-            "scope": "insurance",
-            "should_block": False,
-            "requires_fresh_official_source": True,
-            "insurance_request": "최신 보험 정책을 확인해줘",
-            "out_of_scope_request": None,
-            "reason": "최신 공식 정보가 필요함",
-        }
-    )
-    dependencies.input_decision = QaInputDecision(
-        scope="insurance",
-        should_block=False,
-        requires_fresh_official_source=True,
-        insurance_request="최신 보험 정책을 확인해줘",
-        out_of_scope_request=None,
-        reason="최신 공식 정보가 필요함",
-    )
-    non_web = dependencies.register(
-        "official_rag",
-        PortfolioQuestionResponse(
-            status="answered",
-            answer="기존 공식자료 답변",
-            citations=[],
-            limitations=[],
-        ),
-    )
-    dependencies.register(
-        "web",
-        PortfolioQuestionResponse(
-            status="answered",
-            answer="최신 공식 웹 답변",
-            citations=[],
-            limitations=[],
-        ),
-    )
-    captured: dict[str, object] = {}
-
-    def classify(_system: str, user: str) -> dict[str, object]:
-        captured.update(json.loads(user))
-        return {
-            "unsupported_factual_claims": [],
-            "directs_purchase_or_cancellation": False,
-            "asserts_payout_or_coverage_certainty": False,
-            "invents_personal_facts": False,
-            "reason": "최신 웹 근거와 일치함",
-        }
-
-    dependencies.classify_output = classify
-    classify_output_safety(
-        dependencies,
-        AgentCounselorDraft(
-            selected_result_id=non_web.result_id,
-            answer="최신 공식 웹 답변",
-        ),
-    )
-
-    selected = cast(dict[str, object], captured["selected_tool"])
-    assert selected["kind"] == "web"
-    assert selected["authoritative_answer"] == "최신 공식 웹 답변"
-
-
-def test_sdk_output_guardrail_trips_for_unsupported_factual_claim() -> None:
-    dependencies = _dependencies(
-        {
-            "scope": "insurance",
-            "should_block": False,
-            "requires_fresh_official_source": False,
-            "insurance_request": "지급 조건을 알려줘",
-            "out_of_scope_request": None,
-            "reason": "보험 질문",
-        }
-    )
-    dependencies.classify_output = lambda _system, _answer: {
-        "unsupported_factual_claims": [
-            {
-                "claim": "최초 1회만 지급",
-                "reason": "선택된 근거에 지급 횟수가 없음",
-            }
-        ],
-        "directs_purchase_or_cancellation": False,
-        "asserts_payout_or_coverage_certainty": False,
-        "invents_personal_facts": False,
-        "reason": "근거 없는 지급 조건을 추가함",
-    }
-
-    result = cast(
-        GuardrailFunctionOutput,
-        grounded_output_guardrail.guardrail_function(
-            RunContextWrapper(dependencies),
-            create_qa_agent("gpt-4.1-mini"),
-            AgentCounselorDraft(
-                answer_mode="general_guidance",
-                answer="이 담보는 최초 1회만 지급돼요.",
-            ),
-        ),
-    )
-
-    assert result.tripwire_triggered is True
-
-
-def test_sdk_output_guardrail_fails_closed_when_reviewer_errors() -> None:
+def test_sdk_output_guardrail_validates_and_caches_without_output_llm() -> None:
     dependencies = _dependencies(
         {
             "scope": "insurance",
@@ -427,10 +190,6 @@ def test_sdk_output_guardrail_fails_closed_when_reviewer_errors() -> None:
         }
     )
 
-    def fail_review(_system: str, _answer: str) -> dict[str, object]:
-        raise TimeoutError("review timed out")
-
-    dependencies.classify_output = fail_review
     result = cast(
         GuardrailFunctionOutput,
         grounded_output_guardrail.guardrail_function(
@@ -438,13 +197,43 @@ def test_sdk_output_guardrail_fails_closed_when_reviewer_errors() -> None:
             create_qa_agent("gpt-4.1-mini"),
             AgentCounselorDraft(
                 answer_mode="general_guidance",
-                answer="보험 상담 안내입니다.",
+                answer="가입한 보험의 구체 조건은 약관에서 확인이 필요해요.",
+            ),
+        ),
+    )
+
+    assert result.tripwire_triggered is False
+    assert cast(dict[str, object], result.output_info)["valid"] is True
+    assert dependencies.validated_response is not None
+    assert dependencies.validated_response.status == "answered"
+
+
+def test_sdk_output_guardrail_trips_when_validation_cannot_ground_draft() -> None:
+    dependencies = _dependencies(
+        {
+            "scope": "insurance",
+            "should_block": False,
+            "requires_fresh_official_source": False,
+            "insurance_request": "가입금액을 알려줘",
+            "out_of_scope_request": None,
+            "reason": "보험 질문",
+        }
+    )
+
+    result = cast(
+        GuardrailFunctionOutput,
+        grounded_output_guardrail.guardrail_function(
+            RunContextWrapper(dependencies),
+            create_qa_agent("gpt-4.1-mini"),
+            AgentCounselorDraft(
+                answer_mode="general_guidance",
+                answer="가입금액은 3,000만원이에요.",
             ),
         ),
     )
 
     assert result.tripwire_triggered is True
-    assert cast(dict[str, object], result.output_info)["reason"] == "output_review_unavailable"
+    assert dependencies.validated_response is None
 
 
 def test_generated_tool_result_is_not_used_as_guardrail_fallback() -> None:

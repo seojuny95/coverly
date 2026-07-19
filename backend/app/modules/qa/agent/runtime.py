@@ -54,7 +54,6 @@ def build_qa_agent_runner(
     *,
     complete: JsonCompleter | None = None,
     classify_input: JsonCompleter | None = None,
-    classify_output: JsonCompleter | None = None,
     official_answer: OfficialAnswerer | None = None,
     web_search: OfficialWebSearcher = default_official_web_search,
     model: str | None = None,
@@ -63,7 +62,6 @@ def build_qa_agent_runner(
     return OpenAiQaAgentRunner(
         complete=complete,
         classify_input=classify_input,
-        classify_output=classify_output,
         official_answer=official_answer,
         web_search=web_search,
         model=model,
@@ -79,7 +77,6 @@ class OpenAiQaAgentRunner:
         *,
         complete: JsonCompleter | None = None,
         classify_input: JsonCompleter | None = None,
-        classify_output: JsonCompleter | None = None,
         official_answer: OfficialAnswerer | None = None,
         web_search: OfficialWebSearcher = default_official_web_search,
         model: str | None = None,
@@ -87,7 +84,6 @@ class OpenAiQaAgentRunner:
     ) -> None:
         self._complete = complete
         self._classify_input = classify_input
-        self._classify_output = classify_output
         self._official_answer = official_answer
         self._web_search = web_search
         self._model = model
@@ -199,7 +195,6 @@ class OpenAiQaAgentRunner:
             official_answer=self._official_answer,
             web_search=self._web_search,
             classify_input=self._classify_input,
-            classify_output=self._classify_output,
         )
 
 

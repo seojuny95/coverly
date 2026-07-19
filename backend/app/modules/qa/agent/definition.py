@@ -14,7 +14,6 @@ from app.modules.qa.agent.contracts import (
     QaAgentUnavailable,
 )
 from app.modules.qa.agent.input_guardrail import qa_input_guardrail
-from app.modules.qa.agent.output_review import classify_output_safety
 from app.modules.qa.agent.prompt import agent_instructions
 from app.modules.qa.agent.validation import validated_agent_response
 from app.modules.qa.tools.registry import QA_AGENT_TOOLS
@@ -39,22 +38,15 @@ def grounded_output_guardrail(
     _agent: Agent[QaAgentDependencies],
     output: AgentCounselorDraft,
 ) -> GuardrailFunctionOutput:
-    try:
-        safety = classify_output_safety(ctx.context, output)
-    except Exception as exc:
-        return GuardrailFunctionOutput(
-            output_info={
-                "valid": False,
-                "reason": "output_review_unavailable",
-                "error_type": type(exc).__name__,
-            },
-            tripwire_triggered=True,
-        )
-    if not safety.is_safe:
-        return GuardrailFunctionOutput(
-            output_info=safety.model_dump(mode="json"),
-            tripwire_triggered=True,
-        )
+    """Validate the draft against its evidence and cache the validated response.
+
+    Output safety now rests on the compose prompt (no-sales, placeholder-only,
+    per-source attribution) plus deterministic numeric grounding inside
+    ``validated_agent_response``; there is no separate output-safety LLM. This
+    guardrail runs validation, caches the result for reuse, and trips only when
+    validation cannot ground the draft (``QaAgentUnavailable``).
+    """
+
     try:
         ctx.context.validated_response = validated_agent_response(
             ctx.context.context,

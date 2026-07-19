@@ -96,37 +96,6 @@ class QaInputDecision(BaseModel):
     reason: str = Field(min_length=1, max_length=240)
 
 
-class UnsupportedOutputClaim(BaseModel):
-    """A factual statement that is not supported by the supplied sources."""
-
-    claim: str = Field(min_length=1, max_length=300)
-    reason: str = Field(min_length=1, max_length=300)
-
-
-class QaOutputSafetyDecision(BaseModel):
-    """Semantic findings used by the server to compute the guardrail verdict."""
-
-    unsupported_factual_claims: list[UnsupportedOutputClaim] = Field(
-        default_factory=list,
-        max_length=8,
-    )
-    directs_purchase_or_cancellation: bool
-    asserts_payout_or_coverage_certainty: bool
-    invents_personal_facts: bool
-    uses_general_source_as_policy_specific_fact: bool = False
-    reason: str = Field(min_length=1, max_length=240)
-
-    @property
-    def is_safe(self) -> bool:
-        return not (
-            self.unsupported_factual_claims
-            or self.directs_purchase_or_cancellation
-            or self.asserts_payout_or_coverage_certainty
-            or self.invents_personal_facts
-            or self.uses_general_source_as_policy_specific_fact
-        )
-
-
 @dataclass
 class QaAgentDependencies:
     context: QaContext
@@ -134,7 +103,6 @@ class QaAgentDependencies:
     official_answer: OfficialAnswerer | None
     web_search: OfficialWebSearcher
     classify_input: JsonCompleter | None = None
-    classify_output: JsonCompleter | None = None
     input_decision: QaInputDecision | None = None
     tool_results: dict[str, RegisteredToolResult] = field(default_factory=dict)
     tool_failures: list[ToolFailure] = field(default_factory=list)
