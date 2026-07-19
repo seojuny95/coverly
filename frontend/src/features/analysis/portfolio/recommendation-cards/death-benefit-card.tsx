@@ -5,9 +5,8 @@ import { CoverageStatusBadge } from "../coverage-guide";
 import { CoverageGroupList } from "./coverage-group-list";
 import { CORE_COVERAGE_DESCRIPTION } from "./coverage-copy";
 import { CoverageReference } from "./coverage-reference";
+import { CoreCoverageSection } from "./core-coverage-section";
 
-// Kept as a <section> (not the Card primitive) because panel.test.tsx locates
-// this card via `getByRole("heading", ...).closest("section")`.
 export function RecommendedDeathBenefitCard({
   item,
   deathBenefitContext,
@@ -39,16 +38,10 @@ export function RecommendedDeathBenefitCard({
   };
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-3xl">
-          <h4 className="text-lg font-semibold tracking-[-0.03em] text-zinc-950">
-            {item?.label ?? "확인 결과"}
-          </h4>
-          <p className="mt-2 text-sm leading-6 text-zinc-600">
-            {CORE_COVERAGE_DESCRIPTION.death}
-          </p>
-        </div>
+    <CoreCoverageSection
+      title={item?.label ?? "확인 결과"}
+      description={CORE_COVERAGE_DESCRIPTION.death}
+      status={
         <CoverageStatusBadge
           status={item?.status ?? "not_found"}
           label={
@@ -57,8 +50,8 @@ export function RecommendedDeathBenefitCard({
               : undefined
           }
         />
-      </div>
-
+      }
+    >
       <div className="mt-5 space-y-4 border-t border-zinc-200 pt-5">
         <fieldset className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
           <legend className="sr-only">나의 상황</legend>
@@ -104,7 +97,7 @@ export function RecommendedDeathBenefitCard({
           ) : null}
         </div>
       </div>
-    </section>
+    </CoreCoverageSection>
   );
 }
 

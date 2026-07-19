@@ -9,6 +9,7 @@ import {
 import type { DiagnosisKind } from "./coverage-copy";
 import { CoverageGroupList } from "./coverage-group-list";
 import { CoverageReference } from "./coverage-reference";
+import { CoreCoverageSection } from "./core-coverage-section";
 
 type DiagnosisCoverageItem = EssentialCoverageItem & { kind: DiagnosisKind };
 
@@ -23,8 +24,6 @@ export function recommendedDiagnosisItems(
   );
 }
 
-// Kept as a <section> (not the Card primitive) for consistency with the
-// sibling death-benefit and medical-indemnity cards in this group.
 export function RecommendedDiagnosisCard({
   items,
   confirmedCount,
@@ -33,30 +32,24 @@ export function RecommendedDiagnosisCard({
   confirmedCount: number;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-3xl">
-          <h4 className="text-lg font-semibold tracking-[-0.03em] text-zinc-950">
-            진단 보장
-          </h4>
-          <p className="mt-2 text-sm leading-6 text-zinc-600">
-            {CORE_COVERAGE_DESCRIPTION.diagnosis}
-          </p>
-        </div>
+    <CoreCoverageSection
+      title="진단 보장"
+      description={CORE_COVERAGE_DESCRIPTION.diagnosis}
+      status={
         <Badge
           variant="neutral"
           className="h-auto rounded-full bg-white px-3 py-1 ring-1 ring-zinc-200"
         >
           {confirmedCount}/3 확인
         </Badge>
-      </div>
-
+      }
+    >
       <ul className="mt-5 grid gap-3 border-t border-zinc-200 pt-5 lg:grid-cols-3">
         {items.map((item) => (
           <RecommendedDiagnosisItem key={item.kind} item={item} />
         ))}
       </ul>
-    </section>
+    </CoreCoverageSection>
   );
 }
 

@@ -206,33 +206,19 @@ function ChannelLinkList({
             );
           }
 
-          if (prominent) {
-            return (
-              <Button
-                key={`${link.label}-${link.url}`}
-                asChild
-                variant="outline"
-                size="sm"
-                className="border-blue-200 text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-              >
-                <a href={href} target="_blank" rel="noreferrer">
-                  <ExternalLink data-icon="inline-start" />
-                  {link.label}
-                </a>
-              </Button>
-            );
-          }
-
           return (
-            <a
+            <Button
               key={`${link.label}-${link.url}`}
-              href={href}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 ring-1 ring-blue-200"
+              asChild
+              variant="outline"
+              size={prominent ? "sm" : "xs"}
+              className="border-blue-200 text-blue-700 hover:border-blue-300 hover:bg-blue-50"
             >
-              {link.label}
-            </a>
+              <a href={href} target="_blank" rel="noreferrer">
+                <ExternalLink data-icon="inline-start" />
+                {link.label}
+              </a>
+            </Button>
           );
         })}
       </div>
