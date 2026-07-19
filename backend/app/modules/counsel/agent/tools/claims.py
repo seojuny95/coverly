@@ -1,17 +1,27 @@
 """Agent SDK tool for verified insurer claim channels."""
 
 from agents import RunContextWrapper, function_tool
+from pydantic import BaseModel
 
+from app.modules.counsel.agent.tools.coverages import (
+    UnmatchedCoverageName,
+    match_coverage_names,
+)
 from app.modules.counsel.context import CounselContext
 from app.modules.reference_data.claim_channels import claim_channel_block
 from app.modules.reference_data.contracts import ClaimChannelBlock
+
+
+class ClaimChannelsResult(BaseModel):
+    channels: ClaimChannelBlock
+    unmatched: list[UnmatchedCoverageName]
 
 
 @function_tool
 def get_claim_channels(
     wrapper: RunContextWrapper[CounselContext],
     coverage_names: list[str],
-) -> ClaimChannelBlock:
+) -> ClaimChannelsResult:
     """청구와 관련된 담보의 보험사 고객센터·앱·청구 링크를 확인합니다.
 
     반환되는 연락처·링크는 검증된 참조 데이터에서만 나오며, 직접 지어내지
@@ -19,18 +29,15 @@ def get_claim_channels(
     않습니다.
 
     Args:
-        coverage_names: 청구와 관련된 정확한 담보명 목록입니다. 특정 담보가
-            불명확하면 list_coverage_names로 먼저 확인하세요.
+        coverage_names: 청구와 관련된 정확한 담보명 목록입니다. unmatched에
+            candidates가 있으면, 그중 정확한 이름으로 다시 호출하세요 —
+            채널을 못 찾았다고 바로 답하지 마세요.
     """
 
-    requested = {name.strip() for name in coverage_names}
-    insurers = [
-        policy.기본정보.보험사
-        for policy in wrapper.context.policies
-        if policy.기본정보.보험사
-        if any(coverage.담보명 in requested for coverage in policy.보장목록)
-    ]
-    return claim_channel_block(
+    matches, unmatched = match_coverage_names(wrapper.context.policies, coverage_names)
+    insurers = [match.보험사 for match in matches if match.보험사]
+    channels = claim_channel_block(
         list(dict.fromkeys(insurers)),
         include_medical_indemnity_service=False,
     )
+    return ClaimChannelsResult(channels=channels, unmatched=unmatched)

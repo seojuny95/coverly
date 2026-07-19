@@ -5,7 +5,7 @@ from typing import cast
 from agents import FunctionTool
 from agents.tool_context import ToolContext
 
-from app.modules.counsel.agent.tools.claims import get_claim_channels
+from app.modules.counsel.agent.tools.claims import ClaimChannelsResult, get_claim_channels
 from app.modules.counsel.agent.tools.coverages import (
     CoverageNameInfo,
     CoverageTotalResult,
@@ -19,7 +19,6 @@ from app.modules.counsel.agent.tools.coverages import (
 from app.modules.counsel.agent.tools.policies import PolicyListResult, list_policies
 from app.modules.counsel.context import CounselContext
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.reference_data.contracts import ClaimChannelBlock
 
 
 def _invoke(tool: FunctionTool, context: CounselContext, arguments: str = "{}") -> object:
@@ -68,9 +67,9 @@ def _invoke_find_overlapping_coverages(context: CounselContext) -> list[Overlapp
 
 def _invoke_get_claim_channels(
     context: CounselContext, coverage_names: list[str]
-) -> ClaimChannelBlock:
+) -> ClaimChannelsResult:
     return cast(
-        ClaimChannelBlock,
+        ClaimChannelsResult,
         _invoke(get_claim_channels, context, json.dumps({"coverage_names": coverage_names})),
     )
 
@@ -300,9 +299,25 @@ def test_get_claim_channels_returns_verified_channels_for_matched_insurers() -> 
 
     result = _invoke_get_claim_channels(context, ["암진단비"])
 
-    names = {insurer.name for insurer in result.insurers}
+    names = {insurer.name for insurer in result.channels.insurers}
     assert names == {"현대해상", "삼성화재"}
-    assert all(insurer.customer_center for insurer in result.insurers)
+    assert all(insurer.customer_center for insurer in result.channels.insurers)
+    assert result.unmatched == []
+
+
+def test_get_claim_channels_reports_unmatched_names_instead_of_returning_empty_silently() -> None:
+    # A coverage-name mismatch (e.g. a name carried over unresolved from an earlier
+    # turn) must surface as `unmatched` with candidates, not a silent empty channel
+    # list — otherwise the agent reports "no claim channel data" for insurers that
+    # actually have verified reference data.
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_get_claim_channels(context, ["암진단"])
+
+    assert result.channels.insurers == []
+    assert len(result.unmatched) == 1
+    assert result.unmatched[0].requested_name == "암진단"
+    assert result.unmatched[0].candidates == ["암진단비"]
 
 
 def test_get_claim_channels_returns_empty_when_no_coverage_matches() -> None:
@@ -310,4 +325,5 @@ def test_get_claim_channels_returns_empty_when_no_coverage_matches() -> None:
 
     result = _invoke_get_claim_channels(context, ["존재하지않는담보"])
 
-    assert result.insurers == []
+    assert result.channels.insurers == []
+    assert len(result.unmatched) == 1

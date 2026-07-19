@@ -57,7 +57,7 @@ class UnmatchedCoverageName(BaseModel):
     candidates: list[str]
 
 
-def _match_coverage_names(
+def match_coverage_names(
     policies: list[PolicyInput],
     coverage_names: list[str],
 ) -> tuple[list[CoverageMatch], list[UnmatchedCoverageName]]:
@@ -118,7 +118,7 @@ def find_coverages(
             이름으로 보고됩니다.
     """
 
-    matches, unmatched = _match_coverage_names(wrapper.context.policies, coverage_names)
+    matches, unmatched = match_coverage_names(wrapper.context.policies, coverage_names)
     return FindCoveragesResult(matches=matches, unmatched=unmatched)
 
 
@@ -158,7 +158,7 @@ def calculate_coverage_total(
             list_coverage_names를 호출하세요.
     """
 
-    matches, unmatched = _match_coverage_names(wrapper.context.policies, coverage_names)
+    matches, unmatched = match_coverage_names(wrapper.context.policies, coverage_names)
 
     included = [item for item in matches if item.가입금액숫자 is not None]
     excluded = [
