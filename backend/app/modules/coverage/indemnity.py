@@ -6,13 +6,45 @@ generic actual-loss reimbursement. This module keeps those concepts separate.
 
 import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Protocol
 
 from app.modules.coverage.contracts import CoverageDomain
-from app.modules.portfolio.schemas import CoverageInput, PolicyInput
 
 PaymentBasis = Literal["fixed", "indemnity", "unknown"]
 MedicalIndemnityStatus = Literal["confirmed", "excluded", "unknown"]
+
+
+class CoverageContext(Protocol):
+    @property
+    def 담보명(self) -> str: ...
+
+    @property
+    def 보장분류(self) -> str | None: ...
+
+    @property
+    def 지급유형(self) -> str | None: ...
+
+    @property
+    def 보장내용(self) -> str | None: ...
+
+    @property
+    def 해설(self) -> str | None: ...
+
+
+class PolicyInfoContext(Protocol):
+    @property
+    def 보험분류(self) -> str | None: ...
+
+    @property
+    def 상품명(self) -> str | None: ...
+
+    @property
+    def 상품태그(self) -> list[str]: ...
+
+
+class PolicyContext(Protocol):
+    @property
+    def 기본정보(self) -> PolicyInfoContext: ...
 
 
 @dataclass(frozen=True)
@@ -129,9 +161,9 @@ _DAMAGE_CLASSIFICATIONS = frozenset(
 
 
 def classify_indemnity(
-    coverage: CoverageInput,
+    coverage: CoverageContext,
     *,
-    policy: PolicyInput | None = None,
+    policy: PolicyContext | None = None,
 ) -> IndemnityClassification:
     """Classify actual-loss reimbursement separately from medical indemnity."""
 
@@ -167,7 +199,7 @@ def is_medical_indemnity_name(name: str) -> bool:
     )
 
 
-def has_negated_actual_loss_marker(coverage: CoverageInput) -> bool:
+def has_negated_actual_loss_marker(coverage: CoverageContext) -> bool:
     """Return whether coverage metadata explicitly denies actual-loss payment."""
 
     normalized_name = _normalize(coverage.담보명)
@@ -178,7 +210,7 @@ def has_negated_actual_loss_marker(coverage: CoverageInput) -> bool:
     )
 
 
-def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
+def _payment_basis(coverage: CoverageContext) -> PaymentBasis:
     payment_type = (coverage.지급유형 or "").strip()
     normalized_payment_type = _normalize(payment_type)
     if normalized_payment_type in _NORMALIZED_INDEMNITY_PAYMENT_TYPES:
@@ -200,7 +232,7 @@ def _payment_basis(coverage: CoverageInput) -> PaymentBasis:
     return "unknown"
 
 
-def _coverage_domain(text: str, policy: PolicyInput | None) -> CoverageDomain:
+def _coverage_domain(text: str, policy: PolicyContext | None) -> CoverageDomain:
     if _is_travel_policy_context(policy) and _contains_any(text, _MEDICAL_TERMS):
         return "travel_medical_expense"
     if _is_auto_policy_context(policy):
@@ -212,7 +244,7 @@ def _coverage_domain(text: str, policy: PolicyInput | None) -> CoverageDomain:
 
 
 def _domain_priorities(
-    policy: PolicyInput | None,
+    policy: PolicyContext | None,
 ) -> tuple[tuple[CoverageDomain, tuple[str, ...]], ...]:
     if is_damage_policy_context(policy):
         return (
@@ -233,7 +265,7 @@ def _domain_priorities(
     )
 
 
-def _coverage_text(coverage: CoverageInput) -> str:
+def _coverage_text(coverage: CoverageContext) -> str:
     return _normalize(
         " ".join(
             [
@@ -247,7 +279,7 @@ def _coverage_text(coverage: CoverageInput) -> str:
     )
 
 
-def _policy_default_domain(policy: PolicyInput | None) -> CoverageDomain:
+def _policy_default_domain(policy: PolicyContext | None) -> CoverageDomain:
     if policy is None or _is_travel_policy_context(policy):
         return "other"
 
@@ -258,7 +290,7 @@ def _policy_default_domain(policy: PolicyInput | None) -> CoverageDomain:
     return "other"
 
 
-def is_damage_policy_context(policy: PolicyInput | None) -> bool:
+def is_damage_policy_context(policy: PolicyContext | None) -> bool:
     """Return whether policy belongs to the separately handled damage branch."""
 
     if policy is None:
@@ -268,19 +300,19 @@ def is_damage_policy_context(policy: PolicyInput | None) -> bool:
     return category in _DAMAGE_CLASSIFICATIONS or any(tag in _DAMAGE_TAG_TERMS for tag in tags)
 
 
-def _is_travel_policy_context(policy: PolicyInput | None) -> bool:
+def _is_travel_policy_context(policy: PolicyContext | None) -> bool:
     if policy is None:
         return False
     return _contains_any(_policy_identity(policy), _TRAVEL_POLICY_TERMS)
 
 
-def _is_auto_policy_context(policy: PolicyInput | None) -> bool:
+def _is_auto_policy_context(policy: PolicyContext | None) -> bool:
     if policy is None:
         return False
     return _contains_any(_policy_identity(policy), _AUTO_TERMS)
 
 
-def _policy_identity(policy: PolicyInput) -> str:
+def _policy_identity(policy: PolicyContext) -> str:
     return _normalize(
         " ".join(
             [

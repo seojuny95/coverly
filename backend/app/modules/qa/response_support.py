@@ -1,8 +1,8 @@
 """Shared response metadata for grounded QA paths."""
 
+from app.modules.consultation.contracts import InsuredDemographics
 from app.modules.portfolio.summary import PortfolioFacts
 from app.modules.qa.context import QaContext
-from app.modules.qa.contracts import InsuredDemographics
 from app.modules.qa.schemas import PortfolioQuestionResponse
 
 _MAX_SUGGESTIONS = 3

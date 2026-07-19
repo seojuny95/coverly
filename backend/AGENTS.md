@@ -22,23 +22,25 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy . && uv run p
 
 ```text
 app/
-├── main.py                  # FastAPI 앱 조립
-├── core/                    # config, lifespan, errors, middleware, 공유 pure helper
+├── main.py                  # FastAPI 앱·라우터 조립
+├── lifespan.py              # 공유 자원 초기화·종료 composition root
+├── core/                    # config, errors, middleware, 공유 pure helper
 ├── modules/
+│   ├── upload/              # 증권 업로드 HTTP 경계와 파싱·세션 조합
 │   ├── policy/              # 증권 파싱·분류·요약·담보 해설
-│   ├── portfolio/           # 다건 증권 집계, 총평 입력 준비, 단일 토큰 세션
+│   ├── portfolio/           # 다건 증권 집계, 총평 생성, 단일 토큰 세션
 │   │   └── session/         # 세션 토큰, 구조화 증권 저장, 분석 캐시
-│   ├── analysis/            # 포트폴리오 총평 생성
+│   ├── consultation/        # 상담 응답 공용 계약과 안전 규칙
 │   ├── qa/                  # 근거 기반 Q&A
 │   ├── coverage/            # 담보 분류·매칭·설명
 │   ├── evidence/            # 분석/Q&A 공용 근거 카탈로그
-│   └── reference_data/      # DB-backed reference data access
+│   └── reference_data/      # 참조 데이터 계약·검증·조회 조정
 ├── rag/                     # 공유 런타임 RAG subsystem
 │   ├── official/            # 공식 약관·제도 RAG
 │   └── policy/              # 업로드 세션 RAG
 └── integrations/
     ├── openai/              # OpenAI client boundary
-    └── postgres/            # pgvector / Postgres 구현
+    └── postgres/            # pgvector / 세션 / 참조 데이터 Postgres 구현
 
 backend/evals/
 └── rag/
@@ -53,9 +55,9 @@ tests/
 └── integrations/            # Postgres 등 외부 연동 구현 테스트
 ```
 
-FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별 엔드포인트 묶음에만 쓰고, `Depends`는 실제로 필요한 경우에만 라우터/핸들러에서 국소적으로 사용한다. 전역 의존성 주입은 기본 패턴이 아니며, 앱 수명 주기 연결은 `lifespan`으로 처리한다. `lifespan`은 공용 캐시 워밍, 초기화, 종료 정리에 사용하고 `create_app()`에서 연결한다.
+FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별 엔드포인트 묶음에만 쓰고, `Depends`는 실제로 필요한 경우에만 라우터/핸들러에서 국소적으로 사용한다. 서로 다른 기능을 조합하는 업로드 HTTP 흐름은 `modules/upload`가 소유하며, `modules/policy`는 파싱 도메인에 집중한다. 전역 의존성 주입은 기본 패턴이 아니며, 앱 수명 주기 연결은 최상위 `app/lifespan.py`에서 처리한다. `lifespan`은 공용 캐시 워밍, 초기화, 종료 정리에 사용하고 `create_app()`에서 연결한다.
 
-의존 방향은 대체로 `modules -> core/integrations/rag`, `rag -> integrations/core`, `integrations -> 외부 시스템`이다. `analysis`와 `qa`는 서버 응답을 생성하는 계층이고, `coverage`, `evidence`, `reference_data`는 여러 기능이 공유하는 순수/조회 로직을 담는다. `app`는 평가 코드를 참조하지 않는다.
+의존 방향은 대체로 `modules -> core/integrations/rag`, `rag -> integrations/core`, `integrations -> 외부 시스템`이다. `portfolio`와 `qa`는 서버 응답을 생성하는 계층이고, `consultation`, `coverage`, `evidence`, `reference_data`는 여러 기능이 공유하는 계약·순수 로직·조회 조정을 담는다. `core`는 비즈니스 모듈을 참조하지 않고, 기능 모듈의 import graph는 순환하지 않아야 한다. OpenAI·Postgres 같은 vendor client는 `integrations` 경계를 거치며, 이 규칙들은 `tests/test_architecture.py`로 강제한다. `app`는 평가 코드를 참조하지 않는다.
 
 참조 데이터, 임시 포트폴리오 세션, RAG 테이블 경계와 Supabase migration을 포함한 DB 원본 정의는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다. 분석과 Q&A는 프론트엔드가 증권 전체를 다시 보내는 방식보다 세션 토큰과 선택 문서 ID로 서버 저장 사실을 조회하는 방식을 우선한다.
 
@@ -85,6 +87,7 @@ FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별
 - **실패 정책이 명확한가**: DB, RAG, LLM, 외부 API 실패가 조용히 성공처럼 보이지 않아야 한다. 전체 분석을 실패시켜야 하는 참조 데이터 오류와 확인 불가로 degrade할 수 있는 검색 오류를 구분한다.
 - **타입과 테스트가 회귀를 막는가**: Pydantic schema, mypy, pytest fixture가 실제 응답 계약을 반영하는지 본다. LLM/API/DB는 유닛 테스트에서 stub 가능해야 한다.
 - **성능·비용이 예측 가능한가**: 불필요한 LLM 호출, 반복 DB 조회, 대용량 PDF/RAG 처리의 중복 작업이 없는지 확인한다. 캐시는 소유권과 무효화 기준이 명확해야 한다.
+- **동시성과 취소가 끝까지 전파되는가**: 업로드 한도는 파싱 전에 원자적으로 예약하고 성공·실패·취소에서 해제한다. SSE 연결 종료는 ASGI disconnect부터 agent 실행과 외부 검색까지 취소가 전파돼야 하며, queue와 외부 검색 동시성에는 명시적인 상한을 둔다.
 
 ## Coding Style & Naming Conventions
 

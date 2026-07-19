@@ -1,17 +1,21 @@
 """Restricted official web search for the QA agent."""
 
+import asyncio
 import logging
 import re
+from collections.abc import AsyncIterator, Awaitable
+from contextlib import asynccontextmanager
+from threading import BoundedSemaphore
 from typing import Any, Literal, Protocol, cast
 from urllib.parse import urlparse
 
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
-from app.modules.qa.claim_channels import channels_for
+from app.integrations.openai import search_official_web_async
 from app.modules.qa.context import QaContext
 from app.modules.qa.pii import mask_qa_pii
+from app.modules.reference_data.claim_channels import channels_for
 from app.rag.official.sources import rag_sources
 
 SearchPurpose = Literal[
@@ -24,6 +28,9 @@ logger = logging.getLogger(__name__)
 _URL_PATTERN = re.compile(r"https?://[^\s)\]]+")
 _GENERAL_LAW_DOMAINS = ("law.go.kr", "korea.kr", "molit.go.kr")
 _MAX_CITED_SOURCES = 3
+_WEB_SEARCH_CONCURRENCY = 4
+_WEB_SEARCH_SLOT_POLL_SECONDS = 0.05
+_web_search_slots = BoundedSemaphore(_WEB_SEARCH_CONCURRENCY)
 
 
 class WebSearchResult(BaseModel):
@@ -41,7 +48,7 @@ class OfficialWebSearcher(Protocol):
         *,
         purpose: SearchPurpose,
         allowed_domains: list[str],
-    ) -> WebSearchResult: ...
+    ) -> WebSearchResult | Awaitable[WebSearchResult]: ...
 
 
 def search_allowed_domains(context: QaContext, purpose: SearchPurpose) -> list[str]:
@@ -53,7 +60,7 @@ def search_allowed_domains(context: QaContext, purpose: SearchPurpose) -> list[s
     return list(dict.fromkeys(_allowlist_domain(domain) for domain in domains if domain))
 
 
-def default_official_web_search(
+async def default_official_web_search(
     query: str,
     *,
     purpose: SearchPurpose,
@@ -73,19 +80,14 @@ def default_official_web_search(
         )
 
     safe_query = _search_prompt(sanitize_search_query(query), purpose)
-    client = OpenAI(api_key=settings.openai_api_key, timeout=60.0, max_retries=0)
     try:
-        response = client.responses.create(
-            model=settings.openai_web_search_model,
-            input=safe_query,
-            tools=[
-                {
-                    "type": "web_search",
-                    "filters": {"allowed_domains": allowed_domains},
-                }
-            ],
-            include=["web_search_call.action.sources"],
-        )
+        async with _web_search_slot():
+            response = await search_official_web_async(
+                api_key=settings.openai_api_key,
+                model=settings.openai_web_search_model,
+                query=safe_query,
+                allowed_domains=allowed_domains,
+            )
     except Exception as exc:
         logger.warning("Official web search failed with %s", type(exc).__name__)
         return WebSearchResult(
@@ -107,6 +109,22 @@ def default_official_web_search(
         allowed_domains=allowed_domains,
         source_urls=source_urls,
     )
+
+
+@asynccontextmanager
+async def _web_search_slot() -> AsyncIterator[None]:
+    """Acquire a process-wide permit without binding it to one event loop."""
+
+    acquired = False
+    try:
+        while not acquired:
+            acquired = _web_search_slots.acquire(blocking=False)
+            if not acquired:
+                await asyncio.sleep(_WEB_SEARCH_SLOT_POLL_SECONDS)
+        yield
+    finally:
+        if acquired:
+            _web_search_slots.release()
 
 
 def sanitize_search_query(query: str) -> str:

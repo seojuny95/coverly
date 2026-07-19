@@ -27,12 +27,6 @@ from app.integrations.openai import (
 from app.rag.official.models import RagChunk, RetrievalHit
 from app.rag.official.retrieval import retrieve
 
-# answer_official_question always returns "general" now that profile-based mode
-# classification was removed. "term_explain"/"claim_check" stay in the type
-# because portfolio_qa.py and its tests still branch on them for RagAnswer
-# values built outside this module; simplifying the type would break that
-# contract without actually removing the dead branch it feeds.
-RagAnswerMode = Literal["term_explain", "claim_check", "general"]
 RagAnswerStatus = Literal["answered", "no_evidence", "filtered"]
 
 _MAX_CONTEXT_CHARS = 900
@@ -65,7 +59,6 @@ class RagCitation:
 @dataclass(frozen=True)
 class RagAnswer:
     status: RagAnswerStatus
-    mode: RagAnswerMode
     answer: str
     citations: tuple[RagCitation, ...]
     limitations: tuple[str, ...]
@@ -115,7 +108,6 @@ def answer_official_question(
 
     return RagAnswer(
         status="answered",
-        mode="general",
         answer=answer,
         citations=tuple(
             _citation_by_id(citation_id, selected_hits) for citation_id in citation_ids
@@ -128,7 +120,6 @@ def answer_official_question(
 def _no_evidence() -> RagAnswer:
     return RagAnswer(
         status="no_evidence",
-        mode="general",
         answer="공식 자료에서 답변 근거를 찾지 못했습니다.",
         citations=(),
         limitations=("근거가 확인되지 않으면 답변하지 않습니다.",),
@@ -142,7 +133,6 @@ def _filtered(
 ) -> RagAnswer:
     return RagAnswer(
         status="filtered",
-        mode="general",
         answer="공식 자료 근거 안에서 안전하게 답변하지 못했습니다.",
         citations=tuple(_citation(hit.chunk) for hit in hits[:2]),
         limitations=("답변이 근거를 벗어나면 폐기합니다.",),

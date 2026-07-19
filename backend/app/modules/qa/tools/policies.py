@@ -2,9 +2,9 @@
 
 from agents import RunContextWrapper, function_tool
 
+from app.modules.consultation.contracts import ConsultationEvidence
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.qa.agent.contracts import GroundedToolAnswer, QaAgentDependencies
-from app.modules.qa.contracts import ConsultationEvidence
 from app.modules.qa.response_support import standard_limitations, with_demographics
 from app.modules.qa.schemas import PortfolioQuestionResponse
 from app.modules.qa.tools.evidence import portfolio_snapshot_evidence

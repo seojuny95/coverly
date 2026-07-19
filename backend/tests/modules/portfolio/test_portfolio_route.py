@@ -3,9 +3,9 @@ from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
 from app.core.errors import ApiError, api_error_handler
-from app.modules.analysis.summary_overview import SummaryOverviewUnavailableError
 from app.modules.portfolio import router as portfolio
 from app.modules.portfolio import summary as portfolio_summary
+from app.modules.portfolio.overview import SummaryOverviewUnavailableError
 from app.modules.portfolio.schemas import PolicyInput, PortfolioCoverageSummary, PortfolioOverview
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.models import (

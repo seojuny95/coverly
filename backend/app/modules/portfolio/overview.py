@@ -6,7 +6,6 @@ from typing import Literal, cast
 from pydantic import BaseModel, Field
 
 from app.integrations.openai.client import JsonCompleter, dump_prompt_json, structured_completer
-from app.modules.evidence.catalog import is_safe_analysis_text
 from app.modules.portfolio.schemas import (
     EssentialCoverageItem,
     PortfolioCoverageSummary,
@@ -22,9 +21,43 @@ class SummaryOverviewUnavailableError(RuntimeError):
     """Raised when the required LLM overview cannot be generated safely."""
 
 
+type _OverviewTitle = Literal[
+    "업로드한 증권의 확인 항목을 정리했어요",
+    "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
+    "보험료와 보장 조건을 차례로 확인해요",
+]
+type _OverviewParagraph = Literal[
+    "업로드한 증권에서 읽은 내용을 보험료, 보장 구성, 다음 확인 항목으로 나눠 정리했어요.",
+    "이 총평은 업로드한 자료에서 확인한 내용을 바탕으로 한 1차 정리예요.",
+    "월 보험료는 담보 구성과 갱신 여부, 납입 기간을 함께 확인해야 해요.",
+    "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요.",
+    "확인 범위가 제한된 담보는 실제 보장 범위와 약관 조건을 이어서 확인해보세요.",
+    "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요.",
+]
+
+_BASE_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "업로드한 증권에서 읽은 내용을 보험료, 보장 구성, 다음 확인 항목으로 나눠 정리했어요."
+)
+_LIMITATION_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "이 총평은 업로드한 자료에서 확인한 내용을 바탕으로 한 1차 정리예요."
+)
+_PREMIUM_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "월 보험료는 담보 구성과 갱신 여부, 납입 기간을 함께 확인해야 해요."
+)
+_MISSING_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요."
+)
+_TERMS_REVIEW_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "확인 범위가 제한된 담보는 실제 보장 범위와 약관 조건을 이어서 확인해보세요."
+)
+_OVERLAP_OVERVIEW_PARAGRAPH: _OverviewParagraph = (
+    "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요."
+)
+
+
 class _LlmOverviewDraft(BaseModel):
-    title: str = Field(max_length=80)
-    paragraphs: list[str] = Field(min_length=2, max_length=3)
+    title: _OverviewTitle
+    paragraphs: list[_OverviewParagraph] = Field(min_length=2, max_length=3)
 
 
 def attach_summary_overview(
@@ -50,25 +83,23 @@ def generate_summary_overview(
     try:
         raw = (complete or structured_completer(_LlmOverviewDraft))(
             _system_prompt(),
-            _user_prompt(judgments),
+            _user_prompt(_overview_prompt_facts(summary)),
         )
         draft = _LlmOverviewDraft.model_validate(raw)
     except Exception:
         logger.exception("portfolio_overview_generation_failed")
         return None
 
-    title = draft.title.strip()
-    paragraphs = [
-        paragraph.strip() for paragraph in draft.paragraphs if is_safe_analysis_text(paragraph)
-    ][:3]
-    if not title or not is_safe_analysis_text(title) or len(paragraphs) < 2:
+    allowed_paragraphs = _allowed_overview_paragraphs(summary)
+    paragraphs = list(dict.fromkeys(draft.paragraphs))
+    if len(paragraphs) < 2 or any(paragraph not in allowed_paragraphs for paragraph in paragraphs):
         return None
 
     takeaways = cast(list[dict[str, str]], judgments["takeaways"])
     return PortfolioOverview(
         generation="llm",
-        title=title,
-        paragraphs=paragraphs,
+        title=draft.title,
+        paragraphs=[str(paragraph) for paragraph in paragraphs],
         takeaways=[PortfolioOverviewTakeaway.model_validate(takeaway) for takeaway in takeaways],
     )
 
@@ -80,6 +111,7 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
     review = [item for item in items if item.status == "needs_review"]
     premium = _premium_judgment(summary, missing)
     duplicate_actual_loss_names = duplicate_actual_loss_coverage_names(summary)
+    has_medical_indemnity_overlap = _has_medical_indemnity_overlap(items)
 
     return {
         "premium": premium,
@@ -113,6 +145,7 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
             missing,
             review,
             duplicate_actual_loss_names,
+            has_medical_indemnity_overlap,
         ),
         "limitations": [
             "업로드한 증권에서 읽은 담보명, 가입금액, 월 보험료 기준의 1차 해석",
@@ -120,6 +153,62 @@ def _summary_judgments(summary: PortfolioCoverageSummary) -> dict[str, object]:
             "현재 자료에서 찾지 못한 항목은 미가입 단정이 아니라 추가 확인 대상",
         ],
     }
+
+
+def _overview_prompt_facts(summary: PortfolioCoverageSummary) -> dict[str, object]:
+    """Expose facts needed for sentence selection without adequacy comparisons."""
+
+    items = summary.essential_coverage_check.items
+    missing = [item for item in items if item.status == "not_found"]
+    terms_review = [
+        item for item in items if item.status == "needs_review" and item.kind != "medical_indemnity"
+    ]
+    return {
+        "monthly_premium_confirmed": bool(
+            summary.premium is not None and summary.premium.monthly_policy_count > 0
+        ),
+        "confirmed_in_uploaded_documents": [
+            item.label for item in items if item.status != "not_found"
+        ],
+        "not_confirmed_in_current_materials": [item.label for item in missing],
+        "needs_terms_review": [item.label for item in terms_review],
+        "has_overlapping_actual_loss_contracts": _has_overlap_review(summary),
+        "limitations": [
+            "업로드한 자료에서 확인한 내용만 사용",
+            "현재 자료에서 확인되지 않은 항목을 실제 미가입으로 단정하지 않음",
+        ],
+    }
+
+
+def _allowed_overview_paragraphs(
+    summary: PortfolioCoverageSummary,
+) -> set[_OverviewParagraph]:
+    allowed: set[_OverviewParagraph] = {
+        _BASE_OVERVIEW_PARAGRAPH,
+        _LIMITATION_OVERVIEW_PARAGRAPH,
+    }
+    if summary.premium is not None and summary.premium.monthly_policy_count > 0:
+        allowed.add(_PREMIUM_OVERVIEW_PARAGRAPH)
+    if any(item.status == "not_found" for item in summary.essential_coverage_check.items):
+        allowed.add(_MISSING_OVERVIEW_PARAGRAPH)
+    if any(
+        item.status == "needs_review" and item.kind != "medical_indemnity"
+        for item in summary.essential_coverage_check.items
+    ):
+        allowed.add(_TERMS_REVIEW_OVERVIEW_PARAGRAPH)
+    if _has_overlap_review(summary):
+        allowed.add(_OVERLAP_OVERVIEW_PARAGRAPH)
+    return allowed
+
+
+def _has_overlap_review(summary: PortfolioCoverageSummary) -> bool:
+    return bool(duplicate_actual_loss_coverage_names(summary)) or _has_medical_indemnity_overlap(
+        summary.essential_coverage_check.items
+    )
+
+
+def _has_medical_indemnity_overlap(items: list[EssentialCoverageItem]) -> bool:
+    return any(item.kind == "medical_indemnity" and item.status == "needs_review" for item in items)
 
 
 def _premium_judgment(
@@ -142,25 +231,23 @@ def _premium_judgment(
     if premium.monthly_total < benchmark.suggested_min_premium:
         tone = "low"
         if all_core_coverage_visible:
-            label = "현재 보험료는 좋아보여요"
-            guidance = "핵심 보장이 보인다면 보험료가 낮은 것 자체는 좋은 신호예요."
+            label = "보험료와 보장 조건을 함께 확인해요"
+            guidance = "핵심 보장이 보이는지와 갱신·면책 조건을 함께 확인해보세요."
         else:
-            label = "권장보험을 점검해보세요"
-            guidance = (
-                "보험료가 낮은 이유가 핵심 보장 공백일 수 있으니 권장보험 항목을 먼저 점검해보세요."
-            )
+            label = "미확인 핵심 보장을 확인해요"
+            guidance = "현재 자료에서 찾지 못한 핵심 보장이 실제로 없는지 약관과 함께 확인해보세요."
     elif premium.monthly_total > benchmark.suggested_max_premium:
         tone = "high"
-        label = "현재 보험료는 높아보여요"
-        guidance = "보험료가 과할 수 있으니 가입한 보험과 보장내용을 다시 확인해보세요."
+        label = "보험료 구성과 갱신 조건을 확인해요"
+        guidance = "보험료에 포함된 담보, 갱신 여부, 납입 기간을 현재 자료와 함께 확인해보세요."
     else:
         tone = "in_range"
         if all_core_coverage_visible:
-            label = "현재 보험료는 좋아보여요"
-            guidance = "권장 구간 안에서 핵심 보장도 보여요. 세부 약관 조건만 확인해요."
+            label = "보험료와 보장 조건을 함께 확인해요"
+            guidance = "일반 가이드와의 차이, 세부 약관 조건을 함께 확인해보세요."
         else:
-            label = "권장보험을 점검해보세요"
-            guidance = "보험료는 권장 구간이어도 미확인 권장보험이 있으니 보장 구성을 점검해보세요."
+            label = "미확인 핵심 보장을 확인해요"
+            guidance = "현재 자료에서 찾지 못한 핵심 보장이 실제로 없는지 약관과 함께 확인해보세요."
 
     return {
         "status": tone,
@@ -182,6 +269,7 @@ def _takeaways(
     missing: list[EssentialCoverageItem],
     review: list[EssentialCoverageItem],
     duplicate_actual_loss_names: list[str],
+    has_medical_indemnity_overlap: bool,
 ) -> list[dict[str, str]]:
     return [
         {
@@ -202,7 +290,9 @@ def _takeaways(
             "label": "다음 확인",
             "title": (
                 "중복 여부 확인"
-                if duplicate_actual_loss_names or review
+                if duplicate_actual_loss_names or has_medical_indemnity_overlap
+                else "보장 범위 확인"
+                if review
                 else "미확인 보장 확인"
                 if missing
                 else "약관 조건 확인"
@@ -211,6 +301,7 @@ def _takeaways(
                 missing,
                 review,
                 duplicate_actual_loss_names,
+                has_medical_indemnity_overlap,
             ),
         },
     ]
@@ -234,12 +325,15 @@ def _next_detail(
     missing: list[EssentialCoverageItem],
     review: list[EssentialCoverageItem],
     duplicate_actual_loss_names: list[str],
+    has_medical_indemnity_overlap: bool,
 ) -> str:
     if duplicate_actual_loss_names:
         names = " · ".join(duplicate_actual_loss_names)
         return f"{names} 실손형 담보의 중복 보상 제한 여부를 약관에서 확인해요."
+    if has_medical_indemnity_overlap:
+        return "실손의료보험이 여러 계약에서 확인돼 중복 가입 여부와 약관 조건을 확인해요."
     if review:
-        return f"{_joined_labels(review)}의 중복 가입과 실제 보장 범위를 확인해요."
+        return f"{_joined_labels(review)}의 실제 보장 범위와 약관 조건을 확인해요."
     if missing:
         return "다른 증권, 특약명, 가입설계서에 빠진 보장이 있는지 봐요."
     return "면책, 감액, 갱신, 자기부담금 조건을 약관에서 확인해요."
@@ -272,14 +366,15 @@ def _system_prompt() -> str:
 
 해야 할 것:
 - 입력 JSON의 판단값만 사용한다.
-- 보험료 판단, 보장 구성, 다음 확인 내용을 자연스러운 한국어로 연결한다.
-- 보험료는 금액 단독으로 좋다/나쁘다 판단하지 말고 premium.guidance와 보장 확인 상태를 함께 따른다.
+- 출력 스키마에 허용된 문장 중 입력 사실과 관련된 문장만 고른다.
+- 보험료 확인 여부, 보장 확인 상태, 다음 확인 내용을 연결한다.
 - 사용자가 올린 자료의 한계를 분명히 말한다.
 - 해요체로 쓴다.
 
 하지 말아야 할 것:
 - 입력에 없는 가족관계, 소득, 병력, 상품명, 보험사 평가를 만들지 않는다.
 - 새 상품 가입, 증액, 해지, 유지 같은 행동을 지시하지 않는다.
+- 보험료나 보장을 높다/낮다, 충분하다/부족하다, 적정하다고 평가하지 않는다.
 - 보험금 지급 여부나 약관상 보장 여부를 단정하지 않는다.
 - 입력의 금액, 확인/미확인 상태, 판단 라벨을 바꾸지 않는다.
 
@@ -290,10 +385,10 @@ def _system_prompt() -> str:
 """
 
 
-def _user_prompt(judgments: dict[str, object]) -> str:
+def _user_prompt(facts: dict[str, object]) -> str:
     return dump_prompt_json(
         {
-            "task": "아래 결정적 판단값을 바탕으로 전체 보험 총평의 제목과 문단을 작성하세요.",
-            "judgments": judgments,
+            "task": "아래 확인 사실에 맞는 제목과 문단을 허용된 선택지에서 고르세요.",
+            "facts": facts,
         }
     )

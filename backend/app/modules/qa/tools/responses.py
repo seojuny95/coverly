@@ -1,8 +1,8 @@
 """Response construction shared by structured portfolio tools."""
 
-from app.modules.evidence.catalog import citation_from_evidence
+from app.modules.consultation.contracts import ConsultationEvidence
+from app.modules.qa.citations import citation_from_evidence
 from app.modules.qa.context import QaContext
-from app.modules.qa.contracts import ConsultationEvidence
 from app.modules.qa.response_support import (
     contextual_suggestions,
     standard_limitations,

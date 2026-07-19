@@ -34,6 +34,7 @@ uv run pytest
 
 ```bash
 cd frontend
+pnpm api:check
 pnpm test
 pnpm lint
 pnpm typecheck

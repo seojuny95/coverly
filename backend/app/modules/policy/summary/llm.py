@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter, structured_completer
 from app.modules.policy.models import CoveragePeriod, PolicyCoreSummary, PremiumSummary, VehicleInfo
-from app.modules.policy.summary.catalog import get_insurer_candidates
+from app.modules.reference_data.insurers import get_insurer_candidates
 
 LlmPolicySummary = PolicyCoreSummary
 

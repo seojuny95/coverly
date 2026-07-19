@@ -14,12 +14,14 @@ from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
     NewPortfolioSession,
+    PolicyDocumentReservation,
     PortfolioSessionSnapshot,
     StoredPolicyDocument,
 )
 from app.modules.portfolio.session.repository import (
-    AddDocumentResult,
+    CompleteDocumentResult,
     PortfolioPolicySelectionNotFound,
+    ReserveDocumentResult,
 )
 
 
@@ -53,15 +55,16 @@ class PgPortfolioSessionRepository:
                 ),
             )
 
-    def add_document(
+    def reserve_document(
         self,
         session_id: str,
-        document: StoredPolicyDocument,
+        document_id: str,
+        reservation_id: str,
         *,
         now: datetime,
+        expires_at: datetime,
         max_documents: int,
-    ) -> AddDocumentResult:
-        payload = document.policy.model_dump(mode="json", exclude_none=True)
+    ) -> ReserveDocumentResult:
         with self._pool.connection() as connection:
             session = connection.execute(
                 """SELECT id FROM private.portfolio_sessions
@@ -74,24 +77,99 @@ class PgPortfolioSessionRepository:
             cancelled = connection.execute(
                 """SELECT 1 FROM private.policy_document_tombstones
                    WHERE portfolio_session_id = %s AND document_id = %s""",
-                (session_id, document.id),
+                (session_id, document_id),
             ).fetchone()
             if cancelled is not None:
                 return "cancelled"
-            document_count = connection.execute(
-                """SELECT count(*) FROM private.policy_documents
-                   WHERE portfolio_session_id = %s""",
-                (session_id,),
+            connection.execute(
+                """DELETE FROM private.policy_document_reservations
+                   WHERE portfolio_session_id = %s AND expires_at <= %s""",
+                (session_id, now),
+            )
+            existing_reservation = connection.execute(
+                """SELECT 1 FROM private.policy_document_reservations
+                   WHERE portfolio_session_id = %s AND document_id = %s""",
+                (session_id, document_id),
             ).fetchone()
-            if document_count is not None and int(document_count["count"]) >= max_documents:
+            if existing_reservation is not None:
+                return "duplicate"
+            existing_document = connection.execute(
+                """SELECT 1 FROM private.policy_documents
+                   WHERE portfolio_session_id = %s AND id = %s""",
+                (session_id, document_id),
+            ).fetchone()
+            if existing_document is not None:
+                return "duplicate"
+            occupied_slots = connection.execute(
+                """SELECT
+                       (SELECT count(*) FROM private.policy_documents
+                        WHERE portfolio_session_id = %s)
+                       +
+                       (SELECT count(*) FROM private.policy_document_reservations
+                        WHERE portfolio_session_id = %s)
+                       AS count""",
+                (session_id, session_id),
+            ).fetchone()
+            if occupied_slots is not None and int(occupied_slots["count"]) >= max_documents:
                 return "limit_exceeded"
+            connection.execute(
+                """INSERT INTO private.policy_document_reservations (
+                       portfolio_session_id, document_id, reservation_id, expires_at
+                   ) VALUES (%s, %s, %s, %s)""",
+                (session_id, document_id, reservation_id, expires_at),
+            )
+        return "reserved"
+
+    def complete_document(
+        self,
+        reservation: PolicyDocumentReservation,
+        document: StoredPolicyDocument,
+        *,
+        now: datetime,
+    ) -> CompleteDocumentResult:
+        payload = document.policy.model_dump(mode="json", exclude_none=True)
+        with self._pool.connection() as connection:
+            session = connection.execute(
+                """SELECT id FROM private.portfolio_sessions
+                   WHERE id = %s AND expires_at > %s
+                   FOR UPDATE""",
+                (reservation.session_id, now),
+            ).fetchone()
+            if session is None:
+                return "missing"
+            cancelled = connection.execute(
+                """SELECT 1 FROM private.policy_document_tombstones
+                   WHERE portfolio_session_id = %s AND document_id = %s""",
+                (reservation.session_id, reservation.document_id),
+            ).fetchone()
+            if cancelled is not None:
+                connection.execute(
+                    """DELETE FROM private.policy_document_reservations
+                       WHERE portfolio_session_id = %s AND document_id = %s""",
+                    (reservation.session_id, reservation.document_id),
+                )
+                return "cancelled"
+            reserved = connection.execute(
+                """DELETE FROM private.policy_document_reservations
+                   WHERE portfolio_session_id = %s AND document_id = %s
+                     AND reservation_id = %s AND expires_at > %s
+                   RETURNING document_id""",
+                (
+                    reservation.session_id,
+                    reservation.document_id,
+                    reservation.reservation_id,
+                    now,
+                ),
+            ).fetchone()
+            if reserved is None:
+                return "missing"
             connection.execute(
                 """INSERT INTO private.policy_documents (
                        id, portfolio_session_id, structured_policy, rag_session_id
                    ) VALUES (%s, %s, %s::jsonb, %s)""",
                 (
                     document.id,
-                    session_id,
+                    reservation.session_id,
                     json.dumps(payload, ensure_ascii=False),
                     document.rag_session_id,
                 ),
@@ -103,9 +181,22 @@ class PgPortfolioSessionRepository:
                        analysis_version = null,
                        analysis_result = null
                    WHERE id = %s""",
-                (session_id,),
+                (reservation.session_id,),
             )
         return "stored"
+
+    def release_document(self, reservation: PolicyDocumentReservation) -> None:
+        with self._pool.connection() as connection:
+            connection.execute(
+                """DELETE FROM private.policy_document_reservations
+                   WHERE portfolio_session_id = %s AND document_id = %s
+                     AND reservation_id = %s""",
+                (
+                    reservation.session_id,
+                    reservation.document_id,
+                    reservation.reservation_id,
+                ),
+            )
 
     def snapshot(
         self,
@@ -175,6 +266,14 @@ class PgPortfolioSessionRepository:
 
     def delete(self, session_id: str) -> tuple[str, ...] | None:
         with self._pool.connection() as connection:
+            session = connection.execute(
+                """SELECT id FROM private.portfolio_sessions
+                   WHERE id = %s
+                   FOR UPDATE""",
+                (session_id,),
+            ).fetchone()
+            if session is None:
+                return None
             rows = connection.execute(
                 """SELECT rag_session_id FROM private.policy_documents
                    WHERE portfolio_session_id = %s AND rag_session_id IS NOT NULL""",
@@ -184,7 +283,7 @@ class PgPortfolioSessionRepository:
                 "DELETE FROM private.portfolio_sessions WHERE id = %s RETURNING id",
                 (session_id,),
             ).fetchone()
-        if deleted is None:
+        if deleted is None:  # pragma: no cover - protected by the row lock above
             return None
         return tuple(str(row["rag_session_id"]) for row in rows)
 
@@ -211,6 +310,11 @@ class PgPortfolioSessionRepository:
                    SELECT %s, requested.document_id
                    FROM unnest(%s::uuid[]) AS requested(document_id)
                    ON CONFLICT DO NOTHING""",
+                (session_id, list(document_ids)),
+            )
+            connection.execute(
+                """DELETE FROM private.policy_document_reservations
+                   WHERE portfolio_session_id = %s AND document_id = ANY(%s)""",
                 (session_id, list(document_ids)),
             )
             rows = connection.execute(

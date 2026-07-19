@@ -7,12 +7,12 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from app.core.generation import GenerationMode
-from app.modules.portfolio.schemas import ClaimChannelBlock
 from app.modules.qa.schemas import (
     AnswerCitation,
     PortfolioQuestionResponse,
     QaAnswerStatus,
 )
+from app.modules.reference_data.contracts import ClaimChannelBlock
 
 _STREAM_CHUNK_SIZE = 16
 

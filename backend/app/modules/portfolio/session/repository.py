@@ -6,11 +6,19 @@ from typing import Literal, Protocol
 from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
     NewPortfolioSession,
+    PolicyDocumentReservation,
     PortfolioSessionSnapshot,
     StoredPolicyDocument,
 )
 
-AddDocumentResult = Literal["stored", "missing", "limit_exceeded", "cancelled"]
+ReserveDocumentResult = Literal[
+    "reserved",
+    "duplicate",
+    "missing",
+    "limit_exceeded",
+    "cancelled",
+]
+CompleteDocumentResult = Literal["stored", "missing", "cancelled"]
 
 
 class PortfolioPolicySelectionNotFound(Exception):
@@ -20,14 +28,26 @@ class PortfolioPolicySelectionNotFound(Exception):
 class PortfolioSessionRepository(Protocol):
     def create(self, session: NewPortfolioSession) -> None: ...
 
-    def add_document(
+    def reserve_document(
         self,
         session_id: str,
+        document_id: str,
+        reservation_id: str,
+        *,
+        now: datetime,
+        expires_at: datetime,
+        max_documents: int,
+    ) -> ReserveDocumentResult: ...
+
+    def complete_document(
+        self,
+        reservation: PolicyDocumentReservation,
         document: StoredPolicyDocument,
         *,
         now: datetime,
-        max_documents: int,
-    ) -> AddDocumentResult: ...
+    ) -> CompleteDocumentResult: ...
+
+    def release_document(self, reservation: PolicyDocumentReservation) -> None: ...
 
     def snapshot(
         self,
