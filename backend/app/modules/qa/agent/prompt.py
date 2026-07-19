@@ -110,8 +110,12 @@ def agent_instructions(decision: QaInputDecision | None = None) -> str:
         )
     if decision.scope == "coverly":
         route_context += (
-            "- Coverly가 업로드한 보험증권에서 담보·가입금액·청구 정보를 찾아 답하는 "
-            "상담사라는 점을 사용자가 이해할 수 있게 설명하세요.\n"
+            "- 이 질문은 Coverly의 기능·답변 범위·개인정보 사용·근거 정책에 대한 것입니다. "
+            "업로드 증권의 개별 사실을 조회할 필요가 없으므로 도구를 호출하지 말고 "
+            "answer_mode=general_guidance로 바로 답하세요.\n"
+            "- Coverly가 업로드한 보험증권에서 담보·가입금액·청구 정보를 찾아 답하는 상담사라는 "
+            "점을 예로 들어 설명하세요. 증권 내용과 개인정보는 답변 근거를 확인하는 데 필요한 "
+            "범위에서만 사용한다고 안내하세요.\n"
         )
     if decision.is_situational:
         route_context += (

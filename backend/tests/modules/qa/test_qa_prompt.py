@@ -31,6 +31,27 @@ def test_agent_instructions_add_situational_routing() -> None:
     assert "지급사유" in instructions
 
 
+def _coverly_decision() -> QaInputDecision:
+    return QaInputDecision(
+        scope="coverly",
+        should_block=False,
+        requires_fresh_official_source=False,
+        insurance_request=None,
+        out_of_scope_request=None,
+        reason="Coverly 기능·정책 질문",
+    )
+
+
+def test_agent_instructions_tell_coverly_scope_to_skip_tools() -> None:
+    # Coverly meta/policy/capability questions are about Coverly itself, not the
+    # user's policy data, so the agent must answer general_guidance without tools
+    # (otherwise validation promotes it to tool_grounded and it reads as a lookup).
+    instructions = " ".join(agent_instructions(_coverly_decision()).split())
+    assert "도구를 호출하지 말고" in instructions
+    assert "general_guidance" in instructions
+    assert "필요한 범위" in instructions  # 증권·개인정보는 근거 확인에 필요한 범위에서만
+
+
 def test_agent_instructions_omit_situational_routing_when_not_situational() -> None:
     instructions = agent_instructions(_situational_decision(False))
     # 상황형 전용 되묻기 라우트 컨텍스트는 붙지 않는다

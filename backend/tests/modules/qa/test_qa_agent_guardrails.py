@@ -13,7 +13,11 @@ from app.modules.qa.agent.contracts import (
 )
 from app.modules.qa.agent.definition import create_qa_agent, grounded_output_guardrail
 from app.modules.qa.agent.grounding import numeric_claims_are_grounded
-from app.modules.qa.agent.input_guardrail import is_situational_turn, qa_input_guardrail
+from app.modules.qa.agent.input_guardrail import (
+    _guardrail_instructions,
+    is_situational_turn,
+    qa_input_guardrail,
+)
 from app.modules.qa.agent.prompt import build_agent_input
 from app.modules.qa.agent.runtime import _unambiguous_tool_fallback
 from app.modules.qa.agent.validation import validated_agent_response
@@ -106,6 +110,16 @@ def test_sdk_input_guardrail_stores_situational_decision() -> None:
     assert dependencies.input_decision is not None
     assert dependencies.input_decision.is_situational is True
     assert is_situational_turn(dependencies) is True
+
+
+def test_guardrail_instructions_route_coverly_meta_questions() -> None:
+    # Meta/policy/capability questions about Coverly itself must be pulled to the
+    # coverly scope, even when they contain insurance terms (약관) or read like
+    # casual chat — otherwise they leak to insurance (unnecessary RAG) or greeting.
+    # Normalize wrapping whitespace so the assertions don't depend on line breaks.
+    instructions = " ".join(_guardrail_instructions().split())
+    assert "insurance가 아니라 coverly" in instructions  # 약관 등 보험 용어가 있어도 coverly
+    assert "greeting이 아니라 coverly" in instructions  # 기능 질문은 인사가 아님
 
 
 def test_situational_turn_false_when_no_decision() -> None:
