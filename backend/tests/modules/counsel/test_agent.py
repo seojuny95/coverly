@@ -19,6 +19,11 @@ def test_create_agent_has_tools_and_no_native_guardrails() -> None:
         "list_policies",
         "list_coverage_names",
         "find_coverages",
+        "calculate_coverage_total",
+        "find_overlapping_coverages",
+        "get_claim_channels",
+        "retrieve_official_guidance",
+        "retrieve_policy_terms",
     }
     assert agent.input_guardrails == []
 

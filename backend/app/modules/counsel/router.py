@@ -45,7 +45,7 @@ async def stream_counsel_answer(
     check_completer: CheckCompleterDep,
     agent_runner: AgentRunnerDep,
 ) -> dict[str, object]:
-    """Step 5 shell: resolve policies, rewrite/scope, run the agent (no tools yet)."""
+    """Resolve the session, rewrite/scope-gate the question, then run the agent."""
 
     try:
         snapshot, check = await asyncio.gather(
@@ -67,7 +67,10 @@ async def stream_counsel_answer(
     if not check.in_scope:
         return {"answer": _OUT_OF_SCOPE_ANSWER, "in_scope": False}
 
-    context = CounselContext(policies=list(snapshot.policies))
+    context = CounselContext(
+        policies=list(snapshot.policies),
+        policy_rag_session_ids=snapshot.rag_session_ids,
+    )
 
     settings = get_settings()
     agent = create_agent(settings.openai_model)
