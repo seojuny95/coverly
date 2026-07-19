@@ -19,15 +19,13 @@ import {
 } from "../analysis/policy-identity";
 import { UploadInsuranceError } from "./api";
 import type { SelectedUploadFile, UploadInsurance } from "./types";
+import { useSelectedFiles } from "./use-selected-files";
 import {
-  type ApiErrorCodeOrLocalUiCode,
   ROLLBACK_ERROR_MESSAGE,
   UploadRollbackError,
-  createFileFingerprint,
   isFileSpecificUploadError,
   messageForFailedUploads,
   messageForSubmitFailure,
-  toFiles,
 } from "./upload-helpers";
 
 export function getInsuranceNameOptions(
@@ -89,9 +87,6 @@ export function useUploadOrchestration({
       setAnalysis(analysis);
       router.push("/analysis");
     });
-  const [selectedUploadFiles, setSelectedUploadFiles] = useState<
-    SelectedUploadFile[]
-  >([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState({
     completed: 0,
@@ -100,98 +95,32 @@ export function useUploadOrchestration({
   const [pendingAnalysis, setPendingAnalysis] =
     useState<InsuranceAnalysis | null>(null);
   const [selectedName, setSelectedName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const pendingCleanupRef = useRef<{
     portfolioSessionToken: string;
     documentIds: string[];
   } | null>(null);
 
-  const selectFiles = (files: FileList | File[]) => {
-    if (pendingAnalysis || isAnalyzing) return;
-    const incomingFiles = toFiles(files);
-    if (incomingFiles.length === 0) {
-      setSelectedUploadFiles([]);
+  const {
+    selectedUploadFiles,
+    setSelectedUploadFiles,
+    error,
+    setError,
+    inputRef,
+    selectFiles,
+    removeSelectedFile,
+    updateSelectedFilePassword,
+    failSelectedFiles,
+    rejectDuplicateFiles,
+    markSelectedFilesReading,
+    resetReadingFilesToIdle,
+    fingerprintSelectedFiles,
+  } = useSelectedFiles({
+    isLocked: Boolean(pendingAnalysis) || isAnalyzing,
+    onSelectionReset: () => {
       setPendingAnalysis(null);
       setSelectedName("");
-      setError("올릴 파일을 찾지 못했어요. PDF를 다시 선택해주세요.");
-      return;
-    }
-
-    const selectedFiles = incomingFiles.map((file, index) => ({
-      id: `${Date.now()}-${index}-${file.name}-${file.size}`,
-      file,
-      status: "idle" as const,
-    }));
-    setSelectedUploadFiles(selectedFiles);
-    setPendingAnalysis(null);
-    setSelectedName("");
-    setError(null);
-  };
-
-  const removeSelectedFile = (fileId: string) => {
-    setSelectedUploadFiles((current) => {
-      const next = current.filter((selectedFile) => selectedFile.id !== fileId);
-      if (next.length === 0 && inputRef.current) inputRef.current.value = "";
-      return next;
-    });
-    setPendingAnalysis(null);
-    setSelectedName("");
-    setError(null);
-  };
-
-  const updateSelectedFilePassword = (fileId: string, password: string) => {
-    setSelectedUploadFiles((current) =>
-      current.map((selectedFile) =>
-        selectedFile.id === fileId
-          ? { ...selectedFile, password }
-          : selectedFile,
-      ),
-    );
-  };
-
-  // Mark the given selected files as failed with a shared code + message and
-  // surface one "remove and retry" summary. Non-listed files are left as-is.
-  const failSelectedFiles = (
-    files: Array<{ id: string; fileName: string }>,
-    code: ApiErrorCodeOrLocalUiCode,
-    message: string,
-  ) => {
-    const failedIds = new Set(files.map((file) => file.id));
-    setSelectedUploadFiles((current) =>
-      current.map((selectedFile) => {
-        if (failedIds.has(selectedFile.id)) {
-          return {
-            ...selectedFile,
-            status: "failed",
-            errorCode: code,
-            errorMessage: message,
-          };
-        }
-        // This aborts the batch, so clear the transient "reading" state set at
-        // submit — untouched files must not stay stuck mid-read.
-        if (selectedFile.status === "reading") {
-          return { ...selectedFile, status: "idle" as const };
-        }
-        return selectedFile;
-      }),
-    );
-    setError(
-      `${message} ${files
-        .map((file) => file.fileName)
-        .join(", ")} 파일을 제거하고 다시 시도해주세요.`,
-    );
-  };
-
-  const rejectDuplicateFiles = (
-    duplicates: Array<{ id: string; fileName: string }>,
-  ) => {
-    failSelectedFiles(
-      duplicates,
-      "DUPLICATE_POLICY",
-      "이미 올린 보험증권이에요.",
-    );
-  };
+    },
+  });
 
   // Retry a cleanup a previous failed submit left pending, before starting a
   // new upload. Returns false when the cleanup still fails and submit must abort.
@@ -213,39 +142,6 @@ export function useUploadOrchestration({
       setIsAnalyzing(false);
       return false;
     }
-  };
-
-  const markSelectedFilesReading = () => {
-    setSelectedUploadFiles((current) =>
-      current.map((selectedFile) => ({
-        ...selectedFile,
-        status: "reading",
-        errorCode: undefined,
-        errorMessage: undefined,
-      })),
-    );
-  };
-
-  // Clear the transient "reading" state so files left untouched by an aborted
-  // batch don't stay stuck mid-read.
-  const resetReadingFilesToIdle = () => {
-    setSelectedUploadFiles((current) =>
-      current.map((selectedFile) =>
-        selectedFile.status === "reading"
-          ? { ...selectedFile, status: "idle" }
-          : selectedFile,
-      ),
-    );
-  };
-
-  // Only accepted PDFs reach this stage, so the server's size gate has already
-  // bounded the sequential reads used for local duplicate UX.
-  const fingerprintSelectedFiles = async (files: SelectedUploadFile[]) => {
-    const fingerprints: string[] = [];
-    for (const selectedFile of files) {
-      fingerprints.push(await createFileFingerprint(selectedFile.file));
-    }
-    return fingerprints;
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

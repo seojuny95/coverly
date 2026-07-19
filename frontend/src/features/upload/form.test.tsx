@@ -4,6 +4,7 @@ import { describe, expect, test, vi, beforeEach } from "vitest";
 
 import { InsuranceUploadForm, type UploadInsurance } from "./form";
 import { UploadInsuranceError } from "./api";
+import { isPdfPasswordProtected } from "./pdf-password-check";
 import type { AnalyzedInsurance, InsuranceAnalysis } from "../analysis/store";
 import { useInsuranceData } from "../analysis/store";
 import { renderWithProviders } from "../../test/render-with-providers";
@@ -30,6 +31,12 @@ const routerPrefetch = vi.fn();
 const router = { push: routerPush, prefetch: routerPrefetch };
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
+}));
+
+// Real PDF parsing (pdfjs-dist) is an external browser boundary, so unit
+// tests stub it and default to "not encrypted" unless a test overrides it.
+vi.mock("./pdf-password-check", () => ({
+  isPdfPasswordProtected: vi.fn(),
 }));
 
 const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
@@ -88,6 +95,7 @@ beforeEach(() => {
   routerPush.mockClear();
   routerPrefetch.mockClear();
   createSession.mockClear();
+  vi.mocked(isPdfPasswordProtected).mockReset().mockResolvedValue(false);
 });
 
 describe("InsuranceUploadForm", () => {
@@ -666,6 +674,22 @@ describe("InsuranceUploadForm", () => {
       );
     });
     expect(navigateToAnalysis).toHaveBeenCalledOnce();
+  });
+
+  test("asks for a password right after selecting an encrypted PDF, before submitting", async () => {
+    const user = userEvent.setup();
+    vi.mocked(isPdfPasswordProtected).mockResolvedValueOnce(true);
+    const uploadInsurance = vi.fn<UploadInsurance>();
+    renderForm({ uploadInsurance });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+
+    expect(await screen.findByText("비밀번호 필요")).toBeInTheDocument();
+    expect(screen.getByLabelText("PDF 비밀번호")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeDisabled();
+    expect(uploadInsurance).not.toHaveBeenCalled();
   });
 
   test("asks for a password only for encrypted PDFs and retries with it", async () => {
