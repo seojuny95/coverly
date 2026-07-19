@@ -28,6 +28,13 @@ def test_create_agent_has_tools_and_no_native_guardrails() -> None:
     assert agent.input_guardrails == []
 
 
+def test_create_agent_tells_the_model_not_to_mix_amounts_across_sources() -> None:
+    agent = create_agent("gpt-4.1-mini")
+
+    instructions = cast(str, agent.instructions)
+    assert "섞어 쓰지 않습니다" in instructions
+
+
 def test_run_agent_forwards_input_and_context_to_runner_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
