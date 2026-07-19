@@ -749,16 +749,6 @@ def test_generates_explanation_for_coverage_missing_policy_wording() -> None:
     assert coverages[0]["해설"] == "교통사고처리지원금 설명이에요."
 
 
-def test_default_extract_generates_missing_explanations_without_external_calls() -> None:
-    coverages, status = extract_coverages(
-        _doc(tables=(COVERAGE_TABLE,)),
-        normalize=lambda _s: [_coverage("교통사고처리지원금", None)],
-    )
-
-    assert status == STATUS_OK
-    assert coverages[0]["해설"]
-
-
 def test_policy_wording_is_not_overwritten_by_generated_explanation() -> None:
     # An explanation is offered for every name, but a coverage that already has
     # policy wording must keep it — 해설 stays None (증권 원문 우선).

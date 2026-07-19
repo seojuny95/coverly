@@ -1,4 +1,4 @@
-from app.modules.policy.coverage.explanation import explain_coverages, explain_coverages_fast
+from app.modules.policy.coverage.explanation import explain_coverages
 from app.rag.official.models import RagChunk, RetrievalHit
 
 
@@ -21,33 +21,14 @@ def _hit(text: str) -> RetrievalHit:
     )
 
 
-def test_fast_explanation_handles_known_taxonomy_name_without_llm() -> None:
-    explanations, ok = explain_coverages_fast(["암진단비"])
-
-    assert ok is True
-    assert explanations["암진단비"]
-    assert "암" in explanations["암진단비"]
-
-
-def test_fast_explanation_handles_auto_coverage_name_without_llm() -> None:
-    explanations, ok = explain_coverages_fast(["대인배상Ⅰ"])
-
-    assert ok is True
-    assert explanations["대인배상Ⅰ"]
-    assert "자동차 사고" in explanations["대인배상Ⅰ"]
-
-
-def test_fast_explanation_has_safe_generic_fallback() -> None:
-    explanations, ok = explain_coverages_fast(["알수없는담보"])
-
-    assert ok is True
-    assert "단정하기 어려워요" in explanations["알수없는담보"]
-
-
 def test_generates_an_explanation_for_a_coverage_name() -> None:
     def fake_complete(system: str, user: str) -> dict[str, object]:
         assert "official_excerpts" in user
         assert "약관 확인이 필요하다는 안내" in system
+        assert "90자 안팎" in system
+        assert "왜 보는지까지" in system
+        assert "생활 상황" in user
+        assert "단순히" in user
         return {"설명목록": [{"담보명": "가입설명담보", "해설": "이런 상황에 보험금을 드려요."}]}
 
     explanations, ok = explain_coverages(

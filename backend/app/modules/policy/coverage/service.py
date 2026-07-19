@@ -3,7 +3,7 @@
 from collections.abc import Callable
 
 from app.modules.policy.coverage import table_parsing
-from app.modules.policy.coverage.explanation import explain_coverages_fast
+from app.modules.policy.coverage.explanation import explain_coverages
 from app.modules.policy.coverage.normalization import normalize_coverages as normalize_coverages
 from app.modules.policy.models import Coverage, ParsedDocument, PolicyAnalysisStatus
 
@@ -32,7 +32,7 @@ def extract_coverages(
     doc: ParsedDocument,
     *,
     normalize: Normalizer = normalize_coverages,
-    explain: Explainer = explain_coverages_fast,
+    explain: Explainer = explain_coverages,
 ) -> tuple[list[Coverage], PolicyAnalysisStatus]:
     """Extract and explain policy coverages without propagating stage failures."""
     try:
