@@ -480,6 +480,65 @@ def test_mixed_scope_synthesis_keeps_scope_disclaimer() -> None:
     assert "보험 상담 범위 밖" in result.answer
 
 
+def _policy_terms_required_decision() -> QaInputDecision:
+    return QaInputDecision(
+        scope="insurance",
+        should_block=False,
+        requires_fresh_official_source=False,
+        requires_uploaded_policy_terms=True,
+        insurance_request="지급조건",
+        out_of_scope_request=None,
+        reason="원문 필요",
+    )
+
+
+def test_policy_terms_missing_session_gives_not_ready_message() -> None:
+    dependencies = _dependencies("내 보험 지급조건 알려줘")
+    dependencies.input_decision = _policy_terms_required_decision()
+    dependencies.unmatched("policy_terms", "No uploaded policy-text session exists.")
+
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(answer_mode="insufficient_evidence", answer="확인이 어려워요."),
+        dependencies,
+    )
+
+    assert result.status == "no_data"
+    assert "준비" in result.answer or "읽는 중" in result.answer
+
+
+def test_policy_terms_no_match_gives_not_found_in_policy_message() -> None:
+    dependencies = _dependencies("내 보험 지급조건 알려줘")
+    dependencies.input_decision = _policy_terms_required_decision()
+    dependencies.unmatched("policy_terms", "No uploaded policy text matched.")
+
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(answer_mode="insufficient_evidence", answer="확인이 어려워요."),
+        dependencies,
+    )
+
+    assert result.status == "no_data"
+    assert "확인하지 못했습니다" in result.answer
+    assert "준비" not in result.answer
+
+
+def test_policy_terms_missing_distinguishes_no_session_vs_no_match() -> None:
+    session_missing = _dependencies("내 보험 지급조건 알려줘")
+    session_missing.input_decision = _policy_terms_required_decision()
+    session_missing.unmatched("policy_terms", "No uploaded policy-text session exists.")
+
+    no_match = _dependencies("내 보험 지급조건 알려줘")
+    no_match.input_decision = _policy_terms_required_decision()
+    no_match.unmatched("policy_terms", "Policy evidence was insufficient.")
+
+    draft = AgentCounselorDraft(answer_mode="insufficient_evidence", answer="확인이 어려워요.")
+    session_result = validated_agent_response(session_missing.context, draft, session_missing)
+    match_result = validated_agent_response(no_match.context, draft, no_match)
+
+    assert session_result.answer != match_result.answer
+
+
 def test_insurance_scope_rejects_an_out_of_scope_final_mode() -> None:
     dependencies = _dependencies("가입한 보험은 몇 개야?")
     dependencies.input_decision = QaInputDecision(

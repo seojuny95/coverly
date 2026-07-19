@@ -62,11 +62,11 @@ def validated_agent_response(
         return out_of_scope_response(context)
     if draft.answer_mode == "insufficient_evidence":
         if requires_uploaded_policy_terms(dependencies):
-            return _missing_required_policy_terms_response(context)
+            return _missing_required_policy_terms_response(context, dependencies)
         return _validated_insufficient_evidence_response(context, draft, dependencies)
     if draft.answer_mode == "general_guidance":
         if requires_uploaded_policy_terms(dependencies):
-            return _missing_required_policy_terms_response(context)
+            return _missing_required_policy_terms_response(context, dependencies)
         if requires_fresh_official_source(dependencies):
             return _missing_required_web_response(context)
         return _validated_general_guidance_response(context, draft)
@@ -88,9 +88,9 @@ def validated_agent_response(
         and requires_uploaded_policy_terms(dependencies)
         and selected.kind in {"official_rag", "web"}
     ):
-        return _missing_required_policy_terms_response(context)
+        return _missing_required_policy_terms_response(context, dependencies)
     if selected is None and requires_uploaded_policy_terms(dependencies):
-        return _missing_required_policy_terms_response(context)
+        return _missing_required_policy_terms_response(context, dependencies)
     if selected is None and requires_fresh_official_source(dependencies):
         return _missing_required_web_response(context)
     if selected is None:
@@ -339,15 +339,33 @@ def _missing_required_web_response(context: QaContext) -> PortfolioQuestionRespo
     )
 
 
-def _missing_required_policy_terms_response(context: QaContext) -> PortfolioQuestionResponse:
-    return PortfolioQuestionResponse(
-        status="no_data",
-        answer=(
+def _missing_required_policy_terms_response(
+    context: QaContext,
+    dependencies: QaAgentDependencies,
+) -> PortfolioQuestionResponse:
+    reason = _policy_terms_failure_reason(dependencies)
+    if reason is not None and "session" in reason:
+        answer = (
+            "아직 약관 원문을 확인할 준비가 되지 않았어요. 약관을 읽는 중이거나 "
+            "아직 업로드되지 않았을 수 있어요."
+        )
+    else:
+        answer = (
             "가입하신 보험의 정확한 조건은 업로드된 약관 원문에서 확인해야 해요. "
             "현재 원문 근거에서는 질문하신 조건을 확인하지 못했습니다."
-        ),
+        )
+    return PortfolioQuestionResponse(
+        status="no_data",
+        answer=answer,
         citations=[],
         limitations=["일반 공식자료를 가입한 보험의 실제 계약 조건으로 대신하지 않았습니다."],
         suggestions=[],
         demographics=context.insured,
     )
+
+
+def _policy_terms_failure_reason(dependencies: QaAgentDependencies) -> str | None:
+    for failure in dependencies.tool_failures:
+        if failure.kind == "policy_terms":
+            return failure.reason
+    return None

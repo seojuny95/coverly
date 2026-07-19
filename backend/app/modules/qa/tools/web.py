@@ -15,6 +15,19 @@ from app.modules.qa.tools.web_search import (
 )
 
 
+def web_search_is_eligible(dependencies: QaAgentDependencies) -> bool:
+    """Web search is only allowed when the question needs fresh official info
+
+    (freshness required by the input guardrail), or when the official RAG
+    already failed to find grounded evidence (fallback).
+    """
+
+    decision = dependencies.input_decision
+    fresh = decision is not None and decision.requires_fresh_official_source
+    official_failed = any(failure.kind == "official_rag" for failure in dependencies.tool_failures)
+    return fresh or official_failed
+
+
 @function_tool
 async def search_official_web(
     wrapper: RunContextWrapper[QaAgentDependencies],
@@ -25,6 +38,12 @@ async def search_official_web(
     Args:
         purpose: The official-source category that controls the domain allowlist.
     """
+
+    if not web_search_is_eligible(wrapper.context):
+        return wrapper.context.unmatched(
+            "web",
+            "웹검색은 최신 정보 질문이거나 공식자료에서 확인하지 못했을 때만 사용합니다.",
+        )
 
     context = wrapper.context.context
     allowed_domains = search_allowed_domains(context, purpose)

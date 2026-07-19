@@ -1,21 +1,98 @@
 import asyncio
+import json
 from collections.abc import Callable, Coroutine
 from threading import BoundedSemaphore, Event, Lock, Thread
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from agents.tool_context import ToolContext
 
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.agent.contracts import (
+    GroundedToolAnswer,
+    QaAgentDependencies,
+    QaInputDecision,
+)
 from app.modules.qa.context import build_qa_context
 from app.modules.qa.tools import web_search as subject
+from app.modules.qa.tools.web import search_official_web, web_search_is_eligible
 from app.modules.qa.tools.web_search import (
+    WebSearchResult,
     _contains_unallowed_url,
     _search_prompt,
     _validated_source_urls,
     sanitize_search_query,
     search_allowed_domains,
 )
+
+
+def _unused_web_search(*_args: object, **_kwargs: object) -> WebSearchResult:
+    return WebSearchResult(status="unavailable")
+
+
+def _deps_factory(question: str) -> QaAgentDependencies:
+    return QaAgentDependencies(
+        context=build_qa_context(question, [], None, []),
+        complete=None,
+        official_answer=None,
+        web_search=_unused_web_search,
+    )
+
+
+def _fresh_decision(insurance_request: str) -> QaInputDecision:
+    return QaInputDecision(
+        scope="insurance",
+        should_block=False,
+        requires_fresh_official_source=True,
+        insurance_request=insurance_request,
+        out_of_scope_request=None,
+        reason="시점에 따라 달라지는 정보",
+    )
+
+
+def test_web_not_eligible_without_recency_or_official_failure() -> None:
+    deps = _deps_factory("일반 질문")
+
+    assert web_search_is_eligible(deps) is False
+
+
+def test_web_eligible_on_recency() -> None:
+    deps = _deps_factory("최신 질문")
+    deps.input_decision = _fresh_decision("최신 질문")
+
+    assert web_search_is_eligible(deps) is True
+
+
+def test_web_eligible_after_official_rag_failed() -> None:
+    deps = _deps_factory("질문")
+    deps.unmatched("official_rag", "no grounded answer")
+
+    assert web_search_is_eligible(deps) is True
+
+
+def test_search_official_web_returns_unmatched_when_not_eligible() -> None:
+    deps = _deps_factory("일반 질문")
+    raw_arguments = json.dumps({"purpose": "law_update"}, ensure_ascii=False)
+    context = ToolContext(
+        deps,
+        tool_name=search_official_web.name,
+        tool_call_id="call-1",
+        tool_arguments=raw_arguments,
+    )
+
+    async def invoke() -> object:
+        return await search_official_web.on_invoke_tool(context, raw_arguments)
+
+    raw = asyncio.run(invoke())
+    result = (
+        raw
+        if isinstance(raw, GroundedToolAnswer)
+        else GroundedToolAnswer.model_validate_json(cast(str, raw))
+    )
+
+    assert result.matched is False
+    assert deps.tool_failures[-1].kind == "web"
 
 
 def test_held_insurer_search_uses_only_verified_insurer_domains() -> None:
