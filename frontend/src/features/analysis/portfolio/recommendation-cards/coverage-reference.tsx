@@ -3,6 +3,7 @@ import { Card } from "@/shared/components/ui/card";
 import type { EssentialCoverageItem } from "../api";
 import { ReferenceSourceList } from "../coverage-guide";
 import { formatKoreanWon } from "../money-format";
+import { AmountRangeMeter } from "../amount-range-meter";
 
 export function CoverageReference({
   item,
@@ -60,6 +61,14 @@ export function CoverageReference({
           {item.reference_basis}
         </p>
       ) : null}
+      <AmountRangeMeter
+        current={item.confirmed_amount}
+        referenceMin={item.reference_min_amount}
+        referenceMax={item.reference_max_amount}
+        currentLabel="현재"
+        referenceLabel="권장"
+        formatAmount={formatKoreanWon}
+      />
       {item.guidance_reason && item.guidance_reason !== item.reference_basis ? (
         <p className="mt-2 text-xs leading-5 text-zinc-500">
           {item.guidance_reason}

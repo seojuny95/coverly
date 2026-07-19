@@ -205,9 +205,9 @@
   }
 }
 
-.premium-position-fill {
-  width: var(--premium-position);
-  animation: premium-position-fill 700ms ease-out both;
+.amount-range-fill {
+  width: var(--amount-range-position);
+  animation: amount-range-fill 700ms ease-out both;
 }
 
 .premium-position-user {
@@ -215,12 +215,12 @@
   animation: premium-position-marker 700ms ease-out both;
 }
 
-@keyframes premium-position-fill {
+@keyframes amount-range-fill {
   from {
     width: 0;
   }
   to {
-    width: var(--premium-position);
+    width: var(--amount-range-position);
   }
 }
 
@@ -447,6 +447,7 @@
   .analysis-coverage-node,
   .analysis-status-message,
   .analysis-pixel-loader span,
+  .amount-range-fill,
   .evidence-source::after,
   .evidence-signal,
   .evidence-glow,

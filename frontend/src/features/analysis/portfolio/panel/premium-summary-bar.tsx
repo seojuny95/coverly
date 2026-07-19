@@ -1,6 +1,7 @@
 import { formatWon } from "../money-format";
 import type { PortfolioSummary } from "../api";
 import { ReferenceSourceList, sourceTypeLabel } from "../coverage-guide";
+import { AmountRangeMeter } from "../amount-range-meter";
 
 // Dark, semi-transparent pill styling (bg-white/5, border-white/10) is bespoke
 // to this hero card and does not fit Card's white/zinc surface language.
@@ -50,6 +51,15 @@ export function PremiumSummaryBar({
         {Math.round(benchmark.suggested_max_ratio * 100)}%에 해당하는 참고
         금액이에요. {sourceLabels.join(" + ")} 자료를 사용했어요.
       </p>
+      <AmountRangeMeter
+        current={premium.monthly_total}
+        referenceMin={benchmark.suggested_min_premium}
+        referenceMax={benchmark.suggested_max_premium}
+        currentLabel="현재"
+        referenceLabel="권장"
+        formatAmount={formatWon}
+        tone="dark"
+      />
       <ReferenceSourceList
         sources={[benchmark.income_source, benchmark.guide_source]}
         className="[&_a]:border-white/10 [&_a]:bg-white/10 [&_a]:text-zinc-200 [&_span]:border-white/10 [&_span]:bg-white/10 [&_span]:text-zinc-200"

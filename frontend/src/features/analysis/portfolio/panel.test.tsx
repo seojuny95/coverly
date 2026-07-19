@@ -360,6 +360,11 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.getByText("현재 월 보험료")).toBeInTheDocument();
   expect(screen.getByText("20~30대 참고 구간")).toBeInTheDocument();
   expect(screen.getByText("월 보험료 98,000원")).toBeInTheDocument();
+  expect(
+    screen.getByRole("group", {
+      name: "현재 98,000원, 권장 193,000원 ~ 386,000원",
+    }),
+  ).toBeInTheDocument();
   expect(screen.getByText("핵심 보장 확인")).toBeInTheDocument();
   expect(screen.getAllByText("사망 보장").length).toBeGreaterThan(0);
   expect(screen.getByText("진단 보장")).toBeInTheDocument();
@@ -380,6 +385,11 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
     screen.queryByText("업로드한 전체 보험에서 사망 보장이 확인돼요."),
   ).not.toBeInTheDocument();
   expect(screen.getAllByText("참고 금액").length).toBeGreaterThan(0);
+  expect(
+    screen.getAllByRole("group", {
+      name: "현재 3,000만원, 권장 3,000만원 ~ 5,000만원",
+    }).length,
+  ).toBeGreaterThan(0);
   expect(screen.getAllByText(/공식 출처:/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/아티클·블로그 출처:/).length).toBeGreaterThan(0);
   expect(screen.getByText(/생활비 공백/)).toBeInTheDocument();
