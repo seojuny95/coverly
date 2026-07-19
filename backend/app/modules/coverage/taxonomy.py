@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass
 
 from app.modules.coverage.indemnity import is_medical_indemnity_name
-from app.modules.policy.life_stage import life_stage_for_age as life_stage_for
+from app.modules.coverage.life_stage import life_stage_for_age as life_stage_for
 
 CANCER = "암 진단"
 CEREBRO = "뇌혈관 진단"

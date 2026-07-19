@@ -7,6 +7,7 @@ from app.integrations.openai.client import (
     compact_prompt_text,
     dump_prompt_json,
     embed_texts,
+    search_official_web_async,
     stream_completion,
     structured_completer,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "compact_prompt_text",
     "dump_prompt_json",
     "embed_texts",
+    "search_official_web_async",
     "stream_completion",
     "structured_completer",
 ]

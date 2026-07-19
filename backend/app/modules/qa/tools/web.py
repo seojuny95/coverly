@@ -1,5 +1,6 @@
 """Restricted official-web Agent SDK tool and response mapping."""
 
+import inspect
 from urllib.parse import urlparse
 
 from agents import RunContextWrapper, function_tool
@@ -15,7 +16,7 @@ from app.modules.qa.tools.web_search import (
 
 
 @function_tool
-def search_official_web(
+async def search_official_web(
     wrapper: RunContextWrapper[QaAgentDependencies],
     purpose: SearchPurpose,
 ) -> GroundedToolAnswer:
@@ -27,11 +28,12 @@ def search_official_web(
 
     context = wrapper.context.context
     allowed_domains = search_allowed_domains(context, purpose)
-    result = wrapper.context.web_search(
+    search_result = wrapper.context.web_search(
         sanitize_search_query(context.question),
         purpose=purpose,
         allowed_domains=allowed_domains,
     )
+    result = await search_result if inspect.isawaitable(search_result) else search_result
     response = web_search_response(result)
     return wrapper.context.register(
         "web",

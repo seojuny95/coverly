@@ -5,11 +5,10 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.generation import GenerationMode
-from app.modules.portfolio.schemas import ClaimChannelBlock, PortfolioSelectionInput
-from app.modules.qa.contracts import (
-    AnswerSection,
-    InsuredDemographics,
-)
+from app.modules.consultation.contracts import InsuredDemographics
+from app.modules.portfolio.schemas import PortfolioSelectionInput
+from app.modules.qa.contracts import AnswerSection
+from app.modules.reference_data.contracts import ClaimChannelBlock
 
 
 class ConversationMessage(BaseModel):

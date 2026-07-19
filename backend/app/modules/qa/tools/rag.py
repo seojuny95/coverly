@@ -2,8 +2,9 @@
 
 from agents import RunContextWrapper, function_tool
 
-from app.modules.evidence.catalog import citation_from_evidence, with_session_evidence
+from app.modules.evidence.catalog import with_session_evidence
 from app.modules.qa.agent.contracts import GroundedToolAnswer, QaAgentDependencies
+from app.modules.qa.citations import citation_from_evidence
 from app.modules.qa.contracts import AnswerSection
 from app.modules.qa.response_support import question_suggestions, with_demographics
 from app.modules.qa.schemas import AnswerCitation, PortfolioQuestionResponse
@@ -108,18 +109,15 @@ def _official_response(result: RagAnswer) -> PortfolioQuestionResponse:
         content=result.answer,
         basis="general_guidance",
     )
-    suggestions = (
-        question_suggestions("내 증권 기준으로도 보상 조건을 확인할 수 있어?")
-        if result.mode == "claim_check"
-        else question_suggestions("이 내용이 내 증권에도 들어 있어?", "내 담보 지급 조건은 뭐야?")
-    )
     return PortfolioQuestionResponse(
         status="answered",
         answer=f"공식자료에서 확인한 일반 안내예요.\n\n{result.answer.strip()}",
         sections=[section],
         citations=[_official_citation(citation) for citation in result.citations],
         limitations=list(result.limitations),
-        suggestions=suggestions,
+        suggestions=question_suggestions(
+            "이 내용이 내 증권에도 들어 있어?", "내 담보 지급 조건은 뭐야?"
+        ),
         generation="llm",
     )
 

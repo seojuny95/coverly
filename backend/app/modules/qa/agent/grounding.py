@@ -3,7 +3,7 @@
 import re
 from decimal import Decimal, InvalidOperation
 
-from app.modules.qa.contracts import ConsultationEvidence
+from app.modules.consultation.contracts import ConsultationEvidence
 
 _NUMBER = r"\d[\d,]*(?:\.\d+)?"
 NUMERIC_CLAIM = re.compile(

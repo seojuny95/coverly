@@ -10,12 +10,12 @@ from statistics import median
 from time import perf_counter
 from typing import Literal, cast
 
-from app.modules.evidence.catalog import citation_from_evidence
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.qa.agent.contracts import AgentCounselorDraft, QaAgentDependencies, QaAgentRunner
 from app.modules.qa.agent.runtime import build_qa_agent_runner
 from app.modules.qa.agent.service import stream_answer_with_agent
 from app.modules.qa.agent.validation import validated_agent_response
+from app.modules.qa.citations import citation_from_evidence
 from app.modules.qa.context import QaContext
 from app.modules.qa.response_support import out_of_scope_response
 from app.modules.qa.schemas import ConversationMessage, PortfolioQuestionResponse

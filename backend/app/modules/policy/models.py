@@ -3,9 +3,18 @@
 from dataclasses import dataclass
 from typing import Literal, NotRequired, TypedDict
 
+from app.modules.coverage.contracts import (
+    CoverageType as CoverageType,
+)
+from app.modules.coverage.contracts import (
+    InsuredGender as InsuredGender,
+)
+from app.modules.coverage.contracts import (
+    LifeStage as LifeStage,
+)
+
 # A pdfplumber table: rows of cells (None = empty cell), immutable for ParsedDocument.
 Table = tuple[tuple[str | None, ...], ...]
-CoverageType = Literal["담보", "부가"]
 AmountVerificationStatus = Literal["confirmed", "needs_review", "not_applicable"]
 CoverageExplanationBasis = Literal["policy_wording", "generated_guidance", "none"]
 PolicyClassificationName = Literal["생명보험", "제3보험", "손해보험", "미분류"]
@@ -60,8 +69,6 @@ class PremiumSummary(TypedDict, total=False):
     납입주기: str
 
 
-InsuredGender = Literal["남성", "여성"]
-LifeStage = Literal["어린이", "성인", "시니어"]
 PolicyAnalysisStatus = Literal["완료", "부분"]
 
 

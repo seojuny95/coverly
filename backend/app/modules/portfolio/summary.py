@@ -41,7 +41,7 @@ from app.modules.portfolio.schemas import (
     PremiumOverview,
 )
 from app.modules.portfolio.special_policies import build_special_policy_analyses
-from app.modules.qa.claim_channels import claim_channel_block
+from app.modules.reference_data.claim_channels import claim_channel_block
 from app.modules.reference_data.premium_benchmark import premium_benchmark_for_age
 
 _SAFE_FIXED_NAME_TERMS = (

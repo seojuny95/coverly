@@ -26,7 +26,6 @@ class AliasTarget:
 @dataclass(frozen=True)
 class CoverageMatchingRules:
     version: int
-    candidate_similarity_threshold: float
     ignored_parenthetical_modifiers: frozenset[str]
     ignored_prefix_wrappers: frozenset[str]
     replacements: tuple[tuple[str, str], ...]
@@ -49,12 +48,6 @@ def _parse_matching_rules(payload: object) -> CoverageMatchingRules:
     if not isinstance(version, int) or isinstance(version, bool) or version < 1:
         raise ValueError("version must be a positive integer")
 
-    threshold = payload.get("candidate_similarity_threshold")
-    if not isinstance(threshold, int | float) or isinstance(threshold, bool):
-        raise ValueError("candidate_similarity_threshold must be a number")
-    if not 0 <= threshold <= 1:
-        raise ValueError("candidate_similarity_threshold must be between 0 and 1")
-
     replacements = _validate_replacements(payload.get("replacements"))
     protected_terms = _validate_protected_terms(payload.get("protected_terms"), replacements)
     ignored_modifiers = _validate_ignored_modifiers(payload.get("ignored_parenthetical_modifiers"))
@@ -62,7 +55,6 @@ def _parse_matching_rules(payload: object) -> CoverageMatchingRules:
     alias_index = _validate_alias_groups(payload.get("alias_groups"), replacements, protected_terms)
     return CoverageMatchingRules(
         version=version,
-        candidate_similarity_threshold=float(threshold),
         ignored_parenthetical_modifiers=ignored_modifiers,
         ignored_prefix_wrappers=ignored_wrappers,
         replacements=replacements,

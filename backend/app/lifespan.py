@@ -1,4 +1,4 @@
-"""Startup and shutdown lifecycle for shared application resources."""
+"""Application composition lifecycle for shared resources."""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager

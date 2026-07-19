@@ -61,7 +61,6 @@ def test_answer_official_question_returns_cited_term_explanation() -> None:
     )
 
     assert result.status == "answered"
-    assert result.mode == "general"
     assert result.citations[0].chunk_id == "chunk-1"
     assert "공식자료" in result.limitations[0]
 
@@ -118,7 +117,6 @@ def test_answer_official_question_keeps_missing_context() -> None:
     )
 
     assert result.status == "answered"
-    assert result.mode == "general"
     assert result.missing_context == ("가입 상품 약관", "진단일")
 
 

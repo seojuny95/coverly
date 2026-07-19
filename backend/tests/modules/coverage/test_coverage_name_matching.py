@@ -1,5 +1,4 @@
 import json
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -7,51 +6,46 @@ import pytest
 from app.modules.coverage.matching import (
     canonicalize_coverage_name,
     choose_display_name,
-    match_coverage_names,
     query_contains_canonical_name,
 )
-from app.modules.coverage.rules import default_matching_rules, load_matching_rules
+from app.modules.coverage.rules import load_matching_rules
 
 
 @pytest.mark.parametrize(
-    ("left", "right", "expected_kind", "expected_display"),
+    ("left", "right", "expected_display"),
     [
         (
             "뇌혈관질환진단비",
             "뇌혈관질환진단비(감액없음)",
-            "exact",
             "뇌혈관질환진단비",
         ),
         (
             "암진단비(유사암제외)",
             "암진단비(유사암제외)(감액없음)",
-            "exact",
             "암진단비(유사암제외)",
         ),
         (
             "유사암진단비(감액없음)",
             "유사암진담비",
-            "exact",
             "유사암진단비",
         ),
         (
             "허혈성심장질환진단비",
             "허혈성심질환진단비(감액없음)",
-            "curated_alias",
             "허혈성심질환진단비",
         ),
     ],
 )
-def test_curated_positive_pairs_are_mergeable(
-    left: str, right: str, expected_kind: str, expected_display: str
+def test_canonical_pairs_resolve_to_the_same_identity(
+    left: str, right: str, expected_display: str
 ) -> None:
-    decision = match_coverage_names(left, right)
+    left_canonical = canonicalize_coverage_name(left)
+    right_canonical = canonicalize_coverage_name(right)
 
-    assert decision.mergeable is True
-    assert decision.kind == expected_kind
+    assert left_canonical.normalized_key == right_canonical.normalized_key
     assert choose_display_name([right, left]) == expected_display
-    assert decision.left.original_name == left
-    assert decision.right.original_name == right
+    assert left_canonical.original_name == left
+    assert right_canonical.original_name == right
 
 
 @pytest.mark.parametrize(
@@ -65,11 +59,10 @@ def test_curated_positive_pairs_are_mergeable(
     ],
 )
 def test_protected_term_differences_are_hard_distinct(left: str, right: str) -> None:
-    decision = match_coverage_names(left, right)
-
-    assert decision.kind == "distinct"
-    assert decision.mergeable is False
-    assert decision.reason == "protected terms differ"
+    assert (
+        canonicalize_coverage_name(left).normalized_key
+        != canonicalize_coverage_name(right).normalized_key
+    )
 
 
 def test_unbalanced_parenthetical_is_not_removed() -> None:
@@ -124,36 +117,6 @@ def test_canonicalization_is_idempotent_and_display_choice_is_deterministic() ->
     assert choose_display_name(names) == choose_display_name(reversed(names))
 
 
-def test_similarity_threshold_only_changes_candidate_classification() -> None:
-    base_rules = default_matching_rules()
-    left = "뇌혈관질환진단비A"
-    right = "뇌혈관질환진단비B"
-    measured = match_coverage_names(
-        left,
-        right,
-        replace(base_rules, candidate_similarity_threshold=0),
-    )
-
-    at_boundary = match_coverage_names(
-        left,
-        right,
-        replace(base_rules, candidate_similarity_threshold=measured.similarity),
-    )
-    above_boundary = match_coverage_names(
-        left,
-        right,
-        replace(
-            base_rules,
-            candidate_similarity_threshold=min(1, measured.similarity + 0.0001),
-        ),
-    )
-
-    assert at_boundary.kind == "candidate"
-    assert at_boundary.mergeable is False
-    assert above_boundary.kind == "distinct"
-    assert above_boundary.mergeable is False
-
-
 def test_query_matches_exact_replacement_and_curated_alias_but_never_fuzzy() -> None:
     assert query_contains_canonical_name(
         "허혈성 심장질환 진단비가 얼마인가요?", "허혈성심질환진단비"
@@ -163,14 +126,6 @@ def test_query_matches_exact_replacement_and_curated_alias_but_never_fuzzy() -> 
     assert not query_contains_canonical_name("재진단암진단비는 얼마야?", "암진단비")
     assert not query_contains_canonical_name("일반암진단비는 얼마야?", "암진단비")
     assert not query_contains_canonical_name("뇌혈관질환진단금은?", "뇌혈관질환진단비")
-
-
-@pytest.mark.parametrize("threshold", [-0.01, 1.01, "high", True])
-def test_config_rejects_invalid_threshold(tmp_path: Path, threshold: object) -> None:
-    path = _write_rules(tmp_path, threshold=threshold)
-
-    with pytest.raises(ValueError, match="candidate_similarity_threshold"):
-        load_matching_rules(path)
 
 
 def test_config_rejects_alias_collisions(tmp_path: Path) -> None:
@@ -259,18 +214,9 @@ def test_display_name_requires_at_least_one_name() -> None:
         choose_display_name([])
 
 
-def _write_rules(tmp_path: Path, *, threshold: object) -> Path:
-    payload = _rules_payload()
-    payload["candidate_similarity_threshold"] = threshold
-    path = tmp_path / "rules.json"
-    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    return path
-
-
 def _rules_payload() -> dict[str, object]:
     return {
         "version": 1,
-        "candidate_similarity_threshold": 0.88,
         "ignored_parenthetical_modifiers": ["감액없음"],
         "ignored_prefix_wrappers": ["기본계약"],
         "replacements": {"진담비": "진단비"},

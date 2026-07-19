@@ -1,6 +1,6 @@
 import pytest
 
-from app.modules.analysis.summary_overview import (
+from app.modules.portfolio.overview import (
     SummaryOverviewUnavailableError,
     attach_summary_overview,
     generate_summary_overview,
@@ -21,6 +21,20 @@ from app.modules.portfolio.summary import (
     duplicate_actual_loss_coverage_names,
     normalize_coverage_name,
     summarize_portfolio_coverages,
+)
+
+_SAFE_BASE_PARAGRAPH = (
+    "업로드한 증권에서 읽은 내용을 보험료, 보장 구성, 다음 확인 항목으로 나눠 정리했어요."
+)
+_SAFE_LIMITATION_PARAGRAPH = "이 총평은 업로드한 자료에서 확인한 내용을 바탕으로 한 1차 정리예요."
+_SAFE_MISSING_PARAGRAPH = (
+    "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요."
+)
+_SAFE_TERMS_REVIEW_PARAGRAPH = (
+    "확인 범위가 제한된 담보는 실제 보장 범위와 약관 조건을 이어서 확인해보세요."
+)
+_SAFE_OVERLAP_PARAGRAPH = (
+    "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요."
 )
 
 
@@ -120,14 +134,16 @@ def test_summary_overview_uses_deterministic_judgments_for_llm_copy() -> None:
     summary = summarize_portfolio_coverages([policy])
 
     def complete(_system: str, user: str) -> dict[str, object]:
-        assert "confirmed_count" in user
-        assert "missing" in user
-        assert "takeaways" in user
+        assert "confirmed_in_uploaded_documents" in user
+        assert "not_confirmed_in_current_materials" in user
+        assert "takeaways" not in user
+        assert "recommended_min" not in user
+        assert '"status"' not in user
         return {
-            "title": "암 진단비는 보이고, 다른 핵심 보장은 이어서 확인해요",
+            "title": "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
             "paragraphs": [
-                "현재 자료에서는 암 진단비가 확인돼요.",
-                "다른 핵심 보장은 현재 자료에서 찾지 못해 추가 확인이 필요해요.",
+                _SAFE_BASE_PARAGRAPH,
+                _SAFE_MISSING_PARAGRAPH,
             ],
         }
 
@@ -135,7 +151,7 @@ def test_summary_overview_uses_deterministic_judgments_for_llm_copy() -> None:
 
     assert overview is not None
     assert overview.generation == "llm"
-    assert overview.title == "암 진단비는 보이고, 다른 핵심 보장은 이어서 확인해요"
+    assert overview.title == "확인된 내용과 다음 확인 항목을 함께 살펴봐요"
     assert [item.label for item in overview.takeaways] == ["보험료", "보장 구성", "다음 확인"]
 
 
@@ -151,6 +167,122 @@ def test_summary_overview_failure_is_not_replaced_with_deterministic_copy() -> N
         attach_summary_overview(summary, fail)
 
 
+def test_summary_overview_keeps_limited_death_review_separate_from_overlap() -> None:
+    summary = summarize_portfolio_coverages(
+        [
+            _policy(
+                "p1",
+                "건강보험",
+                "보험사A",
+                [{"담보명": "상해사망·후유장해 (20-100%) / 보통약관", "가입금액": "1억원"}],
+            )
+        ]
+    )
+
+    def overlap_copy(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": "업로드한 증권의 확인 항목을 정리했어요",
+            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_OVERLAP_PARAGRAPH],
+        }
+
+    def terms_review_copy(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
+            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_TERMS_REVIEW_PARAGRAPH],
+        }
+
+    assert generate_summary_overview(summary, overlap_copy) is None
+
+    overview = generate_summary_overview(summary, terms_review_copy)
+
+    assert overview is not None
+    next_takeaway = overview.takeaways[2]
+    assert next_takeaway.title == "보장 범위 확인"
+    assert "약관 조건" in next_takeaway.detail
+    assert "중복" not in next_takeaway.title + next_takeaway.detail
+
+
+def test_summary_overview_keeps_differently_named_medical_contracts_as_overlap() -> None:
+    summary = summarize_portfolio_coverages(
+        [
+            _policy(
+                "p1",
+                "건강보험",
+                "보험사A",
+                [{"담보명": "질병실손의료비", "가입금액": "실손", "지급유형": "실손"}],
+            ),
+            _policy(
+                "p2",
+                "건강보험",
+                "보험사B",
+                [{"담보명": "상해실비", "가입금액": "실손", "지급유형": "실손"}],
+            ),
+        ]
+    )
+
+    def terms_review_copy(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": "업로드한 증권의 확인 항목을 정리했어요",
+            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_TERMS_REVIEW_PARAGRAPH],
+        }
+
+    def overlap_copy(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
+            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_OVERLAP_PARAGRAPH],
+        }
+
+    assert duplicate_actual_loss_coverage_names(summary) == []
+    assert generate_summary_overview(summary, terms_review_copy) is None
+
+    overview = generate_summary_overview(summary, overlap_copy)
+
+    assert overview is not None
+    next_takeaway = overview.takeaways[2]
+    assert next_takeaway.title == "중복 여부 확인"
+    assert "여러 계약" in next_takeaway.detail
+    assert "중복 가입 여부" in next_takeaway.detail
+
+
+@pytest.mark.parametrize(
+    "unsafe_copy",
+    [
+        "현재 보험료는 높아 보여요",
+        "현재 보험료는 낮아 보여요",
+        "보험료 수준은 적정해요",
+        "현재 보장은 충분해요",
+        "현재 보장은 부족해요",
+        "보험료를 많이 내고 있어요",
+        "보험료가 비싼 편이에요",
+        "핵심 보장이 모자라 보여요",
+        "보험료가 일반 가이드 상단을 넘어섰어요",
+    ],
+)
+def test_summary_overview_rejects_adequacy_judgments(unsafe_copy: str) -> None:
+    summary = _summary_for_premium_guidance(150_000, set())
+
+    def unsafe_title(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": unsafe_copy,
+            "paragraphs": [
+                _SAFE_BASE_PARAGRAPH,
+                _SAFE_LIMITATION_PARAGRAPH,
+            ],
+        }
+
+    def unsafe_paragraph(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": "업로드한 증권의 확인 항목을 정리했어요",
+            "paragraphs": [
+                unsafe_copy,
+                _SAFE_LIMITATION_PARAGRAPH,
+            ],
+        }
+
+    assert generate_summary_overview(summary, unsafe_title) is None
+    assert generate_summary_overview(summary, unsafe_paragraph) is None
+
+
 @pytest.mark.parametrize(
     (
         "monthly_total",
@@ -162,32 +294,32 @@ def test_summary_overview_failure_is_not_replaced_with_deterministic_copy() -> N
         (
             90_000,
             set(),
-            "현재 보험료는 좋아보여요",
-            "좋은 신호",
+            "보험료와 보장 조건을 함께 확인해요",
+            "갱신·면책 조건을 함께 확인",
         ),
         (
             90_000,
             {"death"},
-            "권장보험을 점검해보세요",
-            "권장보험 항목을 먼저 점검",
+            "미확인 핵심 보장을 확인해요",
+            "핵심 보장이 실제로 없는지 약관과 함께 확인",
         ),
         (
             150_000,
             set(),
-            "현재 보험료는 좋아보여요",
-            "세부 약관 조건만 확인",
+            "보험료와 보장 조건을 함께 확인해요",
+            "일반 가이드와의 차이, 세부 약관 조건",
         ),
         (
             150_000,
             {"death"},
-            "권장보험을 점검해보세요",
-            "보장 구성을 점검",
+            "미확인 핵심 보장을 확인해요",
+            "핵심 보장이 실제로 없는지 약관과 함께 확인",
         ),
         (
             250_000,
             set(),
-            "현재 보험료는 높아보여요",
-            "가입한 보험과 보장내용을 다시 확인",
+            "보험료 구성과 갱신 조건을 확인해요",
+            "보험료에 포함된 담보, 갱신 여부, 납입 기간",
         ),
     ],
 )
@@ -200,13 +332,16 @@ def test_summary_overview_combines_premium_range_with_core_coverage_status(
     summary = _summary_for_premium_guidance(monthly_total, missing_kinds)
 
     def complete(_system: str, user: str) -> dict[str, object]:
-        assert expected_title in user
-        assert expected_detail in user
+        assert "recommended_min" not in user
+        assert '"status"' not in user
+        assert expected_title not in user
+        assert expected_detail not in user
         return {
-            "title": "보험료와 핵심 보장을 함께 확인해요",
+            "title": "보험료와 보장 조건을 차례로 확인해요",
             "paragraphs": [
-                "보험료는 권장 구간과 핵심 보장 확인 상태를 함께 봐야 해요.",
-                "업로드한 자료 기준의 1차 해석이므로 약관 조건을 이어서 확인해요.",
+                _SAFE_BASE_PARAGRAPH,
+                "월 보험료는 담보 구성과 갱신 여부, 납입 기간을 함께 확인해야 해요.",
+                _SAFE_LIMITATION_PARAGRAPH,
             ],
         }
 

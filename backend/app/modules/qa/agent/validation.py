@@ -1,7 +1,6 @@
 """Validation and grounding for final QA agent responses."""
 
 from app.modules.evidence.catalog import (
-    citation_from_evidence,
     valid_evidence_ids,
 )
 from app.modules.qa.agent.contracts import (
@@ -18,6 +17,7 @@ from app.modules.qa.agent.input_guardrail import (
     requires_uploaded_policy_terms,
 )
 from app.modules.qa.agent.selection import select_tool_result
+from app.modules.qa.citations import citation_from_evidence
 from app.modules.qa.context import QaContext
 from app.modules.qa.response_support import (
     contextual_suggestions,

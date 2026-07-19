@@ -2,13 +2,13 @@
 
 from dataclasses import dataclass
 
+from app.modules.consultation.contracts import InsuredDemographics
 from app.modules.coverage.taxonomy import LifeStageCheck, check_life_stage
 from app.modules.evidence.catalog import EvidenceCatalog, build_evidence_catalog
 from app.modules.portfolio.damage_classification import is_auto_policy
 from app.modules.portfolio.demographics import resolve_portfolio_demographics
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.summary import PortfolioFacts, build_portfolio_facts
-from app.modules.qa.contracts import InsuredDemographics
 from app.modules.qa.schemas import ConversationMessage, recent_history
 
 

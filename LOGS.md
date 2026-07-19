@@ -1,5 +1,6 @@
 # 작업 로그
 
+- 2026-07-19 — 백엔드 아키텍처와 런타임 경계를 정밀 점검해 업로드 슬롯을 파싱 전에 원자적으로 예약하고 lease·소유자 ID로 동시성/ABA를 방어. QA SSE disconnect를 agent·외부 검색 취소까지 전파하고, 정책 업로드 조합·상담 계약·참조 데이터·Postgres/OpenAI 경계를 분리. 총평은 허용된 중립 문장 선택으로 제한하고 사망 범위 검토와 복수 실손 중복 검토를 구분. 공개 API 계약은 유지했으며 백엔드 569개 테스트, 프론트엔드 177개 테스트와 production build, 독립 runtime·architecture 재리뷰 및 CI를 통과(PR #53).
 - 2026-07-17 — Official RAG generation 평가를 재점검하고 citation label·조문 alias 정규화를 추가. Generation live 평가를 52/60에서 60/60으로 개선하고, false negative를 줄이도록 평가 matcher를 보강.
 - 2026-07-17 — Official RAG retrieval 평가를 positive 근거 검색 품질 중심으로 재정리. `accepted_evidence`로 대체 공식 근거를 인정하고, 한국어 복합어·띄어쓰기 차이를 보강했으며, negative no-hit은 상위 QA router/e2e에서 다룰 진단 지표로 격하.
 - 2026-07-15 — 참조 데이터 소유권·RAG 테이블 현황·migration 정리 경계를 `backend/REFERENCE_DATA.md`에 문서화하고 백엔드 가이드의 핵심 라우트와 서버 총평 생성 정책을 갱신.

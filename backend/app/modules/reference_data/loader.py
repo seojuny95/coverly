@@ -6,9 +6,11 @@ from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 
-import psycopg
-
 from app.core.config import get_settings
+from app.integrations.postgres.reference_data_store import (
+    ReferenceDataStoreError,
+    load_reference_payloads,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +30,7 @@ def _database_url() -> str:
 
 @lru_cache(maxsize=1)
 def _database_reference_data() -> dict[str, object]:
-    with psycopg.connect(_database_url(), connect_timeout=3) as connection:
-        rows = connection.execute("SELECT key, payload FROM reference.reference_data").fetchall()
-
-    return {str(key): payload for key, payload in rows}
+    return load_reference_payloads(_database_url())
 
 
 def load_reference_data[T](
@@ -55,7 +54,7 @@ def load_database_reference_data[T](
         database_payload = _database_reference_data().get(key)
     except ReferenceDataUnavailableError:
         raise
-    except (psycopg.Error, OSError, ValueError) as exc:
+    except (ReferenceDataStoreError, ValueError) as exc:
         logger.exception("database_reference_data_unavailable", extra={"reference_key": key})
         raise ReferenceDataUnavailableError(
             f"Database reference data '{key}' is unavailable"

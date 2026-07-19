@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     policy_rag_max_ttl_seconds: int = 2 * 60 * 60
     policy_rag_session_secret: str = ""
     portfolio_session_max_documents: int = 50
+    policy_upload_reservation_ttl_seconds: int = 15 * 60
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",
