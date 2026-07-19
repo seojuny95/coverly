@@ -21,7 +21,6 @@ export const API_ERROR_CODES = [
   "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
   "POLICY_UPLOAD_CANCELLED",
   "portfolio_session_unavailable",
-  "portfolio_overview_unavailable",
   "INVALID_POLICY_SELECTION",
   "REQUEST_VALIDATION_ERROR",
   "INVALID_MULTIPART_REQUEST",

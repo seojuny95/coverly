@@ -106,7 +106,6 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
         "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
         "POLICY_UPLOAD_CANCELLED",
         "portfolio_session_unavailable",
-        "portfolio_overview_unavailable",
         "INVALID_POLICY_SELECTION",
         "REQUEST_VALIDATION_ERROR",
         "INVALID_MULTIPART_REQUEST",

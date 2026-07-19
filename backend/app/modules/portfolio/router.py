@@ -30,8 +30,7 @@ class PortfolioSummaryService:
         policies: list[PolicyInput],
         death_benefit_context: DeathBenefitGuideInput,
     ) -> PortfolioCoverageSummary:
-        summary = summarize_portfolio_coverages(policies, death_benefit_context)
-        return attach_summary_overview(summary)
+        return summarize_portfolio_coverages(policies, death_benefit_context)
 
 
 def get_portfolio_summary_service() -> PortfolioSummaryService:
@@ -56,21 +55,19 @@ def coverage_summary(
 ) -> PortfolioCoverageSummary:
     try:
         snapshot = resolve_portfolio_snapshot(sessions, request)
-        return analyze_portfolio_snapshot(
+        summary = analyze_portfolio_snapshot(
             sessions,
             snapshot,
             request,
             summarize,
         )
+        try:
+            return attach_summary_overview(summary)
+        except SummaryOverviewUnavailableError:
+            return summary.model_copy(update={"overview": None})
     except ReferenceDataUnavailableError as exc:
         raise ApiError(
             status_code=503,
             code="reference_data_unavailable",
             message="분석 기준 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
-        ) from exc
-    except SummaryOverviewUnavailableError as exc:
-        raise ApiError(
-            status_code=503,
-            code="portfolio_overview_unavailable",
-            message="전체 보험 총평을 생성하지 못했어요. 잠시 후 다시 시도해주세요.",
         ) from exc

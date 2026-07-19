@@ -225,7 +225,6 @@ export interface components {
       | "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED"
       | "POLICY_UPLOAD_CANCELLED"
       | "portfolio_session_unavailable"
-      | "portfolio_overview_unavailable"
       | "INVALID_POLICY_SELECTION"
       | "REQUEST_VALIDATION_ERROR"
       | "INVALID_MULTIPART_REQUEST";
@@ -643,17 +642,6 @@ export interface components {
       title: string;
       /** Paragraphs */
       paragraphs?: string[];
-      /** Takeaways */
-      takeaways?: components["schemas"]["PortfolioOverviewTakeaway"][];
-    };
-    /** PortfolioOverviewTakeaway */
-    PortfolioOverviewTakeaway: {
-      /** Label */
-      label: string;
-      /** Title */
-      title: string;
-      /** Detail */
-      detail: string;
     };
     /** PortfolioQuestionRequest */
     PortfolioQuestionRequest: {

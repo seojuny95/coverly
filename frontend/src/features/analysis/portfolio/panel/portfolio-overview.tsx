@@ -101,23 +101,7 @@ export function PortfolioOverview({
               ))}
             </div>
 
-            <div className="mt-6 grid gap-3 border-y border-white/10 py-4 text-sm sm:grid-cols-3">
-              {(generatedOverview.takeaways ?? []).map((takeaway) => (
-                <div key={takeaway.label} className="min-w-0">
-                  <p className="text-[11px] font-semibold tracking-[0.12em] text-blue-300 uppercase">
-                    {takeaway.label}
-                  </p>
-                  <p className="mt-1 font-semibold text-white">
-                    {takeaway.title}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-zinc-400">
-                    {takeaway.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-2 text-xs text-zinc-300">
+            <div className="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-5 text-xs text-zinc-300">
               {hasPremiumReference ? (
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
                   월 보험료 {formatWon(premium?.monthly_total ?? null)}

@@ -46,15 +46,8 @@ const summary: PortfolioSummary = {
   excluded_auto_policy_count: 0,
   overview: {
     generation: "llm",
-    title: "보험료는 낮지만, 진단비 공백을 먼저 확인해야 해요",
+    title: "진단비 구성에서 더 확인할 부분이 있어요",
     paragraphs: ["현재 보장 구성을 바탕으로 확인한 내용을 정리했어요."],
-    takeaways: [
-      {
-        label: "우선 확인",
-        title: "진단비 공백",
-        detail: "뇌혈관질환과 심장질환 진단비를 확인해보세요.",
-      },
-    ],
   },
   essential_coverage_check: {
     items: [
@@ -350,13 +343,12 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   expect(screen.queryByText("가입 확인 현황")).not.toBeInTheDocument();
   expect(
     screen.getByRole("heading", {
-      name: "보험료는 낮지만, 진단비 공백을 먼저 확인해야 해요",
+      name: "진단비 구성에서 더 확인할 부분이 있어요",
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByText("현재 보장 구성을 바탕으로 확인한 내용을 정리했어요."),
   ).toBeInTheDocument();
-  expect(screen.getByText("진단비 공백")).toBeInTheDocument();
   expect(screen.getByText("현재 월 보험료")).toBeInTheDocument();
   expect(screen.getByText("20~30대 참고 구간")).toBeInTheDocument();
   expect(screen.getByText("월 보험료 98,000원")).toBeInTheDocument();

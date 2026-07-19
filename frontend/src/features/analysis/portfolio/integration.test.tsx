@@ -258,7 +258,6 @@ describe("portfolio features", () => {
             generation: "llm",
             title: "현재 보장을 한눈에 확인해보세요",
             paragraphs: ["확인된 보장 정보를 바탕으로 정리했어요."],
-            takeaways: [],
           },
           essential_coverage_check: {
             items: [

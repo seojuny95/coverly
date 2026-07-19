@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from app.modules.portfolio.overview import (
@@ -7,14 +9,7 @@ from app.modules.portfolio.overview import (
 )
 from app.modules.portfolio.schemas import (
     DeathBenefitGuideInput,
-    EssentialCoverageCheck,
-    EssentialCoverageItem,
-    EssentialCoverageKind,
     PolicyInput,
-    PortfolioCoverageSummary,
-    PremiumBenchmark,
-    PremiumBenchmarkSource,
-    PremiumOverview,
 )
 from app.modules.portfolio.summary import (
     build_portfolio_facts,
@@ -23,19 +18,49 @@ from app.modules.portfolio.summary import (
     summarize_portfolio_coverages,
 )
 
-_SAFE_BASE_PARAGRAPH = (
-    "업로드한 증권에서 읽은 내용을 보험료, 보장 구성, 다음 확인 항목으로 나눠 정리했어요."
-)
-_SAFE_LIMITATION_PARAGRAPH = "이 총평은 업로드한 자료에서 확인한 내용을 바탕으로 한 1차 정리예요."
-_SAFE_MISSING_PARAGRAPH = (
-    "현재 자료에서 확인되지 않은 항목은 다른 증권이나 특약명에서도 이어서 확인해보세요."
-)
-_SAFE_TERMS_REVIEW_PARAGRAPH = (
-    "확인 범위가 제한된 담보는 실제 보장 범위와 약관 조건을 이어서 확인해보세요."
-)
-_SAFE_OVERLAP_PARAGRAPH = (
-    "겹쳐 보이는 담보는 실제 지급 조건과 자기부담금 조건을 약관에서 확인해보세요."
-)
+
+def _overview_draft(
+    *,
+    title: str = "확인된 보장과 살펴볼 조건을 함께 정리했어요",
+    confirmed_ids: tuple[str, ...] = (),
+    review_ids: tuple[str, ...] = (),
+    unconfirmed_ids: tuple[str, ...] = (),
+) -> dict[str, object]:
+    groups = {
+        "confirmed": (
+            confirmed_ids,
+            "현재 자료에서 확인된 보장의 역할을 함께 살펴봤어요.",
+        ),
+        "review": (
+            review_ids,
+            "확인된 보장 가운데 약관 조건을 더 살펴볼 내용이 있어요.",
+        ),
+        "unconfirmed": (
+            unconfirmed_ids,
+            "현재 자료에서 확인되지 않은 보장은 미가입으로 단정하지 않고 더 살펴봐요.",
+        ),
+    }
+    all_ids = [fact_id for fact_ids, _text in groups.values() for fact_id in fact_ids]
+    return {
+        "title": title,
+        "title_fact_ids": all_ids[:1],
+        **{
+            role: (
+                {
+                    "fact_ids": list(fact_ids),
+                    "text": text,
+                    **(
+                        {"limitation": "현재 자료에서 찾지 못했을 뿐 미가입으로 단정하지 않아요."}
+                        if role == "unconfirmed"
+                        else {}
+                    ),
+                }
+                if fact_ids
+                else None
+            )
+            for role, (fact_ids, text) in groups.items()
+        },
+    }
 
 
 def _policy(
@@ -59,66 +84,7 @@ def _policy(
     )
 
 
-def _summary_for_premium_guidance(
-    monthly_total: int,
-    missing_kinds: set[EssentialCoverageKind],
-) -> PortfolioCoverageSummary:
-    benchmark_source = PremiumBenchmarkSource(
-        label="테스트 출처",
-        url="https://example.com",
-        published_at="2025-01-01",
-        reliability="official",
-        caveat="테스트용 출처예요.",
-    )
-    labels: dict[EssentialCoverageKind, str] = {
-        "death": "사망 보장",
-        "cancer": "암 진단비",
-        "cerebrovascular": "뇌혈관질환 진단비",
-        "ischemic_heart": "심장질환 진단비",
-        "medical_indemnity": "실손의료보험",
-    }
-    items = [
-        EssentialCoverageItem(
-            kind=kind,
-            label=label,
-            status="not_found" if kind in missing_kinds else "well_prepared",
-            confirmed_amount=None if kind in missing_kinds else 10_000_000,
-            reference_min_amount=None if kind == "medical_indemnity" else 10_000_000,
-            reference_max_amount=None if kind == "medical_indemnity" else 20_000_000,
-            coverage_count=0 if kind in missing_kinds else 1,
-            detail="테스트 상세",
-            matched_coverage_names=[] if kind in missing_kinds else [label],
-        )
-        for kind, label in labels.items()
-    ]
-    return PortfolioCoverageSummary(
-        totals=[],
-        actual_loss_coverages=[],
-        excluded_coverages=[],
-        excluded_auto_policy_count=0,
-        essential_coverage_check=EssentialCoverageCheck(items=items),
-        premium=PremiumOverview(
-            monthly_total=monthly_total,
-            monthly_policy_count=1,
-            unconfirmed_policy_count=0,
-            items=[],
-        ),
-        premium_benchmark=PremiumBenchmark(
-            age_band_label="테스트 연령대",
-            min_age=30,
-            max_age=39,
-            average_monthly_income=2_000_000,
-            suggested_min_ratio=0.05,
-            suggested_max_ratio=0.10,
-            suggested_min_premium=100_000,
-            suggested_max_premium=200_000,
-            income_source=benchmark_source,
-            guide_source=benchmark_source,
-        ),
-    )
-
-
-def test_summary_overview_uses_deterministic_judgments_for_llm_copy() -> None:
+def test_summary_overview_uses_all_llm_generated_copy() -> None:
     policy = _policy(
         "p1",
         "건강보험",
@@ -133,26 +99,40 @@ def test_summary_overview_uses_deterministic_judgments_for_llm_copy() -> None:
     )
     summary = summarize_portfolio_coverages([policy])
 
-    def complete(_system: str, user: str) -> dict[str, object]:
+    generated = _overview_draft(
+        title="암 진단비와 아직 확인할 보장을 차분히 살펴봐요",
+        confirmed_ids=("core:cancer",),
+        unconfirmed_ids=(
+            "core:death",
+            "core:cerebrovascular",
+            "core:ischemic_heart",
+            "core:medical_indemnity",
+        ),
+    )
+
+    def complete(system: str, user: str) -> dict[str, object]:
+        assert "# 역할" in system
+        assert "# 하지 말아야 할 것" in system
+        assert '"facts"' in user
         assert "confirmed_in_uploaded_documents" in user
-        assert "not_confirmed_in_current_materials" in user
+        assert "explanation_basis" in user
+        assert "well_prepared" not in user
         assert "takeaways" not in user
-        assert "recommended_min" not in user
-        assert '"status"' not in user
-        return {
-            "title": "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
-            "paragraphs": [
-                _SAFE_BASE_PARAGRAPH,
-                _SAFE_MISSING_PARAGRAPH,
-            ],
-        }
+        assert "허용된 선택지" not in user
+        return generated
 
     overview = generate_summary_overview(summary, complete)
 
     assert overview is not None
     assert overview.generation == "llm"
-    assert overview.title == "확인된 내용과 다음 확인 항목을 함께 살펴봐요"
-    assert [item.label for item in overview.takeaways] == ["보험료", "보장 구성", "다음 확인"]
+    assert overview.title == generated["title"]
+    assert overview.paragraphs == [
+        "현재 자료에서 확인된 보장의 역할을 함께 살펴봤어요.",
+        (
+            "현재 자료에서 확인되지 않은 보장은 미가입으로 단정하지 않고 더 살펴봐요. "
+            "현재 자료에서 찾지 못했을 뿐 미가입으로 단정하지 않아요."
+        ),
+    ]
 
 
 def test_summary_overview_failure_is_not_replaced_with_deterministic_copy() -> None:
@@ -179,27 +159,22 @@ def test_summary_overview_keeps_limited_death_review_separate_from_overlap() -> 
         ]
     )
 
-    def overlap_copy(_system: str, _user: str) -> dict[str, object]:
-        return {
-            "title": "업로드한 증권의 확인 항목을 정리했어요",
-            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_OVERLAP_PARAGRAPH],
-        }
+    def complete(_system: str, user: str) -> dict[str, object]:
+        assert '"multiple_contracts":false' in user
+        assert '"observation":"confirmed_but_needs_terms_review"' in user
+        return _overview_draft(
+            review_ids=("core:death",),
+            unconfirmed_ids=(
+                "core:cancer",
+                "core:cerebrovascular",
+                "core:ischemic_heart",
+                "core:medical_indemnity",
+            ),
+        )
 
-    def terms_review_copy(_system: str, _user: str) -> dict[str, object]:
-        return {
-            "title": "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
-            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_TERMS_REVIEW_PARAGRAPH],
-        }
-
-    assert generate_summary_overview(summary, overlap_copy) is None
-
-    overview = generate_summary_overview(summary, terms_review_copy)
+    overview = generate_summary_overview(summary, complete)
 
     assert overview is not None
-    next_takeaway = overview.takeaways[2]
-    assert next_takeaway.title == "보장 범위 확인"
-    assert "약관 조건" in next_takeaway.detail
-    assert "중복" not in next_takeaway.title + next_takeaway.detail
 
 
 def test_summary_overview_keeps_differently_named_medical_contracts_as_overlap() -> None:
@@ -220,137 +195,155 @@ def test_summary_overview_keeps_differently_named_medical_contracts_as_overlap()
         ]
     )
 
-    def terms_review_copy(_system: str, _user: str) -> dict[str, object]:
-        return {
-            "title": "업로드한 증권의 확인 항목을 정리했어요",
-            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_TERMS_REVIEW_PARAGRAPH],
-        }
-
-    def overlap_copy(_system: str, _user: str) -> dict[str, object]:
-        return {
-            "title": "확인된 내용과 다음 확인 항목을 함께 살펴봐요",
-            "paragraphs": [_SAFE_BASE_PARAGRAPH, _SAFE_OVERLAP_PARAGRAPH],
-        }
+    def complete(_system: str, user: str) -> dict[str, object]:
+        assert '"multiple_contracts":true' in user
+        return _overview_draft(
+            review_ids=("core:medical_indemnity",),
+            unconfirmed_ids=(
+                "core:death",
+                "core:cancer",
+                "core:cerebrovascular",
+                "core:ischemic_heart",
+            ),
+        )
 
     assert duplicate_actual_loss_coverage_names(summary) == []
-    assert generate_summary_overview(summary, terms_review_copy) is None
-
-    overview = generate_summary_overview(summary, overlap_copy)
-
-    assert overview is not None
-    next_takeaway = overview.takeaways[2]
-    assert next_takeaway.title == "중복 여부 확인"
-    assert "여러 계약" in next_takeaway.detail
-    assert "중복 가입 여부" in next_takeaway.detail
-
-
-@pytest.mark.parametrize(
-    "unsafe_copy",
-    [
-        "현재 보험료는 높아 보여요",
-        "현재 보험료는 낮아 보여요",
-        "보험료 수준은 적정해요",
-        "현재 보장은 충분해요",
-        "현재 보장은 부족해요",
-        "보험료를 많이 내고 있어요",
-        "보험료가 비싼 편이에요",
-        "핵심 보장이 모자라 보여요",
-        "보험료가 일반 가이드 상단을 넘어섰어요",
-    ],
-)
-def test_summary_overview_rejects_adequacy_judgments(unsafe_copy: str) -> None:
-    summary = _summary_for_premium_guidance(150_000, set())
-
-    def unsafe_title(_system: str, _user: str) -> dict[str, object]:
-        return {
-            "title": unsafe_copy,
-            "paragraphs": [
-                _SAFE_BASE_PARAGRAPH,
-                _SAFE_LIMITATION_PARAGRAPH,
-            ],
-        }
-
-    def unsafe_paragraph(_system: str, _user: str) -> dict[str, object]:
-        return {
-            "title": "업로드한 증권의 확인 항목을 정리했어요",
-            "paragraphs": [
-                unsafe_copy,
-                _SAFE_LIMITATION_PARAGRAPH,
-            ],
-        }
-
-    assert generate_summary_overview(summary, unsafe_title) is None
-    assert generate_summary_overview(summary, unsafe_paragraph) is None
-
-
-@pytest.mark.parametrize(
-    (
-        "monthly_total",
-        "missing_kinds",
-        "expected_title",
-        "expected_detail",
-    ),
-    [
-        (
-            90_000,
-            set(),
-            "보험료와 보장 조건을 함께 확인해요",
-            "갱신·면책 조건을 함께 확인",
-        ),
-        (
-            90_000,
-            {"death"},
-            "미확인 핵심 보장을 확인해요",
-            "핵심 보장이 실제로 없는지 약관과 함께 확인",
-        ),
-        (
-            150_000,
-            set(),
-            "보험료와 보장 조건을 함께 확인해요",
-            "일반 가이드와의 차이, 세부 약관 조건",
-        ),
-        (
-            150_000,
-            {"death"},
-            "미확인 핵심 보장을 확인해요",
-            "핵심 보장이 실제로 없는지 약관과 함께 확인",
-        ),
-        (
-            250_000,
-            set(),
-            "보험료 구성과 갱신 조건을 확인해요",
-            "보험료에 포함된 담보, 갱신 여부, 납입 기간",
-        ),
-    ],
-)
-def test_summary_overview_combines_premium_range_with_core_coverage_status(
-    monthly_total: int,
-    missing_kinds: set[EssentialCoverageKind],
-    expected_title: str,
-    expected_detail: str,
-) -> None:
-    summary = _summary_for_premium_guidance(monthly_total, missing_kinds)
-
-    def complete(_system: str, user: str) -> dict[str, object]:
-        assert "recommended_min" not in user
-        assert '"status"' not in user
-        assert expected_title not in user
-        assert expected_detail not in user
-        return {
-            "title": "보험료와 보장 조건을 차례로 확인해요",
-            "paragraphs": [
-                _SAFE_BASE_PARAGRAPH,
-                "월 보험료는 담보 구성과 갱신 여부, 납입 기간을 함께 확인해야 해요.",
-                _SAFE_LIMITATION_PARAGRAPH,
-            ],
-        }
-
     overview = generate_summary_overview(summary, complete)
 
     assert overview is not None
-    premium_takeaway = overview.takeaways[0]
-    assert premium_takeaway.title == expected_title
-    assert expected_detail in premium_takeaway.detail
+
+
+def test_summary_overview_rejects_blank_copy_after_whitespace_normalization() -> None:
+    summary = summarize_portfolio_coverages(
+        [_policy("p1", "건강보험", "보험사A", [{"담보명": "암진단비"}])]
+    )
+
+    def complete(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "title": "     ",
+            "title_fact_ids": ["core:cancer"],
+            "confirmed": {"fact_ids": ["core:cancer"], "text": "          "},
+            "review": None,
+            "unconfirmed": None,
+        }
+
+    assert generate_summary_overview(summary, complete) is None
+
+
+def test_summary_overview_rejects_fact_ids_under_the_wrong_role() -> None:
+    summary = summarize_portfolio_coverages(
+        [_policy("p1", "건강보험", "보험사A", [{"담보명": "암진단비"}])]
+    )
+    draft: dict[str, object] = {
+        "title": "암 진단비와 아직 확인할 보장을 함께 살펴봐요",
+        "title_fact_ids": ["core:cancer"],
+        "confirmed": {
+            "fact_ids": ["core:death"],
+            "text": "현재 자료에서 확인된 보장의 역할을 함께 살펴봤어요.",
+        },
+        "review": None,
+        "unconfirmed": {
+            "fact_ids": [
+                "core:cerebrovascular",
+                "core:ischemic_heart",
+                "core:medical_indemnity",
+            ],
+            "text": "현재 자료에서 확인되지 않은 보장은 미가입으로 단정하지 않아요.",
+            "limitation": "현재 자료에서 찾지 못했을 뿐 미가입으로 단정하지 않아요.",
+        },
+    }
+
+    assert generate_summary_overview(summary, lambda _system, _user: draft) is None
+
+
+def test_summary_overview_does_not_fail_when_a_lower_priority_fact_is_omitted() -> None:
+    summary = summarize_portfolio_coverages(
+        [_policy("p1", "건강보험", "보험사A", [{"담보명": "암진단비"}])]
+    )
+    draft: dict[str, object] = {
+        "title": "암 진단비가 현재 자료에서 확인됐어요",
+        "title_fact_ids": ["core:cancer"],
+        "confirmed": {
+            "fact_ids": ["core:cancer"],
+            "text": "암 진단비는 현재 자료에서 확인된 보장이에요.",
+        },
+        "review": None,
+        "unconfirmed": None,
+    }
+
+    assert generate_summary_overview(summary, lambda _system, _user: draft) is not None
+
+
+def test_summary_overview_retries_once_when_fact_roles_are_invalid() -> None:
+    summary = summarize_portfolio_coverages(
+        [_policy("p1", "건강보험", "보험사A", [{"담보명": "암진단비"}])]
+    )
+    valid = _overview_draft(
+        confirmed_ids=("core:cancer",),
+        unconfirmed_ids=("core:death",),
+    )
+    calls = 0
+
+    def complete(_system: str, user: str) -> dict[str, object]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return {
+                "title": "암 진단비를 중심으로 보장을 살펴봐요",
+                "title_fact_ids": ["core:cancer"],
+                "confirmed": {
+                    "fact_ids": ["core:death"],
+                    "text": "암 진단비는 현재 자료에서 확인된 보장이에요.",
+                },
+                "review": None,
+                "unconfirmed": None,
+            }
+        assert "previous_draft" in user
+        return valid
+
+    assert generate_summary_overview(summary, complete) is not None
+    assert calls == 2
+
+
+def test_summary_overview_receives_the_exact_duplicate_actual_loss_coverage() -> None:
+    summary = summarize_portfolio_coverages(
+        [
+            _policy(
+                "p1",
+                "손해보험",
+                "보험사A",
+                [{"담보명": "자동차사고벌금(실손)", "지급유형": "실손"}],
+                tags=["운전자보험"],
+            ),
+            _policy(
+                "p2",
+                "손해보험",
+                "보험사B",
+                [{"담보명": "자동차사고벌금(실손)", "지급유형": "실손"}],
+                tags=["운전자보험"],
+            ),
+        ]
+    )
+
+    def complete(_system: str, user: str) -> dict[str, object]:
+        payload = json.loads(user)
+        facts = payload["facts"]["facts"]
+        duplicate = next(fact for fact in facts if fact["fact_id"] == "actual_loss_duplicate:0")
+        assert duplicate["coverage_name"] == "자동차사고벌금(실손)"
+        assert duplicate["observation"] == "same_actual_loss_coverage_in_multiple_contracts"
+        assert duplicate["payout_or_duplicate_benefit_confirmed"] is False
+        return _overview_draft(
+            review_ids=("actual_loss_duplicate:0",),
+            unconfirmed_ids=(
+                "core:death",
+                "core:cancer",
+                "core:cerebrovascular",
+                "core:ischemic_heart",
+                "core:medical_indemnity",
+            ),
+        )
+
+    assert generate_summary_overview(summary, complete) is not None
 
 
 def test_sums_safe_fixed_benefits_and_exposes_composition() -> None:

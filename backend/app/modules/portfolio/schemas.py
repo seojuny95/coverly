@@ -263,17 +263,10 @@ class PremiumOverview(BaseModel):
     items: list[PremiumPolicyItem]
 
 
-class PortfolioOverviewTakeaway(BaseModel):
-    label: str
-    title: str
-    detail: str
-
-
 class PortfolioOverview(BaseModel):
     generation: Literal["llm"]
     title: str
     paragraphs: list[str] = Field(default_factory=list, min_length=1, max_length=3)
-    takeaways: list[PortfolioOverviewTakeaway] = Field(default_factory=list, max_length=3)
 
 
 class PortfolioCoverageSummary(BaseModel):
