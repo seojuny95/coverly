@@ -32,27 +32,18 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
           보장금 합계
         </h2>
         <p className="mt-1 text-sm leading-6 text-zinc-500">
-          확인된 합산 금액과 별도 표시 항목을 함께 보여드려요.
+          확인된 합산 금액과 실손 보장을 함께 보여드려요.
         </p>
-        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs leading-5">
-          <Badge
-            variant="info"
-            className="h-auto rounded-full px-2 py-0.5 text-xs font-semibold"
-          >
-            합산
-          </Badge>
-          <Badge
-            variant="success"
-            className="h-auto rounded-full px-2 py-0.5 text-xs font-semibold"
-          >
-            별도 표시
-          </Badge>
-          <Badge
-            variant="neutral"
-            className="h-auto rounded-full px-2 py-0.5 text-xs font-semibold"
-          >
-            개별 확인
-          </Badge>
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs leading-5 text-zinc-500">
+          <CoverageBasisLegend term="합산" variant="info">
+            더할 수 있는 정액 보장
+          </CoverageBasisLegend>
+          <CoverageBasisLegend term="실손 보장" variant="success">
+            실제 손해 기준 보장
+          </CoverageBasisLegend>
+          <CoverageBasisLegend term="개별 확인" variant="neutral">
+            조건 확인이 필요한 보장
+          </CoverageBasisLegend>
         </div>
       </div>
 
@@ -68,6 +59,28 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
         </p>
       )}
     </section>
+  );
+}
+
+function CoverageBasisLegend({
+  children,
+  term,
+  variant,
+}: {
+  children: string;
+  term: string;
+  variant: "info" | "success" | "neutral";
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <Badge
+        variant={variant}
+        className="h-auto rounded-full px-2 py-0.5 text-xs font-semibold"
+      >
+        {term}
+      </Badge>
+      <span className="min-w-0">{children}</span>
+    </span>
   );
 }
 

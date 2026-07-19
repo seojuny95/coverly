@@ -7,6 +7,7 @@ import {
   InsuranceDataProvider,
   useInsuranceData,
 } from "../features/analysis/store";
+import { TooltipProvider } from "@/shared/components/ui/tooltip";
 
 // In-memory only: no persister. Cache is intentionally lost on full reload so
 // sensitive policy data never lands in storage (no auth).
@@ -26,9 +27,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(makeQueryClient);
   return (
     <QueryClientProvider client={queryClient}>
-      <InsuranceDataProvider>
-        <AnalysisRouteScope>{children}</AnalysisRouteScope>
-      </InsuranceDataProvider>
+      <TooltipProvider>
+        <InsuranceDataProvider>
+          <AnalysisRouteScope>{children}</AnalysisRouteScope>
+        </InsuranceDataProvider>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

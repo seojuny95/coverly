@@ -42,6 +42,15 @@ type CoverageGroup = {
   rows: CoverageRow[];
 };
 
+const COVERAGE_GROUP_ORDER = [
+  "사망",
+  "후유장해",
+  "진단",
+  "수술",
+  "치료",
+  "기타",
+];
+
 export function CoverageSummaryTable({
   summary,
 }: {
@@ -166,7 +175,7 @@ function ActualLossCoverage({ row }: { row: ActualLossCoverageRow }) {
         {row.originalAmount || "금액 확인 필요"}
       </td>
       <td className="px-6 py-4 text-right align-top">
-        <CoverageBasis tone="actual-loss">별도 표시</CoverageBasis>
+        <CoverageBasis tone="actual-loss">실손 보장</CoverageBasis>
       </td>
     </tr>
   );
@@ -303,10 +312,23 @@ function buildCoverageGroups(summary: PortfolioSummary): CoverageGroup[] {
     });
   });
 
-  return [...groups.entries()].map(([majorCategory, rows]) => ({
-    majorCategory,
-    rows,
-  }));
+  return [...groups.entries()]
+    .map(([majorCategory, rows]) => ({
+      majorCategory,
+      rows,
+    }))
+    .sort(compareCoverageGroups);
+}
+
+function compareCoverageGroups(a: CoverageGroup, b: CoverageGroup) {
+  return (
+    coverageGroupRank(a.majorCategory) - coverageGroupRank(b.majorCategory)
+  );
+}
+
+function coverageGroupRank(majorCategory: string) {
+  const index = COVERAGE_GROUP_ORDER.indexOf(majorCategory);
+  return index === -1 ? COVERAGE_GROUP_ORDER.length : index;
 }
 
 function coverageSourceLabel(source: {

@@ -5,6 +5,7 @@ import {
   InsuranceDataProvider,
   type InsuranceAnalysis,
 } from "../features/analysis/store";
+import { TooltipProvider } from "../shared/components/ui/tooltip";
 
 export function makeTestQueryClient() {
   return new QueryClient({
@@ -24,9 +25,11 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <InsuranceDataProvider initialAnalysis={initialAnalysis}>
-          {children}
-        </InsuranceDataProvider>
+        <TooltipProvider>
+          <InsuranceDataProvider initialAnalysis={initialAnalysis}>
+            {children}
+          </InsuranceDataProvider>
+        </TooltipProvider>
       </QueryClientProvider>
     );
   }

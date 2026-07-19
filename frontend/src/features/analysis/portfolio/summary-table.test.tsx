@@ -62,7 +62,7 @@ describe("CoverageSummaryTable", () => {
   it("labels actual-loss coverage separately from fixed-benefit totals", () => {
     render(<CoverageSummaryTable summary={summary} />);
     expect(screen.getByText("실손입원")).toBeInTheDocument();
-    expect(screen.getByText("별도 표시")).toBeInTheDocument();
+    expect(screen.getByText("실손 보장")).toBeInTheDocument();
     expect(screen.getByText("중복 확인")).toBeInTheDocument();
   });
 
@@ -86,7 +86,7 @@ describe("CoverageSummaryTable", () => {
     );
 
     expect(screen.getByText("일상생활배상책임")).toBeInTheDocument();
-    expect(screen.getByText("별도 표시")).toBeInTheDocument();
+    expect(screen.getByText("실손 보장")).toBeInTheDocument();
     expect(screen.queryByText("실손의료비")).not.toBeInTheDocument();
   });
 
@@ -125,7 +125,7 @@ describe("CoverageSummaryTable", () => {
     expect(screen.getByRole("rowgroup", { name: "기타" })).toBeInTheDocument();
   });
 
-  it("preserves the category order returned by the backend", () => {
+  it("sorts categories by the coverage map display order", () => {
     render(
       <CoverageSummaryTable
         summary={{
@@ -147,7 +147,7 @@ describe("CoverageSummaryTable", () => {
       .getAllByRole("rowgroup")
       .map((group) => group.getAttribute("aria-label"))
       .filter(Boolean);
-    expect(categoryGroups).toEqual(["기타", "사망", "치료"]);
+    expect(categoryGroups).toEqual(["사망", "치료", "기타"]);
   });
 
   it("keeps amount columns top-aligned when a row is expanded", () => {

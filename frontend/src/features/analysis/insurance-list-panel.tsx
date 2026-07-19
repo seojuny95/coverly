@@ -1,6 +1,12 @@
 import { SectionLabel } from "../../shared/components/section-label";
 import { Button } from "@/shared/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 import { POLICY_CLASSIFICATIONS } from "../../shared/api/generated-runtime";
+import { CircleHelp } from "lucide-react";
 
 import { InsurerLogo, InsuranceDetail, TagBadge } from "./policy-detail";
 import type { AnalyzedInsurance } from "./store";
@@ -69,8 +75,27 @@ export function InsuranceListPanel({
             key={classification}
             className="relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
           >
-            <dt className="text-xs font-medium text-zinc-500">
-              {classification}
+            <dt className="flex items-start justify-between gap-2 text-xs font-medium text-zinc-500">
+              <span>{classification}</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={`${classification} 설명`}
+                    className="inline-flex size-6 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                  >
+                    <CircleHelp aria-hidden="true" className="size-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  align="end"
+                  sideOffset={4}
+                  className="max-w-64 px-3 py-2 text-left text-xs leading-5 font-normal"
+                >
+                  {POLICY_CLASSIFICATION_DESCRIPTIONS[classification]}
+                </TooltipContent>
+              </Tooltip>
             </dt>
             <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
               {groupedInsuranceDocuments[classification]?.length ?? 0}
@@ -100,7 +125,10 @@ export function InsuranceListPanel({
                 <h2 className="text-lg font-semibold tracking-[-0.03em]">
                   {classification}
                 </h2>
-                <p className="mt-1 text-sm text-zinc-500">
+                <p className="mt-1 text-sm leading-6 text-zinc-500">
+                  {POLICY_CLASSIFICATION_DESCRIPTIONS[classification]}
+                </p>
+                <p className="mt-1 text-xs font-medium text-zinc-400">
                   보험 {classificationInsuranceDocuments.length}개
                 </p>
               </div>
@@ -169,6 +197,16 @@ export function InsuranceListPanel({
     </div>
   );
 }
+
+const POLICY_CLASSIFICATION_DESCRIPTIONS = {
+  생명보험:
+    "사망, 생존, 노후처럼 사람의 생명과 기간을 중심으로 보장을 살펴보는 보험이에요.",
+  제3보험:
+    "질병, 상해, 간병, 실손의료비처럼 사람의 건강 상태와 치료 부담을 살펴보는 보험이에요.",
+  손해보험:
+    "자동차, 화재, 배상책임처럼 사고로 생긴 재산 손해나 법적 책임을 살펴보는 보험이에요.",
+  미분류: "현재 올린 증권만으로 보험 종류를 뚜렷하게 나누기 어려운 항목이에요.",
+} as const;
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
