@@ -27,6 +27,8 @@ def test_agent_instructions_add_situational_routing() -> None:
     assert "inspect_portfolio" in instructions
     assert "되묻" in instructions  # 옵션 되묻기 지시
     assert "보유" in instructions  # 보유 보장 한정
+    assert "약관" in instructions  # 실제 지급은 약관 지급사유로 확인하라는 안내
+    assert "지급사유" in instructions
 
 
 def test_agent_instructions_omit_situational_routing_when_not_situational() -> None:

@@ -38,6 +38,8 @@ def test_situational_compose_prompt_adds_empathy_and_option_guidance() -> None:
     assert "공감" in user  # 짧은 공감 지시
     assert "되묻" in user  # 옵션 되묻기 지시
     assert "보유" in user  # 보유 보장에서만 옵션
+    assert "약관" in user  # 실제 지급은 약관 지급사유로 확인
+    assert "지급사유" in user
 
 
 def test_non_situational_compose_prompt_omits_option_guidance() -> None:
