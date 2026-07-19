@@ -22,6 +22,7 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 | `public.policy_rag_chunks` | current ephemeral | 업로드한 증권 원문의 검색용 청크. 내부 문서 RAG ID로 연결하고 만료·삭제를 전제로 한다. 서버 전용이다. |
 | `private.portfolio_sessions` | current ephemeral | 서명된 단일 토큰으로 접근하는 포트폴리오 세션. 만료 시각, 데이터 버전, 분석 결과 캐시를 보관한다. |
 | `private.policy_documents` | current ephemeral | 포트폴리오 세션에 속한 PII 최소화 구조화 증권, 분석 상태, 내부 RAG 참조를 보관한다. 세션 삭제 시 함께 삭제된다. |
+| `private.policy_document_reservations` | current ephemeral | PDF 파싱 전에 문서 슬롯을 원자적으로 확보하는 단기 lease. 세션·문서 ID와 예약 소유자 ID, 만료 시각을 보관하며 완료·실패·취소 또는 만료 정리 시 제거된다. |
 | `reference.reference_data` | current | `claim_channels`, `death_benefit_guides`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides` 운영 참조 데이터의 DB 원본 |
 | `reference.sources` | current | 구조화된 참조 테이블이 공유하는 출처 메타데이터 |
 | `reference.premium_burden_guides` | current | 보험료 부담 가이드의 운영 기준. 스키마·기준일을 함께 관리한다. |
@@ -42,6 +43,8 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 - `private.policy_documents`에는 분석과 Q&A에 필요한 구조화 사실만 저장한다. 계약자명, 피보험자명, 계약번호, 차량번호 같은 직접 식별자는 저장하지 않고 담보 텍스트도 공통 PII 마스커를 통과시킨다.
 - 세션 토큰은 서버가 서명을 검증하며, DB에는 토큰 원문을 저장하지 않는다. `private` 스키마는 `anon`과 `authenticated`에 접근 권한을 주지 않는다.
 - 세션은 절대 만료 시각을 넘겨 연장하지 않는다. 만료 세션은 새 세션 생성 시 정리하며, 세션 삭제 시 하위 구조화 증권은 외래키 연쇄 삭제로 함께 제거한다. 증권 RAG 청크는 연결된 내부 RAG ID의 만료·삭제 경로를 따른다.
+- 업로드 한도는 PDF 파싱을 시작하기 전에 세션 행 잠금 아래 완료 문서와 유효한 예약을 함께 세어 적용한다. 예약은 설정된 TTL을 넘으면 슬롯 계산에서 제거하며, 동일 문서의 동시 예약·완료 문서 재등록은 충돌로 처리한다.
+- 예약 완료·해제는 `reservation_id`가 일치하는 소유자만 수행한다. 만료된 작업이 같은 문서 ID의 새 예약을 완료하거나 해제하는 ABA 상황을 허용하지 않는다. 파싱 실패, 저장 실패, 사용자 취소에서는 예약과 새로 만든 RAG 문서를 정리한다.
 - 분석 결과는 세션 데이터 버전과 분석 입력 해시가 모두 같을 때만 재사용한다. 증권 추가나 분석 입력 변경 시 다시 계산한다.
 
 ## 출처 등급
