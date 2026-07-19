@@ -174,7 +174,10 @@ def _held_insurer_domains(context: QaContext) -> list[str]:
     if not insurers:
         return []
     try:
-        channel_set = channels_for(insurers, has_medical_indemnity=False)
+        channel_set = channels_for(
+            insurers,
+            include_medical_indemnity_service=False,
+        )
     except Exception:
         return []
 

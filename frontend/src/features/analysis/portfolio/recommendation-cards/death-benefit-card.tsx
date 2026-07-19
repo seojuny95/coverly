@@ -1,6 +1,9 @@
+import { cn } from "@/shared/lib/utils";
+
 import type { DeathBenefitGuideInput, EssentialCoverageItem } from "../api";
 import { CoverageStatusBadge } from "../coverage-guide";
 import { CoverageGroupList } from "./coverage-group-list";
+import { CORE_COVERAGE_DESCRIPTION } from "./coverage-copy";
 import { CoverageReference } from "./coverage-reference";
 
 // Kept as a <section> (not the Card primitive) because panel.test.tsx locates
@@ -39,17 +42,12 @@ export function RecommendedDeathBenefitCard({
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
-            사망 보장
-          </p>
-          <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
+          <h4 className="text-lg font-semibold tracking-[-0.03em] text-zinc-950">
             {item?.label ?? "확인 결과"}
           </h4>
-          {item?.guidance_situation ? (
-            <p className="mt-2 text-sm leading-6 text-zinc-700">
-              {item.guidance_situation}
-            </p>
-          ) : null}
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            {CORE_COVERAGE_DESCRIPTION.death}
+          </p>
         </div>
         <CoverageStatusBadge
           status={item?.status ?? "not_found"}
@@ -120,7 +118,7 @@ function DeathBenefitRadio({
   onChange: () => void;
 }) {
   return (
-    <label className="flex items-start gap-2 text-sm leading-5 text-zinc-700">
+    <label className="flex items-start gap-2 text-sm leading-5">
       <input
         type="radio"
         name="death-benefit-context"
@@ -128,7 +126,14 @@ function DeathBenefitRadio({
         onChange={onChange}
         className="mt-0.5 size-4 border-zinc-300 text-blue-600 focus:ring-blue-500"
       />
-      <span>{label}</span>
+      <span
+        className={cn(
+          "font-medium text-zinc-700",
+          checked && "font-semibold text-blue-700",
+        )}
+      >
+        {label}
+      </span>
     </label>
   );
 }

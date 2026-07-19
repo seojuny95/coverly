@@ -1,4 +1,5 @@
 import { Card } from "@/shared/components/ui/card";
+import { cn } from "@/shared/lib/utils";
 
 import type { EssentialCoverageItem } from "../api";
 import { ReferenceSourceList } from "../coverage-guide";
@@ -8,15 +9,19 @@ import { AmountRangeMeter } from "../amount-range-meter";
 export function CoverageReference({
   item,
   isRefreshing = false,
+  compact = false,
+  showBasis = true,
 }: {
   item: EssentialCoverageItem | undefined;
   isRefreshing?: boolean;
+  compact?: boolean;
+  showBasis?: boolean;
 }) {
   if (isRefreshing) {
     return (
       <div
         role="status"
-        aria-label="참고 금액을 다시 확인하고 있어요"
+        aria-label="권장금액을 다시 확인하고 있어요"
         aria-busy="true"
         aria-live="polite"
         className="h-28 animate-pulse rounded-2xl bg-zinc-100"
@@ -38,7 +43,14 @@ export function CoverageReference({
 
   return (
     <Card className="border-transparent p-4 ring-1 ring-zinc-200">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div
+        className={cn(
+          "grid gap-4",
+          compact
+            ? "grid-cols-[minmax(0,1fr)_auto] items-start gap-3"
+            : "sm:grid-cols-2",
+        )}
+      >
         <div>
           <p className="text-xs font-semibold text-zinc-500">현재 가입금액</p>
           <p className="mt-1 text-lg font-semibold text-zinc-950">
@@ -49,14 +61,19 @@ export function CoverageReference({
         </div>
         {referenceAmount ? (
           <div>
-            <p className="text-xs font-semibold text-zinc-500">참고 금액</p>
-            <p className="mt-1 text-sm font-medium text-zinc-700">
+            <p className="text-xs font-semibold text-zinc-500">권장금액</p>
+            <p
+              className={cn(
+                "mt-1 font-medium text-zinc-700 tabular-nums",
+                compact ? "text-[11px] whitespace-nowrap" : "text-sm",
+              )}
+            >
               {referenceAmount}
             </p>
           </div>
         ) : null}
       </div>
-      {item.reference_basis ? (
+      {showBasis && item.reference_basis ? (
         <p className="mt-3 text-xs leading-5 text-zinc-500">
           {item.reference_basis}
         </p>
@@ -69,7 +86,9 @@ export function CoverageReference({
         referenceLabel="권장"
         formatAmount={formatKoreanWon}
       />
-      {item.guidance_reason && item.guidance_reason !== item.reference_basis ? (
+      {showBasis &&
+      item.guidance_reason &&
+      item.guidance_reason !== item.reference_basis ? (
         <p className="mt-2 text-xs leading-5 text-zinc-500">
           {item.guidance_reason}
         </p>

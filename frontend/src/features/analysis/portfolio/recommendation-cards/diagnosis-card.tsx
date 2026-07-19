@@ -2,17 +2,25 @@ import { Badge } from "@/shared/components/ui/badge";
 
 import type { EssentialCoverageItem } from "../api";
 import { CoverageStatusBadge } from "../coverage-guide";
+import {
+  CORE_COVERAGE_DESCRIPTION,
+  diagnosisDescription,
+} from "./coverage-copy";
+import type { DiagnosisKind } from "./coverage-copy";
 import { CoverageGroupList } from "./coverage-group-list";
 import { CoverageReference } from "./coverage-reference";
 
-const DIAGNOSIS_KINDS = new Set<EssentialCoverageItem["kind"]>([
-  "cancer",
-  "cerebrovascular",
-  "ischemic_heart",
-]);
+type DiagnosisCoverageItem = EssentialCoverageItem & { kind: DiagnosisKind };
 
-export function recommendedDiagnosisItems(items: EssentialCoverageItem[]) {
-  return items.filter((item) => DIAGNOSIS_KINDS.has(item.kind));
+export function recommendedDiagnosisItems(
+  items: EssentialCoverageItem[],
+): DiagnosisCoverageItem[] {
+  return items.filter(
+    (item): item is DiagnosisCoverageItem =>
+      item.kind === "cancer" ||
+      item.kind === "cerebrovascular" ||
+      item.kind === "ischemic_heart",
+  );
 }
 
 // Kept as a <section> (not the Card primitive) for consistency with the
@@ -21,19 +29,19 @@ export function RecommendedDiagnosisCard({
   items,
   confirmedCount,
 }: {
-  items: EssentialCoverageItem[];
+  items: DiagnosisCoverageItem[];
   confirmedCount: number;
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
-            진단 이후 생활
-          </p>
-          <h4 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-zinc-950">
+          <h4 className="text-lg font-semibold tracking-[-0.03em] text-zinc-950">
             진단 보장
           </h4>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            {CORE_COVERAGE_DESCRIPTION.diagnosis}
+          </p>
         </div>
         <Badge
           variant="neutral"
@@ -52,12 +60,15 @@ export function RecommendedDiagnosisCard({
   );
 }
 
-function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
+function RecommendedDiagnosisItem({ item }: { item: DiagnosisCoverageItem }) {
   return (
     <li className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-zinc-950">{item.label}</p>
+          <p className="mt-1 text-xs leading-5 text-zinc-600">
+            {diagnosisDescription(item.kind)}
+          </p>
           {item.guidance_situation ? (
             <p className="mt-1 text-xs leading-5 text-zinc-600">
               {item.guidance_situation}
@@ -68,7 +79,7 @@ function RecommendedDiagnosisItem({ item }: { item: EssentialCoverageItem }) {
       </div>
 
       <div className="mt-3">
-        <CoverageReference item={item} />
+        <CoverageReference item={item} compact showBasis={false} />
       </div>
 
       <CoverageGroupList

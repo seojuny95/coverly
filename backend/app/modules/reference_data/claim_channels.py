@@ -94,11 +94,11 @@ def _medical_indemnity_service(directory: dict[str, Any]) -> MedicalIndemnitySer
 def channels_for(
     insurers: list[str],
     *,
-    has_medical_indemnity: bool,
+    include_medical_indemnity_service: bool,
 ) -> ClaimChannelSet:
     """Deterministic claim-channel block for the user's insurers.
 
-    `has_medical_indemnity` includes the 실손24 medical-expense claim service.
+    `include_medical_indemnity_service` includes the 실손24 claim resource.
     Unknown insurers are skipped; duplicates collapse to one entry.
     """
 
@@ -121,7 +121,9 @@ def channels_for(
             )
         )
 
-    medical_indemnity = _medical_indemnity_service(directory) if has_medical_indemnity else None
+    medical_indemnity = (
+        _medical_indemnity_service(directory) if include_medical_indemnity_service else None
+    )
     return ClaimChannelSet(
         insurers=tuple(matched),
         medical_indemnity=medical_indemnity,
@@ -131,13 +133,13 @@ def channels_for(
 def claim_channel_block(
     insurers: list[str],
     *,
-    has_medical_indemnity: bool,
+    include_medical_indemnity_service: bool,
 ) -> ClaimChannelBlock:
     """API-shaped claim channels (with clickable links) for the given insurers."""
 
     channel_set = channels_for(
         insurers,
-        has_medical_indemnity=has_medical_indemnity,
+        include_medical_indemnity_service=include_medical_indemnity_service,
     )
     schema_insurers: list[ClaimChannelInsurer] = []
     for insurer in channel_set.insurers:

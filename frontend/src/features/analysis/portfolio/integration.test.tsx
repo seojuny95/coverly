@@ -282,7 +282,7 @@ describe("portfolio features", () => {
                 ],
                 coverage_count: 1,
                 detail:
-                  "일반암 진단비는 확인되지만 가입금액이 참고금액보다 낮아요.",
+                  "일반암 진단비는 확인되지만 가입금액이 권장금액보다 낮아요.",
                 matched_coverage_names: ["암 진단비"],
               },
             ],
@@ -378,7 +378,7 @@ describe("portfolio features", () => {
                   },
                 ],
                 coverage_count: 1,
-                detail: "일반암 진단비가 참고금액 이상으로 확인돼요.",
+                detail: "일반암 진단비가 권장금액 이상으로 확인돼요.",
                 matched_coverage_names: ["암진단비"],
               },
             ],

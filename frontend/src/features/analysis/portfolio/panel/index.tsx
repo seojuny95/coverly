@@ -60,7 +60,13 @@ export function PortfolioAnalysisPanel({
         <SpecialPolicySections analyses={specialAnalyses} />
       ) : null}
 
-      <ClaimGuide claimChannels={summary?.claim_channels ?? null} />
+      <ClaimGuide
+        claimChannels={summary?.claim_channels ?? null}
+        hasMedicalIndemnity={items.some(
+          (item) =>
+            item.kind === "medical_indemnity" && item.status !== "not_found",
+        )}
+      />
     </div>
   );
 }

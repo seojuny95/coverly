@@ -37,7 +37,7 @@ export function PremiumSummaryBar({
         </div>
         <div className="sm:text-right">
           <p className="text-xs text-zinc-400">
-            {benchmark.age_band_label} 참고 구간
+            {benchmark.age_band_label} 권장금액
           </p>
           <p className="mt-1 text-sm font-medium text-zinc-200">
             {formatWon(benchmark.suggested_min_premium)} ~{" "}
@@ -48,8 +48,8 @@ export function PremiumSummaryBar({
 
       <p className="mt-3 text-xs leading-5 text-zinc-300">
         월 소득의 {Math.round(benchmark.suggested_min_ratio * 100)}%~
-        {Math.round(benchmark.suggested_max_ratio * 100)}%에 해당하는 참고
-        금액이에요. {sourceLabels.join(" + ")} 자료를 사용했어요.
+        {Math.round(benchmark.suggested_max_ratio * 100)}%에 해당하는
+        권장금액이에요. {sourceLabels.join(" + ")} 자료를 사용했어요.
       </p>
       <AmountRangeMeter
         current={premium.monthly_total}

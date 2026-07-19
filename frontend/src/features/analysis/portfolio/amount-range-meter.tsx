@@ -17,7 +17,7 @@ export function AmountRangeMeter({
   referenceMin,
   referenceMax,
   currentLabel = "현재",
-  referenceLabel = "참고 구간",
+  referenceLabel = "권장",
   formatAmount,
   tone = "light",
 }: AmountRangeMeterProps) {

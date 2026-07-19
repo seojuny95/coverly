@@ -36,7 +36,7 @@ def get_claim_channels(
     )
     block = claim_channel_block(
         insurers,
-        has_medical_indemnity=include_medical_indemnity_service,
+        include_medical_indemnity_service=include_medical_indemnity_service,
     )
     if not block.insurers and block.medical_indemnity is None:
         return dependencies.unmatched(

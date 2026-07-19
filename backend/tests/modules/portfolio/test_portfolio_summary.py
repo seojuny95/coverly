@@ -1585,7 +1585,10 @@ def test_travel_medical_actual_loss_does_not_count_as_personal_medical_indemnity
     assert summary.actual_loss_coverages[0].is_medical_indemnity is False
     assert medical_item.status == "not_found"
     assert summary.claim_channels is not None
-    assert summary.claim_channels.medical_indemnity is None
+    assert summary.claim_channels.medical_indemnity is not None
+    assert summary.claim_channels.medical_indemnity.name == "실손24"
+    assert summary.claim_channels.medical_indemnity.links
+    assert summary.claim_channels.medical_indemnity.links[0].url == "https://www.silson24.or.kr"
 
 
 def test_domestic_travel_medical_actual_loss_is_not_personal_medical_indemnity() -> None:
@@ -1606,4 +1609,7 @@ def test_domestic_travel_medical_actual_loss_is_not_personal_medical_indemnity()
     assert summary.actual_loss_coverages[0].is_medical_indemnity is False
     assert medical_item.status == "not_found"
     assert summary.claim_channels is not None
-    assert summary.claim_channels.medical_indemnity is None
+    assert summary.claim_channels.medical_indemnity is not None
+    assert summary.claim_channels.medical_indemnity.name == "실손24"
+    assert summary.claim_channels.medical_indemnity.links
+    assert summary.claim_channels.medical_indemnity.links[0].url == "https://www.silson24.or.kr"

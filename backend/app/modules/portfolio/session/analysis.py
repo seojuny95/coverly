@@ -21,6 +21,8 @@ PortfolioSummaryCalculator = Callable[
     PortfolioCoverageSummary,
 ]
 
+PORTFOLIO_ANALYSIS_CACHE_VERSION = 2
+
 
 def analyze_portfolio_snapshot(
     sessions: PortfolioSessionService,
@@ -47,6 +49,7 @@ def analyze_portfolio_snapshot(
 
 def _analysis_context_hash(request: PortfolioSummaryRequest) -> str:
     payload = {
+        "analysis_version": PORTFOLIO_ANALYSIS_CACHE_VERSION,
         "policy_ids": request.policy_id_strings(),
         "death_benefit_context": request.death_benefit_context.model_dump(mode="json"),
     }

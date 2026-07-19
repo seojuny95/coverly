@@ -33,7 +33,6 @@ from app.modules.portfolio.schemas import (
     DamageCoverageItem,
     DamagePolicyCoverageGroup,
     DeathBenefitGuideInput,
-    EssentialCoverageCheck,
     ExcludedCoverageItem,
     PolicyInput,
     PortfolioCoverageSummary,
@@ -221,7 +220,7 @@ def summarize_portfolio_coverages(
         update={
             "essential_coverage_check": essential_coverage_check,
             "special_policy_analyses": build_special_policy_analyses(policies),
-            "claim_channels": _claim_channels(policies, essential_coverage_check),
+            "claim_channels": _claim_channels(policies),
             "premium": PremiumOverview.model_validate(
                 summarize_premiums(policies).model_dump(mode="python")
             ),
@@ -259,23 +258,12 @@ def build_portfolio_facts(policies: list[PolicyInput]) -> PortfolioFacts:
 
 def _claim_channels(
     policies: list[PolicyInput],
-    essential_coverage_check: EssentialCoverageCheck,
-) -> ClaimChannelBlock | None:
+) -> ClaimChannelBlock:
     insurers = [policy.기본정보.보험사 for policy in policies if policy.기본정보.보험사]
-    has_medical_indemnity = any(
-        item.kind == "medical_indemnity" and item.status != "not_found"
-        for item in essential_coverage_check.items
-    )
-    if not insurers and not has_medical_indemnity:
-        return None
-
-    channels = claim_channel_block(
+    return claim_channel_block(
         insurers,
-        has_medical_indemnity=has_medical_indemnity,
+        include_medical_indemnity_service=True,
     )
-    if not channels.insurers and channels.medical_indemnity is None:
-        return None
-    return channels
 
 
 def _single_policy_age(policies: list[PolicyInput]) -> int | None:
