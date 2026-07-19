@@ -7,6 +7,7 @@ from agents.tool_context import ToolContext
 
 from app.modules.counsel.agent.tools.claims import get_claim_channels
 from app.modules.counsel.agent.tools.coverages import (
+    CoverageNameInfo,
     CoverageTotalResult,
     FindCoveragesResult,
     OverlappingCoverage,
@@ -39,8 +40,8 @@ def _invoke_list_policies(context: CounselContext) -> PolicyListResult:
     return cast(PolicyListResult, _invoke(list_policies, context))
 
 
-def _invoke_list_coverage_names(context: CounselContext) -> list[str]:
-    return cast(list[str], _invoke(list_coverage_names, context))
+def _invoke_list_coverage_names(context: CounselContext) -> list[CoverageNameInfo]:
+    return cast(list[CoverageNameInfo], _invoke(list_coverage_names, context))
 
 
 def _invoke_find_coverages(
@@ -155,12 +156,15 @@ def test_empty_portfolio_returns_zero_count() -> None:
     assert result.policies == []
 
 
-def test_list_coverage_names_returns_every_distinct_name_sorted() -> None:
+def test_list_coverage_names_returns_every_distinct_name_sorted_with_its_type() -> None:
     context = CounselContext(policies=_policies())
 
     result = _invoke_list_coverage_names(context)
 
-    assert result == sorted(["암진단비(유사암제외)", "유사암진단비"])
+    assert result == [
+        CoverageNameInfo(담보명="암진단비(유사암제외)", 지급유형="정액"),
+        CoverageNameInfo(담보명="유사암진단비", 지급유형="정액"),
+    ]
 
 
 def test_find_coverages_docstring_tells_the_model_to_ask_instead_of_guessing() -> None:
