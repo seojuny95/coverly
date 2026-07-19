@@ -5,9 +5,8 @@ from typing import cast
 from agents import FunctionTool
 from agents.tool_context import ToolContext
 
-from app.modules.counsel.context import CounselContext
-from app.modules.counsel.tools.claims import get_claim_channels
-from app.modules.counsel.tools.coverages import (
+from app.modules.counsel.agent.tools.claims import get_claim_channels
+from app.modules.counsel.agent.tools.coverages import (
     CoverageTotalResult,
     FindCoveragesResult,
     OverlappingCoverage,
@@ -16,7 +15,8 @@ from app.modules.counsel.tools.coverages import (
     find_overlapping_coverages,
     list_coverage_names,
 )
-from app.modules.counsel.tools.policies import PolicyListResult, list_policies
+from app.modules.counsel.agent.tools.policies import PolicyListResult, list_policies
+from app.modules.counsel.context import CounselContext
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.reference_data.contracts import ClaimChannelBlock
 

@@ -4,17 +4,17 @@ from collections.abc import Awaitable, Callable
 
 from agents import Agent, Runner, RunResult
 
-from app.modules.counsel.context import CounselContext
-from app.modules.counsel.tools.claims import get_claim_channels
-from app.modules.counsel.tools.coverages import (
+from app.modules.counsel.agent.tools.claims import get_claim_channels
+from app.modules.counsel.agent.tools.coverages import (
     calculate_coverage_total,
     find_coverages,
     find_overlapping_coverages,
     list_coverage_names,
 )
-from app.modules.counsel.tools.official import retrieve_official_guidance
-from app.modules.counsel.tools.policies import list_policies
-from app.modules.counsel.tools.policy_terms import retrieve_policy_terms
+from app.modules.counsel.agent.tools.official import retrieve_official_guidance
+from app.modules.counsel.agent.tools.policies import list_policies
+from app.modules.counsel.agent.tools.policy_terms import retrieve_policy_terms
+from app.modules.counsel.context import CounselContext
 
 _INSTRUCTIONS = """당신은 사용자의 편에서 업로드된 보험을 함께 살펴보는 보험 상담사입니다.
 

@@ -4,9 +4,12 @@ from typing import cast
 from agents import FunctionTool
 from agents.tool_context import ToolContext
 
+from app.modules.counsel.agent.tools.official import (
+    OfficialGuidanceResult,
+    retrieve_official_guidance,
+)
+from app.modules.counsel.agent.tools.policy_terms import PolicyTermsResult, retrieve_policy_terms
 from app.modules.counsel.context import CounselContext
-from app.modules.counsel.tools.official import OfficialGuidanceResult, retrieve_official_guidance
-from app.modules.counsel.tools.policy_terms import PolicyTermsResult, retrieve_policy_terms
 from app.rag.official.answer import RagAnswer
 from app.rag.policy.generation import PolicyGenerationResult
 

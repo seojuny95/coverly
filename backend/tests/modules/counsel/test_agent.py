@@ -4,7 +4,7 @@ from typing import Any, cast
 import pytest
 from agents import Runner
 
-from app.modules.counsel.agent import create_agent, run_agent
+from app.modules.counsel.agent.definition import create_agent, run_agent
 from app.modules.counsel.context import CounselContext
 
 

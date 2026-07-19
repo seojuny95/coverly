@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.integrations.openai.client import JsonCompleter, structured_completer
-from app.modules.counsel.agent import AgentRunner, create_agent, run_agent
+from app.modules.counsel.agent.definition import AgentRunner, create_agent, run_agent
 from app.modules.counsel.check_scope_and_rewrite import (
     ScopeAndRewriteResult,
     check_scope_and_rewrite,
