@@ -26,6 +26,7 @@ class GroundedAnswerSpec:
     citations: list[AnswerCitation]
     limitations: list[str]
     claim_channels: ClaimChannelBlock | None
+    situational: bool = False
 
 
 def build_amount_label_map(results: list[RegisteredToolResult]) -> dict[str, str]:
@@ -75,6 +76,8 @@ def _placeholderize(text: str, amounts: dict[str, str]) -> str:
 def build_answer_spec(
     validated: PortfolioQuestionResponse,
     results: list[RegisteredToolResult],
+    *,
+    situational: bool = False,
 ) -> GroundedAnswerSpec:
     """Turn a validated response plus tool results into a compose spec.
 
@@ -97,4 +100,5 @@ def build_answer_spec(
         citations=validated.citations,
         limitations=validated.limitations,
         claim_channels=validated.claim_channels,
+        situational=situational,
     )

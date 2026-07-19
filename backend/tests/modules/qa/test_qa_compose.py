@@ -20,6 +20,31 @@ def _spec() -> GroundedAnswerSpec:
     )
 
 
+def _situational_spec() -> GroundedAnswerSpec:
+    return GroundedAnswerSpec(
+        mode="grounded",
+        facts=("암진단비 가입 확인", "암수술비 가입 확인"),
+        amounts={"amt1": "3,000만원", "amt2": "500만원"},
+        grounding_sources=("암진단비 30,000,000원",),
+        citations=[],
+        limitations=[],
+        claim_channels=None,
+        situational=True,
+    )
+
+
+def test_situational_compose_prompt_adds_empathy_and_option_guidance() -> None:
+    _, user = build_compose_prompt(_situational_spec(), "대장암에 걸렸는데 어떻게 해?")
+    assert "공감" in user  # 짧은 공감 지시
+    assert "되묻" in user  # 옵션 되묻기 지시
+    assert "보유" in user  # 보유 보장에서만 옵션
+
+
+def test_non_situational_compose_prompt_omits_option_guidance() -> None:
+    _, user = build_compose_prompt(_spec(), "암진단비 가입금액 알려줘")
+    assert "되묻" not in user
+
+
 def test_system_prompt_forbids_raw_numbers() -> None:
     # 숫자는 자리표시자로만 쓰라는 지시가 시스템 프롬프트에 있다
     assert "{{" in COMPOSE_SYSTEM
