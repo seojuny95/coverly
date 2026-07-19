@@ -113,4 +113,13 @@ def agent_instructions(decision: QaInputDecision | None = None) -> str:
             "- Coverly가 업로드한 보험증권에서 담보·가입금액·청구 정보를 찾아 답하는 "
             "상담사라는 점을 사용자가 이해할 수 있게 설명하세요.\n"
         )
+    if decision.is_situational:
+        route_context += (
+            "- 이 질문은 질병·사고를 말한 상황형입니다. inspect_portfolio로 포트폴리오를 "
+            "넓게 살펴 관련 보장을 선별하고, 확인된 관련 담보의 가입금액을 "
+            "calculate_coverage_total로 확인하세요.\n"
+            "- 짧게 공감한 뒤 관련 보장과 금액을 요약하고, 사용자가 이미 보유한 보장 중에서 "
+            "더 자세히 볼 항목을 고르도록 되묻는 질문으로 끝맺으세요. 보유하지 않은 보장이나 "
+            "새 상품을 옵션으로 제시하지 않습니다.\n"
+        )
     return base + route_context
