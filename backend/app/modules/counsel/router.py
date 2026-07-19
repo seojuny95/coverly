@@ -69,6 +69,7 @@ async def stream_counsel_answer(
             "answer": _OUT_OF_SCOPE_ANSWER,
             "in_scope": False,
             "rewritten_question": check.rewritten_question,
+            "excluded_note": check.excluded_note,
         }
 
     context = CounselContext(
@@ -84,4 +85,5 @@ async def stream_counsel_answer(
         "answer": str(result.final_output),
         "in_scope": True,
         "rewritten_question": check.rewritten_question,
+        "excluded_note": check.excluded_note,
     }

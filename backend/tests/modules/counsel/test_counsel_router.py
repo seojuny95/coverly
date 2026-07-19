@@ -67,6 +67,7 @@ def test_stream_endpoint_returns_the_agent_answer_when_in_scope() -> None:
         "answer": "암진단비가 확인돼요.",
         "in_scope": True,
         "rewritten_question": "암진단비 알려줘",
+        "excluded_note": None,
     }
 
 

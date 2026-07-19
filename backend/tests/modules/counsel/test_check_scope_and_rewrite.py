@@ -40,3 +40,26 @@ def test_unrelated_question_is_classified_out_of_scope() -> None:
     result = check_scope_and_rewrite("오늘 날씨 알려줘", [], complete=fake)
 
     assert result.in_scope is False
+
+
+def test_excluded_note_defaults_to_none_when_the_model_omits_it() -> None:
+    def fake(_system: str, _user: str) -> dict[str, object]:
+        return {"rewritten_question": "암진단비 알려줘", "in_scope": True, "reason": "보험 질문"}
+
+    result = check_scope_and_rewrite("암진단비 알려줘", [], complete=fake)
+
+    assert result.excluded_note is None
+
+
+def test_excluded_note_carries_the_dropped_out_of_scope_part_of_a_mixed_question() -> None:
+    def fake(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "rewritten_question": "암진단비 합계를 알려줘.",
+            "in_scope": True,
+            "excluded_note": "오늘 날씨는 보험과 무관해 답변에서 뺐습니다.",
+            "reason": "보험 질문 + 무관한 질문 혼합",
+        }
+
+    result = check_scope_and_rewrite("암진단비 합계 알려주고 오늘 날씨도 알려줘", [], complete=fake)
+
+    assert result.excluded_note == "오늘 날씨는 보험과 무관해 답변에서 뺐습니다."

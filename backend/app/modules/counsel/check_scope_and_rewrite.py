@@ -11,8 +11,13 @@ _INSTRUCTIONS = """이전 대화와 현재 질문을 보고 두 가지를 판단
    - 대명사, 생략된 주어·목적어만 이전 대화 내용으로 채우세요.
    - 없는 사실이나 의도를 새로 지어내지 마세요.
    - 이전 대화가 없거나 무관하면 원문을 그대로 반환하세요.
+   - 질문에 보험과 무관한 내용이 섞여 있으면(예: "암보험 얼마야? 날씨도 알려줘"),
+     그 부분은 빼고 보험 관련 부분만 남기세요.
 
-2. in_scope: 재작성한 질문이 다음 중 하나에 해당하면 true입니다.
+2. excluded_note: rewritten_question을 쓰면서 보험과 무관해서 뺀 내용이 있으면,
+   무엇을 왜 뺐는지 한 문장으로 적으세요. 뺀 내용이 없으면 null입니다.
+
+3. in_scope: 재작성한 질문이 다음 중 하나에 해당하면 true입니다.
    - 사용자가 가입한 보험, 증권, 담보, 가입금액, 약관, 청구처럼 본인의 보험 정보에 관한 질문
      (이런 개인 정보 질문이 Coverly가 답하는 핵심 범위입니다)
    - 보험 제도나 용어에 관한 일반적인 질문
@@ -28,6 +33,7 @@ _INSTRUCTIONS = """이전 대화와 현재 질문을 보고 두 가지를 판단
 class ScopeAndRewriteResult(BaseModel):
     rewritten_question: str
     in_scope: bool
+    excluded_note: str | None = None
     reason: str
 
 
