@@ -7,24 +7,32 @@ import time
 from argparse import ArgumentParser
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast
 
+from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter
 from app.modules.qa.contracts import ConsultationEvidence
 from app.rag.policy.generation import generate_policy_answer
 from app.rag.policy.retrieval import retrieve_policy_context
 from evals.rag.data import string_groups as _string_groups
 from evals.rag.data import string_tuple as _string_tuple
+from evals.rag.execution import (
+    GenerationMode,
+    RagEvalRunMetadata,
+    RetrievalMode,
+    build_run_metadata,
+    validate_execution_modes,
+)
 from evals.rag.policy.retrieval import (
     EVAL_FIXTURE as RETRIEVAL_FIXTURE,
 )
 from evals.rag.policy.retrieval import (
     OfflinePolicyRetrievalContext,
     PolicyEvalCase,
-    build_offline_policy_retrieval_context,
     load_policy_retrieval_eval_cases,
+    policy_retrieval_eval_context,
     policy_text_matches_expected_group,
     sign_policy_eval_case_sessions,
 )
@@ -58,6 +66,8 @@ class PolicyRagE2EResult:
     evidence_ids: tuple[str, ...]
     hit_texts: tuple[str, ...]
     notes: tuple[str, ...]
+    retrieval_latency_seconds: float
+    generation_latency_seconds: float
 
 
 @dataclass(frozen=True)
@@ -66,6 +76,7 @@ class PolicyRagE2EReport:
     total: int
     elapsed_seconds: float
     results: tuple[PolicyRagE2EResult, ...]
+    metadata: RagEvalRunMetadata
 
     @property
     def pass_rate(self) -> float:
@@ -99,25 +110,66 @@ def evaluate_e2e(
     cases: tuple[PolicyRagE2ECase, ...] | None = None,
     *,
     complete: JsonCompleter | None = None,
+    retrieval_mode: RetrievalMode = "offline",
+    generation_mode: GenerationMode = "deterministic",
 ) -> PolicyRagE2EReport:
-    active_completer = complete or offline_extractive_completer
+    validate_execution_modes(retrieval_mode, generation_mode)
+    settings = get_settings()
+    if generation_mode == "live" and complete is None and not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is required for live policy RAG E2E evaluation")
+    active_completer = complete
+    if generation_mode == "deterministic" and active_completer is None:
+        active_completer = offline_extractive_completer
     active_cases = cases if cases is not None else load_e2e_eval_cases()
-    context = build_offline_policy_retrieval_context(path=RETRIEVAL_FIXTURE)
+    executed_at = datetime.now(UTC)
     started = time.perf_counter()
-    results = tuple(
-        _evaluate_case(
-            _case_with_signed_sessions(case, expires_at=context.expires_at),
-            context=context,
-            complete=active_completer,
+    with policy_retrieval_eval_context(
+        mode=retrieval_mode,
+        path=RETRIEVAL_FIXTURE,
+    ) as context:
+        results = tuple(
+            _evaluate_case(
+                _case_with_signed_sessions(
+                    case,
+                    expires_at=context.expires_at,
+                    context=context,
+                ),
+                context=context,
+                complete=active_completer,
+            )
+            for case in active_cases
         )
-        for case in active_cases
-    )
+        corpus_version = context.corpus_version
+        index_version = context.index_version
 
     return PolicyRagE2EReport(
         passed=sum(result.passed for result in results),
         total=len(results),
         elapsed_seconds=time.perf_counter() - started,
         results=results,
+        metadata=build_run_metadata(
+            retrieval_mode=retrieval_mode,
+            generation_mode=generation_mode,
+            retrieval_model=(
+                "hashing-embedder-v1"
+                if retrieval_mode == "offline"
+                else settings.openai_embedding_model
+            ),
+            generation_model=(
+                "injected-completer"
+                if complete is not None and complete is not offline_extractive_completer
+                else (
+                    "offline-extractive-v1"
+                    if generation_mode == "deterministic"
+                    else settings.openai_model
+                )
+            ),
+            corpus_version=corpus_version,
+            index_version=index_version,
+            retrieval_latencies=tuple(result.retrieval_latency_seconds for result in results),
+            generation_latencies=tuple(result.generation_latency_seconds for result in results),
+            executed_at=executed_at,
+        ),
     )
 
 
@@ -137,14 +189,36 @@ def offline_extractive_completer(_: str, user: str) -> dict[str, object]:
 
 
 def render_report(report: PolicyRagE2EReport, *, show_passing: bool = False) -> str:
+    metadata = report.metadata
     lines = [
+        (
+            f"retrieval_mode={metadata.retrieval_mode} "
+            f"generation_mode={metadata.generation_mode} "
+            f"retrieval_model={metadata.retrieval_model} "
+            f"generation_model={metadata.generation_model}"
+        ),
+        (
+            f"executed_at={metadata.executed_at.isoformat()} "
+            f"corpus_version={metadata.corpus_version} "
+            f"index_version={metadata.index_version}"
+        ),
         (
             f"passed={report.passed}/{report.total} "
             f"pass_rate={report.pass_rate:.3f} "
             f"retrieval_match={report.retrieval_match_rate:.3f} "
             f"answer_contract={report.answer_contract_rate:.3f} "
             f"elapsed_s={report.elapsed_seconds:.2f}"
-        )
+        ),
+        (
+            f"latency_avg_s retrieval={metadata.retrieval_average_latency_seconds:.3f} "
+            f"generation={metadata.generation_average_latency_seconds:.3f} "
+            f"total={metadata.total_average_latency_seconds:.3f}"
+        ),
+        (
+            f"latency_p95_s retrieval={metadata.retrieval_p95_latency_seconds:.3f} "
+            f"generation={metadata.generation_p95_latency_seconds:.3f} "
+            f"total={metadata.total_p95_latency_seconds:.3f}"
+        ),
     ]
 
     for result in report.results:
@@ -253,8 +327,9 @@ def _evaluate_case(
     case: PolicyRagE2ECase,
     *,
     context: OfflinePolicyRetrievalContext,
-    complete: JsonCompleter,
+    complete: JsonCompleter | None,
 ) -> PolicyRagE2EResult:
+    retrieval_started = time.perf_counter()
     hits = retrieve_policy_context(
         list(case.session_ids),
         case.query,
@@ -262,6 +337,7 @@ def _evaluate_case(
         store=context.store,
         embedder=context.embedder,
     )
+    retrieval_latency = time.perf_counter() - retrieval_started
     evidence = tuple(
         ConsultationEvidence(
             id=f"session:{index}",
@@ -269,7 +345,9 @@ def _evaluate_case(
         )
         for index, hit in enumerate(hits, start=1)
     )
+    generation_started = time.perf_counter()
     answer = generate_policy_answer(case.query, evidence, complete=complete)
+    generation_latency = time.perf_counter() - generation_started
     answer_status: Literal["answered", "no_data"] = (
         "no_data" if answer.generation == "fallback" else "answered"
     )
@@ -318,6 +396,8 @@ def _evaluate_case(
             expected_status=case.expected_status,
             answer_status=answer_status,
         ),
+        retrieval_latency_seconds=retrieval_latency,
+        generation_latency_seconds=generation_latency,
     )
 
 
@@ -325,11 +405,12 @@ def _case_with_signed_sessions(
     case: PolicyRagE2ECase,
     *,
     expires_at: datetime,
+    context: OfflinePolicyRetrievalContext,
 ) -> PolicyRagE2ECase:
     retrieval_case = PolicyEvalCase(
         id=case.id,
         query=case.query,
-        session_ids=case.session_ids,
+        session_ids=context.map_session_ids(case.session_ids),
         expected_session_id="",
         expected_term_groups=case.expected_term_groups,
     )
@@ -385,14 +466,32 @@ def _rate(values: Iterable[bool]) -> float:
     return sum(1 for item in items if item) / len(items) if items else 0.0
 
 
-def _parse_args() -> tuple[Path, bool]:
+def _parse_args() -> tuple[Path, RetrievalMode, GenerationMode, bool]:
     parser = ArgumentParser(description="Evaluate uploaded-policy RAG E2E.")
     parser.add_argument("--path", type=Path, default=EVAL_FIXTURE)
+    parser.add_argument("--retrieval-mode", choices=("offline", "production"), default="offline")
+    parser.add_argument(
+        "--generation-mode", choices=("deterministic", "live"), default="deterministic"
+    )
     parser.add_argument("--show-passing", action="store_true")
     args = parser.parse_args()
-    return cast(Path, args.path), bool(args.show_passing)
+    return (
+        cast(Path, args.path),
+        cast(RetrievalMode, args.retrieval_mode),
+        cast(GenerationMode, args.generation_mode),
+        bool(args.show_passing),
+    )
 
 
 if __name__ == "__main__":
-    path, show_passing = _parse_args()
-    print(render_report(evaluate_e2e(load_e2e_eval_cases(path)), show_passing=show_passing))
+    path, retrieval_mode, generation_mode, show_passing = _parse_args()
+    print(
+        render_report(
+            evaluate_e2e(
+                load_e2e_eval_cases(path),
+                retrieval_mode=retrieval_mode,
+                generation_mode=generation_mode,
+            ),
+            show_passing=show_passing,
+        )
+    )

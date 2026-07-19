@@ -9,7 +9,8 @@ import time
 import unicodedata
 import uuid
 from argparse import ArgumentParser
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -25,6 +26,7 @@ from app.rag.policy.retrieval import retrieve_policy_context
 from app.rag.policy.session_tokens import sign_policy_session_id
 from app.rag.policy.store import PolicyRagStore
 from app.rag.scoring import cosine_similarity as _cosine
+from evals.rag.execution import RetrievalMode, content_version
 
 EVAL_FIXTURE = Path(__file__).resolve().parent / "retrieval_dataset.json"
 _SAMPLE_DIR_ENV = "POLICY_RAG_EVAL_SAMPLE_DIR"
@@ -91,6 +93,12 @@ class OfflinePolicyRetrievalContext:
     store: PolicyRagStore
     embedder: Embedder
     expires_at: datetime
+    session_map: dict[str, str]
+    corpus_version: str
+    index_version: str
+
+    def map_session_ids(self, session_ids: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(self.session_map.get(session_id, session_id) for session_id in session_ids)
 
 
 def load_policy_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[PolicyEvalCase, ...]:
@@ -116,11 +124,66 @@ def build_offline_policy_retrieval_context(
         parse=parse,
         created_at=created_at,
     )
+    corpus_version = _policy_corpus_version(records)
     return OfflinePolicyRetrievalContext(
         store=_InMemoryPolicyStore(records),
         embedder=active_embedder,
         expires_at=created_at + timedelta(hours=1),
+        session_map={},
+        corpus_version=corpus_version,
+        index_version=f"in-memory:{corpus_version}",
     )
+
+
+@contextmanager
+def policy_retrieval_eval_context(
+    *,
+    mode: RetrievalMode,
+    path: Path = EVAL_FIXTURE,
+    sample_dir: Path | None = None,
+    embedder: Embedder | None = None,
+    store: PolicyRagStore | None = None,
+    parse: Callable[[bytes], ParsedDocument] = parse_document,
+) -> Iterator[OfflinePolicyRetrievalContext]:
+    if mode == "offline":
+        yield build_offline_policy_retrieval_context(
+            path=path,
+            sample_dir=sample_dir,
+            embedder=embedder,
+            parse=parse,
+        )
+        return
+
+    active_embedder = embedder or openai_embedder_from_settings()
+    active_store = store or shared_policy_store()
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    documents = cast(list[dict[str, object]], raw["documents"])
+    source_dir = _resolve_sample_dir(sample_dir, source=str(raw["source"]))
+    session_map = _eval_session_map(documents)
+    created_at = datetime.now(UTC)
+    records = _records_from_documents(
+        documents,
+        active_embedder,
+        source_dir,
+        parse=parse,
+        created_at=created_at,
+        session_map=session_map,
+    )
+    corpus_version = _policy_corpus_version(records)
+    eval_session_ids = tuple(session_map.values())
+
+    try:
+        active_store.add(records)
+        yield OfflinePolicyRetrievalContext(
+            store=active_store,
+            embedder=active_embedder,
+            expires_at=created_at + timedelta(hours=1),
+            session_map=session_map,
+            corpus_version=corpus_version,
+            index_version=f"pgvector:policy_rag_chunks:{corpus_version}",
+        )
+    finally:
+        _delete_eval_sessions(active_store, eval_session_ids)
 
 
 def sign_policy_eval_case_sessions(
@@ -324,6 +387,27 @@ def _records_from_documents(
             )
         )
     return tuple(records)
+
+
+def _policy_corpus_version(records: tuple[PolicyVectorRecord, ...]) -> str:
+    return content_version(
+        *(
+            f"{record.chunk.content_type}\n{record.chunk.chunk_index}\n"
+            f"{record.chunk.table_index}\n{record.chunk.text}"
+            for record in records
+        )
+    )
+
+
+def _delete_eval_sessions(store: PolicyRagStore, session_ids: tuple[str, ...]) -> None:
+    errors: list[Exception] = []
+    for session_id in session_ids:
+        try:
+            store.delete(session_id)
+        except Exception as error:
+            errors.append(error)
+    if errors:
+        raise ExceptionGroup("failed to delete policy RAG evaluation sessions", errors)
 
 
 class _InMemoryPolicyStore:

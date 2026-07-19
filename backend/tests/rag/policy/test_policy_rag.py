@@ -24,6 +24,7 @@ from evals.rag.policy.retrieval import (
     EVAL_FIXTURE,
     _text_matches_expected_group,
     evaluate_policy_retrieval,
+    policy_retrieval_eval_context,
 )
 
 RAG_TEST_BIRTH = "90" + "0101"
@@ -633,6 +634,46 @@ def test_policy_retrieval_evaluation_can_use_production_embedder(
 
     assert report.recall == 1.0
     assert calls
+    assert store.records == []
+
+
+def test_policy_e2e_production_context_cleans_up_after_failure() -> None:
+    raw = {
+        "source": "sample-insurance-input",
+        "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
+        "cases": [],
+    }
+    document = ParsedDocument(
+        text="월 보험료는 87,000원입니다.",
+        layout_text="",
+        tables=(),
+    )
+
+    with TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        sample_dir = root / "sample-insurance-input"
+        sample_dir.mkdir()
+        (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
+        dataset = root / "evaluation_dataset.json"
+        dataset.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+        store = _MemoryStore(())
+
+        with (
+            pytest.raises(RuntimeError, match="stop evaluation"),
+            policy_retrieval_eval_context(
+                mode="production",
+                path=dataset,
+                sample_dir=sample_dir,
+                embedder=_FixedEmbedder(),
+                store=store,
+                parse=lambda _: document,
+            ) as context,
+        ):
+            assert context.session_map["session-a"].startswith("eval-")
+            assert context.index_version.startswith("pgvector:policy_rag_chunks:")
+            assert store.records
+            raise RuntimeError("stop evaluation")
+
     assert store.records == []
 
 

@@ -1,20 +1,24 @@
 """End-to-end evaluation for official-source RAG.
 
 This runner evaluates the official RAG path as retrieval followed by answer
-generation. The default completer is deterministic and extractive so the
-offline score tracks retrieval-to-answer wiring without requiring an OpenAI
-API key. Use ``--live-generation`` when validating the live LLM answer step.
+generation. Retrieval and generation modes are explicit so deterministic,
+production-retrieval, and fully live results can be compared consistently.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from argparse import ArgumentParser
+import time
+from argparse import SUPPRESS, ArgumentParser
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast
+
+import psycopg
+from psycopg import sql
 
 from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter, compact_prompt_text
@@ -25,6 +29,14 @@ from app.rag.official.models import RagChunk
 from app.rag.official.retrieval import retrieve
 from evals.rag.data import string_groups as _string_groups
 from evals.rag.data import string_tuple as _string_tuple
+from evals.rag.execution import (
+    GenerationMode,
+    RagEvalRunMetadata,
+    RetrievalMode,
+    build_run_metadata,
+    content_version,
+    validate_execution_modes,
+)
 from evals.rag.official.generation import (
     EVAL_FIXTURE as GENERATION_FIXTURE,
 )
@@ -58,6 +70,7 @@ class OfficialRagE2EReport:
     passed: int
     total: int
     results: tuple[OfficialRagE2EResult, ...]
+    metadata: RagEvalRunMetadata
 
     @property
     def pass_rate(self) -> float:
@@ -96,6 +109,8 @@ class OfficialRagE2EResult:
     answer_status: str
     citation_ids: tuple[str, ...]
     notes: tuple[str, ...]
+    retrieval_latency_seconds: float
+    generation_latency_seconds: float
 
     @property
     def failure_bucket(self) -> FailureBucket:
@@ -136,31 +151,82 @@ def evaluate_e2e(
     cases: tuple[GenerationEvalCase, ...] | None = None,
     *,
     complete: JsonCompleter | None = None,
-    live_generation: bool = False,
+    retrieval_mode: RetrievalMode = "offline",
+    generation_mode: GenerationMode = "deterministic",
+    live_generation: bool | None = None,
 ) -> OfficialRagE2EReport:
+    if live_generation is not None:
+        generation_mode = "live" if live_generation else "deterministic"
+    validate_execution_modes(retrieval_mode, generation_mode)
     active_completer = complete
-    if not live_generation and active_completer is None:
+    if generation_mode == "deterministic" and active_completer is None:
         active_completer = offline_extractive_completer
-    if live_generation and active_completer is None and not get_settings().openai_api_key:
+    if generation_mode == "live" and active_completer is None and not get_settings().openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is required for live official RAG E2E evaluation")
 
     active_cases = cases if cases is not None else load_e2e_eval_cases()
     chunks = load_official_chunks()
     chunks_by_id = {chunk.id: chunk for chunk in chunks}
+    settings = get_settings()
+    corpus_version = _official_corpus_version(chunks)
+    index_version = (
+        f"in-memory:{corpus_version}"
+        if retrieval_mode == "offline"
+        else _production_index_version(
+            database_url=settings.database_url,
+            table_name=settings.rag_pg_table,
+        )
+    )
+    executed_at = datetime.now(UTC)
     results = tuple(
         _evaluate_case(
             case,
             chunks=chunks,
             chunks_by_id=chunks_by_id,
             complete=active_completer,
+            retrieval_mode=retrieval_mode,
         )
         for case in active_cases
     )
+
+    if retrieval_mode == "production":
+        final_index_version = _production_index_version(
+            database_url=settings.database_url,
+            table_name=settings.rag_pg_table,
+        )
+        if final_index_version != index_version:
+            raise RuntimeError(
+                "official RAG index changed during E2E evaluation: "
+                f"{index_version} -> {final_index_version}"
+            )
 
     return OfficialRagE2EReport(
         passed=sum(result.passed for result in results),
         total=len(results),
         results=results,
+        metadata=build_run_metadata(
+            retrieval_mode=retrieval_mode,
+            generation_mode=generation_mode,
+            retrieval_model=(
+                "hashing-embedder-v1"
+                if retrieval_mode == "offline"
+                else f"{settings.openai_embedding_model}+{settings.openai_model}-reranker"
+            ),
+            generation_model=(
+                "injected-completer"
+                if complete is not None and complete is not offline_extractive_completer
+                else (
+                    "offline-extractive-v1"
+                    if generation_mode == "deterministic"
+                    else settings.openai_model
+                )
+            ),
+            corpus_version=corpus_version,
+            index_version=index_version,
+            retrieval_latencies=tuple(result.retrieval_latency_seconds for result in results),
+            generation_latencies=tuple(result.generation_latency_seconds for result in results),
+            executed_at=executed_at,
+        ),
     )
 
 
@@ -192,13 +258,35 @@ def offline_extractive_completer(_: str, user: str) -> dict[str, object]:
 
 
 def render_report(report: OfficialRagE2EReport, *, show_passing: bool = False) -> str:
+    metadata = report.metadata
     lines = [
+        (
+            f"retrieval_mode={metadata.retrieval_mode} "
+            f"generation_mode={metadata.generation_mode} "
+            f"retrieval_model={metadata.retrieval_model} "
+            f"generation_model={metadata.generation_model}"
+        ),
+        (
+            f"executed_at={metadata.executed_at.isoformat()} "
+            f"corpus_version={metadata.corpus_version} "
+            f"index_version={metadata.index_version}"
+        ),
         (
             f"passed={report.passed}/{report.total} "
             f"pass_rate={report.pass_rate:.3f} "
             f"retrieval_required_citations={report.retrieval_required_citation_rate:.3f} "
             f"answer_contract={report.answer_contract_rate:.3f}"
-        )
+        ),
+        (
+            f"latency_avg_s retrieval={metadata.retrieval_average_latency_seconds:.3f} "
+            f"generation={metadata.generation_average_latency_seconds:.3f} "
+            f"total={metadata.total_average_latency_seconds:.3f}"
+        ),
+        (
+            f"latency_p95_s retrieval={metadata.retrieval_p95_latency_seconds:.3f} "
+            f"generation={metadata.generation_p95_latency_seconds:.3f} "
+            f"total={metadata.total_p95_latency_seconds:.3f}"
+        ),
     ]
     failed_buckets = {
         bucket: count
@@ -234,20 +322,28 @@ def _evaluate_case(
     chunks: tuple[RagChunk, ...],
     chunks_by_id: dict[str, RagChunk],
     complete: JsonCompleter | None,
+    retrieval_mode: RetrievalMode,
 ) -> OfficialRagE2EResult:
-    hits = retrieve(
-        query=case.question,
-        chunks=chunks,
-        embedder=HashingEmbedder(),
-        final_k=5,
-    )
+    retrieval_started = time.perf_counter()
+    if retrieval_mode == "offline":
+        hits = retrieve(
+            query=case.question,
+            chunks=chunks,
+            embedder=HashingEmbedder(),
+            final_k=5,
+        )
+    else:
+        hits = retrieve(query=case.question, final_k=5)
+    retrieval_latency = time.perf_counter() - retrieval_started
     hit_chunk_ids = tuple(hit.chunk.id for hit in hits)
     required_citation_groups = _required_citation_groups(case, chunks_by_id)
     required_citations_retrieved = not required_citation_groups or all(
         any(citation_id in hit_chunk_ids for citation_id in group)
         for group in required_citation_groups
     )
+    generation_started = time.perf_counter()
     answer = answer_official_question(case.question, hits=hits, complete=complete)
+    generation_latency = time.perf_counter() - generation_started
     citation_ids = tuple(citation.chunk_id for citation in answer.citations)
     answer_text = _normalize(answer.answer)
     status_matched = answer.status == case.expected_status
@@ -300,7 +396,44 @@ def _evaluate_case(
             citation_ids=citation_ids,
             answer_status=answer.status,
         ),
+        retrieval_latency_seconds=retrieval_latency,
+        generation_latency_seconds=generation_latency,
     )
+
+
+def _official_corpus_version(chunks: tuple[RagChunk, ...]) -> str:
+    return content_version(
+        *(
+            f"{chunk.id}\n{chunk.source_id}\n{chunk.version_label}\n{chunk.text}"
+            for chunk in sorted(chunks, key=lambda item: item.id)
+        )
+    )
+
+
+def _production_index_version(*, database_url: str, table_name: str) -> str:
+    if not database_url:
+        return f"pgvector:{table_name}:unavailable"
+    if re.fullmatch(r"[a-z_][a-z0-9_]*", table_name) is None:
+        raise ValueError("official RAG table name must be a safe SQL identifier")
+
+    physical_table_name = f"data_{table_name}"
+    statement = sql.SQL("SELECT text, metadata_ FROM {} ORDER BY node_id").format(
+        sql.Identifier(physical_table_name)
+    )
+    with psycopg.connect(database_url) as connection:
+        rows = connection.execute(statement).fetchall()
+    nodes = tuple(
+        (str(row[0]), json.loads(str(cast(dict[str, object], row[1])["_node_content"])))
+        for row in rows
+    )
+    index_version = content_version(
+        *(
+            f"{node['id_']}\n{cast(dict[str, object], node['metadata'])['source_id']}\n"
+            f"{cast(dict[str, object], node['metadata']).get('version_label')}\n{text}"
+            for text, node in nodes
+        )
+    )
+    return f"pgvector:{table_name}:{index_version}"
 
 
 def _notes(
@@ -490,19 +623,29 @@ def _rate(values: Iterable[bool]) -> float:
     return sum(1 for item in items if item) / len(items) if items else 0.0
 
 
-def _parse_args() -> tuple[Path, bool, bool]:
+def _parse_args() -> tuple[Path, RetrievalMode, GenerationMode, bool]:
     parser = ArgumentParser(description="Evaluate official RAG retrieval-to-generation E2E.")
     parser.add_argument("--path", type=Path, default=EVAL_FIXTURE)
-    parser.add_argument("--live-generation", action="store_true")
+    parser.add_argument("--retrieval-mode", choices=("offline", "production"), default="offline")
+    parser.add_argument(
+        "--generation-mode", choices=("deterministic", "live"), default="deterministic"
+    )
+    parser.add_argument("--live-generation", action="store_true", help=SUPPRESS)
     parser.add_argument("--show-passing", action="store_true")
     args = parser.parse_args()
-    return cast(Path, args.path), bool(args.live_generation), bool(args.show_passing)
+    return (
+        cast(Path, args.path),
+        cast(RetrievalMode, args.retrieval_mode),
+        "live" if args.live_generation else cast(GenerationMode, args.generation_mode),
+        bool(args.show_passing),
+    )
 
 
 if __name__ == "__main__":
-    path, live_generation, show_passing = _parse_args()
+    path, retrieval_mode, generation_mode, show_passing = _parse_args()
     report = evaluate_e2e(
         load_e2e_eval_cases(path),
-        live_generation=live_generation,
+        retrieval_mode=retrieval_mode,
+        generation_mode=generation_mode,
     )
     print(render_report(report, show_passing=show_passing))

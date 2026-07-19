@@ -83,6 +83,12 @@ QA router/planner는 거치지 않는다.
 - 운전자보험, 어린이보험, 자동차보험, 제3보험 기본정보, 담보 금액, 후기 페이지 유의사항, 다중 세션 hard-negative, 실손의료보험 혼동, 개인 상황 판단 불가, 실제 사고/청구 판단 불가, 수익자/환급금/해지/대출/세금 같은 증권 밖 질문을 포함한다.
 - 평가셋에는 실제 개인정보를 넣지 않고 `sample-*` 세션 ID와 일반 질문만 사용한다.
 - 기본 completer는 검색된 evidence를 그대로 선택하는 deterministic extractive 방식이다.
+- Official E2E와 동일하게 `retrieval-mode=offline|production`,
+  `generation-mode=deterministic|live`를 사용한다.
+- production retrieval은 실행별 고유 `eval-*` 세션에 평가 vector를 임시 적재하고
+  성공·실패와 관계없이 종료 시 삭제한다.
+- 보고서에는 모델, 실행 시각, corpus/index fingerprint, retrieval/generation/전체
+  latency의 평균·p95가 기록된다.
 
 ### 개선 기록
 
@@ -92,6 +98,27 @@ QA router/planner는 거치지 않는다.
 | RAG E2E broad baseline | 118/134, pass_rate 0.881 | retrieval 전체 세트와 no_data/hard-negative를 추가했다. 다중 세션 hard-negative, 실손의료보험 혼동, 수익자/면책/개인 상황 판단 no_data에서 실패가 드러났다. |
 | RAG E2E reliable baseline | 123/171, pass_rate 0.719 | no_data/hard-negative를 49개까지 늘렸다. 실손의료보험 혼동, 실제 사고/청구 판단, 수익자/환급금/해지/대출/세금 등 증권 밖 질문에서 answered로 흐르는 문제가 뚜렷해졌다. |
 | PII 안내문 false positive 수정 후 | 124/171, pass_rate 0.725 | retrieval_match 0.959, answer_contract 0.737이다. 주소 변경 안내 chunk가 보존되면서 1건 개선됐고 나머지 실패군은 유지됐다. |
+| production retrieval E2E | 131/171, pass_rate 0.766 | generation을 deterministic으로 고정하고 OpenAI embedding + 운영 pgvector 효과만 측정했다. retrieval_match는 0.994다. |
+| production retrieval + live generation | 135/171, pass_rate 0.789 | 실제 Online 경로에서 deterministic generation보다 4건 개선됐다. retrieval_match는 0.994로 유지됐다. |
+
+### 실행 모드별 최신 결과
+
+2026-07-19 전체 171개 기준이다. Offline과 production에서 사용한 평가 corpus
+fingerprint는 모두 `189854d9d4d80a0a`다. Production 실행 종료 후 DB의 남은
+`eval-*` 세션이 0건임을 확인했다.
+Production retrieval은 `text-embedding-3-small`, live generation은
+`gpt-4o-mini`로 실측했다. Live 결과는 단일 전체 실행값이므로 모델 변동성을 볼
+때는 같은 fingerprint로 반복 측정한다.
+
+| Retrieval | Generation | 결과 | Retrieval match | 평균 latency | p95 latency |
+|---|---|---:|---:|---:|---:|
+| Offline | Deterministic | 124/171 (0.725) | 0.959 | 0.007초 | 0.017초 |
+| Production | Deterministic | 131/171 (0.766) | 0.994 | 1.496초 | 1.892초 |
+| Production | Live | 135/171 (0.789) | 0.994 | 3.358초 | 4.694초 |
+
+Production retrieval은 Offline보다 7건, 0.041p 개선됐다. 같은 production
+retrieval에서 live generation은 4건, 0.023p 추가 개선됐다. 남은 실패는 주로
+증권에 없는 내용도 `answered`로 흐르는 no-data 경계와 필수 내용 누락이다.
 
 ## 현재 상태 요약
 
@@ -101,4 +128,6 @@ QA router/planner는 거치지 않는다.
 | Retrieval production | 120/122, recall@5 0.984, MRR 0.844 | 주소 안내문 false positive 수정 효과 확인 |
 | Generation practice, live | 0.851 | 고정 retrieval context 기준 측정 완료 |
 | Generation test, live | 0.850 | 독립 test 20개 기준 측정 완료 |
-| RAG E2E | 124/171, pass_rate 0.725 | retrieval은 0.959지만 no-data 답변 거절이 주요 잔여 병목 |
+| RAG E2E offline | 124/171, pass_rate 0.725 | 빠른 결정적 회귀 기준선, retrieval match 0.959 |
+| RAG E2E production retrieval | 131/171, pass_rate 0.766 | retrieval match 0.994, deterministic generation 기준 |
+| RAG E2E Online | 135/171, pass_rate 0.789 | production retrieval + live generation, 전체 p95 4.694초 |

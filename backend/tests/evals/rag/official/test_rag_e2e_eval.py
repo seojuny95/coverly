@@ -60,10 +60,13 @@ def test_official_rag_e2e_scores_retrieval_then_generation(
     )
 
     monkeypatch.setattr("evals.rag.official.e2e.load_official_chunks", lambda: (chunk,))
-    monkeypatch.setattr(
-        "evals.rag.official.e2e.retrieve",
-        lambda **_: [RetrievalHit(chunk=chunk, score=1.0, keyword_score=1.0, vector_score=1.0)],
-    )
+    retrieval_calls: list[dict[str, object]] = []
+
+    def retrieve_stub(**kwargs: object) -> list[RetrievalHit]:
+        retrieval_calls.append(kwargs)
+        return [RetrievalHit(chunk=chunk, score=1.0, keyword_score=1.0, vector_score=1.0)]
+
+    monkeypatch.setattr("evals.rag.official.e2e.retrieve", retrieve_stub)
 
     report = evaluate_e2e((case,), complete=offline_extractive_completer)
 
@@ -71,7 +74,21 @@ def test_official_rag_e2e_scores_retrieval_then_generation(
     assert report.pass_rate == 1.0
     assert report.retrieval_required_citation_rate == 1.0
     assert report.failure_buckets == {"passed": 1}
+    assert report.metadata.retrieval_mode == "offline"
+    assert report.metadata.generation_mode == "deterministic"
+    assert report.metadata.index_version.startswith("in-memory:")
+    assert "chunks" in retrieval_calls[0]
     assert "passed=1/1" in render_report(report)
+
+    production_report = evaluate_e2e(
+        (case,),
+        complete=offline_extractive_completer,
+        retrieval_mode="production",
+    )
+
+    assert production_report.passed == 1
+    assert production_report.metadata.retrieval_mode == "production"
+    assert "chunks" not in retrieval_calls[1]
 
 
 def test_official_rag_e2e_accepts_one_retrieved_citation_from_required_group(
@@ -227,3 +244,23 @@ def test_official_rag_e2e_requires_openai_key_for_live_generation(
 
     with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
         evaluate_e2e((), complete=None, live_generation=True)
+
+
+def test_official_rag_e2e_rejects_unknown_execution_mode() -> None:
+    with pytest.raises(ValueError, match="unknown retrieval mode"):
+        evaluate_e2e((), retrieval_mode="typo")  # type: ignore[arg-type]
+
+
+def test_official_rag_e2e_rejects_index_change_during_production_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    versions = iter(("pgvector:index:v1", "pgvector:index:v2"))
+
+    monkeypatch.setattr("evals.rag.official.e2e.load_official_chunks", tuple)
+    monkeypatch.setattr(
+        "evals.rag.official.e2e._production_index_version",
+        lambda **_kwargs: next(versions),
+    )
+
+    with pytest.raises(RuntimeError, match="index changed during E2E evaluation"):
+        evaluate_e2e((), retrieval_mode="production")

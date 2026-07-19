@@ -22,6 +22,36 @@ uv run python -m evals.rag.policy.generation --set test
 uv run python -m evals.rag.policy.e2e
 ```
 
+Official/Policy E2E는 같은 실행 모드를 사용한다.
+
+```bash
+# 빠르고 결정적인 로컬 회귀 기준선
+uv run python -m evals.rag.official.e2e \
+  --retrieval-mode offline --generation-mode deterministic
+uv run python -m evals.rag.policy.e2e \
+  --retrieval-mode offline --generation-mode deterministic
+
+# 운영 retrieval 효과만 분리해서 측정
+uv run python -m evals.rag.official.e2e \
+  --retrieval-mode production --generation-mode deterministic
+uv run python -m evals.rag.policy.e2e \
+  --retrieval-mode production --generation-mode deterministic
+
+# 실제 retrieval과 LLM generation을 모두 포함한 Online E2E
+uv run python -m evals.rag.official.e2e \
+  --retrieval-mode production --generation-mode live
+uv run python -m evals.rag.policy.e2e \
+  --retrieval-mode production --generation-mode live
+```
+
+`production` retrieval과 `live` generation에는 `DATABASE_URL`과 OpenAI 설정이
+필요하다. Policy production 평가는 실행별 고유 `eval-*` 세션에 평가용 vector를
+임시 적재하고, 성공·실패와 관계없이 종료 시 삭제한다.
+
+E2E 보고서는 실행 모드, retrieval/generation 모델, 실행 시각, corpus/index
+fingerprint와 retrieval/generation/전체 latency의 평균·p95를 함께 출력한다.
+점수를 비교할 때는 같은 corpus/index와 같은 실행 모드끼리 비교한다.
+
 ## 규칙
 
 - `app`는 `evals`를 import하지 않는다.
