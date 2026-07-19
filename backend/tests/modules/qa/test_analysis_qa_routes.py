@@ -7,7 +7,13 @@ from fastapi.testclient import TestClient
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.models import PortfolioSessionSnapshot
-from app.modules.qa.agent.contracts import QaAgentCompleted, QaAgentProgress, QaAgentUnavailable
+from app.modules.qa.agent.contracts import (
+    QaAgentCompleted,
+    QaAgentDelta,
+    QaAgentMeta,
+    QaAgentProgress,
+    QaAgentUnavailable,
+)
 from app.modules.qa.agent.service import stream_answer_with_agent
 from app.modules.qa.context import QaContext
 from app.modules.qa.router import get_portfolio_answer_streamer
@@ -32,8 +38,12 @@ class _ProgressAgent:
     def run(self, _context: QaContext) -> PortfolioQuestionResponse:
         raise AssertionError("stream-capable agents must use stream")
 
-    def stream(self, _context: QaContext) -> Iterator[QaAgentProgress | QaAgentCompleted]:
+    def stream(
+        self, _context: QaContext
+    ) -> Iterator[QaAgentProgress | QaAgentMeta | QaAgentDelta | QaAgentCompleted]:
         yield QaAgentProgress(stage="portfolio", text="증권을 확인하고 있어요.")
+        yield QaAgentMeta(status="answered", generation="llm")
+        yield QaAgentDelta(text="확인을 마쳤어요.")
         yield QaAgentCompleted(
             PortfolioQuestionResponse(
                 status="answered",

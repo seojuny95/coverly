@@ -32,11 +32,22 @@ class QaAgentProgress:
 
 
 @dataclass(frozen=True)
+class QaAgentMeta:
+    status: str  # PortfolioQuestionResponse.status
+    generation: str  # "llm" | "fallback"
+
+
+@dataclass(frozen=True)
+class QaAgentDelta:
+    text: str
+
+
+@dataclass(frozen=True)
 class QaAgentCompleted:
     response: PortfolioQuestionResponse
 
 
-type QaAgentStreamItem = QaAgentProgress | QaAgentCompleted
+type QaAgentStreamItem = QaAgentProgress | QaAgentMeta | QaAgentDelta | QaAgentCompleted
 
 
 @dataclass(frozen=True)

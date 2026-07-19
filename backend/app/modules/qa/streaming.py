@@ -1,6 +1,5 @@
 """Small SSE protocol helpers shared by QA transports."""
 
-import re
 from collections.abc import Iterator
 from typing import Annotated, Literal
 
@@ -13,8 +12,6 @@ from app.modules.qa.schemas import (
     QaAnswerStatus,
 )
 from app.modules.reference_data.contracts import ClaimChannelBlock
-
-_STREAM_CHUNK_SIZE = 16
 
 
 class QaProgressEvent(BaseModel):
@@ -50,33 +47,19 @@ QaStreamEvent = Annotated[
 ]
 
 
-def answer_text_chunks(text: str) -> Iterator[str]:
-    """Split completed answers into stable display-sized SSE deltas."""
+def response_to_events(response: PortfolioQuestionResponse) -> Iterator[QaStreamEvent]:
+    """Turn a completed response into meta → single delta → end.
 
-    buffer = ""
-    for token in re.findall(r"\S+\s*", text):
-        while len(token) > _STREAM_CHUNK_SIZE:
-            if buffer:
-                yield buffer
-                buffer = ""
-            yield token[:_STREAM_CHUNK_SIZE]
-            token = token[_STREAM_CHUNK_SIZE:]
-        if buffer and len(buffer) + len(token) > _STREAM_CHUNK_SIZE:
-            yield buffer
-            buffer = ""
-        buffer += token
-    if buffer:
-        yield buffer
+    Used only for non-streamed fallback paths (agent-unavailable, non-streaming
+    ``run()``) where no real per-token deltas were produced by the runtime.
+    """
 
-
-def stream_response(response: PortfolioQuestionResponse) -> Iterator[QaStreamEvent]:
     yield QaMetaEvent(
         type="meta",
         status=response.status,
         generation=response.generation,
     )
-    for chunk in answer_text_chunks(response.answer):
-        yield QaDeltaEvent(type="delta", text=chunk)
+    yield QaDeltaEvent(type="delta", text=response.answer)
     yield QaEndEvent(
         type="end",
         status=response.status,

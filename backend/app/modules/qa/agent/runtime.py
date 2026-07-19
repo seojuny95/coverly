@@ -17,15 +17,16 @@ from agents import (
 from agents.models.openai_provider import OpenAIProvider
 
 from app.core.config import get_settings
-from app.integrations.openai.client import JsonCompleter
+from app.integrations.openai.client import JsonCompleter, TextStreamer, stream_completion
+from app.modules.qa.agent.answer_stream import safe_answer_stream_items
 from app.modules.qa.agent.contracts import (
     AgentCounselorDraft,
     OfficialAnswerer,
-    QaAgentCompleted,
     QaAgentDependencies,
     QaAgentRunner,
     QaAgentStreamItem,
     QaAgentUnavailable,
+    RegisteredToolResult,
 )
 from app.modules.qa.agent.definition import create_qa_agent
 from app.modules.qa.agent.progress import (
@@ -57,6 +58,7 @@ def build_qa_agent_runner(
     official_answer: OfficialAnswerer | None = None,
     web_search: OfficialWebSearcher = default_official_web_search,
     model: str | None = None,
+    compose_streamer: TextStreamer = stream_completion,
 ) -> QaAgentRunner:
     return OpenAiQaAgentRunner(
         complete=complete,
@@ -65,6 +67,7 @@ def build_qa_agent_runner(
         official_answer=official_answer,
         web_search=web_search,
         model=model,
+        compose_streamer=compose_streamer,
     )
 
 
@@ -80,6 +83,7 @@ class OpenAiQaAgentRunner:
         official_answer: OfficialAnswerer | None = None,
         web_search: OfficialWebSearcher = default_official_web_search,
         model: str | None = None,
+        compose_streamer: TextStreamer = stream_completion,
     ) -> None:
         self._complete = complete
         self._classify_input = classify_input
@@ -87,6 +91,7 @@ class OpenAiQaAgentRunner:
         self._official_answer = official_answer
         self._web_search = web_search
         self._model = model
+        self._compose_streamer = compose_streamer
 
     def run(self, context: QaContext) -> PortfolioQuestionResponse:
         settings = get_settings()
@@ -129,6 +134,7 @@ class OpenAiQaAgentRunner:
                 settings.openai_api_key,
                 queue,
                 cancellation_requested,
+                self._compose_streamer,
             ),
             daemon=True,
             name="coverly-qa-agent",
@@ -168,6 +174,7 @@ class OpenAiQaAgentRunner:
                 self._model or settings.openai_model,
                 settings.openai_api_key,
                 queue,
+                self._compose_streamer,
             ),
             name="coverly-qa-agent",
         )
@@ -203,6 +210,7 @@ def _run_streamed_worker(
     api_key: str,
     queue: Queue[QueuedAgentStreamItem],
     cancellation_requested: Event,
+    compose_streamer: TextStreamer,
 ) -> None:
     try:
         asyncio.run(
@@ -213,6 +221,7 @@ def _run_streamed_worker(
                 api_key,
                 queue,
                 cancellation_requested,
+                compose_streamer,
             )
         )
     except Exception as exc:
@@ -227,6 +236,7 @@ async def _run_async_streamed_worker(
     model: str,
     api_key: str,
     queue: asyncio.Queue[QueuedAgentStreamItem],
+    compose_streamer: TextStreamer,
 ) -> None:
     cancelled = False
     try:
@@ -236,6 +246,7 @@ async def _run_async_streamed_worker(
             model,
             api_key,
             queue,
+            compose_streamer,
         )
     except asyncio.CancelledError:
         cancelled = True
@@ -254,6 +265,7 @@ async def _run_streamed_agent(
     api_key: str,
     queue: Queue[QueuedAgentStreamItem],
     cancellation_requested: Event,
+    compose_streamer: TextStreamer,
 ) -> None:
     result = Runner.run_streamed(
         create_qa_agent(model),
@@ -270,20 +282,22 @@ async def _run_streamed_agent(
         async for _event in result.stream_events():
             pass
     except InputGuardrailTripwireTriggered:
-        enqueue_stream_item(
+        _enqueue_answer_items(
             queue,
             cancellation_requested,
-            QaAgentCompleted(out_of_scope_response(context)),
+            out_of_scope_response(context),
+            [],
+            context,
+            compose_streamer,
+            compose=False,
         )
         return
     except OutputGuardrailTripwireTriggered:
         fallback = _unambiguous_tool_fallback(dependencies)
         if fallback is None:
             raise
-        enqueue_stream_item(
-            queue,
-            cancellation_requested,
-            QaAgentCompleted(fallback),
+        _enqueue_answer_items(
+            queue, cancellation_requested, fallback, [], context, compose_streamer, compose=False
         )
         return
     finally:
@@ -294,10 +308,14 @@ async def _run_streamed_agent(
     if cancellation_requested.is_set():
         return
     draft = result.final_output_as(AgentCounselorDraft, raise_if_incorrect_type=True)
-    enqueue_stream_item(
+    validated = _validated_or_cached_response(context, draft, dependencies)
+    _enqueue_answer_items(
         queue,
         cancellation_requested,
-        QaAgentCompleted(_validated_or_cached_response(context, draft, dependencies)),
+        validated,
+        list(dependencies.tool_results.values()),
+        context,
+        compose_streamer,
     )
 
 
@@ -307,6 +325,7 @@ async def _run_async_streamed_agent(
     model: str,
     api_key: str,
     queue: asyncio.Queue[QueuedAgentStreamItem],
+    compose_streamer: TextStreamer,
 ) -> None:
     result = Runner.run_streamed(
         create_qa_agent(model),
@@ -323,17 +342,96 @@ async def _run_async_streamed_agent(
         result.cancel(mode="immediate")
         raise
     except InputGuardrailTripwireTriggered:
-        await queue.put(QaAgentCompleted(out_of_scope_response(context)))
+        await _put_answer_items(
+            queue, out_of_scope_response(context), [], context, compose_streamer, compose=False
+        )
         return
     except OutputGuardrailTripwireTriggered:
         fallback = _unambiguous_tool_fallback(dependencies)
         if fallback is None:
             raise
-        await queue.put(QaAgentCompleted(fallback))
+        await _put_answer_items(queue, fallback, [], context, compose_streamer, compose=False)
         return
 
     draft = result.final_output_as(AgentCounselorDraft, raise_if_incorrect_type=True)
-    await queue.put(QaAgentCompleted(_validated_or_cached_response(context, draft, dependencies)))
+    validated = _validated_or_cached_response(context, draft, dependencies)
+    await _put_answer_items(
+        queue,
+        validated,
+        list(dependencies.tool_results.values()),
+        context,
+        compose_streamer,
+    )
+
+
+def _enqueue_answer_items(
+    queue: Queue[QueuedAgentStreamItem],
+    cancellation_requested: Event,
+    validated: PortfolioQuestionResponse,
+    results: list[RegisteredToolResult],
+    context: QaContext,
+    compose_streamer: TextStreamer,
+    *,
+    compose: bool = True,
+) -> None:
+    """Compose the validated answer into stream items and enqueue them in order.
+
+    Stops early if the consumer has cancelled — ``enqueue_stream_item`` returns
+    ``False`` and no more items are pushed onto the bounded queue. Guardrail
+    tripwire fallbacks pass ``compose=False`` to stream the deterministic answer
+    verbatim without re-running the LLM compose.
+    """
+
+    for item in safe_answer_stream_items(
+        validated, results, context.question, streamer=compose_streamer, compose=compose
+    ):
+        if not enqueue_stream_item(queue, cancellation_requested, item):
+            return
+
+
+def _next_stream_item(items: Iterator[QaAgentStreamItem]) -> QaAgentStreamItem | None:
+    """Pull one item from the sync generator, mapping exhaustion to ``None``.
+
+    Runs inside a worker thread via ``asyncio.to_thread`` so the blocking compose
+    reads never execute on the ASGI event loop. ``safe_answer_stream_items`` only
+    yields ``QaAgentStreamItem`` (never ``None``), so ``None`` is an unambiguous
+    end sentinel.
+    """
+
+    try:
+        return next(items)
+    except StopIteration:
+        return None
+
+
+async def _put_answer_items(
+    queue: asyncio.Queue[QueuedAgentStreamItem],
+    validated: PortfolioQuestionResponse,
+    results: list[RegisteredToolResult],
+    context: QaContext,
+    compose_streamer: TextStreamer,
+    *,
+    compose: bool = True,
+) -> None:
+    """Compose the validated answer OFF the event loop and put the items on the
+    loop queue in ``meta → delta* → completed`` order.
+
+    The sync ``safe_answer_stream_items`` generator drives the blocking compose
+    streamer per token. Pumping it through ``asyncio.to_thread`` keeps those
+    blocking network reads off the ASGI event loop, so request cancellation and
+    other connections stay responsive during the compose phase. The ``await`` per
+    item restores a cancellation point; ``CancelledError`` propagates out to
+    terminate the worker cleanly. Guardrail tripwire fallbacks pass
+    ``compose=False`` to stream the deterministic answer verbatim."""
+
+    items = safe_answer_stream_items(
+        validated, results, context.question, streamer=compose_streamer, compose=compose
+    )
+    while True:
+        item = await asyncio.to_thread(_next_stream_item, items)
+        if item is None:
+            break
+        await queue.put(item)
 
 
 async def _cancel_when_requested(
