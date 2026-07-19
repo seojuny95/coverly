@@ -65,7 +65,11 @@ async def stream_counsel_answer(
         ) from None
 
     if not check.in_scope:
-        return {"answer": _OUT_OF_SCOPE_ANSWER, "in_scope": False}
+        return {
+            "answer": _OUT_OF_SCOPE_ANSWER,
+            "in_scope": False,
+            "rewritten_question": check.rewritten_question,
+        }
 
     context = CounselContext(
         policies=list(snapshot.policies),
@@ -76,4 +80,8 @@ async def stream_counsel_answer(
     agent = create_agent(settings.openai_model)
     result = await agent_runner(agent, check.rewritten_question, context)
 
-    return {"answer": str(result.final_output), "in_scope": True}
+    return {
+        "answer": str(result.final_output),
+        "in_scope": True,
+        "rewritten_question": check.rewritten_question,
+    }
