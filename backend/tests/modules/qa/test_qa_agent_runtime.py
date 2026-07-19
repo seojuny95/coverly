@@ -23,6 +23,7 @@ from app.modules.qa.agent.contracts import (
     QaAgentDependencies,
     QaAgentMeta,
     QaAgentProgress,
+    QaInputDecision,
 )
 from app.modules.qa.agent.progress import QueuedAgentStreamItem, enqueue_stream_item
 from app.modules.qa.context import QaContext
@@ -333,6 +334,71 @@ def test_stream_composes_meta_deltas_then_completed_from_injected_streamer(
     delta_indices = [index for index, item in enumerate(items) if isinstance(item, QaAgentDelta)]
     assert meta_index < min(delta_indices)
     assert max(delta_indices) < completed_index
+
+
+def test_stream_threads_situational_intent_into_compose_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A situational input decision must reach the compose prompt through the
+    streaming runtime. This is the one seam the non-streaming eval `.run()` path
+    never exercises: runtime → is_situational_turn → compose situational block."""
+    result = _FinishedStreamResult()
+
+    def run_streamed(
+        _runner: object,
+        *_args: object,
+        hooks: Any,
+        **_kwargs: object,
+    ) -> _FinishedStreamResult:
+        result.hooks = hooks
+        return result
+
+    monkeypatch.setattr(
+        runtime,
+        "get_settings",
+        lambda: SimpleNamespace(openai_api_key="test-key", openai_model="test-model"),
+    )
+    monkeypatch.setattr(runtime, "build_agent_input", lambda _context: "test input")
+    monkeypatch.setattr(Runner, "run_streamed", classmethod(cast(Any, run_streamed)))
+
+    validated = PortfolioQuestionResponse(
+        status="answered", answer="암진단비가 확인돼요.", citations=[], limitations=[]
+    )
+
+    def fake_validated(
+        _context: QaContext,
+        _draft: AgentCounselorDraft,
+        dependencies: QaAgentDependencies,
+    ) -> PortfolioQuestionResponse:
+        # The intent node marks this turn situational; the runtime must carry it
+        # into compose. Register a deterministic result so the mode is grounded.
+        dependencies.input_decision = QaInputDecision(
+            scope="insurance",
+            should_block=False,
+            requires_fresh_official_source=False,
+            is_situational=True,
+            insurance_request="대장암 진단 관련 보장을 봐줘",
+            out_of_scope_request=None,
+            reason="상황형 질문",
+        )
+        dependencies.register("coverage_total", validated, trust_level="deterministic")
+        return validated
+
+    monkeypatch.setattr(runtime, "_validated_or_cached_response", fake_validated)
+
+    captured: dict[str, str] = {}
+
+    def capturing_streamer(_system: str, user: str) -> Generator[str, None, None]:
+        captured["user"] = user
+        yield "암진단비가 확인돼요."
+
+    runner = runtime.OpenAiQaAgentRunner(compose_streamer=capturing_streamer)
+    context = cast(QaContext, SimpleNamespace(question="대장암에 걸렸는데 어떻게 해?"))
+    list(runner.stream(context))
+
+    assert "user" in captured  # compose ran
+    assert "되묻" in captured["user"]  # situational option follow-up reached compose
+    assert "약관" in captured["user"]  # payout-confirmation caveat reached compose
 
 
 def test_async_answer_stream_preserves_public_event_order() -> None:
