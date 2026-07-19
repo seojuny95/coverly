@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-from app.integrations.openai import compact_prompt_text
 from app.modules.consultation.contracts import ConsultationEvidence, InsuredDemographics
 from app.modules.consultation.safety import (
     filter_safe_unique_texts as filter_safe_unique_texts,
@@ -22,7 +21,6 @@ from app.modules.consultation.safety import (
 from app.modules.coverage.taxonomy import classify_coverage
 from app.modules.portfolio.schemas import CoverageSourceItem, PolicyInput
 from app.modules.portfolio.summary import PortfolioFacts
-from app.rag.official.models import RetrievalHit
 from app.rag.policy import PolicyRetrievalHit
 
 
@@ -47,36 +45,6 @@ def with_session_evidence(
             ConsultationEvidence(
                 id=f"session:{index}",
                 fact=f"업로드 증권 원문 발췌: {hit.chunk.text}",
-            )
-        )
-    return EvidenceCatalog(
-        items=tuple(items),
-        by_id={item.id: item for item in items},
-        coverage_ids_by_category=catalog.coverage_ids_by_category,
-    )
-
-
-def with_official_evidence(
-    catalog: EvidenceCatalog, hits: tuple[RetrievalHit, ...]
-) -> EvidenceCatalog:
-    """Append official-source guidance as auxiliary citation evidence."""
-
-    if not hits:
-        return catalog
-    items = list(catalog.items)
-    for index, hit in enumerate(hits, start=1):
-        chunk = hit.chunk
-        label = f" ({chunk.citation_label})" if chunk.citation_label else ""
-        items.append(
-            ConsultationEvidence(
-                id=f"official:{index}",
-                fact=(
-                    f"{chunk.publisher} {chunk.source_title}{label}: "
-                    f"{compact_prompt_text(chunk.text, 700)}"
-                ),
-                source_title=chunk.source_title,
-                publisher=chunk.publisher,
-                citation_label=chunk.citation_label,
             )
         )
     return EvidenceCatalog(

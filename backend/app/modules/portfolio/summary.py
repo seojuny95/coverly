@@ -54,14 +54,6 @@ _SAFE_FIXED_NAME_TERMS = (
 _UNCONFIRMED_PAYMENT_REASON = "지급 방식을 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_AMOUNT_REASON = "가입금액을 숫자로 확인하지 못해 합계에는 더하지 않았어요."
 _UNCONFIRMED_NAME_REASON = "담보명을 분류하지 못해 합계에는 더하지 않았어요."
-MAJOR_CATEGORY_ORDER = (
-    "사망",
-    "후유장해",
-    "진단",
-    "수술",
-    "치료",
-    "기타",
-)
 
 
 @dataclass(frozen=True)
