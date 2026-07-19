@@ -8,6 +8,15 @@
       "must_include_any": ["5"],
       "live": true,
       "notes": "2026-07-19 라이브 테스트에서 발견한 실제 회귀. check_scope_and_rewrite의 in_scope 기준이 '보험 질문 또는 Coverly 기능 질문'을 한 문장에 '또는'으로 묶어 서술했는데, 모델이 'Coverly의'라는 수식어가 앞 절(보험/가입증권/담보 등)까지 걸리는 것으로 잘못 해석해 '내 개인 보험 데이터 질문'을 'Coverly 자체에 대한 게 아니니 범위 밖'으로 3/3 재현되게 오분류했다. 정작 이게 제품의 핵심 use case였다. 참고로 옛 qa 시스템의 evals/qa/dataset.json 'portfolio_count' 케이스는 거의 동일한 질문인데 통과했었다 — 즉 counsel로 단순화하면서 새로 생긴 회귀. 수정: in_scope 기준을 별도 줄로 분리하고 '개인 보험 정보 질문이 핵심 범위'라고 명시. 수정 후 재현 스크립트로 3/3 정상 확인."
+    },
+    {
+      "id": "situational_illness_scope",
+      "question": "대장암에 걸렸는데 어떻게 해?",
+      "history": [],
+      "expected_in_scope": true,
+      "must_include_any": [],
+      "live": true,
+      "notes": "2026-07-20 라이브 테스트에서 발견한 실제 회귀. check_scope_and_rewrite의 in_scope 기준이 명시적 보험 어휘(가입 보험, 담보, 약관 등)가 있는 질문만 다뤘고, '대장암에 걸렸는데 어떻게 해?', '주차장에 세워둔 차를 박았는데 어떻게 해?'처럼 '보험'이라는 단어 없이 자신에게 일어난 일을 말하며 도움을 구하는 상황형 질문은 in_scope=false로 오분류됐다. 옛 qa 시스템에는 이런 상황형 질문을 다루는 'Phase 6 상황형 대화 패턴'이 있었는데 counsel로 재작성하며 누락됐다. 수정: 질병·진단·사고·부상 상황을 말하며 도움을 구하는 질문을 in_scope 기준에 명시적으로 추가."
     }
   ]
 }
