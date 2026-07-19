@@ -826,5 +826,17 @@
     "expected_table_indexes": [1],
     "must_include_groups": [["대표번호", "[전화번호]"], ["식별번호", "[주민등록번호]"]],
     "expected_mask_tokens": ["[전화번호]", "[주민등록번호]"]
+  },
+  {
+    "id": "mask_ocr_spaced_address_label",
+    "text_lines": [
+      "주 소 (자택) {address_ocr_spaced}"
+    ],
+    "tables": [],
+    "generated_pii": ["address_ocr_spaced"],
+    "expected_content_types": ["text"],
+    "expected_table_indexes": [],
+    "must_include_groups": [["주 소", "[주소]"]],
+    "expected_mask_tokens": ["[주소]"]
   }
 ]

@@ -32,6 +32,7 @@ PiiKind = Literal[
     "representative_phone_no_hyphen",
     "email",
     "rrn",
+    "address_ocr_spaced",
 ]
 ExtractionCheckName = Literal[
     "records",
@@ -264,6 +265,7 @@ def _generated_pii_values(kinds: tuple[PiiKind, ...]) -> dict[PiiKind, str]:
         "representative_phone_no_hyphen": "1688" + "1234",
         "email": "person" + "@example.invalid",
         "rrn": "900101-" + "1234567",
+        "address_ocr_spaced": "경기도 성남시 분당구 판교로 100",
     }
     return {kind: values[kind] for kind in kinds}
 
@@ -316,6 +318,7 @@ def _pii_tuple(value: object) -> tuple[PiiKind, ...]:
         "representative_phone_no_hyphen",
         "email",
         "rrn",
+        "address_ocr_spaced",
     }
     kinds = tuple(str(item) for item in cast(list[object], value))
     unknown = tuple(item for item in kinds if item not in allowed)

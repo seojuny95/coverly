@@ -3,6 +3,17 @@
 업로드한 보험증권을 세션 범위 안에서 검색하는 policy RAG의 평가 기록이다.
 평가 데이터셋에는 주민등록번호, 전화번호, 이메일 같은 원문 개인정보를 넣지 않는다.
 
+## Extraction
+
+Extraction은 파싱된 표가 policy chunk로 변환될 때 content type, table index, 핵심 문구와 PII 마스킹 계약이 유지되는지 본다.
+
+| 단계 | 전체 통과 | content type | table index | 필수 문구 | PII 마스킹 | 마스킹 토큰 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2026-07-19 현재 | 57/57 (1.000) | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+
+주소·연락처 변경 안내 문장을 실제 주소값으로 오인하던 false positive를 수정하고, OCR이 `주소`를 `주 소`로 분리한 실제 주소도 마스킹한다.
+평가 실패 보고서에는 검색 근거 원문을 출력하지 않아 로컬 표본의 개인정보가 로그로 노출되지 않게 했다.
+
 ## Retrieval
 
 평가셋은 실제 샘플 PDF 4개를 파싱해 만든 세션별 chunk를 대상으로 한다. 기본정보,
@@ -14,6 +25,8 @@
 | baseline | 122 | 0.656 | 0.198 | 0.355 | 0.910 | vector score만 사용해 같은 세션 안 관련 chunk 랭킹이 약했다. |
 | hybrid rerank | 122 | 0.918 | 0.313 | 0.667 | 0.928 | 후보를 넓히고 BM25/RRF로 재정렬했다. |
 | query expansion | 122 | 0.934 | 0.321 | 0.671 | 0.933 | 보험 문서에서 자주 달라지는 표현과 금액 단위 표기를 보강했다. |
+| 운영 pgvector, PII 수정 전 | 122 | 0.975 (119/122) | - | - | - | 주소 변경 안내 문장이 마스킹되면서 후기 페이지 근거 1건을 놓쳤다. |
+| 운영 pgvector, PII 수정 후 | 122 | 0.984 (120/122) | 0.361 | 0.844 | 0.951 | 일반 안내 문장은 보존하고 실제 주소는 계속 마스킹했다. 평균 검색 지연은 1.22초다. |
 
 현재 남은 실패는 대부분 여러 증권이 함께 들어왔을 때 질문 표현만으로 목표 계약을
 정확히 고르는 케이스다. 예를 들어 “4만원대 어린이보험”처럼 금액 범위가 암시된
@@ -78,3 +91,14 @@ QA router/planner는 거치지 않는다.
 | RAG E2E v1 baseline | 19/19, pass_rate 1.000 | 대표 케이스만 골라 연결 smoke test로 시작했다. 부족한 지점을 충분히 드러내지 못했다. |
 | RAG E2E broad baseline | 118/134, pass_rate 0.881 | retrieval 전체 세트와 no_data/hard-negative를 추가했다. 다중 세션 hard-negative, 실손의료보험 혼동, 수익자/면책/개인 상황 판단 no_data에서 실패가 드러났다. |
 | RAG E2E reliable baseline | 123/171, pass_rate 0.719 | no_data/hard-negative를 49개까지 늘렸다. 실손의료보험 혼동, 실제 사고/청구 판단, 수익자/환급금/해지/대출/세금 등 증권 밖 질문에서 answered로 흐르는 문제가 뚜렷해졌다. |
+| PII 안내문 false positive 수정 후 | 124/171, pass_rate 0.725 | retrieval_match 0.959, answer_contract 0.737이다. 주소 변경 안내 chunk가 보존되면서 1건 개선됐고 나머지 실패군은 유지됐다. |
+
+## 현재 상태 요약
+
+| 영역 | 최신 결과 | 상태 |
+| --- | ---: | --- |
+| Extraction | 57/57 | OCR 공백 주소 라벨과 PII 마스킹을 포함한 chunk 변환 계약 통과 |
+| Retrieval production | 120/122, recall@5 0.984, MRR 0.844 | 주소 안내문 false positive 수정 효과 확인 |
+| Generation practice, live | 0.851 | 고정 retrieval context 기준 측정 완료 |
+| Generation test, live | 0.850 | 독립 test 20개 기준 측정 완료 |
+| RAG E2E | 124/171, pass_rate 0.725 | retrieval은 0.959지만 no-data 답변 거절이 주요 잔여 병목 |

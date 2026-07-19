@@ -160,8 +160,6 @@ def render_report(report: PolicyRagE2EReport, *, show_passing: bool = False) -> 
             lines.append(f"  - {note}")
         if result.evidence_ids:
             lines.append(f"  evidence: {', '.join(result.evidence_ids)}")
-        if result.hit_texts:
-            lines.append(f"  top_hit: {result.hit_texts[0]}")
 
     return "\n".join(lines)
 

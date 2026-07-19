@@ -200,7 +200,7 @@ uv run python -m evals.rag.official.generation --show-passing
 
 ## 최근 기준 결과
 
-2026-07-15에 Retrieval/Generation 데이터셋으로 측정한 결과와, 2026-07-16에 Extraction 데이터셋으로 측정한 결과다.
+2026-07-15부터 2026-07-19까지 Retrieval/Generation/Extraction 데이터셋으로 측정한 결과다.
 수치는 모델, 공식문서 index, 데이터베이스 상태가 바뀌면 함께 달라질 수 있다.
 
 ### Retrieval
@@ -216,6 +216,7 @@ uv run python -m evals.rag.official.generation --show-passing
 | 운영 pgvector accepted 기준 재측정 | 49/54 | 0.907 | 0.815 | 0.907 | 0.185 | 0.654 | 0.665 | 0/18 | 1.120초 | 운영 index에서도 accepted 기준 개선 확인 |
 | 운영 pgvector 문서 타입별 chunker 재인덱싱 후 | 48/54 | 0.889 | 0.833 | 0.889 | 0.185 | 0.636 | 0.651 | 0/18 | 1.049초 | Supabase index를 1,326개 chunk로 재생성하고 legacy 테이블을 제거 |
 | 운영 pgvector hybrid 후보 폭/가중치 조정 | 49/54 | 0.907 | 0.852 | 0.907 | 0.189 | 0.662 | 0.673 | 0/18 | 1.338초 | 운영 index는 재생성 없이 retrieval 후보 폭과 BM25 비중만 조정 |
+| 운영 pgvector 의미 기반 context selection | 54/54 | 1.000 | 0.981 | 1.000 | 0.421 | 0.814 | 0.824 | 17/18 | 3.560초 | hybrid/RRF 후보를 LLM이 질문과 직접 비교하고 선택하지 않은 context는 제외한다. 품질은 개선됐지만 LLM 호출로 지연이 늘어남 |
 
 ### Extraction
 
@@ -231,10 +232,8 @@ uv run python -m evals.rag.official.generation --show-passing
 
 Extraction 점수는 회귀 안정성을 뜻한다. 특히 `broad_regression`은 현재 corpus의 chunk ID 보존을 확인하는 성격이 강하므로, 일반화된 extraction 품질 점수로 해석하지 않는다.
 
-운영 검색은 positive 질문에서 관련 근거를 찾는 능력은 유지하지만, negative 질문에서도 항상 결과를 반환한다.
-이는 현재 설계상 예상된 결과다. Official RAG retrieval은 공식문서 후보 검색을 담당하고, out-of-scope 질문 거절은 상위 QA 전체 라우터가 맡는다.
-
-따라서 `diagnostic_negative_no_hit_rate`는 현재 retrieval 품질 목표라기보다, 상위 라우터 없이 검색기만 실행했을 때 생기는 한계를 보여주는 진단 지표로 해석한다.
+기존 hybrid 검색은 negative 질문에서도 항상 결과를 반환했지만, 의미 기반 context selection 적용 후에는 18개 중 17개를 근거 없음으로 판정했다.
+`diagnostic_negative_no_hit_rate`는 retrieval 단계의 context sufficiency 진단으로 추적하되, out-of-scope 질문을 최종 거절하는 책임은 상위 QA 전체 라우터에 둔다.
 
 ### Generation
 

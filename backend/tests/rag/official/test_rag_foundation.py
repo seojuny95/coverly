@@ -8,7 +8,7 @@ from app.rag.embeddings import HashingEmbedder, openai_embedder_from_settings
 from app.rag.official.chunkers import build_chunks
 from app.rag.official.indexing import build_vector_records
 from app.rag.official.loaders import _load_law_xml_chunks, load_official_chunks
-from app.rag.official.models import RagChunk, RetrievalHit
+from app.rag.official.models import RagChunk, RetrievalHit, VectorRecord
 from app.rag.official.retrieval import retrieve, transform_query
 from app.rag.official.sources import (
     OfficialSource,
@@ -338,6 +338,73 @@ def test_retrieve_requires_an_explicit_embedder_for_in_memory_chunks() -> None:
 
     with pytest.raises(ValueError, match="embedder is required"):
         retrieve("지급사유", chunks=chunks)
+
+
+def test_production_retrieval_applies_injected_semantic_reranker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _StubSettings:
+        database_url = "postgresql://configured"
+        openai_api_key = ""
+
+    class _StubEmbedder:
+        def embed_query(self, _text: str) -> tuple[float, ...]:
+            return (1.0, 0.0)
+
+    class _StubStore:
+        def replace_all(self, records: tuple[VectorRecord, ...]) -> None:
+            raise AssertionError(f"unexpected replace_all with {len(records)} records")
+
+        def query(
+            self,
+            *,
+            query_embedding: tuple[float, ...],
+            query_text: str,
+            top_k: int,
+        ) -> list[RetrievalHit]:
+            assert query_embedding == (1.0, 0.0)
+            assert query_text == "질문"
+            assert top_k == 120
+            return [
+                RetrievalHit(
+                    chunk=RagChunk(
+                        id=chunk_id,
+                        source_id="source",
+                        source_title="공식 문서",
+                        source_category="law",
+                        publisher="공식 기관",
+                        text=f"{chunk_id} 근거",
+                        page_start=1,
+                        page_end=1,
+                    ),
+                    score=score,
+                    keyword_score=score,
+                    vector_score=score,
+                )
+                for chunk_id, score in (("first", 1.0), ("second", 0.9))
+            ]
+
+    monkeypatch.setattr("app.rag.official.retrieval.get_settings", lambda: _StubSettings())
+    monkeypatch.setattr(
+        "app.rag.official.retrieval.openai_embedder_from_settings",
+        lambda: _StubEmbedder(),
+    )
+
+    hits = retrieve(
+        "질문",
+        final_k=1,
+        store=_StubStore(),
+        rerank_complete=lambda _system, _user: {
+            "has_relevant_evidence": True,
+            "ids": ["second"],
+        },
+    )
+
+    assert [hit.chunk.id for hit in hits] == ["second"]
+
+
+def test_retrieve_returns_no_hits_for_non_positive_final_k() -> None:
+    assert retrieve("질문", final_k=0) == []
 
 
 def test_transform_query_normalizes_whitespace_and_adds_korean_ngrams() -> None:

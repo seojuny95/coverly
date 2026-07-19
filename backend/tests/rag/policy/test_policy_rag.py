@@ -188,6 +188,33 @@ def test_policy_pii_masks_contact_and_policy_identifiers() -> None:
     assert "[계좌번호]" in masked
 
 
+def test_policy_pii_keeps_address_change_guidance() -> None:
+    text = (
+        "주소 또는 연락처 변동시 반드시 회사로 통보해야 합니다.\n"
+        "주소가 변경되면 지체 없이 알려주세요.\n"
+        "소재지 변경 안내는 약관을 확인하세요.\n"
+        "주소를 정확히 입력해 주세요.\n"
+        "주소\n보험료는 매월 납입합니다."
+    )
+
+    assert mask_policy_pii(text) == text
+
+
+def test_policy_pii_masks_structurally_labeled_address_without_colon() -> None:
+    text = (
+        "피보험자 주소 서울특별시 중구 세종대로 110\n"
+        "주 소 (자택) 경기도 성남시 분당구 판교로 100\n"
+        "소재지 04524"
+    )
+
+    masked = mask_policy_pii(text)
+
+    assert "서울특별시 중구 세종대로 110" not in masked
+    assert "경기도 성남시 분당구 판교로 100" not in masked
+    assert "04524" not in masked
+    assert masked == "피보험자 주소 [주소]\n주 소 [주소]\n소재지 [주소]"
+
+
 def test_policy_pii_keeps_large_amounts() -> None:
     text = "가입금액은 30,000,000원이고 보상한도는 100,000,000원입니다."
     text += "\n정액 보장금액은 10000000원입니다."

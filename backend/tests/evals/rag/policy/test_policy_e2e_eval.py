@@ -96,3 +96,4 @@ def test_policy_rag_e2e_reports_contract_failure(
         "expected evidence was not retrieved",
         "answer did not include required terms",
     )
+    assert "질병수술비 가입금액 30만원" not in render_report(report)

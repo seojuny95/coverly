@@ -5,7 +5,8 @@ The production path is intentionally small:
 1. normalize the user question
 2. embed the normalized query
 3. run pgvector hybrid search
-4. return the top chunks
+4. fuse vector and lexical ranks
+5. select directly relevant context semantically
 
 Diagnostics and tests may pass explicit chunks with their own embedder. That
 path builds temporary records in process, but production retrieval always
@@ -18,6 +19,7 @@ import math
 from collections import Counter
 
 from app.core.config import get_settings
+from app.integrations.openai import JsonCompleter
 from app.integrations.postgres.official_rag_store import shared_pgvector_store
 from app.rag.embeddings import Embedder, openai_embedder_from_settings
 from app.rag.lexical import tokenize as _tokens
@@ -28,6 +30,7 @@ from app.rag.official.models import (
     VectorRecord,
     chunk_embedding_text,
 )
+from app.rag.official.reranking import semantic_rerank
 from app.rag.official.store import OfficialRagStore
 from app.rag.scoring import (
     cosine_similarity as _cosine,
@@ -50,8 +53,9 @@ def retrieve(
     vector_weight: float = 0.40,
     bm25_weight: float = 0.60,
     store: OfficialRagStore | None = None,
+    rerank_complete: JsonCompleter | None = None,
 ) -> list[RetrievalHit]:
-    """Retrieve official-source chunks with plain hybrid search.
+    """Retrieve official-source chunks with hybrid and semantic ranking.
 
     ``chunks`` is for tests, evaluation, and diagnostics — they build records
     in process instead of going through pgvector. Callers on that path must
@@ -62,7 +66,7 @@ def retrieve(
     """
 
     plan = transform_query(query)
-    if not plan.search_query:
+    if not plan.search_query or final_k <= 0:
         return []
 
     if chunks is None:
@@ -71,6 +75,7 @@ def retrieve(
             candidate_k=candidate_k,
             final_k=final_k,
             store=store,
+            rerank_complete=rerank_complete,
         )
 
     if embedder is None:
@@ -108,6 +113,7 @@ def _retrieve_from_pgvector(
     candidate_k: int,
     final_k: int,
     store: OfficialRagStore | None,
+    rerank_complete: JsonCompleter | None,
 ) -> list[RetrievalHit]:
     if not get_settings().database_url:
         raise RuntimeError("DATABASE_URL is required for RAG retrieval")
@@ -118,7 +124,15 @@ def _retrieve_from_pgvector(
         query_text=plan.search_query,
         top_k=max(candidate_k, final_k),
     )
-    return _rerank_with_rrf(plan, hits, top_k=candidate_k)[:final_k]
+    ranked = _rerank_with_rrf(plan, hits, top_k=candidate_k)
+    if rerank_complete is None and not get_settings().openai_api_key:
+        return ranked[:final_k]
+    return semantic_rerank(
+        plan.original_query,
+        ranked,
+        final_k=final_k,
+        complete=rerank_complete,
+    )
 
 
 def _retrieve_from_records(
