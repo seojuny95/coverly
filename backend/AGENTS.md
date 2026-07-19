@@ -100,6 +100,13 @@ FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별
 - 타입은 **mypy strict**를 통과해야 한다.
 - 라우트는 얇게 유지하고, 외부 I/O와 도메인 로직은 해당 `modules/`, `rag/`, `integrations/` 아래로 분리한다.
 - 마크다운은 한국어, 코드 코멘트·docstring은 영어. 한국어 필드명(담보명 등)은 의도된 데이터 값이다.
+  - **예외**: `@function_tool`로 감싼 함수의 docstring은 **한국어**로 쓴다. 이 docstring은 사람만
+    읽는 문서가 아니라 `agents` SDK가 파싱해 매 턴 모델에게 그대로 보내는 도구 설명·인자
+    설명이 된다(SDK 소스 `tool.py`의 `function_tool` 참고). 프롬프트 언어(한국어)와 도구
+    설명 언어가 다르면 도구 선택·인자 추출 정확도가 떨어진다는 연구 근거가 있어(예:
+    "Arabic Prompts with English Tools" 벤치마크) 일반 코드 docstring 규칙의 예외로 둔다.
+    단, `Args:` 같은 섹션 헤더 키워드는 영어로 그대로 둔다 — `griffe`가 이 키워드로 인자별
+    설명을 파싱하므로 한국어로 바꾸면(`인자:` 등) 해당 파싱이 조용히 깨진다.
 
 ## 테스트 정책
 
