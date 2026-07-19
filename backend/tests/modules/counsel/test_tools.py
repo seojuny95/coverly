@@ -6,13 +6,19 @@ from agents import FunctionTool
 from agents.tool_context import ToolContext
 
 from app.modules.counsel.context import CounselContext
+from app.modules.counsel.tools.claims import get_claim_channels
 from app.modules.counsel.tools.coverages import (
+    CoverageTotalResult,
     FindCoveragesResult,
+    OverlappingCoverage,
+    calculate_coverage_total,
     find_coverages,
+    find_overlapping_coverages,
     list_coverage_names,
 )
 from app.modules.counsel.tools.policies import PolicyListResult, list_policies
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.reference_data.contracts import ClaimChannelBlock
 
 
 def _invoke(tool: FunctionTool, context: CounselContext, arguments: str = "{}") -> object:
@@ -43,6 +49,28 @@ def _invoke_find_coverages(
     return cast(
         FindCoveragesResult,
         _invoke(find_coverages, context, json.dumps({"coverage_names": coverage_names})),
+    )
+
+
+def _invoke_calculate_coverage_total(
+    context: CounselContext, coverage_names: list[str]
+) -> CoverageTotalResult:
+    return cast(
+        CoverageTotalResult,
+        _invoke(calculate_coverage_total, context, json.dumps({"coverage_names": coverage_names})),
+    )
+
+
+def _invoke_find_overlapping_coverages(context: CounselContext) -> list[OverlappingCoverage]:
+    return cast(list[OverlappingCoverage], _invoke(find_overlapping_coverages, context))
+
+
+def _invoke_get_claim_channels(
+    context: CounselContext, coverage_names: list[str]
+) -> ClaimChannelBlock:
+    return cast(
+        ClaimChannelBlock,
+        _invoke(get_claim_channels, context, json.dumps({"coverage_names": coverage_names})),
     )
 
 
@@ -180,3 +208,102 @@ def test_find_coverages_reports_unmatched_names_without_guessing() -> None:
     assert len(result.unmatched) == 1
     assert result.unmatched[0].requested_name == "존재하지않는담보"
     assert result.unmatched[0].candidates == []
+
+
+def _policies_with_indemnity_and_overlap() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "현대해상", "상품명": "건강보험A"},
+                "보장목록": [
+                    {
+                        "담보명": "암진단비",
+                        "가입금액": "3,000만원",
+                        "가입금액숫자": 30_000_000,
+                        "지급유형": "정액",
+                    },
+                    {
+                        "담보명": "실손의료비",
+                        "가입금액": "급여 90%",
+                        "가입금액숫자": None,
+                        "지급유형": "실손",
+                    },
+                ],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "p2",
+                "기본정보": {"보험사": "삼성화재", "상품명": "건강보험B"},
+                "보장목록": [
+                    {
+                        "담보명": "암진단비",
+                        "가입금액": "2,000만원",
+                        "가입금액숫자": 20_000_000,
+                        "지급유형": "정액",
+                    },
+                ],
+            }
+        ),
+    ]
+
+
+def test_calculate_coverage_total_sums_only_fixed_amount_coverages() -> None:
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_calculate_coverage_total(context, ["암진단비", "실손의료비"])
+
+    assert result.total == 50_000_000
+    assert len(result.included) == 2
+    assert len(result.excluded) == 1
+    assert result.excluded[0].담보명 == "실손의료비"
+    assert result.unmatched == []
+
+
+def test_calculate_coverage_total_reports_unmatched_names() -> None:
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_calculate_coverage_total(context, ["존재하지않는담보"])
+
+    assert result.total == 0
+    assert result.included == []
+    assert len(result.unmatched) == 1
+
+
+def test_find_overlapping_coverages_reports_names_held_in_multiple_policies() -> None:
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_find_overlapping_coverages(context)
+
+    assert len(result) == 1
+    assert result[0].담보명 == "암진단비"
+    assert len(result[0].policies) == 2
+
+
+def test_find_overlapping_coverages_excludes_names_held_once() -> None:
+    # 실손의료비 only appears in one policy, so it must not be reported as an overlap.
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_find_overlapping_coverages(context)
+
+    names = {item.담보명 for item in result}
+    assert "실손의료비" not in names
+
+
+def test_get_claim_channels_returns_verified_channels_for_matched_insurers() -> None:
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_get_claim_channels(context, ["암진단비"])
+
+    names = {insurer.name for insurer in result.insurers}
+    assert names == {"현대해상", "삼성화재"}
+    assert all(insurer.customer_center for insurer in result.insurers)
+
+
+def test_get_claim_channels_returns_empty_when_no_coverage_matches() -> None:
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_get_claim_channels(context, ["존재하지않는담보"])
+
+    assert result.insurers == []
