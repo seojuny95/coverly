@@ -1,3 +1,7 @@
+import { Alert, AlertDescription } from "@/shared/components/ui/alert";
+import { Badge } from "@/shared/components/ui/badge";
+import { Card } from "@/shared/components/ui/card";
+
 import type { ClaimChannelBlock } from "./api";
 import { safeHref } from "./safe-href";
 
@@ -12,7 +16,7 @@ export function ClaimGuide({
 
   return (
     <section aria-labelledby="claim-guide-title">
-      <div className="rounded-[28px] border border-zinc-200 bg-zinc-50 p-5 sm:p-7">
+      <Card variant="muted" className="rounded-[28px] p-5 sm:p-7">
         <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
           보험금 청구 채널
         </p>
@@ -20,7 +24,7 @@ export function ClaimGuide({
           확인된 접수 채널을 모았어요
         </h2>
         <ClaimChannelOptions claimChannels={claimChannels} />
-      </div>
+      </Card>
     </section>
   );
 }
@@ -33,25 +37,31 @@ function ClaimChannelOptions({
   return (
     <div className="mt-3 space-y-3">
       {claimChannels.medical_indemnity ? (
-        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs leading-5 text-zinc-600">
-          <p className="font-semibold text-zinc-900">
-            {claimChannels.medical_indemnity.name}
-          </p>
-          {claimChannels.medical_indemnity.description ? (
-            <p className="mt-1">
-              {claimChannels.medical_indemnity.description}
+        <Alert
+          variant="info"
+          role="note"
+          className="gap-0 rounded-xl px-3 py-2.5 text-xs leading-5"
+        >
+          <AlertDescription className="text-xs text-zinc-600 [&_p:not(:last-child)]:mb-0">
+            <p className="font-semibold text-zinc-900">
+              {claimChannels.medical_indemnity.name}
             </p>
-          ) : null}
-          {claimChannels.medical_indemnity.call_center ? (
-            <p className="mt-1 text-zinc-500">
-              콜센터 {claimChannels.medical_indemnity.call_center}
-            </p>
-          ) : null}
-          <ChannelLinkList
-            links={claimChannels.medical_indemnity.links ?? []}
-            className="mt-2"
-          />
-        </div>
+            {claimChannels.medical_indemnity.description ? (
+              <p className="mt-1">
+                {claimChannels.medical_indemnity.description}
+              </p>
+            ) : null}
+            {claimChannels.medical_indemnity.call_center ? (
+              <p className="mt-1 text-zinc-500">
+                콜센터 {claimChannels.medical_indemnity.call_center}
+              </p>
+            ) : null}
+            <ChannelLinkList
+              links={claimChannels.medical_indemnity.links ?? []}
+              className="mt-2"
+            />
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       {claimChannels.insurers?.length ? (
@@ -62,24 +72,32 @@ function ClaimChannelOptions({
                 보험사별 청구 채널
               </span>
             </span>
-            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-600">
+            <Badge
+              variant="neutral"
+              className="h-auto px-2.5 py-1 text-[11px] font-medium"
+            >
               {claimChannels.insurers.length}곳
-            </span>
+            </Badge>
           </summary>
 
           <ul className="mt-3 space-y-3 border-t border-zinc-100 pt-3 text-xs leading-5 text-zinc-600">
             {claimChannels.insurers.map((insurer) => (
-              <li key={insurer.name} className="rounded-lg bg-zinc-50 p-3">
-                <p className="font-semibold text-zinc-900">{insurer.name}</p>
-                {insurer.customer_center ? (
-                  <p className="mt-1 text-zinc-500">
-                    고객센터 {insurer.customer_center}
-                  </p>
-                ) : null}
-                {insurer.note ? (
-                  <p className="mt-1 text-zinc-500">{insurer.note}</p>
-                ) : null}
-                <ChannelLinkList links={insurer.links ?? []} className="mt-2" />
+              <li key={insurer.name}>
+                <Card variant="muted" className="rounded-lg border-none p-3">
+                  <p className="font-semibold text-zinc-900">{insurer.name}</p>
+                  {insurer.customer_center ? (
+                    <p className="mt-1 text-zinc-500">
+                      고객센터 {insurer.customer_center}
+                    </p>
+                  ) : null}
+                  {insurer.note ? (
+                    <p className="mt-1 text-zinc-500">{insurer.note}</p>
+                  ) : null}
+                  <ChannelLinkList
+                    links={insurer.links ?? []}
+                    className="mt-2"
+                  />
+                </Card>
               </li>
             ))}
           </ul>
@@ -107,12 +125,13 @@ function ChannelLinkList({
           const href = safeHref(link.url);
           if (!href) {
             return (
-              <span
+              <Badge
                 key={`${link.label}-${link.url}`}
-                className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-500"
+                variant="neutral"
+                className="h-auto px-2.5 py-1 text-[11px] font-medium text-zinc-500"
               >
                 {link.label}
-              </span>
+              </Badge>
             );
           }
 

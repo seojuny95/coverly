@@ -8,7 +8,10 @@ import {
   deletePortfolioSessionDocuments,
   type PortfolioSessionResult,
 } from "../analysis/session-api";
-import { Button } from "../../shared/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
+import { Card } from "@/shared/components/ui/card";
+import { Label } from "@/shared/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { AnalysisProgress } from "./progress";
 import { PolicyDocumentGuide } from "./document-guide";
 import { SelectedFileList } from "./file-list";
@@ -147,14 +150,17 @@ export function InsuranceUploadForm({
                   : "border-zinc-200 bg-white"
             } ${isModal ? "min-h-44 py-8" : "min-h-64 py-12"}`}
           >
-            <span className="relative mb-5 grid size-11 place-items-center rounded-xl border border-zinc-200 bg-white shadow-[5px_5px_0_#e8edff]">
+            <Card
+              shadow="mist"
+              className="relative mb-5 grid size-11 place-items-center rounded-xl"
+            >
               <span className="grid grid-cols-2 gap-1" aria-hidden="true">
                 <span className="size-1.5 bg-zinc-300" />
                 <span className="size-1.5 bg-blue-600" />
                 <span className="size-1.5 bg-zinc-300" />
                 <span className="size-1.5 bg-zinc-300" />
               </span>
-            </span>
+            </Card>
             <p
               className={`relative font-medium text-zinc-950 ${
                 isModal ? "text-base" : "text-base"
@@ -250,12 +256,13 @@ export function InsuranceUploadForm({
           ) : null}
 
           {error ? (
-            <p
+            <Card
               role="alert"
-              className="mt-4 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm leading-6 text-zinc-700 shadow-[5px_5px_0_#f4f4f5]"
+              shadow="zinc"
+              className="mt-4 rounded-xl px-4 py-3 text-sm leading-6 text-zinc-700"
             >
               {error}
-            </p>
+            </Card>
           ) : null}
         </div>
       </section>
@@ -300,7 +307,7 @@ function NameSelectionPanel({
   onContinue: () => void;
 }) {
   return (
-    <div className="mt-4 rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[5px_5px_0_#f4f4f5]">
+    <Card shadow="zinc" className="mt-4 rounded-xl px-4 py-4">
       <p className="text-sm font-semibold text-zinc-950">
         피보험자가 여러 명 있어요
       </p>
@@ -308,36 +315,33 @@ function NameSelectionPanel({
         결과로 볼 피보험자를 선택하세요. 선택한 피보험자의 증권만 보여드려요.
       </p>
 
-      <div className="mt-4 grid gap-2">
+      <RadioGroup
+        value={selectedName}
+        onValueChange={onSelectedNameChange}
+        name="insurance-person-name"
+        className="mt-4 gap-2"
+      >
         {options.map((option, index) => {
           const inputId = `insurance-person-name-${index}`;
           return (
-            <label
+            <Label
               key={option.name}
               htmlFor={inputId}
-              className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-3 text-sm transition-colors ${
+              className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-3 text-sm font-normal transition-colors ${
                 selectedName === option.name
                   ? "border-blue-600 bg-blue-50"
                   : "border-zinc-200 bg-white hover:bg-zinc-50"
               }`}
             >
               <span className="flex items-center gap-3">
-                <input
-                  id={inputId}
-                  type="radio"
-                  name="insurance-person-name"
-                  value={option.name}
-                  checked={selectedName === option.name}
-                  onChange={(event) => onSelectedNameChange(event.target.value)}
-                  className="h-4 w-4 accent-[#2563EB]"
-                />
+                <RadioGroupItem id={inputId} value={option.name} />
                 <span className="font-medium text-zinc-800">{option.name}</span>
               </span>
               <span className="text-zinc-500">{option.count}개</span>
-            </label>
+            </Label>
           );
         })}
-      </div>
+      </RadioGroup>
 
       <Button
         type="button"
@@ -347,6 +351,6 @@ function NameSelectionPanel({
       >
         선택한 피보험자로 보기
       </Button>
-    </div>
+    </Card>
   );
 }

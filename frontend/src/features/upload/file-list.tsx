@@ -1,5 +1,7 @@
 "use client";
 
+import { Card } from "@/shared/components/ui/card";
+import { Input } from "@/shared/components/ui/input";
 import type { FileReadStatus, SelectedUploadFile } from "./types";
 
 // The list of PDFs the user has picked (before submitting), with per-file
@@ -20,26 +22,18 @@ export function SelectedFileList({
 }) {
   if (files.length === 0) {
     return (
-      <div
-        className={
-          surface === "modal"
-            ? "rounded-xl border border-zinc-200 bg-white px-4 py-4"
-            : "rounded-xl border border-zinc-200 bg-white px-4 py-4"
-        }
-      >
+      <Card data-surface={surface} className="rounded-xl px-4 py-4">
         <p className="text-sm text-zinc-500">선택된 PDF가 없어요.</p>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <section
+    <Card
+      role="region"
       aria-label="선택한 PDF"
-      className={
-        surface === "modal"
-          ? "rounded-xl border border-zinc-200 bg-white px-4 py-4"
-          : "rounded-xl border border-zinc-200 bg-white px-4 py-4"
-      }
+      data-surface={surface}
+      className="rounded-xl px-4 py-4"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-zinc-950">선택한 PDF</p>
@@ -96,7 +90,7 @@ export function SelectedFileList({
                     <span className="mb-1 block text-[11px] font-semibold text-zinc-700">
                       PDF 비밀번호
                     </span>
-                    <input
+                    <Input
                       type="password"
                       aria-label="PDF 비밀번호"
                       autoFocus={shouldAutoFocusPassword}
@@ -105,7 +99,7 @@ export function SelectedFileList({
                         onPasswordChange(selectedFile.id, event.target.value)
                       }
                       autoComplete="off"
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 transition-colors outline-none placeholder:text-zinc-400 focus:border-blue-500"
+                      className="h-auto w-full border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950"
                       placeholder="PDF를 열 때 쓰는 비밀번호"
                     />
                     <span className="mt-1 block leading-5 text-zinc-500">
@@ -128,7 +122,7 @@ export function SelectedFileList({
           );
         })}
       </ul>
-    </section>
+    </Card>
   );
 }
 

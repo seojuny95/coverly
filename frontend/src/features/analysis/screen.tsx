@@ -2,21 +2,12 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import {
-  forwardRef,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, type ReactNode, useMemo, useState } from "react";
 
 import { SectionLabel } from "../../shared/components/section-label";
-import { Button } from "../../shared/components/ui/button";
-import { POLICY_CLASSIFICATIONS } from "../../shared/api/generated-runtime";
+import { Button } from "@/shared/components/ui/button";
 
 import { UploadInsuranceModal } from "./upload-modal";
-import { InsurerLogo, InsuranceDetail, TagBadge } from "./policy-detail";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
@@ -24,8 +15,10 @@ import {
 } from "./store";
 import { usePortfolioSessionRefresh } from "./use-session-refresh";
 import { useBeforeUnloadGuard } from "./use-leave-guard";
+import { useTabNavigation } from "./use-tab-navigation";
+import { useExpandedRows } from "./use-expanded-rows";
+import { InsuranceListPanel } from "./insurance-list-panel";
 import type { UploadInsurance } from "../upload/form";
-import { CoverageTotalTable } from "./portfolio/total-table";
 import { PortfolioAnalysisPanel } from "./portfolio/panel";
 import { usePortfolioSummary } from "./portfolio/use-summary";
 import type { DeathBenefitGuideInput } from "./portfolio/api";
@@ -41,8 +34,6 @@ type InsuranceAnalysisPageProps = {
   uploadInsurance?: UploadInsurance;
 };
 
-type AnalysisTab = "insurance" | "analysis" | "chat";
-
 export function InsuranceAnalysisPage({
   uploadInsurance,
 }: InsuranceAnalysisPageProps = {}) {
@@ -55,39 +46,23 @@ export function InsuranceAnalysisPage({
     expireSession,
   } = useInsuranceData();
   useBeforeUnloadGuard(hasData);
+
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<AnalysisTab>("insurance");
-  const insuranceTabRef = useRef<HTMLButtonElement>(null);
-  const analysisTabRef = useRef<HTMLButtonElement>(null);
-  const chatTabRef = useRef<HTMLButtonElement>(null);
+  const {
+    activeTab,
+    setActiveTab,
+    handleTabListKeyDown,
+    insuranceTabRef,
+    analysisTabRef,
+    chatTabRef,
+  } = useTabNavigation();
+  const { isExpanded, toggle: toggleInsurance } = useExpandedRows();
   const [deathBenefitContext, setDeathBenefitContext] =
     useState<DeathBenefitGuideInput>({
       has_dependent_family: false,
       has_minor_children: false,
       has_major_debt: false,
     });
-
-  // Arrow-key navigation between the tabs (WAI-ARIA tabs pattern,
-  // automatic activation): moves focus and switches the panel in one step.
-  const handleTabListKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    event.preventDefault();
-    const tabs: AnalysisTab[] = ["insurance", "analysis", "chat"];
-    const direction = event.key === "ArrowRight" ? 1 : -1;
-    const nextIndex =
-      (tabs.indexOf(activeTab) + direction + tabs.length) % tabs.length;
-    const next = tabs[nextIndex];
-    setActiveTab(next);
-    const tabRefs = {
-      insurance: insuranceTabRef,
-      analysis: analysisTabRef,
-      chat: chatTabRef,
-    };
-    tabRefs[next].current?.focus();
-  };
-  const [expandedInsuranceIds, setExpandedInsuranceIds] = useState<Set<string>>(
-    () => new Set(),
-  );
 
   const insuranceDocuments = useMemo(
     () => analysis?.insuranceDocuments ?? [],
@@ -103,34 +78,22 @@ export function InsuranceAnalysisPage({
         : undefined,
     [analysis],
   );
+  const groupedInsuranceDocuments = useMemo(
+    () => groupInsuranceDocuments(insuranceDocuments),
+    [insuranceDocuments],
+  );
+
   usePortfolioSessionRefresh({
     session: portfolioSession,
     enabled: hasData && !sessionExpired,
     onRefreshed: replacePortfolioSession,
     onExpired: expireSession,
   });
-  const groupedInsuranceDocuments = useMemo(
-    () => groupInsuranceDocuments(insuranceDocuments),
-    [insuranceDocuments],
-  );
-  const classificationTypeCount = POLICY_CLASSIFICATIONS.length;
   const portfolioSummary = usePortfolioSummary(
     insuranceDocuments,
     deathBenefitContext,
     analysis?.portfolioSessionToken,
   );
-
-  const toggleInsurance = (policyId: string) => {
-    setExpandedInsuranceIds((current) => {
-      const next = new Set(current);
-      if (next.has(policyId)) {
-        next.delete(policyId);
-      } else {
-        next.add(policyId);
-      }
-      return next;
-    });
-  };
 
   const openUploadModal = () => setIsUploadModalOpen(true);
   const closeUploadModal = () => setIsUploadModalOpen(false);
@@ -210,152 +173,21 @@ export function InsuranceAnalysisPage({
         </nav>
         {sessionExpired ? <PolicySessionExpiredNotice /> : null}
         {activeTab === "insurance" ? (
-          <div
-            id="insurance-tabpanel"
-            role="tabpanel"
-            aria-labelledby="insurance-tab"
-            tabIndex={0}
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <div className="mb-4">
-                  <SectionLabel>나의 보장 지도</SectionLabel>
-                </div>
-                <h1 className="text-3xl font-semibold tracking-[-0.05em] text-zinc-950 sm:text-4xl">
-                  내 보험을 종류별로 정리했어요
-                </h1>
-                <p className="mt-3 text-sm leading-6 text-zinc-500">
-                  {analysis.selectedName
-                    ? `${analysis.selectedName}님의 보험을 ${classificationTypeCount}가지 종류로 보기 쉽게 정리했어요.`
-                    : `보험을 ${classificationTypeCount}가지 종류로 보기 쉽게 정리했어요.`}
-                </p>
-              </div>
-              <div className="flex flex-col items-start gap-3 sm:items-end">
-                <Button type="button" onClick={openUploadModal}>
-                  보험증권 더 올리기
-                </Button>
-                <p className="font-mono text-[10px] tracking-[0.04em] text-zinc-400">
-                  정리한 시각 {formatDateTime(analysis.generatedAt)}
-                </p>
-              </div>
-            </div>
-
-            <dl className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {POLICY_CLASSIFICATIONS.map((classification) => (
-                <div
-                  key={classification}
-                  className="relative rounded-xl border border-zinc-200 bg-white px-4 py-4 shadow-[4px_4px_0_#f4f4f5]"
-                >
-                  <dt className="text-xs font-medium text-zinc-500">
-                    {classification}
-                  </dt>
-                  <dd className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-blue-600">
-                    {groupedInsuranceDocuments[classification]?.length ?? 0}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-
-            <CoverageTotalTable
-              status={portfolioSummary.state.status}
-              summary={
-                portfolioSummary.state.status === "success"
-                  ? portfolioSummary.state.summary
-                  : undefined
-              }
-              onRetry={portfolioSummary.retry}
-            />
-
-            <div className="mt-8 space-y-5">
-              {POLICY_CLASSIFICATIONS.map((classification) => {
-                const classificationInsuranceDocuments =
-                  groupedInsuranceDocuments[classification] ?? [];
-                if (classificationInsuranceDocuments.length === 0) return null;
-
-                return (
-                  <section
-                    key={classification}
-                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white"
-                  >
-                    <div className="border-b border-zinc-100 bg-zinc-50/60 px-5 py-4">
-                      <h2 className="text-lg font-semibold tracking-[-0.03em]">
-                        {classification}
-                      </h2>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        보험 {classificationInsuranceDocuments.length}개
-                      </p>
-                    </div>
-
-                    <ul className="divide-y divide-zinc-100">
-                      {classificationInsuranceDocuments.map(
-                        (insuranceDocument) => {
-                          const isExpanded = expandedInsuranceIds.has(
-                            insuranceDocument.id,
-                          );
-                          const basicInfo = insuranceDocument.result.기본정보;
-
-                          return (
-                            <li key={insuranceDocument.id}>
-                              <button
-                                type="button"
-                                aria-expanded={isExpanded}
-                                onClick={() =>
-                                  toggleInsurance(insuranceDocument.id)
-                                }
-                                className="flex w-full flex-col gap-4 px-5 py-4 text-left transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset sm:flex-row sm:items-center sm:justify-between"
-                              >
-                                <span className="flex min-w-0 items-start gap-3">
-                                  <InsurerLogo
-                                    insurerName={basicInfo?.보험사 ?? undefined}
-                                  />
-                                  <span className="min-w-0 flex-1">
-                                    <span className="flex min-w-0 items-center gap-2">
-                                      <span className="truncate text-base font-semibold text-zinc-950">
-                                        {basicInfo?.상품명 ??
-                                          insuranceDocument.fileName}
-                                      </span>
-                                      {basicInfo?.상품태그?.length ? (
-                                        <span className="flex shrink-0 flex-wrap gap-1.5">
-                                          {basicInfo.상품태그.map((tag) => (
-                                            <TagBadge key={tag} tag={tag} />
-                                          ))}
-                                        </span>
-                                      ) : null}
-                                    </span>
-                                    <span className="mt-1 block truncate text-sm text-zinc-500">
-                                      {insuranceDocument.fileName}
-                                    </span>
-                                  </span>
-                                </span>
-                                <span className="inline-flex shrink-0 items-center rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                                  {isExpanded ? "접기" : "자세히 보기"}
-                                </span>
-                              </button>
-
-                              <div
-                                className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                                  isExpanded
-                                    ? "grid-rows-[1fr]"
-                                    : "grid-rows-[0fr]"
-                                }`}
-                              >
-                                <div className="overflow-hidden">
-                                  <InsuranceDetail
-                                    insuranceDocument={insuranceDocument}
-                                    isExpanded={isExpanded}
-                                  />
-                                </div>
-                              </div>
-                            </li>
-                          );
-                        },
-                      )}
-                    </ul>
-                  </section>
-                );
-              })}
-            </div>
-          </div>
+          <InsuranceListPanel
+            selectedName={analysis.selectedName}
+            generatedAt={analysis.generatedAt}
+            groupedInsuranceDocuments={groupedInsuranceDocuments}
+            coverageTotalStatus={portfolioSummary.state.status}
+            coverageTotalSummary={
+              portfolioSummary.state.status === "success"
+                ? portfolioSummary.state.summary
+                : undefined
+            }
+            onRetryCoverageTotal={portfolioSummary.retry}
+            isExpanded={isExpanded}
+            onToggle={toggleInsurance}
+            onOpenUploadModal={openUploadModal}
+          />
         ) : activeTab === "analysis" ? (
           <div
             id="analysis-tabpanel"
@@ -485,11 +317,4 @@ function groupInsuranceDocuments(insuranceDocuments: AnalyzedInsurance[]) {
     },
     {},
   );
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Card } from "@/shared/components/ui/card";
 
 export function PolicyDocumentGuide() {
   return (
@@ -32,7 +33,7 @@ export function PolicyDocumentGuide() {
           보험증권을 이렇게 받을 수 있어요
         </h2>
 
-        <div className="mt-4 rounded-xl bg-zinc-50 p-4">
+        <Card variant="muted" className="mt-4 rounded-xl border-0 p-4">
           <GuideStepNumber>1</GuideStepNumber>
           <div className="mt-3">
             <h3 className="text-sm font-semibold text-zinc-800">
@@ -46,7 +47,7 @@ export function PolicyDocumentGuide() {
               보험사마다 메뉴 이름은 조금 다를 수 있어요.
             </p>
           </div>
-        </div>
+        </Card>
 
         <div className="mt-4 flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">

@@ -82,8 +82,9 @@ src/
 - **주석은 이유와 제약만 남긴다**: 코드를 그대로 풀어쓴 설명, 임시 작업 과정, 작성자만 이해할 메모, 실제로 유지보수자가 읽지 않을 서술형 주석은 작성하지 않는다. 이런 주석이나 코드와 맞지 않는 낡은 주석을 발견하면 제거한다. 코드만으로 드러나지 않는 의사결정·안전 제약·프레임워크 우회 이유만 짧게 영어로 남긴다.
 - 기본은 **Server Components**; 상호작용이 필요할 때만 `"use client"`를 사용한다.
 - 파일명은 kebab-case, 컴포넌트는 PascalCase를 사용한다.
-- 기능 폴더가 문맥을 제공하므로 하위 파일명에 같은 기능명을 prefix로 반복하지 않는다. 예: `features/upload/form.tsx`, `features/analysis/store.tsx`, `features/analysis/portfolio/panel.tsx`.
-- 파일명은 폴더 안에서 간결하게 유지하되 export 이름은 import 문맥과 React DevTools에서 의미가 드러나게 짓는다. 예: `form.tsx`의 `InsuranceUploadForm`, `panel.tsx`의 `PortfolioAnalysisPanel`.
+- 기능 폴더가 문맥을 제공하므로 하위 파일명에 같은 기능명을 prefix로 반복하지 않는다. 예: `features/upload/form.tsx`, `features/analysis/store.tsx`, `features/analysis/portfolio/total-table.tsx`.
+- 파일명은 폴더 안에서 간결하게 유지하되 export 이름은 import 문맥과 React DevTools에서 의미가 드러나게 짓는다. 예: `form.tsx`의 `InsuranceUploadForm`, `total-table.tsx`의 `CoverageTotalTable`.
+- 하나의 컴포넌트 파일이 여러 하위 컴포넌트로 커지면 같은 이름의 폴더로 나누고 `index.tsx`에서 공개 export를 유지한다(import 경로는 그대로). 예: `portfolio/panel/`, `portfolio/recommendation-cards/`.
 - shadcn/ui 컴포넌트는 `components.json`의 alias에 따라 `shared/components/ui/`에 두고, 공용 class 병합에는 `shared/lib/utils.ts`의 `cn`을 사용한다.
 - 마크다운은 한국어, 코드 코멘트는 영어. 사용자 대상 UI 카피는 한국어.
 - 사용자 대상 UI 카피를 작성하거나 수정할 때는 [UX_COPY.md](UX_COPY.md)를 먼저 확인한다.

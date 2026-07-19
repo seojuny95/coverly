@@ -8,6 +8,8 @@ import {
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 
+import { Alert, AlertDescription } from "@/shared/components/ui/alert";
+
 import type { ClaimChannelBlock } from "./api";
 import { safeHref } from "./safe-href";
 
@@ -122,11 +124,17 @@ function ChatMessageComponent({ message }: { message: ChatMessageData }) {
           <summary className="cursor-pointer text-[11px] font-semibold text-zinc-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
             답변의 확인 범위
           </summary>
-          <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-            {message.limitations.map((item, index) => (
-              <p key={`${item}-${index}`}>{item}</p>
-            ))}
-          </div>
+          <Alert
+            variant="warning"
+            role="note"
+            className="mt-2 gap-0 border-transparent px-3 py-2 text-xs leading-5 text-amber-900"
+          >
+            <AlertDescription className="text-xs text-pretty text-amber-900 [&_p:not(:last-child)]:mb-0">
+              {message.limitations.map((item, index) => (
+                <p key={`${item}-${index}`}>{item}</p>
+              ))}
+            </AlertDescription>
+          </Alert>
         </details>
       ) : null}
     </article>

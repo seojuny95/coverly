@@ -1,3 +1,5 @@
+import { Badge } from "@/shared/components/ui/badge";
+
 import type { SpecialPolicyAnalysis } from "./api";
 
 export function SpecialPolicySections({
@@ -22,9 +24,12 @@ export function SpecialPolicySections({
             <div className="border-b border-zinc-100 bg-zinc-50 px-5 py-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">{analysis.label}</h3>
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs text-zinc-600 ring-1 ring-zinc-200">
+                <Badge
+                  variant="outline"
+                  className="h-auto rounded-full border-transparent bg-white px-2.5 py-1 text-xs text-zinc-600 ring-1 ring-zinc-200"
+                >
                   {analysis.policy_count}건
-                </span>
+                </Badge>
               </div>
               <p className="mt-2 text-xs font-medium text-zinc-500">
                 {analysis.product_names?.join(" · ")}

@@ -1,3 +1,8 @@
+import type { VariantProps } from "class-variance-authority";
+
+import { Badge, type badgeVariants } from "@/shared/components/ui/badge";
+import { cn } from "@/shared/lib/utils";
+
 import type {
   EssentialCoverageItem,
   ReferenceSource,
@@ -5,18 +10,20 @@ import type {
 } from "./api";
 import { safeHref } from "./safe-href";
 
+type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
+
 export const STATUS_COPY = {
   well_prepared: {
     label: "가입 확인",
-    className: "bg-emerald-50 text-emerald-700",
+    variant: "success" satisfies BadgeVariant,
   },
   needs_review: {
     label: "추가 확인",
-    className: "bg-amber-50 text-amber-800",
+    variant: "warning" satisfies BadgeVariant,
   },
   not_found: {
     label: "현재 자료에서 미확인",
-    className: "bg-zinc-100 text-zinc-600",
+    variant: "neutral" satisfies BadgeVariant,
   },
 } as const;
 
@@ -28,11 +35,15 @@ export function CoverageStatusBadge({
   label?: string;
 }) {
   return (
-    <span
-      className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_COPY[status].className}`}
+    <Badge
+      variant={STATUS_COPY[status].variant}
+      className={cn(
+        "h-auto px-3 py-1 text-xs font-medium",
+        status === "needs_review" && "text-amber-800",
+      )}
     >
       {label ?? STATUS_COPY[status].label}
-    </span>
+    </Badge>
   );
 }
 
@@ -45,13 +56,16 @@ export function ReferenceSourceList({
 }) {
   if (sources.length === 0) return null;
 
+  // Links keep a plain <a> (not Badge asChild) so hover styling stays
+  // exactly as before; Badge's [a]:hover variants would otherwise leak in.
+  const anchorClassName =
+    "rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-medium text-zinc-600";
+
   return (
     <div className={`mt-3 flex flex-wrap gap-1.5 ${className}`}>
       {sources.map((source) => {
         const href = safeHref(source.url);
         const label = sourceTypeLabel(source.reliability);
-        const className =
-          "rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-medium text-zinc-600";
 
         return href ? (
           <a
@@ -59,19 +73,20 @@ export function ReferenceSourceList({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className={className}
+            className={anchorClassName}
             title={source.caveat}
           >
             {label}: {source.label}
           </a>
         ) : (
-          <span
+          <Badge
             key={`${source.label}-${source.url}`}
-            className={className}
+            variant="outline"
+            className="h-auto rounded-full border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-medium text-zinc-600"
             title={source.caveat}
           >
             {label}: {source.label}
-          </span>
+          </Badge>
         );
       })}
     </div>

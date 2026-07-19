@@ -1,5 +1,7 @@
 import Image from "next/image";
 
+import { Badge } from "@/shared/components/ui/badge";
+import { Card } from "@/shared/components/ui/card";
 import type {
   InsuranceBasicInfo,
   InsurancePeriod,
@@ -74,12 +76,12 @@ export function InsuranceDetail({
 
       <div className="mt-6">
         <h3 className="text-xs font-medium text-zinc-500">보장 내용</h3>
-        <div className="mt-2 rounded-xl border border-zinc-200 bg-white px-5 py-4">
+        <Card className="mt-2 rounded-xl px-5 py-4">
           <InsuranceCoverageList
             coverages={insuranceDocument.result.보장목록}
             status={insuranceDocument.result.분석상태}
           />
-        </div>
+        </Card>
       </div>
     </div>
   );
@@ -89,7 +91,7 @@ export function InsurerLogo({ insurerName }: { insurerName?: string }) {
   const logo = findInsurerLogo(insurerName);
 
   return (
-    <span className="flex h-10 min-w-[4.75rem] shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white px-2.5">
+    <Card className="flex h-10 min-w-[4.75rem] shrink-0 items-center justify-center rounded-xl px-2.5">
       {logo ? (
         <span className="relative flex h-7 w-full items-center justify-center overflow-hidden">
           <Image
@@ -106,17 +108,17 @@ export function InsurerLogo({ insurerName }: { insurerName?: string }) {
           {(insurerName ?? "?").slice(0, 1)}
         </span>
       )}
-    </span>
+    </Card>
   );
 }
 
 export function TagBadge({ tag }: { tag: string }) {
   return (
-    <span
-      className={`inline-flex h-6 items-center rounded-full border px-2 py-0 text-[11px] font-medium whitespace-nowrap ${TAG_STYLES[tag] ?? "border-[#111827]/10 bg-[#111827]/[0.04] text-[#111827]/60"}`}
+    <Badge
+      className={`h-6 rounded-full px-2 py-0 text-[11px] ${TAG_STYLES[tag] ?? "border-[#111827]/10 bg-[#111827]/[0.04] text-[#111827]/60"}`}
     >
       {tag}
-    </span>
+    </Badge>
   );
 }
 

@@ -17,41 +17,18 @@ import {
   findByteIdenticalDuplicateIndexes,
   findDuplicatePolicyDocuments,
 } from "../analysis/policy-identity";
-import { UploadInsuranceError, type UploadErrorCode } from "./api";
+import { UploadInsuranceError } from "./api";
 import type { SelectedUploadFile, UploadInsurance } from "./types";
-
-function toFiles(files: FileList | File[]): File[] {
-  return Array.from(files);
-}
-
-function isFileSpecificUploadError(err: unknown) {
-  if (!(err instanceof UploadInsuranceError)) return false;
-  if (err.code === "UPLOAD_NETWORK_ERROR") return false;
-  if (err.status && err.status >= 500) return false;
-  return true;
-}
-
-function isPasswordUploadError(code: UploadErrorCode) {
-  return code === "PDF_PASSWORD_REQUIRED" || code === "PDF_PASSWORD_INCORRECT";
-}
-
-const ROLLBACK_ERROR_MESSAGE =
-  "업로드한 문서를 정리하지 못했어요. 다시 시도해주세요.";
-
-class UploadRollbackError extends Error {
-  constructor() {
-    super(ROLLBACK_ERROR_MESSAGE);
-    this.name = "UploadRollbackError";
-  }
-}
-
-async function createFileFingerprint(file: File) {
-  const buffer = await file.arrayBuffer();
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
+import {
+  type ApiErrorCodeOrLocalUiCode,
+  ROLLBACK_ERROR_MESSAGE,
+  UploadRollbackError,
+  createFileFingerprint,
+  isFileSpecificUploadError,
+  messageForFailedUploads,
+  messageForSubmitFailure,
+  toFiles,
+} from "./upload-helpers";
 
 export function getInsuranceNameOptions(
   insuranceDocuments: AnalyzedInsurance[],
@@ -216,31 +193,29 @@ export function useUploadOrchestration({
     );
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (selectedUploadFiles.length === 0 || isAnalyzing || pendingAnalysis)
-      return;
-
+  // Retry a cleanup a previous failed submit left pending, before starting a
+  // new upload. Returns false when the cleanup still fails and submit must abort.
+  const resolvePendingCleanup = async () => {
     const pendingCleanup = pendingCleanupRef.current;
-    if (pendingCleanup) {
-      setIsAnalyzing(true);
-      setError(null);
-      try {
-        await deleteSessionDocuments(
-          currentAnalysis?.portfolioSessionToken ??
-            pendingCleanup.portfolioSessionToken,
-          pendingCleanup.documentIds,
-        );
-        pendingCleanupRef.current = null;
-      } catch {
-        setError(ROLLBACK_ERROR_MESSAGE);
-        setIsAnalyzing(false);
-        return;
-      }
-    }
-
+    if (!pendingCleanup) return true;
     setIsAnalyzing(true);
-    setAnalysisProgress({ completed: 0, total: selectedUploadFiles.length });
+    setError(null);
+    try {
+      await deleteSessionDocuments(
+        currentAnalysis?.portfolioSessionToken ??
+          pendingCleanup.portfolioSessionToken,
+        pendingCleanup.documentIds,
+      );
+      pendingCleanupRef.current = null;
+      return true;
+    } catch {
+      setError(ROLLBACK_ERROR_MESSAGE);
+      setIsAnalyzing(false);
+      return false;
+    }
+  };
+
+  const markSelectedFilesReading = () => {
     setSelectedUploadFiles((current) =>
       current.map((selectedFile) => ({
         ...selectedFile,
@@ -249,6 +224,40 @@ export function useUploadOrchestration({
         errorMessage: undefined,
       })),
     );
+  };
+
+  // Clear the transient "reading" state so files left untouched by an aborted
+  // batch don't stay stuck mid-read.
+  const resetReadingFilesToIdle = () => {
+    setSelectedUploadFiles((current) =>
+      current.map((selectedFile) =>
+        selectedFile.status === "reading"
+          ? { ...selectedFile, status: "idle" }
+          : selectedFile,
+      ),
+    );
+  };
+
+  // Only accepted PDFs reach this stage, so the server's size gate has already
+  // bounded the sequential reads used for local duplicate UX.
+  const fingerprintSelectedFiles = async (files: SelectedUploadFile[]) => {
+    const fingerprints: string[] = [];
+    for (const selectedFile of files) {
+      fingerprints.push(await createFileFingerprint(selectedFile.file));
+    }
+    return fingerprints;
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (selectedUploadFiles.length === 0 || isAnalyzing || pendingAnalysis)
+      return;
+
+    if (!(await resolvePendingCleanup())) return;
+
+    setIsAnalyzing(true);
+    setAnalysisProgress({ completed: 0, total: selectedUploadFiles.length });
+    markSelectedFilesReading();
     setError(null);
     setPendingAnalysis(null);
     setSelectedName("");
@@ -287,68 +296,72 @@ export function useUploadOrchestration({
         : await sessionMutation.mutateAsync();
       portfolioSessionToken = portfolioSession.portfolioSessionToken;
 
+      // Upload one selected file, advancing the shared progress counter and its
+      // per-file status for both success and failure.
+      const uploadSelectedFile = async (selectedFile: SelectedUploadFile) => {
+        try {
+          const uploadInput = {
+            file: selectedFile.file,
+            documentId: assignedDocumentIds.get(selectedFile.id)!,
+            ...(selectedFile.password
+              ? { password: selectedFile.password }
+              : {}),
+            portfolioSessionToken: portfolioSession.portfolioSessionToken,
+          };
+          const result = await uploadMutation.mutateAsync(uploadInput);
+          const { documentId: _documentId, ...policyResult } = result;
+          void _documentId;
+          setAnalysisProgress((current) => ({
+            ...current,
+            completed: current.completed + 1,
+          }));
+          setSelectedUploadFiles((current) =>
+            current.map((currentFile) =>
+              currentFile.id === selectedFile.id
+                ? { ...currentFile, status: "done" }
+                : currentFile,
+            ),
+          );
+          return {
+            status: "fulfilled" as const,
+            selectedFileId: selectedFile.id,
+            documentId: uploadInput.documentId,
+            fileName: selectedFile.file.name,
+            policyResult,
+          };
+        } catch (err) {
+          const uploadError = isFileSpecificUploadError(err)
+            ? (err as UploadInsuranceError)
+            : undefined;
+          setAnalysisProgress((current) => ({
+            ...current,
+            completed: current.completed + 1,
+          }));
+          setSelectedUploadFiles((current) =>
+            current.map((currentFile) =>
+              currentFile.id === selectedFile.id
+                ? uploadError
+                  ? {
+                      ...currentFile,
+                      status: "failed",
+                      errorCode: uploadError.code,
+                      errorMessage: uploadError.userMessage,
+                    }
+                  : { ...currentFile, status: "idle" }
+                : currentFile,
+            ),
+          );
+          return {
+            status: "rejected" as const,
+            fileName: selectedFile.file.name,
+            error: err,
+            uploadError,
+          };
+        }
+      };
+
       const uploadResults = await Promise.all(
-        selectedUploadFiles.map(async (selectedFile) => {
-          try {
-            const uploadInput = {
-              file: selectedFile.file,
-              documentId: assignedDocumentIds.get(selectedFile.id)!,
-              ...(selectedFile.password
-                ? { password: selectedFile.password }
-                : {}),
-              portfolioSessionToken: portfolioSession.portfolioSessionToken,
-            };
-            const result = await uploadMutation.mutateAsync(uploadInput);
-            const { documentId: _documentId, ...policyResult } = result;
-            void _documentId;
-            setAnalysisProgress((current) => ({
-              ...current,
-              completed: current.completed + 1,
-            }));
-            setSelectedUploadFiles((current) =>
-              current.map((currentFile) =>
-                currentFile.id === selectedFile.id
-                  ? { ...currentFile, status: "done" }
-                  : currentFile,
-              ),
-            );
-            return {
-              status: "fulfilled" as const,
-              selectedFileId: selectedFile.id,
-              documentId: uploadInput.documentId,
-              fileName: selectedFile.file.name,
-              policyResult,
-            };
-          } catch (err) {
-            const uploadError = isFileSpecificUploadError(err)
-              ? (err as UploadInsuranceError)
-              : undefined;
-            setAnalysisProgress((current) => ({
-              ...current,
-              completed: current.completed + 1,
-            }));
-            setSelectedUploadFiles((current) =>
-              current.map((currentFile) =>
-                currentFile.id === selectedFile.id
-                  ? uploadError
-                    ? {
-                        ...currentFile,
-                        status: "failed",
-                        errorCode: uploadError.code,
-                        errorMessage: uploadError.userMessage,
-                      }
-                    : { ...currentFile, status: "idle" }
-                  : currentFile,
-              ),
-            );
-            return {
-              status: "rejected" as const,
-              fileName: selectedFile.file.name,
-              error: err,
-              uploadError,
-            };
-          }
-        }),
+        selectedUploadFiles.map(uploadSelectedFile),
       );
 
       const failedUploads = uploadResults.filter(
@@ -363,30 +376,12 @@ export function useUploadOrchestration({
         const uploadErrors = failedUploads.flatMap((result) =>
           result.uploadError ? [result.uploadError] : [],
         );
-        const hasPasswordErrors = failedUploads.some(
-          (result) =>
-            result.uploadError &&
-            isPasswordUploadError(result.uploadError.code),
-        );
-        const onlyPasswordErrors = uploadErrors.every((uploadError) =>
-          isPasswordUploadError(uploadError.code),
-        );
-        setError(
-          onlyPasswordErrors
-            ? "비밀번호가 필요한 PDF가 있어요. 표시된 파일에 비밀번호를 입력한 뒤 다시 시도해주세요."
-            : hasPasswordErrors
-              ? "일부 PDF는 비밀번호가 필요해요. 읽을 수 없는 PDF는 제거한 뒤 다시 시도해주세요."
-              : "텍스트를 추출할 수 없는 PDF가 있어요. 표시된 파일을 제거한 뒤 다시 시도해주세요.",
-        );
+        setError(messageForFailedUploads(uploadErrors));
         return;
       }
 
-      // Only accepted PDFs reach this stage, so the server's size gate has
-      // already bounded the sequential reads used for local duplicate UX.
-      const fileFingerprints: string[] = [];
-      for (const selectedFile of selectedUploadFiles) {
-        fileFingerprints.push(await createFileFingerprint(selectedFile.file));
-      }
+      const fileFingerprints =
+        await fingerprintSelectedFiles(selectedUploadFiles);
       const byteIdenticalIndexes = findByteIdenticalDuplicateIndexes({
         fingerprints: fileFingerprints,
         existingDocuments,
@@ -445,24 +440,8 @@ export function useUploadOrchestration({
           err = new UploadRollbackError();
         }
       }
-      setSelectedUploadFiles((current) =>
-        current.map((selectedFile) =>
-          selectedFile.status === "reading"
-            ? { ...selectedFile, status: "idle" }
-            : selectedFile,
-        ),
-      );
-      if (err instanceof UploadRollbackError) {
-        setError(ROLLBACK_ERROR_MESSAGE);
-      } else if (err instanceof UploadInsuranceError) {
-        setError(err.userMessage);
-      } else {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "업로드에 실패했어요. 잠시 후 다시 시도해주세요.",
-        );
-      }
+      resetReadingFilesToIdle();
+      setError(messageForSubmitFailure(err));
     } finally {
       if (!shouldKeepProgress) {
         setIsAnalyzing(false);
@@ -594,8 +573,3 @@ export function useUploadOrchestration({
     handleNameSelectionSubmit,
   };
 }
-
-type ApiErrorCodeOrLocalUiCode = Exclude<
-  UploadErrorCode,
-  "UPLOAD_NETWORK_ERROR" | "UPLOAD_FAILED"
->;
