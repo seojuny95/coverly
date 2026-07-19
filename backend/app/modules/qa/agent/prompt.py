@@ -25,7 +25,9 @@ def build_agent_input(context: QaContext) -> str:
         "보험 상담 범위 밖의 질문만 있으면 answer_mode=out_of_scope로 답하세요. "
         "보험 질문과 범위 밖 질문이 함께 있으면 보험 부분은 도구로 답하고 나머지는 보험 상담 "
         "범위 밖이라고 짧게 구분하세요. "
-        "그 외에는 matched=true인 도구 결과 하나를 선택해 result_id를 최종 출력에 넣으세요. "
+        "그 외에는 근거 도구를 필요한 만큼 사용하세요. 한 도구로 충분하면 그 result_id를 "
+        "selected_result_id에 넣고, 여러 도구의 근거를 합쳐 답하면 selected_result_id는 비우고 "
+        "사용한 근거의 evidence_ids만 넣으세요. 근거 밖 담보·금액·조건은 지어내지 않습니다. "
         "질문에 맞는 근거 도구를 사용했지만 모두 matched=false라면 같은 도구를 반복하지 말고 "
         "answer_mode=insufficient_evidence로 확인하지 못한 범위만 설명하세요."
     )
@@ -69,6 +71,8 @@ def agent_instructions(decision: QaInputDecision | None = None) -> str:
 - 근거 도구를 호출했지만 확인하지 못한 답변은 answer_mode=insufficient_evidence이며 result_id와
   evidence_ids를 비웁니다. 실제 도구 실패 없이 이 모드를 사용하지 않습니다.
 - 범위 밖 답변은 answer_mode=out_of_scope이며 result_id와 evidence_ids를 비웁니다.
+- 여러 도구의 근거를 합쳐 답할 때는 selected_result_id를 비우고 사용한 evidence_ids만 넣습니다.
+  답의 모든 숫자는 사용한 도구 근거에 실제로 있는 값이어야 합니다.
 - consultation 결과를 사용하면 실제 답변에 쓴 evidence id만 evidence_ids에 넣으세요.
 - 질문에 먼저 답하고 필요한 설명만 이어가며, 근거 목록 전체를 그대로 복사하지 않습니다.
 - 기본 답변은 짧은 문단 두세 개로 끝내고 친근한 해요체를 사용합니다.

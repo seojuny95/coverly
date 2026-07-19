@@ -1,5 +1,6 @@
 """Validation and grounding for final QA agent responses."""
 
+from app.modules.consultation.contracts import ConsultationEvidence
 from app.modules.evidence.catalog import (
     valid_evidence_ids,
 )
@@ -7,10 +8,12 @@ from app.modules.qa.agent.contracts import (
     AgentCounselorDraft,
     QaAgentDependencies,
     QaAgentUnavailable,
+    RegisteredToolResult,
 )
 from app.modules.qa.agent.grounding import (
     NUMERIC_CLAIM,
     numeric_claims_are_grounded,
+    numeric_claims_grounded_in_sources,
 )
 from app.modules.qa.agent.input_guardrail import (
     requires_fresh_official_source,
@@ -25,7 +28,11 @@ from app.modules.qa.response_support import (
     standard_limitations,
     with_demographics,
 )
-from app.modules.qa.schemas import PortfolioQuestionResponse
+from app.modules.qa.schemas import AnswerCitation, PortfolioQuestionResponse
+
+_DEGRADED_SYNTHESIS_NOTE = (
+    "확인된 개별 항목의 답변만 그대로 정리했고, 근거 없는 종합 수치는 포함하지 않았습니다."
+)
 
 
 def validated_agent_response(
@@ -63,6 +70,17 @@ def validated_agent_response(
         if requires_fresh_official_source(dependencies):
             return _missing_required_web_response(context)
         return _validated_general_guidance_response(context, draft)
+
+    matched_results = list(dependencies.tool_results.values())
+    is_synthesis = (
+        draft.answer_mode == "tool_grounded"
+        and draft.selected_result_id is None
+        and len(matched_results) > 1
+        and not requires_fresh_official_source(dependencies)
+        and not requires_uploaded_policy_terms(dependencies)
+    )
+    if is_synthesis:
+        return _validated_synthesis_response(context, draft, matched_results, dependencies)
 
     selected = select_tool_result(dependencies, draft.selected_result_id)
     if (
@@ -116,6 +134,144 @@ def validated_agent_response(
         ),
         context.insured,
     )
+
+
+def _validated_synthesis_response(
+    context: QaContext,
+    draft: AgentCounselorDraft,
+    results: list[RegisteredToolResult],
+    dependencies: QaAgentDependencies,
+) -> PortfolioQuestionResponse:
+    authoritative = [item.response.answer for item in results]
+    union_evidence = tuple(ev for item in results for ev in item.evidence)
+    answer = draft.answer.strip()
+
+    citations = _synthesis_citations(draft, union_evidence, results)
+
+    # An answered synthesis must rest on real grounding: either an evidence
+    # citation resolved from the participating results' own union, or a numeric
+    # claim that Task 4a verified against those results. Otherwise the model has
+    # only produced ungrounded prose (or a fabricated number), so we degrade to
+    # the confirmed individual answers instead of dressing prose up as grounded.
+    numbers_grounded = numeric_claims_grounded_in_sources(answer, authoritative, union_evidence)
+    has_union_citation = _has_union_evidence_citation(draft, union_evidence)
+    has_grounded_number = numbers_grounded and NUMERIC_CLAIM.search(answer) is not None
+    if not numbers_grounded or not (has_union_citation or has_grounded_number):
+        return _degraded_synthesis_response(context, draft, results, dependencies)
+
+    decision = dependencies.input_decision
+    if decision is not None and decision.scope == "mixed":
+        answer = f"{answer}\n\n보험 상담 범위 밖의 내용은 여기서 답하기 어려워요."
+
+    limitations = list(
+        dict.fromkeys(
+            [lim for item in results for lim in item.response.limitations]
+            + list(standard_limitations(context.facts))
+        )
+    )
+    return with_demographics(
+        PortfolioQuestionResponse(
+            status="answered",
+            answer=answer,
+            citations=citations,
+            limitations=limitations,
+            suggestions=contextual_suggestions(context),
+            generation="llm",
+        ),
+        context.insured,
+    )
+
+
+def _degraded_synthesis_response(
+    context: QaContext,
+    draft: AgentCounselorDraft,
+    results: list[RegisteredToolResult],
+    dependencies: QaAgentDependencies,
+) -> PortfolioQuestionResponse:
+    """Fall back to the confirmed tool answers verbatim, dropping model prose.
+
+    The model's own wording is discarded (it carried an ungrounded number or no
+    grounding at all). Each participating result's `response.answer` is already
+    grounded tool output, so surfacing them in order stays honest without any
+    scoring, ranking, or synthesized number.
+    """
+
+    confirmed = [
+        item
+        for item in results
+        if item.response.status == "answered" and item.response.answer.strip()
+    ]
+    if not confirmed:
+        return _missing_grounded_synthesis_response(context)
+
+    answer = "\n\n".join(item.response.answer.strip() for item in confirmed)
+    decision = dependencies.input_decision
+    if decision is not None and decision.scope == "mixed":
+        answer = f"{answer}\n\n보험 상담 범위 밖의 내용은 여기서 답하기 어려워요."
+
+    union_evidence = tuple(ev for item in confirmed for ev in item.evidence)
+    citations = _synthesis_citations(draft, union_evidence, confirmed)
+    limitations = list(
+        dict.fromkeys(
+            [lim for item in confirmed for lim in item.response.limitations]
+            + [_DEGRADED_SYNTHESIS_NOTE]
+            + list(standard_limitations(context.facts))
+        )
+    )
+    return with_demographics(
+        PortfolioQuestionResponse(
+            status="answered",
+            answer=answer,
+            citations=citations,
+            limitations=limitations,
+            suggestions=contextual_suggestions(context),
+            generation="llm",
+        ),
+        context.insured,
+    )
+
+
+def _missing_grounded_synthesis_response(context: QaContext) -> PortfolioQuestionResponse:
+    return PortfolioQuestionResponse(
+        status="no_data",
+        answer="질문에 필요한 근거를 도구에서 확인하지 못했습니다.",
+        citations=[],
+        limitations=["확인된 근거가 없어 종합 답변을 만들지 않았습니다."],
+        suggestions=[],
+        demographics=context.insured,
+    )
+
+
+def _has_union_evidence_citation(
+    draft: AgentCounselorDraft,
+    union_evidence: tuple[ConsultationEvidence, ...],
+) -> bool:
+    union_ids = {item.id for item in union_evidence}
+    return any(eid in union_ids for eid in draft.evidence_ids)
+
+
+def _synthesis_citations(
+    draft: AgentCounselorDraft,
+    union_evidence: tuple[ConsultationEvidence, ...],
+    results: list[RegisteredToolResult],
+) -> list[AnswerCitation]:
+    by_id = {item.id: item for item in union_evidence}
+    evidence_citations = [
+        citation_from_evidence(by_id[eid])
+        for eid in dict.fromkeys(draft.evidence_ids)
+        if eid in by_id
+    ]
+    native_citations = [citation for item in results for citation in item.response.citations]
+
+    seen: set[str] = set()
+    deduped: list[AnswerCitation] = []
+    for citation in [*evidence_citations, *native_citations]:
+        key = citation.model_dump_json()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(citation)
+    return deduped[:3]
 
 
 def _validated_general_guidance_response(

@@ -259,6 +259,227 @@ def test_mixed_consultation_keeps_the_validated_answer_instead_of_internal_promp
     assert "보험 상담 범위 밖" in result.answer
 
 
+def test_synthesis_across_two_results_grounds_numbers_from_union() -> None:
+    dependencies = _dependencies("두 증권 암진단비 각각 얼마야?")
+    a = dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="보험사A 암진단비 30,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+    b = dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="보험사B 암진단비 20,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+    assert a.result_id != b.result_id
+
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id=None,
+            answer="보험사A는 3,000만원, 보험사B는 2,000만원이에요.",
+        ),
+        dependencies,
+    )
+
+    assert "3,000만원" in result.answer
+    assert result.status == "answered"
+
+
+def _two_coverage_results(dependencies: QaAgentDependencies) -> None:
+    dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="보험사A 암진단비 30,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+    dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="보험사B 암진단비 20,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+
+
+def test_synthesis_number_absent_from_all_results_degrades_without_the_number() -> None:
+    # Task 4b: the ungrounded number no longer hard-fails the whole turn; it is
+    # dropped and the confirmed individual results are surfaced instead.
+    dependencies = _dependencies("두 증권 암진단비 합계 얼마야?")
+    _two_coverage_results(dependencies)
+
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id=None,
+            answer="두 증권 합계는 9,999만원이에요.",  # union에 없음
+        ),
+        dependencies,
+    )
+
+    assert "9,999" not in result.answer
+    assert "30,000,000" in result.answer
+
+
+def test_general_guidance_prose_does_not_become_empty_cited_synthesis() -> None:
+    # 근거 없는 프로즈(숫자 0, evidence_ids 0)가 answered+인용0 으로 새면 안 된다
+    dependencies = _dependencies("내 보장 어때?")
+    _two_coverage_results(dependencies)
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            answer_mode="general_guidance",
+            answer="가입하신 담보들을 보면 대체로 잘 준비돼 있어요.",
+        ),
+        dependencies,
+    )
+    # degrade: 확인된 도구 원문이 반영되고, "근거 있는 척 빈 인용 answered"가 아니다
+    assert "30,000,000" in result.answer or "3,000만" in result.answer
+    assert not (
+        result.status == "answered" and result.citations == [] and "30,000,000" not in result.answer
+    )
+
+
+def test_synthesis_preserves_web_result_citations() -> None:
+    dependencies = _dependencies("최신 안내랑 내 담보 같이 봐줘")
+    dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="암진단비 30,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+    dependencies.register(
+        "web",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="최신 공식 안내입니다.",
+            citations=[
+                AnswerCitation(
+                    policy_id=None,
+                    insurer=None,
+                    product_name=None,
+                    source_id="web:1",
+                )
+            ],
+            limitations=[],
+        ),
+    )
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id=None,
+            answer="암진단비는 3,000만원이고, 최신 안내도 확인했어요.",
+        ),
+        dependencies,
+    )
+    assert any(c.source_id == "web:1" for c in result.citations)
+
+
+def test_ungrounded_number_degrades_to_confirmed_results_not_total_failure() -> None:
+    dependencies = _dependencies("두 증권 합계 얼마야?")
+    _two_coverage_results(dependencies)
+    # 지어낸 9,999만원: 모델 문장은 버리되, 확인된 개별 결과로 degrade (턴 전체 실패 아님)
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id=None,
+            answer="두 증권 합계는 9,999만원이에요.",
+        ),
+        dependencies,
+    )
+    assert "9,999" not in result.answer  # 지어낸 숫자 제거
+    assert "30,000,000" in result.answer or "3,000만" in result.answer  # 확인된 근거 반영
+
+
+def test_policy_terms_required_blocks_multi_result_synthesis() -> None:
+    dependencies = _dependencies("내 암보험 지급조건 두 개 다 알려줘")
+    dependencies.input_decision = QaInputDecision(
+        scope="insurance",
+        should_block=False,
+        requires_fresh_official_source=False,
+        requires_uploaded_policy_terms=True,
+        insurance_request="지급조건",
+        out_of_scope_request=None,
+        reason="원문 필요",
+    )
+    _two_coverage_results(dependencies)
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id=None,
+            answer="A는 3,000만원, B는 2,000만원이에요.",
+        ),
+        dependencies,
+    )
+    # 종합이 발동하지 않고 원문-필요 거절로 간다
+    assert result.status == "no_data"
+    assert "약관" in result.answer
+
+
+def test_mixed_scope_synthesis_keeps_scope_disclaimer() -> None:
+    dependencies = _dependencies("두 증권 암진단비 보고 날씨도 알려줘")
+    dependencies.input_decision = QaInputDecision(
+        scope="mixed",
+        should_block=False,
+        requires_fresh_official_source=False,
+        insurance_request="두 증권 암진단비 봐줘",
+        out_of_scope_request="날씨도 알려줘",
+        reason="보험과 범위 밖 요청이 함께 있음",
+    )
+    dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="보험사A 암진단비 30,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+    dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="보험사B 암진단비 20,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id=None,
+            answer="보험사A는 3,000만원, 보험사B는 2,000만원이에요.",
+        ),
+        dependencies,
+    )
+
+    assert "보험 상담 범위 밖" in result.answer
+
+
 def test_insurance_scope_rejects_an_out_of_scope_final_mode() -> None:
     dependencies = _dependencies("가입한 보험은 몇 개야?")
     dependencies.input_decision = QaInputDecision(
