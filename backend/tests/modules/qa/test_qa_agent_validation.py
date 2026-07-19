@@ -296,6 +296,55 @@ def test_synthesis_across_two_results_grounds_numbers_from_union() -> None:
     assert result.status == "answered"
 
 
+def test_blank_selected_result_id_normalizes_to_none() -> None:
+    # LLMs emit "" (or whitespace) instead of null for "no selection"; the
+    # contract must canonicalize it to None so every `is None` gate works.
+    assert AgentCounselorDraft(answer="x", selected_result_id="").selected_result_id is None
+    assert AgentCounselorDraft(answer="x", selected_result_id="  ").selected_result_id is None
+    assert AgentCounselorDraft(answer="x", selected_result_id=None).selected_result_id is None
+    kept = AgentCounselorDraft(answer="x", selected_result_id="coverage_total:2")
+    assert kept.selected_result_id == "coverage_total:2"
+
+
+def test_synthesis_entered_when_selection_is_blank_string() -> None:
+    # Regression: a multi-tool synthesis draft whose selected_result_id is ""
+    # (not null) must still take the synthesis path, not fall through to
+    # single-result selection and raise "did not select an unambiguous result".
+    dependencies = _dependencies("두 증권 암진단비 각각 얼마야?")
+    dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="보험사A 암진단비 30,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+    dependencies.register(
+        "coverage_total",
+        PortfolioQuestionResponse(
+            status="answered",
+            answer="보험사B 암진단비 20,000,000원 확인",
+            citations=[],
+            limitations=[],
+        ),
+        trust_level="deterministic",
+    )
+
+    result = validated_agent_response(
+        dependencies.context,
+        AgentCounselorDraft(
+            selected_result_id="",
+            answer="보험사A는 3,000만원, 보험사B는 2,000만원이에요.",
+        ),
+        dependencies,
+    )
+
+    assert result.status == "answered"
+    assert "3,000만원" in result.answer
+
+
 def _two_coverage_results(dependencies: QaAgentDependencies) -> None:
     dependencies.register(
         "coverage_total",

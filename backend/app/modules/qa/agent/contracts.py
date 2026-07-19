@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.integrations.openai.client import JsonCompleter
 from app.modules.consultation.contracts import ConsultationEvidence
@@ -82,6 +82,20 @@ class AgentCounselorDraft(BaseModel):
     selected_result_id: str | None = None
     answer: str = Field(min_length=1, max_length=4_000)
     evidence_ids: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator("selected_result_id", mode="before")
+    @classmethod
+    def _blank_selection_is_none(cls, value: object) -> object:
+        """Canonicalize "no selection" to None.
+
+        Models emit an empty or whitespace string instead of null when they use
+        no single tool result (multi-tool synthesis). Downstream grounding gates
+        all test ``selected_result_id is None``, so normalize blanks to None here
+        rather than duplicating the check at every call site.
+        """
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 class QaInputDecision(BaseModel):
