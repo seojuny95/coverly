@@ -40,11 +40,11 @@ export function PolicyDocumentGuide() {
       </button>
 
       <div
-        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+        className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
           expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         }`}
       >
-        <div className="overflow-hidden">
+        <div className="overflow-hidden" inert={!expanded}>
           <div
             id={panelId}
             className="border-t border-zinc-200 px-4 pt-5 pb-4 sm:px-5 sm:pt-6 sm:pb-5"

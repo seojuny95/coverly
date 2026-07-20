@@ -159,7 +159,7 @@ function InsurerChannelList({
         aria-expanded={expanded}
         aria-controls={panelId}
         onClick={() => setExpanded((current) => !current)}
-        className="flex w-full cursor-pointer items-center justify-between gap-3 text-left"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-none"
       >
         <span>
           <span className="text-sm font-semibold text-zinc-900">
@@ -178,11 +178,11 @@ function InsurerChannelList({
       </button>
 
       <div
-        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+        className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
           expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         }`}
       >
-        <div className="overflow-hidden">
+        <div className="overflow-hidden" inert={!expanded}>
           <ul
             id={panelId}
             className="mt-3 divide-y divide-zinc-100 border-t border-zinc-100 text-xs leading-5 text-zinc-600"
