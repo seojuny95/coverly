@@ -25,6 +25,7 @@ from app.modules.qa.tools.web_search import (
     sanitize_search_query,
     search_allowed_domains,
 )
+from app.rag.official.sources import load_sources
 
 
 def _unused_web_search(*_args: object, **_kwargs: object) -> WebSearchResult:
@@ -265,3 +266,19 @@ def test_web_search_limit_is_shared_across_event_loops(
     assert not first.is_alive()
     assert not second.is_alive()
     assert errors == []
+
+
+def test_official_domains_do_not_depend_on_whether_a_source_is_indexed() -> None:
+    # rag_enabled governs the RAG corpus, not who counts as an official publisher.
+    # 금융위원회's only registered document is retired from the corpus, yet fsc.go.kr
+    # must stay searchable for law and policy questions.
+    retired = [source for source in load_sources() if not source.rag_enabled]
+    assert retired, "이 테스트는 색인에서 빠진 출처가 하나는 있어야 의미가 있다"
+
+    context = build_qa_context("보험 법령의 최신 변경을 알려줘", [], None, [])
+    domains = search_allowed_domains(context, "law_update")
+
+    for source in retired:
+        if source.source_url:
+            host = source.source_url.split("//")[-1].split("/")[0].removeprefix("www.")
+            assert host in domains

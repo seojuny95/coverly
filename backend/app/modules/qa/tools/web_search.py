@@ -16,7 +16,7 @@ from app.integrations.openai import search_official_web_async
 from app.modules.qa.context import QaContext
 from app.modules.qa.pii import mask_qa_pii
 from app.modules.reference_data.claim_channels import channels_for
-from app.rag.official.sources import rag_sources
+from app.rag.official.sources import load_sources
 
 SearchPurpose = Literal[
     "insurer_guidance",
@@ -146,10 +146,19 @@ def _search_prompt(query: str, purpose: SearchPurpose) -> str:
 
 
 def _official_source_domains(purpose: SearchPurpose) -> list[str]:
+    """Official publisher domains we trust for web search.
+
+    Every registered source counts, including ones we do not index. rag_enabled
+    decides whether a document joins the RAG corpus, not whether its publisher
+    is an official authority -- dropping 금융위원회 from the allowlist because its
+    one indexed document was retired would lose a primary source for law and
+    policy questions.
+    """
+
     domains = list(
         dict.fromkeys(
             domain
-            for source in rag_sources()
+            for source in load_sources()
             if _source_matches_purpose(source.category, source.publisher, purpose)
             if source.source_url and (domain := _domain_from_url(source.source_url))
         )
