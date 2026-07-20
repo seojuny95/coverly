@@ -5,6 +5,12 @@ instruction to the model. These helpers mark the trust boundary explicitly.
 """
 
 import re
+import unicodedata
+
+# Angle-bracket lookalikes that no Unicode normalisation folds back to "<"/">",
+# so a fenced body keeps its shape without ever carrying a usable delimiter.
+_SAFE_LT = "‹"  # ‹
+_SAFE_GT = "›"  # ›
 
 _INJECTION_MARKERS = (
     "이전 지시",
@@ -20,30 +26,47 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 def wrap_untrusted(text: str, *, label: str = "문서") -> str:
-    """Fence untrusted text, stripping any embedded tag that would break out."""
+    """Fence untrusted text so that no tag can form inside the fence.
 
-    escaped = _strip_fence_tags_to_fixed_point(text, label)
-    return f"<{label}>\n{escaped.strip()}\n</{label}>"
+    Post-condition: the fenced body contains no character that NFKC-normalises
+    to "<" or ">", and no invisible format character. Enumerating tag spellings
+    ("</문서>", "< /문서>", "＜/문서＞", "</문​서>", ...) is a losing game,
+    so this neutralises the delimiters themselves instead of the tags.
 
+    Effect on legitimate Korean policy text: "<" and ">" are rare there, and a
+    heading like "<보장내용>" survives as "‹보장내용›" - readable, but no longer
+    a tag. Any other character that folds to a bracket (fullwidth, small form,
+    "≮"...) becomes the same lookalike; invisible format characters (zero-width
+    space/joiner, BOM, soft hyphen) are dropped, since their only use inside a
+    fenced body is hiding a delimiter from a matcher that a model still reads.
 
-def _strip_fence_tags_to_fixed_point(text: str, label: str) -> str:
-    """Remove fence tags for `label`, repeating until nothing more matches.
-
-    A single removal pass can splice the leftover characters around a match
-    into a fresh tag (e.g. "</</문서>문서>" -> "</문서>" after one pass), so
-    the attacker escapes the fence. Re-running the substitution to a fixed
-    point closes that gap for any nesting depth. The string strictly shrinks
-    on every pass that changes it (each match is replaced with nothing), so
-    this terminates in at most len(text) iterations.
+    NFKC is applied per character for detection only, never to the body as a
+    whole: whole-body normalisation would also rewrite parentheses, ligatures
+    and Korean compatibility forms in real policy text, which is content the
+    fence has no business changing.
     """
 
-    pattern = re.compile(rf"</?\s*{re.escape(label)}\s*>")
-    previous = text
-    while True:
-        current = pattern.sub("", previous)
-        if current == previous:
-            return current
-        previous = current
+    body = _neutralize_tag_delimiters(text)
+    return f"<{label}>\n{body.strip()}\n</{label}>"
+
+
+def _neutralize_tag_delimiters(text: str) -> str:
+    """Drop format characters and replace every bracket-like character."""
+
+    out: list[str] = []
+    for char in text:
+        if unicodedata.category(char) == "Cf":
+            continue
+
+        folded = unicodedata.normalize("NFKC", char)
+        if "<" in folded:
+            out.append(_SAFE_LT)
+        elif ">" in folded:
+            out.append(_SAFE_GT)
+        else:
+            out.append(char)
+
+    return "".join(out)
 
 
 def strip_injection_markers(text: str) -> str:
