@@ -84,3 +84,36 @@ def test_claim_channel_answer_includes_the_medical_indemnity_service() -> None:
     assert answer is not None
     assert "실손24" in answer
     assert "silson24" in answer
+
+
+def _two_contract_policies() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "삼성화재", "상품명": "실손의료보험"},
+                "보장목록": [{"담보명": "실손의료비", "가입금액": "5,000만원", "지급유형": "실손"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "p2",
+                "기본정보": {"보험사": "한화손해보험", "상품명": "한화실손"},
+                "보장목록": [{"담보명": "실손의료비", "가입금액": "3,000만원", "지급유형": "실손"}],
+            }
+        ),
+    ]
+
+
+def test_overlap_answer_names_the_contracts_instead_of_counting_rows() -> None:
+    # "실손의료비: 2건" leaves the user to work out what the two are. Say which
+    # contracts they are and what each covers.
+    plan = _plan(CounselTask(kind="overlap_check"))
+
+    answer = compose_fact_answer(execute_fact_tasks(plan, _two_contract_policies()))
+
+    assert answer is not None
+    assert "삼성화재" in answer
+    assert "한화손해보험" in answer
+    assert "5,000만원" in answer
+    assert "2건" not in answer

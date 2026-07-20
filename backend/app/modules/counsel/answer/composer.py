@@ -109,12 +109,23 @@ def _coverage_total_answer(result: FactTaskResult) -> str:
 
 
 def _overlap_answer(result: FactTaskResult) -> str:
+    """Name the contracts that share a coverage.
+
+    A row count leaves the reader to guess what the rows are; the amounts and
+    the insurer are what tells them whether the overlap matters.
+    """
+
     overlaps = result.overlaps or []
     if not overlaps:
-        return "현재 자료에서는 같은 담보명이 두 개 이상 확인된 항목이 없어요."
-    lines = ["같은 담보명이 두 개 이상 확인된 항목이에요."]
+        return "현재 자료에서는 여러 계약에 걸쳐 겹치는 담보가 없어요."
+
+    lines = ["여러 계약에서 함께 확인된 담보예요."]
     for item in overlaps:
-        lines.append(f"- {item.담보명}: {len(item.policies)}건")
+        lines.append(f"- {item.담보명}")
+        for entry in item.policies:
+            owner = " · ".join(part for part in (entry.보험사, entry.상품명) if part)
+            amount = entry.가입금액 or "가입금액 미확인"
+            lines.append(f"  - {owner or '보험사 미확인'}: {amount}")
     return "\n".join(lines)
 
 

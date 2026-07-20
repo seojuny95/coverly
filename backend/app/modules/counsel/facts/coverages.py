@@ -142,12 +142,31 @@ def calculate_coverage_total_fact(
 def find_overlapping_coverage_facts(
     policies: list[PolicyInput],
 ) -> list[OverlappingCoverage]:
-    """Return coverage names that appear in two or more policies."""
+    """Return coverages the user holds in two or more separate contracts.
+
+    Counted per contract, not per row. A policy often writes one coverage over
+    several rows -- 화재배상책임 split into 대인 and 대물, each with its own
+    limit -- and calling that an overlap tells the user they bought the same
+    protection twice.
+
+    Names are compared by canonical identity so a line break inside a name does
+    not hide a real overlap, while a meaningful qualifier such as (감액없음)
+    still keeps two coverages apart.
+    """
 
     groups: dict[str, list[OverlapEntry]] = defaultdict(list)
-    for policy in policies:
+    display_names: dict[str, str] = {}
+    contracts: dict[str, set[str]] = defaultdict(set)
+
+    for index, policy in enumerate(policies):
+        contract_id = policy.id or f"index-{index}"
         for coverage in policy.보장목록:
-            groups[coverage.담보명].append(
+            key = _canonical_key(coverage.담보명)
+            if not key:
+                continue
+            display_names.setdefault(key, coverage.담보명)
+            contracts[key].add(contract_id)
+            groups[key].append(
                 OverlapEntry(
                     policy_id=policy.id,
                     보험사=policy.기본정보.보험사,
@@ -161,9 +180,9 @@ def find_overlapping_coverage_facts(
             )
 
     return [
-        OverlappingCoverage(담보명=name, policies=entries)
-        for name, entries in sorted(groups.items())
-        if len(entries) > 1
+        OverlappingCoverage(담보명=display_names[key], policies=entries)
+        for key, entries in sorted(groups.items(), key=lambda item: display_names[item[0]])
+        if len(contracts[key]) > 1
     ]
 
 
