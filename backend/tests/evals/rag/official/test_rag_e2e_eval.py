@@ -22,7 +22,7 @@ def test_official_rag_e2e_dataset_selects_generation_scenarios() -> None:
     assert raw_cases["generation_cases"]["include"] == "all"
     assert raw_cases["retrieval_cases"]["include"] == "all"
     assert len(raw_cases["extra_cases"]) >= 15
-    assert len(cases) >= 150
+    assert len(cases) >= 144
     assert {case.expected_status for case in cases} == {"answered", "filtered", "no_evidence"}
 
 

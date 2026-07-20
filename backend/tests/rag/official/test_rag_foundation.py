@@ -47,7 +47,6 @@ def test_rag_sources_are_verified_and_small() -> None:
 
     assert {source.id for source in sources} == {
         "standard_terms_annex_15_2026_06_30",
-        "fsc_policy_terms_roadmap_2019_10_22",
         "knia_auto_insurance_product_explanation_2024_04_01",
         "easylaw_insurance_policyholder_2026_06_15",
         "insurance_business_act",
@@ -55,7 +54,6 @@ def test_rag_sources_are_verified_and_small() -> None:
     }
     assert {source.id: source.document_type for source in sources} == {
         "standard_terms_annex_15_2026_06_30": "standard_terms",
-        "fsc_policy_terms_roadmap_2019_10_22": "consumer_guide",
         "knia_auto_insurance_product_explanation_2024_04_01": "product_explanation",
         "easylaw_insurance_policyholder_2026_06_15": "consumer_guide",
         "insurance_business_act": "law",
@@ -297,14 +295,14 @@ def test_retrieve_uses_hybrid_vector_and_bm25_search() -> None:
         ),
         RagChunk(
             id="plain",
-            source_id="fsc_policy_terms_roadmap_2019_10_22",
-            source_title="보험약관 개선 로드맵",
+            source_id="easylaw_insurance_policyholder_2026_06_15",
+            source_title="찾기 쉬운 생활법령정보 보험계약자",
             source_category="consumer_guide",
-            publisher="금융위원회",
-            text="보험약관의 용어순화와 소비자 이해도 제고 방향입니다.",
+            publisher="법제처 찾기 쉬운 생활법령정보",
+            text="보험계약자의 권리와 의무를 쉽게 설명하는 생활법령 안내입니다.",
             page_start=2,
             page_end=2,
-            label="약관 개선",
+            label="보험계약자 안내",
         ),
     )
 
@@ -418,8 +416,8 @@ def test_retrieval_eval_fixture_passes_current_small_corpus() -> None:
     cases = load_retrieval_eval_cases()
     report = evaluate_retrieval(cases)
 
-    assert report.total_cases == 72
-    assert report.total == 54
+    assert report.total_cases == 66
+    assert report.total == 48
     assert report.recall >= 0.3, report.results
     assert 0.0 <= report.mrr <= 1.0
     assert 0.0 <= report.precision_at_k <= 1.0
@@ -433,7 +431,7 @@ def test_retrieval_eval_fixture_uses_exact_existing_chunks_without_pii() -> None
     chunk_ids = {chunk.id for chunk in load_official_chunks()}
     fixture_text = EVAL_FIXTURE.read_text(encoding="utf-8")
 
-    assert len(cases) == 72
+    assert len(cases) == 66
     assert len({case.id for case in cases}) == len(cases)
     assert all(
         case.expected_no_hits or set(case.relevant_chunk_ids).issubset(chunk_ids) for case in cases
@@ -450,7 +448,7 @@ def test_extraction_eval_fixture_passes_current_official_sources() -> None:
     cases = load_extraction_eval_cases()
     report = evaluate_extraction(cases)
 
-    assert report.total == 130
+    assert report.total == 120
     assert report.pass_rate == 1.0
     assert report.chunk_found_rate == 1.0
     assert report.metadata_match_rate == 1.0
@@ -463,11 +461,11 @@ def test_extraction_eval_fixture_uses_existing_chunks_without_pii() -> None:
     chunks_by_id = {chunk.id: chunk for chunk in load_official_chunks()}
     fixture_text = EXTRACTION_EVAL_FIXTURE.read_text(encoding="utf-8")
 
-    assert len(cases) == 130
+    assert len(cases) == 120
     assert len({case.id for case in cases}) == len(cases)
     assert all(case.chunk_id is None or case.chunk_id in chunks_by_id for case in cases)
-    assert sum(case.case_type == "curated" for case in cases) == 50
-    assert sum(case.case_type == "broad_regression" for case in cases) == 80
+    assert sum(case.case_type == "curated" for case in cases) == 47
+    assert sum(case.case_type == "broad_regression" for case in cases) == 73
     assert all(case.chunk_id is None for case in cases if case.case_type == "curated")
     assert all(case.chunk_id is not None for case in cases if case.case_type == "broad_regression")
     assert re.search(r"\b\d{6}-[1-4]\d{6}\b", fixture_text) is None
