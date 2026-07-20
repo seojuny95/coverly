@@ -385,9 +385,7 @@
   .animate-enter,
   .animate-enter-overlay,
   .animate-pulse,
-  .animate-bounce,
-  [class*="animate-in"],
-  [class*="animate-out"] {
+  .animate-bounce {
     animation: none;
   }
 
