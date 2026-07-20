@@ -57,6 +57,12 @@ class FixtureSessions:
             rag_session_ids=(),
         )
 
+    def consume_counsel_turn(self, token: str, *, max_turns: int, **_kwargs: object) -> int:
+        """Never exhaust turns: an eval case may run more turns than the product allows."""
+
+        del token
+        return max_turns
+
 
 @dataclass
 class TurnTrace:
