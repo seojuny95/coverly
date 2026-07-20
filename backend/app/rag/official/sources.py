@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import Any
 
 DATA_ROOT = Path(__file__).resolve().parents[3] / "data"
-REGISTRY_PATH = DATA_ROOT / "official-sources/source_registry.json"
+OFFICIAL_SOURCES_ROOT = DATA_ROOT / "official-sources"
+REGISTRY_PATH = OFFICIAL_SOURCES_ROOT / "registry.json"
 DOCUMENT_TYPES = frozenset(
     {
         "consumer_guide",
@@ -45,7 +46,7 @@ class OfficialSource:
     def absolute_path(self) -> Path | None:
         if not self.local_path:
             return None
-        return DATA_ROOT / self.local_path
+        return OFFICIAL_SOURCES_ROOT / self.local_path
 
     @property
     def version_label(self) -> str:
