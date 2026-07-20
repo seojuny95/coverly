@@ -3,6 +3,11 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_BACKEND_CORS_ORIGINS = (
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+)
+
 
 class Settings(BaseSettings):
     openai_api_key: str = ""
@@ -22,12 +27,20 @@ class Settings(BaseSettings):
     portfolio_session_max_documents: int = 50
     counsel_max_turns_per_session: int = 10
     policy_upload_reservation_ttl_seconds: int = 15 * 60
+    backend_cors_origins: str = ",".join(DEFAULT_BACKEND_CORS_ORIGINS)
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    def parsed_backend_cors_origins(self) -> list[str]:
+        return [
+            origin
+            for raw_origin in self.backend_cors_origins.split(",")
+            if (origin := raw_origin.strip())
+        ]
 
 
 @lru_cache
