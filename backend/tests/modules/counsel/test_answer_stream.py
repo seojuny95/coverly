@@ -1,6 +1,7 @@
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
+from typing import cast
 
 from app.modules.counsel.answer_stream import build_answer_stream
 from app.modules.counsel.check_scope_and_rewrite import ScopeAndRewriteResult
@@ -78,3 +79,44 @@ def test_streams_the_refusal_message_without_running_the_agent_when_out_of_scope
     assert events[1]["type"] == "delta"
     assert events[-1] == {"type": "end"}
     assert called is False
+
+
+def test_closing_the_stream_early_propagates_into_the_agent_stream_runner() -> None:
+    # Guards SSE-disconnect cancellation from silently breaking (e.g. buffering, detached tasks).
+    cleaned_up = False
+
+    async def slow_agent_stream_runner(
+        _agent: object, _input_text: str, _context: object
+    ) -> AsyncIterator[str]:
+        nonlocal cleaned_up
+        try:
+            yield "첫 "
+            yield "이 청크는 소비되지 않아야 함"
+        finally:
+            cleaned_up = True
+
+    check = ScopeAndRewriteResult(
+        rewritten_question="암진단비 알려줘", in_scope=True, reason="보험 질문"
+    )
+
+    async def consume_meta_and_first_delta_then_stop() -> None:
+        events = cast(
+            AsyncGenerator[str, None],
+            build_answer_stream(
+                check=check,
+                policies=[],
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                agent_stream_runner=slow_agent_stream_runner,
+            ),
+        )
+        seen = 0
+        async for _event in events:
+            seen += 1
+            if seen == 2:  # meta event, then the first delta
+                break
+        await events.aclose()
+
+    asyncio.run(consume_meta_and_first_delta_then_stop())
+
+    assert cleaned_up is True
