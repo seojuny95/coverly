@@ -13,9 +13,17 @@ from typing import Any, cast
 
 from agents import set_default_openai_key, set_tracing_disabled
 from openai import OpenAI
+from openai.types.responses import EasyInputMessageParam
 from pydantic import BaseModel
 
 from app.core.config import get_settings
+
+ConversationMessage = EasyInputMessageParam
+"""One message in a conversation sent to a model.
+
+Re-exported so feature modules can build model input without importing the
+vendor package directly, which the architecture tests forbid.
+"""
 
 JsonCompleter = Callable[[str, str], dict[str, object]]
 

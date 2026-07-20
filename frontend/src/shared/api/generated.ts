@@ -307,8 +307,8 @@ export interface components {
       type: "meta";
       /** In Scope */
       in_scope: boolean;
-      /** Rewritten Question */
-      rewritten_question: string;
+      /** Answered Question */
+      answered_question: string;
       /** Excluded Note */
       excluded_note: string | null;
       /** Turns Remaining */
