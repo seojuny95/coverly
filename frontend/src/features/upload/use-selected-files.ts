@@ -52,27 +52,31 @@ export function useSelectedFiles({
   // Fire-and-forget: check each newly selected file for an encryption
   // password so the field shows up before submit instead of after a failed
   // upload round trip. Matches by id so a removed/superseded file is a no-op.
-  // isPdfPasswordProtected fails open (resolves false) on internal errors, and
-  // every branch below must still clear "checking" or submit stays locked.
+  // A file left in "checking" keeps submit disabled forever, so both outcomes
+  // of the check must clear it.
   const flagPasswordProtectedFiles = (files: SelectedUploadFile[]) => {
+    const clearChecking = (fileId: string, needsPassword: boolean) => {
+      setSelectedUploadFiles((current) =>
+        current.map((currentFile) => {
+          if (currentFile.id !== fileId) return currentFile;
+          if (currentFile.status !== "checking") return currentFile;
+          if (needsPassword && !currentFile.errorCode) {
+            return {
+              ...currentFile,
+              status: "idle" as const,
+              errorCode: "PDF_PASSWORD_REQUIRED",
+              errorMessage: "PDF 비밀번호를 입력해주세요.",
+            };
+          }
+          return { ...currentFile, status: "idle" as const };
+        }),
+      );
+    };
+
     for (const selectedFile of files) {
-      void isPdfPasswordProtected(selectedFile.file).then((needsPassword) => {
-        setSelectedUploadFiles((current) =>
-          current.map((currentFile) => {
-            if (currentFile.id !== selectedFile.id) return currentFile;
-            if (currentFile.status !== "checking") return currentFile;
-            if (needsPassword && !currentFile.errorCode) {
-              return {
-                ...currentFile,
-                status: "idle" as const,
-                errorCode: "PDF_PASSWORD_REQUIRED",
-                errorMessage: "PDF 비밀번호를 입력해주세요.",
-              };
-            }
-            return { ...currentFile, status: "idle" as const };
-          }),
-        );
-      });
+      void isPdfPasswordProtected(selectedFile.file)
+        .then((needsPassword) => clearChecking(selectedFile.id, needsPassword))
+        .catch(() => clearChecking(selectedFile.id, false));
     }
   };
 

@@ -814,7 +814,9 @@ describe("InsuranceUploadForm", () => {
 
   test("unlocks submit when the password pre-check fails", async () => {
     const user = userEvent.setup();
-    vi.mocked(isPdfPasswordProtected).mockResolvedValue(false);
+    vi.mocked(isPdfPasswordProtected).mockRejectedValue(
+      new Error("pdf worker unavailable"),
+    );
     renderForm();
 
     await user.upload(
