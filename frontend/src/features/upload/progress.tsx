@@ -10,6 +10,9 @@ const ANALYSIS_STEP_MESSAGES = [
 
 const LONG_WAIT_MESSAGE = "파일이 길수록 조금 더 걸려요. 지금도 읽고 있어요.";
 const ALMOST_DONE_MESSAGE = "거의 다 왔어요. 조금만 더 기다려주세요.";
+// States only that reading finished — must not assert anything about the
+// analysis results, which haven't been shown yet.
+const COMPLETE_MESSAGE = "다 읽었어요. 결과를 보여드릴게요.";
 
 // Full-screen (page) / inline (modal) progress view shown while uploads are in
 // flight. Owns its own trickle/message/elapsed timers; the caller only feeds it
@@ -18,10 +21,12 @@ export function AnalysisProgress({
   progress,
   files,
   surface,
+  isCompleting = false,
 }: {
   progress: { completed: number; total: number };
   files: Array<{ name: string; status: "done" | "reading" }>;
   surface: "page" | "modal";
+  isCompleting?: boolean;
 }) {
   const milestonePercent =
     progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
@@ -66,9 +71,13 @@ export function AnalysisProgress({
         ? [LONG_WAIT_MESSAGE]
         : []),
   ];
-  const statusMessage = statusMessages[messageIndex % statusMessages.length];
+  const statusMessage = isCompleting
+    ? COMPLETE_MESSAGE
+    : statusMessages[messageIndex % statusMessages.length];
   // Real milestones floor the trickle so completed files always show through.
-  const percent = Math.round(Math.max(displayPercent, milestonePercent));
+  const percent = isCompleting
+    ? 100
+    : Math.round(Math.max(displayPercent, milestonePercent));
   const fileListClassName =
     files.length === 1
       ? "mt-5 grid w-full max-w-md grid-cols-1 gap-1.5 text-left"

@@ -54,6 +54,7 @@ export function InsuranceUploadForm({
   const {
     selectedUploadFiles,
     isAnalyzing,
+    isCompleting,
     analysisProgress,
     pendingAnalysis,
     selectedName,
@@ -116,6 +117,7 @@ export function InsuranceUploadForm({
             selectedFile.status === "done" ? "done" : ("reading" as const),
         }))}
         surface={surface}
+        isCompleting={isCompleting}
       />
     );
   }

@@ -19,6 +19,7 @@ import {
 } from "../analysis/policy-identity";
 import { UploadInsuranceError } from "./api";
 import type { SelectedUploadFile, UploadInsurance } from "./types";
+import { useCompletionBeat } from "./use-completion-beat";
 import { useSelectedFiles } from "./use-selected-files";
 import {
   ROLLBACK_ERROR_MESSAGE,
@@ -87,6 +88,7 @@ export function useUploadOrchestration({
       setAnalysis(analysis);
       router.push("/analysis");
     });
+  const { isCompleting, runAfterBeat } = useCompletionBeat();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState({
     completed: 0,
@@ -429,8 +431,10 @@ export function useUploadOrchestration({
           getInsuredPersonName(insuranceDocument) === personName,
       ),
     };
-    completeAnalysis(filteredAnalysis);
-    navigateToAnalysis();
+    runAfterBeat(() => {
+      completeAnalysis(filteredAnalysis);
+      navigateToAnalysis();
+    });
   };
 
   const handleNameSelectionSubmit = async () => {
@@ -459,6 +463,7 @@ export function useUploadOrchestration({
   return {
     selectedUploadFiles,
     isAnalyzing,
+    isCompleting,
     analysisProgress,
     pendingAnalysis,
     selectedName,

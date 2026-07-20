@@ -95,4 +95,24 @@ describe("AnalysisProgress", () => {
     expect(bar.getAttribute("aria-valuenow")).toBe("0");
     expect(screen.queryByLabelText("파일별 진행 상태")).not.toBeInTheDocument();
   });
+
+  it("shows a finished state when completing", () => {
+    render(
+      <AnalysisProgress
+        progress={{ completed: 2, total: 2 }}
+        files={[
+          { name: "a.pdf", status: "done" },
+          { name: "b.pdf", status: "done" },
+        ]}
+        surface="page"
+        isCompleting
+      />,
+    );
+
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "100",
+    );
+    expect(screen.getByText("다 읽었어요. 결과를 보여드릴게요.")).toBeVisible();
+  });
 });

@@ -604,12 +604,16 @@ describe("InsuranceAnalysisPage", () => {
         expect.anything(),
       );
     });
+    // The completion beat holds the modal's finished progress state on
+    // screen for 400ms (real timer) before onAnalysisComplete/onClose fire.
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
     expect(
-      await screen.findByText(
+      screen.getByText(
         "테스트고객님의 보험을 4가지 종류로 보기 쉽게 정리했어요.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("자동차보험")).toBeInTheDocument();
   });
 
