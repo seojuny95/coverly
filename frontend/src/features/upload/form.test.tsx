@@ -833,20 +833,7 @@ describe("InsuranceUploadForm", () => {
   test("lets the user type a password and submit once the pre-check flags an encrypted PDF", async () => {
     const user = userEvent.setup();
     vi.mocked(isPdfPasswordProtected).mockResolvedValueOnce(true);
-    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValueOnce({
-      ...POLICY_PARSE_RESPONSE_DEFAULTS,
-      status: "accepted",
-      documentId: "test-document-id",
-      문자수: 20,
-      기본정보: {
-        보험사: "삼성화재",
-        상품명: "건강보험",
-        피보험자: "테스트고객",
-        보험분류: "제3보험",
-        상품태그: ["질병보험"],
-      },
-    });
-    renderForm({ uploadInsurance });
+    renderForm();
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
 
