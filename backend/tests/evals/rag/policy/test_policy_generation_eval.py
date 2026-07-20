@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from app.modules.qa.contracts import ConsultationEvidence, InsuredDemographics
+from app.modules.consultation.contracts import ConsultationEvidence, InsuredDemographics
 from evals.rag.policy.generation import (
     EVAL_FIXTURE,
     TEST_FIXTURE,

@@ -113,15 +113,14 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
 
 
 def test_openapi_exposes_discriminated_sse_events_and_json_errors() -> None:
-    responses = app.openapi()["paths"]["/qa/stream"]["post"]["responses"]
+    responses = app.openapi()["paths"]["/counsel/stream"]["post"]["responses"]
 
     assert set(responses["200"]["content"]) == {"text/event-stream"}
     stream_schema = responses["200"]["content"]["text/event-stream"]["schema"]
     assert {item["$ref"] for item in stream_schema["oneOf"]} == {
-        "#/components/schemas/QaProgressEvent",
-        "#/components/schemas/QaMetaEvent",
-        "#/components/schemas/QaDeltaEvent",
-        "#/components/schemas/QaEndEvent",
+        "#/components/schemas/CounselMetaEvent",
+        "#/components/schemas/CounselDeltaEvent",
+        "#/components/schemas/CounselEndEvent",
     }
     assert stream_schema["discriminator"]["propertyName"] == "type"
     assert set(responses["422"]["content"]) == {"application/json"}
@@ -148,13 +147,9 @@ def test_request_validation_uses_common_error_envelope() -> None:
     app.dependency_overrides[get_portfolio_session_service] = lambda: object()
     try:
         response = TestClient(app).post(
-            "/qa/stream",
+            "/counsel/stream",
             headers={"x-request-id": "validation-request"},
-            json={
-                "question": "",
-                "portfolioSessionToken": "portfolio-token",
-                "policyIds": ["00000000-0000-0000-0000-000000000001"],
-            },
+            json={"question": "", "history": [], "session_id": "portfolio-token"},
         )
     finally:
         app.dependency_overrides.pop(get_portfolio_session_service, None)

@@ -14,7 +14,6 @@ from app.lifespan import lifespan
 from app.modules.counsel.router import router as counsel_router
 from app.modules.portfolio.router import router as portfolio_router
 from app.modules.portfolio.session.router import router as portfolio_sessions_router
-from app.modules.qa.router import router as qa_router
 from app.modules.upload.router import router as policies_router
 
 
@@ -40,7 +39,6 @@ def create_app() -> FastAPI:
     app.include_router(policies_router)
     app.include_router(portfolio_sessions_router)
     app.include_router(portfolio_router)
-    app.include_router(qa_router)
     app.include_router(counsel_router)
     app.add_api_route("/health", health, methods=["GET"])
     return app

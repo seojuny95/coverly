@@ -1,10 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
+from app.modules.consultation.contracts import InsuredDemographics
 from app.modules.portfolio.demographics import resolve_portfolio_demographics
 from app.modules.portfolio.schemas import PolicyInput
-from app.modules.qa.context import build_qa_context
-from app.modules.qa.contracts import InsuredDemographics
 
 
 def _policy(
@@ -108,34 +107,3 @@ def test_policy_demographic_schema_rejects_invalid_or_inconsistent_values() -> N
                 }
             }
         )
-
-
-def test_qa_uses_same_policy_verified_demographics_resolver() -> None:
-    context = build_qa_context(
-        "상담 전에 무엇을 볼까요?",
-        [_policy("p1", age=35, gender="여성")],
-        InsuredDemographics(age=70, gender="남성", source="policy"),
-        [],
-    )
-
-    assert context.insured == InsuredDemographics(
-        age=35,
-        gender="여성",
-        source="policy",
-        status="verified_policy",
-    )
-
-
-def test_qa_explains_why_conflicting_demographics_disable_personalization() -> None:
-    context = build_qa_context(
-        "가입한 보험 목록을 알려줘",
-        [
-            _policy("p1", age=35, gender="여성"),
-            _policy("p2", age=41, gender="남성"),
-        ],
-        InsuredDemographics(age=35, gender="여성", source="policy"),
-        [],
-    )
-
-    assert context.insured.status == "conflict"
-    assert context.insured.source == "unknown"

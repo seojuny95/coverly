@@ -8,15 +8,15 @@ from app.modules.portfolio.schemas import (
     ClaimChannelBlock,
     CoverageInput,
     PolicyInsuredDemographicsInput,
+    PortfolioCoverageSummary,
     PremiumBenchmarkSource,
     ReferenceSource,
 )
-from app.modules.qa.schemas import PortfolioQuestionResponse
 
 
 def test_claim_channel_and_reference_models_have_single_runtime_identity() -> None:
     claim_channel_types = get_args(
-        PortfolioQuestionResponse.model_fields["claim_channels"].annotation
+        PortfolioCoverageSummary.model_fields["claim_channels"].annotation
     )
     assert ClaimChannelBlock in claim_channel_types
     assert PremiumBenchmarkSource is ReferenceSource

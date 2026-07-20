@@ -106,26 +106,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/qa/stream": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Ask Portfolio Question Stream
-     * @description Stream the answer as Server-Sent Events: progress* → meta → delta* → end.
-     */
-    post: operations["ask_portfolio_question_stream_qa_stream_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/counsel/stream": {
     parameters: {
       query?: never;
@@ -208,31 +188,6 @@ export interface components {
        */
       major_category: string;
     };
-    /** AnswerCitation */
-    AnswerCitation: {
-      /** Evidence Id */
-      evidence_id?: string | null;
-      /** Policy Id */
-      policy_id: string | null;
-      /** Insurer */
-      insurer: string | null;
-      /** Product Name */
-      product_name: string | null;
-      /** Coverage Name */
-      coverage_name?: string | null;
-      /** Source Id */
-      source_id?: string | null;
-      /** Source Title */
-      source_title?: string | null;
-      /** Source Category */
-      source_category?: string | null;
-      /** Source Url */
-      source_url?: string | null;
-      /** Source Page */
-      source_page?: number | null;
-      /** Source Version */
-      source_version?: string | null;
-    };
     /** @enum {string} */
     ApiErrorCode:
       | "PDF_TOO_LARGE"
@@ -313,16 +268,6 @@ export interface components {
       call_center?: string | null;
       /** Links */
       links?: components["schemas"]["ClaimChannelLink"][];
-    };
-    /** ConversationMessage */
-    ConversationMessage: {
-      /**
-       * Role
-       * @enum {string}
-       */
-      role: "user" | "assistant";
-      /** Content */
-      content: string;
     };
     /** CounselDeltaEvent */
     CounselDeltaEvent: {
@@ -578,40 +523,9 @@ export interface components {
     };
     /**
      * InsuredDemographics
-     * @description Minimal non-identifying insured context used for personalization.
-     */
-    "InsuredDemographics-Input": {
-      /** Age */
-      age?: number | null;
-      /**
-       * Gender
-       * @default 미상
-       * @enum {string}
-       */
-      gender: "남성" | "여성" | "기타" | "미상";
-      /**
-       * Source
-       * @default unknown
-       * @enum {string}
-       */
-      source: "policy" | "user" | "unknown";
-      /**
-       * Status
-       * @default missing
-       * @enum {string}
-       */
-      status:
-        | "verified_policy"
-        | "user_provided"
-        | "conflict_user_override"
-        | "conflict"
-        | "missing";
-    };
-    /**
-     * InsuredDemographics
      * @description Non-identifying insured attributes derived locally from the policy.
      */
-    "InsuredDemographics-Output": {
+    InsuredDemographics: {
       /** 나이 */
       "\uB098\uC774": number;
       /**
@@ -679,7 +593,7 @@ export interface components {
       "\uB0A9\uC785\uAE30\uAC04"?: string | null;
       "\uBCF4\uD5D8\uB8CC"?: components["schemas"]["PremiumSummary"] | null;
       "\uD53C\uBCF4\uD5D8\uC790\uC815\uBCF4"?:
-        components["schemas"]["InsuredDemographics-Output"] | null;
+        components["schemas"]["InsuredDemographics"] | null;
       "\uCC28\uB7C9\uC815\uBCF4"?: components["schemas"]["VehicleInfo"] | null;
     };
     /** PortfolioCoverageSummary */
@@ -713,18 +627,6 @@ export interface components {
       title: string;
       /** Paragraphs */
       paragraphs?: string[];
-    };
-    /** PortfolioQuestionRequest */
-    PortfolioQuestionRequest: {
-      /** Portfoliosessiontoken */
-      portfolioSessionToken: string;
-      /** Policyids */
-      policyIds: string[];
-      /** Question */
-      question: string;
-      demographics?: components["schemas"]["InsuredDemographics-Input"];
-      /** History */
-      history?: components["schemas"]["ConversationMessage"][];
     };
     /** PortfolioSessionDeleteResponse */
     PortfolioSessionDeleteResponse: {
@@ -812,65 +714,6 @@ export interface components {
       "\uAE08\uC561"?: number;
       /** 납입주기 */
       "\uB0A9\uC785\uC8FC\uAE30"?: string;
-    };
-    /** @enum {string} */
-    QaAnswerStatus: "answered" | "refused" | "no_data" | "clarify";
-    /** QaDeltaEvent */
-    QaDeltaEvent: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: "delta";
-      /** Text */
-      text: string;
-    };
-    /** QaEndEvent */
-    QaEndEvent: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: "end";
-      status: components["schemas"]["QaAnswerStatus"];
-      /**
-       * Generation
-       * @enum {string}
-       */
-      generation: "llm" | "fallback";
-      /** Citations */
-      citations: components["schemas"]["AnswerCitation"][];
-      /** Limitations */
-      limitations: string[];
-      /** Suggestions */
-      suggestions: string[];
-      claim_channels: components["schemas"]["ClaimChannelBlock"] | null;
-    };
-    /** QaMetaEvent */
-    QaMetaEvent: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: "meta";
-      status: components["schemas"]["QaAnswerStatus"];
-      /**
-       * Generation
-       * @enum {string}
-       */
-      generation: "llm" | "fallback";
-    };
-    /** QaProgressEvent */
-    QaProgressEvent: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: "progress";
-      /** Stage */
-      stage: string;
-      /** Text */
-      text: string;
     };
     /** ReferenceSource */
     ReferenceSource: {
@@ -1239,61 +1082,6 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PortfolioCoverageSummary"];
-        };
-      };
-      /** @description Coverly API error */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiErrorResponse"];
-        };
-      };
-      /** @description Coverly API error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiErrorResponse"];
-        };
-      };
-      /** @description Coverly API error */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiErrorResponse"];
-        };
-      };
-    };
-  };
-  ask_portfolio_question_stream_qa_stream_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["PortfolioQuestionRequest"];
-      };
-    };
-    responses: {
-      /** @description Server-Sent Events: progress* → meta → delta* → end */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "text/event-stream":
-            | components["schemas"]["QaProgressEvent"]
-            | components["schemas"]["QaMetaEvent"]
-            | components["schemas"]["QaDeltaEvent"]
-            | components["schemas"]["QaEndEvent"];
         };
       };
       /** @description Coverly API error */

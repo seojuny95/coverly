@@ -18,27 +18,20 @@ FORBIDDEN_FEATURE_IMPORTS: dict[str, tuple[str, ...]] = {
     "consultation": (
         "app.modules.analysis",
         "app.modules.coverage",
-        "app.modules.evidence",
         "app.modules.policy",
         "app.modules.portfolio",
-        "app.modules.qa",
         "app.modules.reference_data",
         "app.modules.upload",
     ),
     "coverage": (
         "app.modules.analysis",
-        "app.modules.evidence",
         "app.modules.policy",
         "app.modules.portfolio",
-        "app.modules.qa",
     ),
-    "evidence": ("app.modules.qa",),
     "reference_data": (
         "app.modules.analysis",
-        "app.modules.evidence",
         "app.modules.policy",
         "app.modules.portfolio",
-        "app.modules.qa",
     ),
 }
 

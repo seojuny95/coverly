@@ -376,7 +376,7 @@ def database_reference_data(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.modules.coverage import disclosure_links
     from app.modules.policy.summary import catalog
     from app.modules.portfolio import death_benefit_guides, essential_guides
-    from app.modules.qa import claim_channels
+    from app.modules.reference_data import claim_channels
     from app.modules.reference_data import loader as reference_data
 
     _cache_clear(reference_data._database_reference_data)

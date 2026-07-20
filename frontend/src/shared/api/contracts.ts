@@ -12,7 +12,7 @@ export type PolicyClassification = NonNullable<PolicySummary["보험분류"]>;
 export type PolicyCoverage = Schemas["Coverage"];
 export type CoveragePeriod = Schemas["CoveragePeriod"];
 export type PremiumSummary = Schemas["PremiumSummary"];
-export type InsuredDemographics = Schemas["InsuredDemographics-Output"];
+export type InsuredDemographics = Schemas["InsuredDemographics"];
 export type VehicleInfo = Schemas["VehicleInfo"];
 
 export type PortfolioSessionRequest = Schemas["PortfolioSessionRequest"];

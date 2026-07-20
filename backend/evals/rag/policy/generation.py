@@ -17,7 +17,7 @@ from typing import Literal, cast
 
 from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter
-from app.modules.qa.contracts import ConsultationEvidence, InsuredDemographics
+from app.modules.consultation.contracts import ConsultationEvidence, InsuredDemographics
 from app.rag.policy.generation import PolicyGenerationResult, generate_policy_answer
 from evals.rag.data import string_groups as _string_groups
 from evals.rag.data import string_tuple as _string_tuple
