@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.modules.consultation.contracts import InsuredDemographics
+from app.modules.coverage.contracts import InsuredDemographics
 from app.modules.portfolio.demographics import resolve_portfolio_demographics
 from app.modules.portfolio.schemas import PolicyInput
 

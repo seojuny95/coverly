@@ -15,14 +15,6 @@ LEGACY_APP_NAMESPACES = (
 )
 
 FORBIDDEN_FEATURE_IMPORTS: dict[str, tuple[str, ...]] = {
-    "consultation": (
-        "app.modules.analysis",
-        "app.modules.coverage",
-        "app.modules.policy",
-        "app.modules.portfolio",
-        "app.modules.reference_data",
-        "app.modules.upload",
-    ),
     "coverage": (
         "app.modules.analysis",
         "app.modules.policy",

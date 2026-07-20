@@ -17,10 +17,11 @@ from typing import Literal, cast
 
 from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter
-from app.modules.consultation.contracts import ConsultationEvidence, InsuredDemographics
+from app.modules.coverage.contracts import InsuredDemographics
 from app.rag.policy.generation import PolicyGenerationResult, generate_policy_answer
 from evals.rag.data import string_groups as _string_groups
 from evals.rag.data import string_tuple as _string_tuple
+from evals.rag.policy.contracts import ConsultationEvidence
 from evals.rag.text import missing_term_groups as _missing_term_groups
 from evals.rag.text import normalize_whitespace as _normalize
 from evals.rag.text import present_terms as _present_terms

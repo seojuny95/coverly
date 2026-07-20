@@ -13,7 +13,6 @@ from typing import Literal, cast
 
 from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter
-from app.modules.consultation.contracts import ConsultationEvidence
 from app.rag.policy.generation import generate_policy_answer
 from app.rag.policy.retrieval import retrieve_policy_context
 from evals.rag.data import string_groups as _string_groups
@@ -25,6 +24,7 @@ from evals.rag.execution import (
     build_run_metadata,
     validate_execution_modes,
 )
+from evals.rag.policy.contracts import ConsultationEvidence
 from evals.rag.policy.retrieval import (
     EVAL_FIXTURE as RETRIEVAL_FIXTURE,
 )
