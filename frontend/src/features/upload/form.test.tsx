@@ -120,12 +120,14 @@ describe("InsuranceUploadForm", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const guide = screen.getByTestId("policy-document-guide");
-    expect(guide).not.toHaveAttribute("open");
+    const trigger = screen.getByRole("button", {
+      name: "보험증권을 어디서 받는지 모르겠어요",
+    });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
 
-    await user.click(screen.getByText("보험증권을 어디서 받는지 모르겠어요"));
+    await user.click(trigger);
 
-    expect(guide).toHaveAttribute("open");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(
       screen.getByText("보험증권을 이렇게 받을 수 있어요"),
     ).toBeInTheDocument();
@@ -141,6 +143,23 @@ describe("InsuranceUploadForm", () => {
       "https://cont.insure.or.kr/cont_web/intro.do",
     );
     expect(insurerLookupLink).toHaveAttribute("target", "_blank");
+  });
+
+  test("toggles the policy document guide from the keyboard", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    const trigger = screen.getByRole("button", {
+      name: "보험증권을 어디서 받는지 모르겠어요",
+    });
+    trigger.focus();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    await user.keyboard("{Enter}");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    await user.keyboard(" ");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
   test("selects a PDF through the file picker", async () => {
