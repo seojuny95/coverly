@@ -193,9 +193,11 @@ describe("InsuranceUploadForm", () => {
     });
 
     expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "내 보험 분석하기" }),
-    ).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "내 보험 분석하기" }),
+      ).toBeEnabled(),
+    );
   });
 
   test("shows a clear error when a drop contains no file", () => {
@@ -215,7 +217,7 @@ describe("InsuranceUploadForm", () => {
     ).toBeDisabled();
   });
 
-  test("selects multiple PDFs through drag and drop", () => {
+  test("selects multiple PDFs through drag and drop", async () => {
     renderForm();
 
     fireEvent.drop(screen.getByTestId("insurance-upload-dropzone"), {
@@ -227,12 +229,14 @@ describe("InsuranceUploadForm", () => {
     expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
     expect(screen.getByText("second-insurance.pdf")).toBeInTheDocument();
     expect(screen.getByText("2개 · 0.02 KB")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "내 보험 분석하기" }),
-    ).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "내 보험 분석하기" }),
+      ).toBeEnabled(),
+    );
   });
 
-  test("does not enforce the server file type rule in the browser", () => {
+  test("does not enforce the server file type rule in the browser", async () => {
     renderForm();
 
     fireEvent.drop(screen.getByTestId("insurance-upload-dropzone"), {
@@ -242,9 +246,11 @@ describe("InsuranceUploadForm", () => {
     });
 
     expect(screen.getByText("note.txt")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "내 보험 분석하기" }),
-    ).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "내 보험 분석하기" }),
+      ).toBeEnabled(),
+    );
   });
 
   test("does not enforce the server size limit in the browser", async () => {
@@ -788,6 +794,40 @@ describe("InsuranceUploadForm", () => {
       screen.getByRole("button", { name: "내 보험 분석하기" }),
     ).toBeDisabled();
     expect(uploadInsurance).not.toHaveBeenCalled();
+  });
+
+  test("blocks submit while the password pre-check is still running", async () => {
+    const user = userEvent.setup();
+    vi.mocked(isPdfPasswordProtected).mockReturnValue(new Promise(() => {}));
+    renderForm({});
+
+    await user.upload(
+      screen.getByLabelText(/PDF/i),
+      new File(["x"], "insurance.pdf", { type: "application/pdf" }),
+    );
+
+    expect(screen.getByText("확인 중")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeDisabled();
+  });
+
+  test("unlocks submit when the password pre-check fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(isPdfPasswordProtected).mockResolvedValue(false);
+    renderForm({});
+
+    await user.upload(
+      screen.getByLabelText(/PDF/i),
+      new File(["x"], "insurance.pdf", { type: "application/pdf" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText("확인 중")).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeEnabled();
   });
 
   test("asks for a password only for encrypted PDFs and retries with it", async () => {

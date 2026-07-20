@@ -148,7 +148,15 @@ export function useUploadOrchestration({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (selectedUploadFiles.length === 0 || isAnalyzing || pendingAnalysis)
+    const isCheckingPasswords = selectedUploadFiles.some(
+      (selectedFile) => selectedFile.status === "checking",
+    );
+    if (
+      selectedUploadFiles.length === 0 ||
+      isAnalyzing ||
+      pendingAnalysis ||
+      isCheckingPasswords
+    )
       return;
 
     if (!(await resolvePendingCleanup())) return;

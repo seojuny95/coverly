@@ -164,6 +164,14 @@ function SelectedFileStatusBadge({
     );
   }
 
+  if (status === "checking") {
+    return (
+      <span className="rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-zinc-500">
+        확인 중
+      </span>
+    );
+  }
+
   if (status === "done") {
     return (
       <span className="rounded-md border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">

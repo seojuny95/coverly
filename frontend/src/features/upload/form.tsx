@@ -101,6 +101,9 @@ export function InsuranceUploadForm({
   const hasMissingPasswords = passwordRetryFiles.some(
     (selectedFile) => !(selectedFile.password ?? "").trim(),
   );
+  const isCheckingPasswords = selectedUploadFiles.some(
+    (selectedFile) => selectedFile.status === "checking",
+  );
   const submitLabel = isModal ? "분석에 추가하기" : "내 보험 분석하기";
   const dropzoneTitle = fixedSelectedName
     ? `${fixedSelectedName}(피보험자)의 보험증권 PDF만 올릴 수 있어요`
@@ -238,7 +241,8 @@ export function InsuranceUploadForm({
                 selectedUploadFiles.length === 0 ||
                 isAnalyzing ||
                 Boolean(pendingAnalysis) ||
-                (hasPasswordRetryFiles && hasMissingPasswords)
+                (hasPasswordRetryFiles && hasMissingPasswords) ||
+                isCheckingPasswords
               }
               className={`self-stretch ${isModal ? "" : "sm:self-end"}`}
             >

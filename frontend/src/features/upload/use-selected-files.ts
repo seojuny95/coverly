@@ -39,7 +39,7 @@ export function useSelectedFiles({
     const selectedFiles = incomingFiles.map((file, index) => ({
       id: `${Date.now()}-${index}-${file.name}-${file.size}`,
       file,
-      status: "idle" as const,
+      status: "checking" as const,
     }));
     setSelectedUploadFiles(selectedFiles);
     setError(null);
@@ -49,20 +49,25 @@ export function useSelectedFiles({
   // Fire-and-forget: check each newly selected file for an encryption
   // password so the field shows up before submit instead of after a failed
   // upload round trip. Matches by id so a removed/superseded file is a no-op.
+  // isPdfPasswordProtected fails open (resolves false) on internal errors, and
+  // every branch below must still clear "checking" or submit stays locked.
   const flagPasswordProtectedFiles = (files: SelectedUploadFile[]) => {
     for (const selectedFile of files) {
       void isPdfPasswordProtected(selectedFile.file).then((needsPassword) => {
-        if (!needsPassword) return;
         setSelectedUploadFiles((current) =>
-          current.map((currentFile) =>
-            currentFile.id === selectedFile.id && !currentFile.errorCode
-              ? {
-                  ...currentFile,
-                  errorCode: "PDF_PASSWORD_REQUIRED",
-                  errorMessage: "PDF 비밀번호를 입력해주세요.",
-                }
-              : currentFile,
-          ),
+          current.map((currentFile) => {
+            if (currentFile.id !== selectedFile.id) return currentFile;
+            if (currentFile.status !== "checking") return currentFile;
+            if (needsPassword && !currentFile.errorCode) {
+              return {
+                ...currentFile,
+                status: "idle" as const,
+                errorCode: "PDF_PASSWORD_REQUIRED",
+                errorMessage: "PDF 비밀번호를 입력해주세요.",
+              };
+            }
+            return { ...currentFile, status: "idle" as const };
+          }),
         );
       });
     }
