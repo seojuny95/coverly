@@ -1,9 +1,12 @@
+"use client";
+
 import { ExternalLink } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
+import { CollapseRegion, useDisclosure } from "@/shared/components/disclosure";
 
 import type { ClaimChannelBlock } from "./api";
 import { safeHref } from "./safe-href";
@@ -39,7 +42,11 @@ export function ClaimGuide({
   hasMedicalIndemnity: boolean;
 }) {
   return (
-    <section aria-labelledby="claim-guide-title">
+    // Continues the panel's enter stagger (0/100/200ms) as the last section in render order.
+    <section
+      aria-labelledby="claim-guide-title"
+      className="animate-enter delay-300"
+    >
       <Card variant="muted" className="rounded-[28px] p-5 sm:p-7">
         <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
           보험금 청구 방법
@@ -131,47 +138,64 @@ function ClaimChannelOptions({
       ) : null}
 
       {claimChannels.insurers?.length ? (
-        <details className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
-            <span>
-              <span className="text-sm font-semibold text-zinc-900">
-                가입한 보험사별 청구 채널
-              </span>
-              <span className="mt-1 block text-xs text-zinc-500">
-                가입한 보험사의 접수 링크와 고객센터만 모았어요.
-              </span>
-            </span>
-            <Badge
-              variant="neutral"
-              className="h-auto px-2.5 py-1 text-[11px] font-medium"
-            >
-              {claimChannels.insurers.length}곳
-            </Badge>
-          </summary>
-
-          <ul className="mt-3 divide-y divide-zinc-100 border-t border-zinc-100 text-xs leading-5 text-zinc-600">
-            {claimChannels.insurers.map((insurer) => (
-              <li key={insurer.name} className="py-3 first:pt-3 last:pb-0">
-                <div className="px-1">
-                  <p className="font-semibold text-zinc-900">{insurer.name}</p>
-                  {insurer.customer_center ? (
-                    <p className="mt-1 text-zinc-500">
-                      고객센터 {insurer.customer_center}
-                    </p>
-                  ) : null}
-                  {insurer.note ? (
-                    <p className="mt-1 text-zinc-500">{insurer.note}</p>
-                  ) : null}
-                  <ChannelLinkList
-                    links={insurer.links ?? []}
-                    className="mt-2"
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </details>
+        <InsurerChannelList insurers={claimChannels.insurers} />
       ) : null}
+    </div>
+  );
+}
+
+function InsurerChannelList({
+  insurers,
+}: {
+  insurers: NonNullable<ClaimChannelBlock["insurers"]>;
+}) {
+  const { expanded, toggle, panelId } = useDisclosure();
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={toggle}
+        className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-none"
+      >
+        <span>
+          <span className="text-sm font-semibold text-zinc-900">
+            가입한 보험사별 청구 채널
+          </span>
+          <span className="mt-1 block text-xs text-zinc-500">
+            가입한 보험사의 접수 링크와 고객센터만 모았어요.
+          </span>
+        </span>
+        <Badge
+          variant="neutral"
+          className="h-auto px-2.5 py-1 text-[11px] font-medium"
+        >
+          {insurers.length}곳
+        </Badge>
+      </button>
+
+      <CollapseRegion expanded={expanded} id={panelId}>
+        <ul className="mt-3 divide-y divide-zinc-100 border-t border-zinc-100 text-xs leading-5 text-zinc-600">
+          {insurers.map((insurer) => (
+            <li key={insurer.name} className="py-3 first:pt-3 last:pb-0">
+              <div className="px-1">
+                <p className="font-semibold text-zinc-900">{insurer.name}</p>
+                {insurer.customer_center ? (
+                  <p className="mt-1 text-zinc-500">
+                    고객센터 {insurer.customer_center}
+                  </p>
+                ) : null}
+                {insurer.note ? (
+                  <p className="mt-1 text-zinc-500">{insurer.note}</p>
+                ) : null}
+                <ChannelLinkList links={insurer.links ?? []} className="mt-2" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CollapseRegion>
     </div>
   );
 }

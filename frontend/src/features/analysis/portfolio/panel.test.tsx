@@ -491,15 +491,32 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
       name: "실손24 홈페이지",
     }),
   ).toHaveAttribute("href", "https://www.silson24.or.kr/claim/web/");
-  const insurerChannels = screen
-    .getByText("가입한 보험사별 청구 채널")
-    .closest("details");
-  expect(insurerChannels).not.toHaveAttribute("open");
-  await user.click(screen.getByText("가입한 보험사별 청구 채널"));
-  expect(insurerChannels).toHaveAttribute("open");
+  const insurerChannelsTrigger = screen.getByRole("button", {
+    name: /가입한 보험사별 청구 채널/,
+  });
+  expect(insurerChannelsTrigger).toHaveAttribute("aria-expanded", "false");
+
+  // jsdom's accessibility-tree queries don't honor `inert`, so a collapsed
+  // link is still findable by role here; assert the `inert` ancestor
+  // directly to prove it is actually removed from the tab order.
+  const collapsedClaimLinks = screen.getAllByRole("link", {
+    name: "청구 링크",
+  });
+  for (const link of collapsedClaimLinks) {
+    expect(link.closest("[inert]")).not.toBeNull();
+  }
+
+  await user.click(insurerChannelsTrigger);
+  expect(insurerChannelsTrigger).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByText("삼성화재")).toBeInTheDocument();
   expect(screen.getByText("메리츠화재")).toBeInTheDocument();
-  expect(screen.getAllByRole("link", { name: "청구 링크" })[0]).toHaveAttribute(
+  const expandedClaimLinks = screen.getAllByRole("link", {
+    name: "청구 링크",
+  });
+  for (const link of expandedClaimLinks) {
+    expect(link.closest("[inert]")).toBeNull();
+  }
+  expect(expandedClaimLinks[0]).toHaveAttribute(
     "href",
     "https://www.samsungfire.com",
   );

@@ -82,7 +82,7 @@ export function PortfolioOverview({
 
   return (
     <section aria-labelledby="portfolio-overview-title" className="space-y-4">
-      <div className="analysis-overview-reveal relative overflow-hidden rounded-[28px] border border-blue-200 bg-zinc-950 px-6 py-7 text-white shadow-[10px_10px_0_#e8edff] sm:px-8 sm:py-9">
+      <div className="animate-enter relative overflow-hidden rounded-[28px] border border-blue-200 bg-zinc-950 px-6 py-7 text-white shadow-[10px_10px_0_#e8edff] sm:px-8 sm:py-9">
         <div className="analysis-overview-grid pointer-events-none absolute inset-0" />
         <div className="relative">
           <div className="min-w-0">

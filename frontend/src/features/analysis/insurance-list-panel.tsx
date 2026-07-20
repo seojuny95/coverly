@@ -1,4 +1,5 @@
 import { SectionLabel } from "../../shared/components/section-label";
+import { CollapseRegion } from "@/shared/components/disclosure";
 import { Button } from "@/shared/components/ui/button";
 import {
   Tooltip,
@@ -174,18 +175,12 @@ export function InsuranceListPanel({
                         </span>
                       </button>
 
-                      <div
-                        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                        }`}
-                      >
-                        <div className="overflow-hidden">
-                          <InsuranceDetail
-                            insuranceDocument={insuranceDocument}
-                            isExpanded={expanded}
-                          />
-                        </div>
-                      </div>
+                      <CollapseRegion expanded={expanded}>
+                        <InsuranceDetail
+                          insuranceDocument={insuranceDocument}
+                          isExpanded={expanded}
+                        />
+                      </CollapseRegion>
                     </li>
                   );
                 })}

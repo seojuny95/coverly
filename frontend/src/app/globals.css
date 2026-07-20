@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -82,7 +83,26 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Shared motion tokens. Every enter animation in the app resolves to one of
+     these so the rule lives in one place instead of in class strings. */
+  --animate-enter: coverly-enter 200ms ease-out both;
+  --animate-enter-overlay: coverly-enter-overlay 300ms ease-out both;
+
+  /* Screen-specific animations. Their keyframes cannot be expressed as
+     utility combinations (step timing, many keyframes), so only the entry
+     point is unified here. */
+  --animate-evidence-scan: evidence-scan 8s ease-in-out infinite;
+  --animate-evidence-signal: evidence-signal 8s linear infinite;
+  --animate-evidence-glow: evidence-glow 8s steps(4, end) infinite;
+  --animate-evidence-result-row: evidence-result-row 8s steps(1, end) infinite;
+  --animate-evidence-complete: evidence-complete 8s steps(1, end) infinite;
+  --animate-pixel-pulse: analysis-pixel-pulse 1.6s steps(2, end) infinite;
+  --animate-amount-range-fill: amount-range-fill 700ms ease-out both;
 }
+
+/* Screen-specific keyframes and CSS-only rules below (descendant, pseudo-element,
+   and :nth-child selectors that a utility class can't express). */
 
 .analysis-overview-grid {
   background-image:
@@ -90,77 +110,6 @@
     linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px);
   background-size: 24px 24px;
   mask-image: linear-gradient(to right, black, transparent 88%);
-}
-
-.analysis-overview-reveal {
-  animation: analysis-overview-reveal 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.analysis-overview-delay-1 {
-  animation-delay: 90ms;
-}
-
-.analysis-coverage-orbit {
-  position: relative;
-  isolation: isolate;
-  animation: analysis-overview-reveal 700ms cubic-bezier(0.22, 1, 0.36, 1) 120ms
-    both;
-}
-
-.analysis-coverage-orbit::before {
-  position: absolute;
-  z-index: -1;
-  inset: -14px;
-  border-radius: 999px;
-  content: "";
-  background: rgb(96 165 250 / 14%);
-  animation: analysis-overview-breathe 3.8s ease-in-out infinite;
-}
-
-.analysis-coverage-node {
-  animation: analysis-coverage-node 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.analysis-coverage-node:nth-child(2) {
-  animation-delay: 80ms;
-}
-
-.analysis-coverage-node:nth-child(3) {
-  animation-delay: 160ms;
-}
-
-@keyframes analysis-overview-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes analysis-overview-breathe {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(0.96);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.04);
-  }
-}
-
-@keyframes analysis-coverage-node {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 .upload-dropzone::before {
@@ -182,7 +131,7 @@
 
 .analysis-pixel-loader span {
   background: #d4d4d8;
-  animation: analysis-pixel-pulse 1.6s steps(2, end) infinite;
+  animation: var(--animate-pixel-pulse);
 }
 
 .analysis-pixel-loader span:nth-child(2),
@@ -207,12 +156,6 @@
 
 .amount-range-fill {
   width: var(--amount-range-position);
-  animation: amount-range-fill 700ms ease-out both;
-}
-
-.premium-position-user {
-  left: var(--premium-position);
-  animation: premium-position-marker 700ms ease-out both;
 }
 
 @keyframes amount-range-fill {
@@ -221,17 +164,6 @@
   }
   to {
     width: var(--amount-range-position);
-  }
-}
-
-@keyframes premium-position-marker {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 8px) scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
   }
 }
 
@@ -265,7 +197,7 @@
   );
   opacity: 0;
   transform: translateX(-120%);
-  animation: evidence-scan 8s ease-in-out infinite;
+  animation: var(--animate-evidence-scan);
 }
 
 .evidence-source-2::after {
@@ -293,7 +225,7 @@
   stroke-dashoffset: 1.08;
   opacity: 0;
   vector-effect: non-scaling-stroke;
-  animation: evidence-signal 8s linear infinite;
+  animation: var(--animate-evidence-signal);
 }
 
 .evidence-signal-2 {
@@ -317,13 +249,12 @@
 .evidence-glow {
   fill: var(--coverly-mist);
   opacity: 0;
-  animation: evidence-glow 8s steps(4, end) infinite;
+  animation: var(--animate-evidence-glow);
 }
 
 .evidence-result-row {
   background: transparent;
   opacity: 0.48;
-  animation: evidence-result-row 8s steps(1, end) infinite;
 }
 
 .evidence-result-row-2 {
@@ -332,10 +263,6 @@
 
 .evidence-result-row-3 {
   animation-delay: 360ms;
-}
-
-.evidence-complete {
-  animation: evidence-complete 8s steps(1, end) infinite;
 }
 
 @keyframes evidence-scan {
@@ -425,14 +352,12 @@
   }
 }
 
-.analysis-status-message {
-  animation: analysis-status-fade 0.5s ease-out;
-}
-
-@keyframes analysis-status-fade {
+/* Prefixed: tw-animate-css ships its own `enter`/`exit` keyframes, and a
+   duplicate name is overwritten wholesale rather than merged. */
+@keyframes coverly-enter {
   from {
     opacity: 0;
-    transform: translateY(3px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -440,29 +365,48 @@
   }
 }
 
+@keyframes coverly-enter-overlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .analysis-overview-reveal,
-  .analysis-coverage-orbit,
-  .analysis-coverage-orbit::before,
-  .analysis-coverage-node,
-  .analysis-status-message,
   .analysis-pixel-loader span,
-  .amount-range-fill,
+  .animate-amount-range-fill,
   .evidence-source::after,
   .evidence-signal,
   .evidence-glow,
-  .evidence-result-row,
-  .evidence-complete {
+  .animate-evidence-result-row,
+  .animate-evidence-complete,
+  .animate-enter,
+  .animate-enter-overlay,
+  .animate-pulse,
+  .animate-bounce {
     animation: none;
   }
 
   .evidence-result-row,
-  .evidence-complete {
+  .animate-evidence-complete {
     opacity: 1;
   }
 
   .evidence-result-row {
     background: #f4f7ff;
+  }
+
+  /* Both start hidden and are only revealed by their animation, so without
+     one they need explicit values — taken from the frame the loop peaks at. */
+  .evidence-signal {
+    stroke-dashoffset: -0.08;
+    opacity: 1;
+  }
+
+  .evidence-glow {
+    opacity: 0.85;
   }
 }
 

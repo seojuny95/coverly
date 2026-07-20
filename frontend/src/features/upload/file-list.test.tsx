@@ -116,4 +116,18 @@ describe("SelectedFileList", () => {
     );
     expect(screen.getByRole("button", { name: "a.pdf 제거" })).toBeDisabled();
   });
+
+  it("shows a checking badge while the password pre-check runs", () => {
+    render(
+      <SelectedFileList
+        files={[file({ id: "1", name: "insurance.pdf", status: "checking" })]}
+        surface="page"
+        onRemove={vi.fn()}
+        onPasswordChange={vi.fn()}
+        disableRemove={false}
+      />,
+    );
+
+    expect(screen.getByText("확인 중")).toBeVisible();
+  });
 });
