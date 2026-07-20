@@ -6,6 +6,7 @@ from typing import Any, cast
 import pytest
 from agents import Runner
 
+from app.core.config import get_settings
 from app.modules.counsel.agent.definition import create_agent, run_agent_streamed
 from app.modules.counsel.context import CounselContext
 
@@ -82,3 +83,7 @@ def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
     assert captured["agent"] is agent
     assert captured["input"] == "암진단비 알려줘"
     assert captured["context"] is context
+    # This turn cap is the server-side defense against runaway agent loops;
+    # without this assertion, removing the argument from definition.py would
+    # leave this test green.
+    assert captured["max_turns"] == get_settings().counsel_agent_max_turns
