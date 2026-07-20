@@ -604,8 +604,6 @@ describe("InsuranceAnalysisPage", () => {
         expect.anything(),
       );
     });
-    // The completion beat holds the modal's finished progress state on
-    // screen for 400ms (real timer) before onAnalysisComplete/onClose fire.
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });

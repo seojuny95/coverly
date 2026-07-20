@@ -452,9 +452,8 @@ export function useUploadOrchestration({
         pendingAnalysis.portfolioSessionToken,
         excludedDocumentIds,
       );
-      // Leave the progress screen up through the completion beat instead of
-      // tearing it down here, so the user never sees the name-selection panel
-      // flash back before navigation. Only the failure branch below clears it.
+      // No setIsAnalyzing(false) here: the progress screen must stay up through
+      // the completion beat, or the name-selection panel flashes back.
       saveSelectedNameAnalysis(pendingAnalysis, selectedName);
     } catch {
       setError(ROLLBACK_ERROR_MESSAGE);

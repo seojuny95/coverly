@@ -71,9 +71,8 @@ export function AmountRangeMeter({
           />
           <span
             className={cn(
-              // amount-range-fill sets the static final width so the bar still
-              // shows the right value when reduced-motion disables
-              // animate-amount-range-fill (animation: none in globals.css).
+              // amount-range-fill carries the final width, so the bar still
+              // reads correctly when reduced-motion drops the animation.
               "amount-range-fill animate-amount-range-fill absolute inset-y-0 left-0 rounded-full",
               tone === "dark" ? "bg-white" : "bg-blue-600",
             )}

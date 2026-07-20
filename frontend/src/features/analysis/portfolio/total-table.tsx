@@ -52,7 +52,6 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
       ) : status === "error" ? (
         <CoverageSummaryError onRetry={onRetry} />
       ) : (
-        // Animate the result, not the skeleton it replaces, so the swap fades up.
         <div className="animate-enter">
           {summary && hasCoverages ? (
             <CoverageSummaryTable summary={summary} />

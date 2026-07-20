@@ -173,12 +173,8 @@ export function InsuranceAnalysisPage({
           </TabButton>
         </nav>
         {sessionExpired ? <PolicySessionExpiredNotice /> : null}
-        {/* key remounts the panel on tab change so animate-enter replays.
-            No flex/height classes here: none of the three branches (or
-            InsuranceChatbot, which stays outside this wrapper) rely on a
-            flex-1 ancestor for sizing — the chat tab's own scroll area gets
-            its flex-1/min-h-0 from InsuranceChatbot's full-mode root, not
-            from this wrapper. */}
+        {/* Deliberately no flex/height classes: flex-1 here would compete with
+            InsuranceChatbot's full-mode root and halve the chat scroll area. */}
         <div key={activeTab} className="animate-enter">
           {activeTab === "insurance" ? (
             <InsuranceListPanel
