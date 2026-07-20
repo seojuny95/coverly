@@ -51,12 +51,17 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
         <CoverageSummaryLoading />
       ) : status === "error" ? (
         <CoverageSummaryError onRetry={onRetry} />
-      ) : summary && hasCoverages ? (
-        <CoverageSummaryTable summary={summary} />
       ) : (
-        <p className="px-6 py-8 text-sm text-zinc-500">
-          표시할 보장금액을 찾지 못했어요.
-        </p>
+        // Animate the result, not the skeleton it replaces, so the swap fades up.
+        <div className="animate-enter">
+          {summary && hasCoverages ? (
+            <CoverageSummaryTable summary={summary} />
+          ) : (
+            <p className="px-6 py-8 text-sm text-zinc-500">
+              표시할 보장금액을 찾지 못했어요.
+            </p>
+          )}
+        </div>
       )}
     </section>
   );
