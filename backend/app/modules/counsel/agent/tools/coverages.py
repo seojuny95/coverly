@@ -2,7 +2,7 @@
 
 from agents import RunContextWrapper, function_tool
 
-from app.core.untrusted import strip_injection_markers_by_line
+from app.core.untrusted import strip_injection_markers, strip_injection_markers_by_line
 from app.modules.counsel.context import CounselContext
 from app.modules.counsel.facts import coverages as coverage_facts
 
@@ -10,6 +10,7 @@ CoverageNameInfo = coverage_facts.CoverageNameInfo
 CoverageMatch = coverage_facts.CoverageMatch
 CoverageTotalResult = coverage_facts.CoverageTotalResult
 FindCoveragesResult = coverage_facts.FindCoveragesResult
+OverlapEntry = coverage_facts.OverlapEntry
 OverlappingCoverage = coverage_facts.OverlappingCoverage
 
 
@@ -30,7 +31,31 @@ def _strip_free_text_fields[T: (CoverageNameInfo, CoverageMatch)](item: T) -> T:
         updates["해설"] = strip_injection_markers_by_line(item.해설)
     if not updates:
         return item
-    return item.model_copy(update=updates)
+
+    stripped = item.model_copy(update=updates)
+    # The grounding label must not outlive the evidence it describes: if
+    # stripping emptied both fields, nothing text-based backs 설명근거 anymore.
+    if not stripped.보장내용 and not stripped.해설:
+        return stripped.model_copy(update={"설명근거": "none"})
+    return stripped
+
+
+def _strip_overlap_entry_free_text_fields(entry: OverlapEntry) -> OverlapEntry:
+    """Sanitize 상품명/가입금액, the only free text an overlap entry carries from a PDF.
+
+    담보명 (on the parent OverlappingCoverage), 보험사, ids, and 가입금액숫자 are
+    identity or matching fields and stay untouched. 가입금액 here is display-only
+    prose — it is never compared or summed downstream, unlike 가입금액숫자.
+    """
+
+    updates: dict[str, str] = {}
+    if entry.상품명:
+        updates["상품명"] = strip_injection_markers(entry.상품명)
+    if entry.가입금액:
+        updates["가입금액"] = strip_injection_markers(entry.가입금액)
+    if not updates:
+        return entry
+    return entry.model_copy(update=updates)
 
 
 @function_tool
@@ -68,9 +93,8 @@ def find_coverages(
     """
 
     result = coverage_facts.find_coverage_facts(wrapper.context.policies, coverage_names)
-    return FindCoveragesResult(
-        matches=[_strip_free_text_fields(match) for match in result.matches],
-        unmatched=result.unmatched,
+    return result.model_copy(
+        update={"matches": [_strip_free_text_fields(match) for match in result.matches]}
     )
 
 
@@ -97,11 +121,8 @@ def calculate_coverage_total(
     """
 
     result = coverage_facts.calculate_coverage_total_fact(wrapper.context.policies, coverage_names)
-    return CoverageTotalResult(
-        total=result.total,
-        included=[_strip_free_text_fields(match) for match in result.included],
-        excluded=result.excluded,
-        unmatched=result.unmatched,
+    return result.model_copy(
+        update={"included": [_strip_free_text_fields(match) for match in result.included]}
     )
 
 
@@ -114,4 +135,14 @@ def find_overlapping_coverages(
     중복 여부만 사실대로 알려주고, 해지하거나 줄이라고 권유하지 마세요.
     """
 
-    return coverage_facts.find_overlapping_coverage_facts(wrapper.context.policies)
+    results = coverage_facts.find_overlapping_coverage_facts(wrapper.context.policies)
+    return [
+        overlap.model_copy(
+            update={
+                "policies": [
+                    _strip_overlap_entry_free_text_fields(entry) for entry in overlap.policies
+                ]
+            }
+        )
+        for overlap in results
+    ]
