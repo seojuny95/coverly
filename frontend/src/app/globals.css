@@ -98,25 +98,6 @@
   mask-image: linear-gradient(to right, black, transparent 88%);
 }
 
-.analysis-overview-reveal {
-  animation: analysis-overview-reveal 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.analysis-overview-delay-1 {
-  animation-delay: 90ms;
-}
-
-@keyframes analysis-overview-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 .upload-dropzone::before {
   position: absolute;
   inset: 0;
@@ -363,21 +344,6 @@
   }
 }
 
-.analysis-status-message {
-  animation: analysis-status-fade 0.5s ease-out;
-}
-
-@keyframes analysis-status-fade {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @keyframes enter {
   from {
     opacity: 0;
@@ -399,8 +365,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .analysis-overview-reveal,
-  .analysis-status-message,
   .analysis-pixel-loader span,
   .amount-range-fill,
   .evidence-source::after,

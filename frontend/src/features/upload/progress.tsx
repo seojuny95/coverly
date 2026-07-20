@@ -136,7 +136,7 @@ export function AnalysisProgress({
         ) : null}
         <p
           key={statusMessage}
-          className="analysis-status-message mt-6 text-sm leading-6 text-zinc-500"
+          className="animate-enter mt-6 text-sm leading-6 text-zinc-500"
         >
           {statusMessage}
         </p>

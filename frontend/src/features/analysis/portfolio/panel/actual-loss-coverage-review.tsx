@@ -27,7 +27,7 @@ export function ActualLossCoverageReview({
   const duplicateNames = duplicateActualLossCoverageNames(coverages);
 
   return (
-    <article className="analysis-overview-reveal analysis-overview-delay-2 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
+    <article className="animate-enter rounded-2xl border border-zinc-200 bg-white p-5 delay-200 sm:p-6">
       <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
         실손형 보장 중복 확인
       </p>
