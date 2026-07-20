@@ -8,6 +8,7 @@ from app.modules.counsel.facts.coverages import (
     CoverageTotalResult,
     FindCoveragesResult,
     OverlappingCoverage,
+    UnmatchedCoverageName,
     calculate_coverage_total_fact,
     find_coverage_facts,
     find_overlapping_coverage_facts,
@@ -37,6 +38,12 @@ class FactExecution(BaseModel):
     def has_results(self) -> bool:
         return bool(self.results)
 
+    @property
+    def has_unresolved_names(self) -> bool:
+        """True when any requested coverage name did not resolve to a real coverage."""
+
+        return any(_unmatched_names(result) for result in self.results)
+
 
 def execute_fact_tasks(plan: CounselPlan, policies: list[PolicyInput]) -> FactExecution:
     """Run deterministic fact tasks selected by the planner."""
@@ -47,6 +54,13 @@ def execute_fact_tasks(plan: CounselPlan, policies: list[PolicyInput]) -> FactEx
         if result is not None:
             results.append(result)
     return FactExecution(results=results)
+
+
+def _unmatched_names(result: FactTaskResult) -> list[UnmatchedCoverageName]:
+    for source in (result.coverage_lookup, result.coverage_total, result.claim_channels):
+        if source is not None and source.unmatched:
+            return list(source.unmatched)
+    return []
 
 
 def _execute_task(task: CounselTask, policies: list[PolicyInput]) -> FactTaskResult | None:

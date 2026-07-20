@@ -1,4 +1,5 @@
-from app.modules.counsel.planner import _INSTRUCTIONS, CounselTask, plan_counsel_turn
+from app.modules.counsel.planner import CounselTask, plan_counsel_turn
+from app.modules.counsel.planner.prompt import build_system_prompt
 from app.modules.counsel.schemas import CounselMessage
 
 
@@ -92,5 +93,6 @@ def test_instructions_keep_the_scope_clauses_that_fixed_live_regressions() -> No
     # policy_count_personal_scope, situational_illness_scope) and were once silently
     # dropped in a prompt rewrite, which sent "차를 박았는데 어떻게 해?" back to
     # out_of_scope. Pin them so a future rewrite has to be deliberate.
-    assert "이런 개인 정보 질문이 Coverly가 답하는 핵심 범위입니다" in _INSTRUCTIONS
-    assert '"보험"이라는 단어가 없어도' in _INSTRUCTIONS
+    instructions = build_system_prompt()
+    assert "이런 개인 정보 질문이 Coverly가 답하는 핵심 범위입니다" in instructions
+    assert '"보험"이라는 단어가 없어도' in instructions

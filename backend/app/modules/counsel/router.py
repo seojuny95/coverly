@@ -10,7 +10,7 @@ from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.integrations.openai.client import JsonCompleter, structured_completer
 from app.modules.counsel.agent.definition import AgentStreamRunner, run_agent_streamed
-from app.modules.counsel.answer_stream import build_answer_stream
+from app.modules.counsel.answer import build_answer_stream
 from app.modules.counsel.planner import CounselPlan, plan_counsel_turn
 from app.modules.counsel.schemas import CounselRequest
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
@@ -38,10 +38,10 @@ async def stream_counsel_answer(
     plan_completer: PlanCompleterDep,
     agent_stream_runner: AgentStreamRunnerDep,
 ) -> StreamingResponse:
-    """Resolve the session and scope, then stream the agent's answer as SSE."""
+    """Resolve the session, plan the turn, then stream the answer as SSE."""
 
     try:
-        snapshot, check = await asyncio.gather(
+        snapshot, plan = await asyncio.gather(
             asyncio.to_thread(sessions.snapshot, request.session_id),
             asyncio.to_thread(
                 plan_counsel_turn,
@@ -58,7 +58,8 @@ async def stream_counsel_answer(
         ) from None
 
     events = build_answer_stream(
-        check=check,
+        question=request.question,
+        plan=plan,
         policies=list(snapshot.policies),
         policy_rag_session_ids=snapshot.rag_session_ids,
         model=get_settings().openai_model,

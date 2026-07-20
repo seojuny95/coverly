@@ -3,7 +3,7 @@ import json
 from collections.abc import AsyncGenerator, AsyncIterator
 from typing import cast
 
-from app.modules.counsel.answer_stream import build_answer_stream
+from app.modules.counsel.answer import build_answer_stream
 from app.modules.counsel.planner import CounselPlan, CounselTask
 from app.modules.portfolio.schemas import PolicyInput
 
@@ -25,7 +25,8 @@ def test_streams_meta_then_agent_deltas_then_end_when_in_scope() -> None:
     events = asyncio.run(
         _collect(
             build_answer_stream(
-                check=check,
+                question=check.rewritten_question,
+                plan=check,
                 policies=[],
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
@@ -62,7 +63,8 @@ def test_streams_the_refusal_message_without_running_the_agent_when_out_of_scope
     events = asyncio.run(
         _collect(
             build_answer_stream(
-                check=check,
+                question=check.rewritten_question,
+                plan=check,
                 policies=[],
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
@@ -99,7 +101,8 @@ def test_streams_fact_answer_without_running_agent_for_fact_only_plan() -> None:
     events = asyncio.run(
         _collect(
             build_answer_stream(
-                check=check,
+                question=check.rewritten_question,
+                plan=check,
                 policies=[
                     PolicyInput.model_validate(
                         {"id": "p1", "기본정보": {"보험사": "현대해상"}, "보장목록": []}
@@ -132,7 +135,8 @@ def test_streams_fact_answer_before_agent_for_fact_then_explanation_plan() -> No
     events = asyncio.run(
         _collect(
             build_answer_stream(
-                check=check,
+                question=check.rewritten_question,
+                plan=check,
                 policies=[
                     PolicyInput.model_validate(
                         {
@@ -183,7 +187,8 @@ def test_closing_the_stream_early_propagates_into_the_agent_stream_runner() -> N
         events = cast(
             AsyncGenerator[str, None],
             build_answer_stream(
-                check=check,
+                question=check.rewritten_question,
+                plan=check,
                 policies=[],
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",

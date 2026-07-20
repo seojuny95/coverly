@@ -1,31 +1,4 @@
-"""LLM-backed turn planner for grounded counsel answers."""
-
-from typing import Literal
-
-from pydantic import BaseModel, Field
-
-from app.integrations.openai.client import JsonCompleter
-from app.modules.counsel.schemas import CounselMessage
-
-CounselTaskKind = Literal[
-    "policy_count",
-    "policy_list",
-    "coverage_list",
-    "coverage_lookup",
-    "coverage_total",
-    "overlap_check",
-    "claim_channel",
-    "portfolio_review",
-]
-CounselResponseMode = Literal[
-    "agent",
-    "fact_only",
-    "fact_then_explanation",
-    "clarify",
-    "out_of_scope",
-]
-
-_INSTRUCTIONS = """이전 대화와 현재 질문을 보고 상담 실행 계획만 JSON으로 반환하세요.
+이전 대화와 현재 질문을 보고 상담 실행 계획만 JSON으로 반환하세요.
 
 1. rewritten_question: 질문을 그 자체로 이해 가능한 독립된 질문으로 다시 쓰세요.
    - 대명사, 생략된 주어·목적어만 이전 대화 내용으로 채우세요.
@@ -57,6 +30,9 @@ _INSTRUCTIONS = """이전 대화와 현재 질문을 보고 상담 실행 계획
    - claim_channel: 청구 채널 확인
    - portfolio_review: 월 보험료, 핵심 보장 체크, 실손형 중복 해석
 
+   coverage_names에는 사용자가 말한 담보명을 원문 그대로 적으세요. 괄호나 접미사가
+   붙어 있으면 그것까지 그대로 옮기고, 임의로 줄이거나 바꾸지 마세요.
+
 5. response_mode:
    - out_of_scope: in_scope=false
    - fact_only: 보험 사실만 답하면 충분함
@@ -65,43 +41,4 @@ _INSTRUCTIONS = """이전 대화와 현재 질문을 보고 상담 실행 계획
    - clarify: 담보명이나 의도가 부족해 되묻는 게 맞는 경우
 
 보험 사실(보험명, 담보명, 금액, 합계, 중복 여부)을 직접 답하거나 추측하지 마세요.
-당신은 답변 작성자가 아니라 실행 계획 작성자입니다."""
-
-
-class CounselTask(BaseModel):
-    kind: CounselTaskKind
-    coverage_names: list[str] = Field(default_factory=list)
-    focus: str | None = None
-
-
-class CounselPlan(BaseModel):
-    rewritten_question: str
-    in_scope: bool
-    excluded_note: str | None = None
-    reason: str
-    tasks: list[CounselTask] = Field(default_factory=list)
-    response_mode: CounselResponseMode = "agent"
-
-
-def plan_counsel_turn(
-    question: str,
-    history: list[CounselMessage],
-    *,
-    complete: JsonCompleter,
-) -> CounselPlan:
-    """Rewrite, scope-check, and plan the counsel turn in one structured LLM call."""
-
-    raw = complete(_INSTRUCTIONS, _planner_user_prompt(question, history))
-    plan = CounselPlan.model_validate(raw)
-    if not plan.in_scope:
-        return plan.model_copy(update={"tasks": [], "response_mode": "out_of_scope"})
-    return plan
-
-
-def _planner_user_prompt(question: str, history: list[CounselMessage]) -> str:
-    history_text = (
-        "\n".join(f"{item.role}: {item.content}" for item in history)
-        if history
-        else "(이전 대화 없음)"
-    )
-    return f"이전 대화:\n{history_text}\n\n질문: {question}"
+당신은 답변 작성자가 아니라 실행 계획 작성자입니다.
