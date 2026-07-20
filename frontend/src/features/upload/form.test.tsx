@@ -799,10 +799,10 @@ describe("InsuranceUploadForm", () => {
   test("blocks submit while the password pre-check is still running", async () => {
     const user = userEvent.setup();
     vi.mocked(isPdfPasswordProtected).mockReturnValue(new Promise(() => {}));
-    renderForm({});
+    renderForm();
 
     await user.upload(
-      screen.getByLabelText(/PDF/i),
+      screen.getByLabelText("PDF 파일 선택"),
       new File(["x"], "insurance.pdf", { type: "application/pdf" }),
     );
 
@@ -815,16 +815,44 @@ describe("InsuranceUploadForm", () => {
   test("unlocks submit when the password pre-check fails", async () => {
     const user = userEvent.setup();
     vi.mocked(isPdfPasswordProtected).mockResolvedValue(false);
-    renderForm({});
+    renderForm();
 
     await user.upload(
-      screen.getByLabelText(/PDF/i),
+      screen.getByLabelText("PDF 파일 선택"),
       new File(["x"], "insurance.pdf", { type: "application/pdf" }),
     );
 
     await waitFor(() =>
       expect(screen.queryByText("확인 중")).not.toBeInTheDocument(),
     );
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeEnabled();
+  });
+
+  test("lets the user type a password and submit once the pre-check flags an encrypted PDF", async () => {
+    const user = userEvent.setup();
+    vi.mocked(isPdfPasswordProtected).mockResolvedValueOnce(true);
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValueOnce({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
+      status: "accepted",
+      documentId: "test-document-id",
+      문자수: 20,
+      기본정보: {
+        보험사: "삼성화재",
+        상품명: "건강보험",
+        피보험자: "테스트고객",
+        보험분류: "제3보험",
+        상품태그: ["질병보험"],
+      },
+    });
+    renderForm({ uploadInsurance });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+
+    expect(await screen.findByText("비밀번호 필요")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("PDF 비밀번호"), "900101");
+
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
     ).toBeEnabled();

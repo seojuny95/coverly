@@ -25,6 +25,9 @@ export function useSelectedFiles({
   >([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isCheckingPasswords = selectedUploadFiles.some(
+    (selectedFile) => selectedFile.status === "checking",
+  );
 
   const selectFiles = (files: FileList | File[]) => {
     if (isLocked) return;
@@ -172,6 +175,7 @@ export function useSelectedFiles({
   return {
     selectedUploadFiles,
     setSelectedUploadFiles,
+    isCheckingPasswords,
     error,
     setError,
     inputRef,

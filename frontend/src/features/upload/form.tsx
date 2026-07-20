@@ -53,6 +53,7 @@ export function InsuranceUploadForm({
   const activeUploadInsurance = uploadInsurance ?? uploadInsuranceRequest;
   const {
     selectedUploadFiles,
+    isCheckingPasswords,
     isAnalyzing,
     isCompleting,
     analysisProgress,
@@ -100,9 +101,6 @@ export function InsuranceUploadForm({
   const hasPasswordRetryFiles = passwordRetryFiles.length > 0;
   const hasMissingPasswords = passwordRetryFiles.some(
     (selectedFile) => !(selectedFile.password ?? "").trim(),
-  );
-  const isCheckingPasswords = selectedUploadFiles.some(
-    (selectedFile) => selectedFile.status === "checking",
   );
   const submitLabel = isModal ? "분석에 추가하기" : "내 보험 분석하기";
   const dropzoneTitle = fixedSelectedName

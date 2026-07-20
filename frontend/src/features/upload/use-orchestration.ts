@@ -105,6 +105,7 @@ export function useUploadOrchestration({
   const {
     selectedUploadFiles,
     setSelectedUploadFiles,
+    isCheckingPasswords,
     error,
     setError,
     inputRef,
@@ -148,9 +149,6 @@ export function useUploadOrchestration({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const isCheckingPasswords = selectedUploadFiles.some(
-      (selectedFile) => selectedFile.status === "checking",
-    );
     if (
       selectedUploadFiles.length === 0 ||
       isAnalyzing ||
@@ -471,6 +469,7 @@ export function useUploadOrchestration({
 
   return {
     selectedUploadFiles,
+    isCheckingPasswords,
     isAnalyzing,
     isCompleting,
     analysisProgress,
