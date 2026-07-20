@@ -31,3 +31,6 @@ dist/
 sample-insurance-input/
 .local/
 local-fixtures/
+
+# Design and proposal docs stay on disk, out of git
+docs/
