@@ -7,10 +7,10 @@ and rewrite policy a person needs to read and review, per backend/PROMPTING.md.
 from functools import lru_cache
 from pathlib import Path
 
-from app.integrations.openai import dump_prompt_json
 from app.modules.counsel.schemas import CounselMessage
 
 _INSTRUCTIONS_PATH = Path(__file__).with_name("instructions.md")
+_NO_HISTORY = "(이전 대화 없음)"
 
 
 @lru_cache(maxsize=1)
@@ -28,16 +28,23 @@ def build_system_prompt() -> str:
 
 
 def build_user_prompt(question: str, history: list[CounselMessage]) -> str:
-    """Pass turns as structure so a typed "assistant:" line cannot forge one.
+    history_text = (
+        "\n".join(f"{item.role}: {_one_line(item.content)}" for item in history)
+        if history
+        else _NO_HISTORY
+    )
+    return f"이전 대화:\n{history_text}\n\n질문: {_one_line(question)}"
 
-    Concatenating turns into "{role}: {content}" lines makes a user-typed line
-    starting with "assistant:" indistinguishable from a real prior turn. JSON
-    keeps every turn boundary in the structure, where user text cannot reach.
+
+def _one_line(content: str) -> str:
+    """Flatten a turn so its text cannot start a line and forge a turn label.
+
+    One line per turn is what marks a turn boundary here, so a user who types a
+    newline followed by "assistant:" would otherwise produce a line
+    indistinguishable from a real prior turn. `splitlines` uses Python's own
+    definition of a line boundary, which covers \\r, \\v, \\f, \\x1c-\\x1e,
+    \\x85, \\u2028 and \\u2029 as well as \\n — enumerating them by hand is how
+    this kind of guard gets bypassed.
     """
 
-    return dump_prompt_json(
-        {
-            "history": [{"role": item.role, "content": item.content} for item in history],
-            "question": question,
-        }
-    )
+    return " ".join(content.splitlines())
