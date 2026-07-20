@@ -381,7 +381,11 @@
   .animate-evidence-result-row,
   .animate-evidence-complete,
   .animate-enter,
-  .animate-enter-overlay {
+  .animate-enter-overlay,
+  .animate-pulse,
+  .animate-bounce,
+  [class*="animate-in"],
+  [class*="animate-out"] {
     animation: none;
   }
 
