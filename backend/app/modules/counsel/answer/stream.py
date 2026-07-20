@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 
 from app.modules.counsel.agent.definition import AgentStreamRunner, create_agent
 from app.modules.counsel.answer.brief import build_agent_input
+from app.modules.counsel.answer.composer import compose_fact_answer
 from app.modules.counsel.answer.escalation import route_answer
 from app.modules.counsel.answer.events import (
     CounselDeltaEvent,
@@ -11,9 +12,8 @@ from app.modules.counsel.answer.events import (
     CounselMetaEvent,
     serialize_event,
 )
-from app.modules.counsel.composer import compose_fact_answer
+from app.modules.counsel.answer.executor import execute_fact_tasks
 from app.modules.counsel.context import CounselContext
-from app.modules.counsel.fact_executor import execute_fact_tasks
 from app.modules.counsel.planner import CounselPlan
 from app.modules.counsel.schemas import CounselMessage
 from app.modules.portfolio.schemas import PolicyInput

@@ -9,7 +9,7 @@ what is general guidance, and what still needs the policy wording.
 
 from dataclasses import dataclass
 
-from app.modules.counsel.fact_executor import FactExecution
+from app.modules.counsel.answer.executor import FactExecution
 from app.modules.counsel.planner import CounselPlan
 from app.modules.coverage.matching import query_contains_canonical_name
 

@@ -1,6 +1,6 @@
 """Compose user-facing counsel text from deterministic fact execution."""
 
-from app.modules.counsel.fact_executor import FactExecution, FactTaskResult
+from app.modules.counsel.answer.executor import FactExecution, FactTaskResult
 from app.modules.counsel.facts.coverages import (
     CoverageMatch,
     CoverageNameInfo,

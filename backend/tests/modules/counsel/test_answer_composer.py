@@ -1,5 +1,5 @@
-from app.modules.counsel.composer import compose_fact_answer
-from app.modules.counsel.fact_executor import execute_fact_tasks
+from app.modules.counsel.answer.composer import compose_fact_answer
+from app.modules.counsel.answer.executor import execute_fact_tasks
 from app.modules.counsel.planner import CounselPlan, CounselTask
 from app.modules.portfolio.schemas import PolicyInput
 

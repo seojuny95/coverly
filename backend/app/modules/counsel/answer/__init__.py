@@ -1,4 +1,9 @@
-"""Turning a planned turn into the streamed answer the user sees."""
+"""Turning a planned turn into the streamed answer the user sees.
+
+The stages run in order: executor resolves the planned fact tasks against the
+pure fact modules, composer renders them, escalation decides whether they can
+stand as the answer, and stream emits the SSE events.
+"""
 
 from app.modules.counsel.answer.events import (
     CounselDeltaEvent,
