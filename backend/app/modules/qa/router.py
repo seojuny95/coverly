@@ -9,10 +9,11 @@ from typing import Annotated
 
 import anyio
 from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from starlette.types import Receive, Scope, Send
 
 from app.core.errors import api_error_responses
+from app.core.responses import EventStreamOpenAPIResponse
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.http import resolve_portfolio_snapshot
 from app.modules.qa.agent.runtime import build_qa_agent_runner
@@ -21,12 +22,6 @@ from app.modules.qa.schemas import PortfolioQuestionRequest
 from app.modules.qa.streaming import QaStreamEvent
 
 router = APIRouter(tags=["qa"])
-
-
-class EventStreamOpenAPIResponse(JSONResponse):
-    """Declare the event media type while runtime delivery remains streaming."""
-
-    media_type = "text/event-stream"
 
 
 class DisconnectAwareStreamingResponse(StreamingResponse):

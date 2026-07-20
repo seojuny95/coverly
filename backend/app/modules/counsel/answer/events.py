@@ -1,9 +1,9 @@
 """SSE event contracts for a streamed counsel answer."""
 
 import json
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CounselMetaEvent(BaseModel):
@@ -22,7 +22,12 @@ class CounselEndEvent(BaseModel):
     type: Literal["end"] = "end"
 
 
-CounselStreamEvent = CounselMetaEvent | CounselDeltaEvent | CounselEndEvent
+# Discriminated so the published schema is a strict oneOf: a client validator can
+# then reject an event that only loosely resembles one of the shapes.
+CounselStreamEvent = Annotated[
+    CounselMetaEvent | CounselDeltaEvent | CounselEndEvent,
+    Field(discriminator="type"),
+]
 
 
 def serialize_event(event: CounselStreamEvent) -> str:

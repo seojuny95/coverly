@@ -7,10 +7,11 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from app.core.config import get_settings
-from app.core.errors import ApiError
+from app.core.errors import ApiError, api_error_responses
+from app.core.responses import EventStreamOpenAPIResponse
 from app.integrations.openai.client import JsonCompleter, structured_completer
 from app.modules.counsel.agent.definition import AgentStreamRunner, run_agent_streamed
-from app.modules.counsel.answer import build_answer_stream
+from app.modules.counsel.answer import CounselStreamEvent, build_answer_stream
 from app.modules.counsel.planner import CounselPlan, plan_counsel_turn
 from app.modules.counsel.schemas import CounselRequest
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
@@ -31,7 +32,17 @@ PlanCompleterDep = Annotated[JsonCompleter, Depends(get_plan_completer)]
 AgentStreamRunnerDep = Annotated[AgentStreamRunner, Depends(get_agent_stream_runner)]
 
 
-@router.post("/stream")
+@router.post(
+    "/stream",
+    response_class=EventStreamOpenAPIResponse,
+    responses={
+        200: {
+            "model": CounselStreamEvent,
+            "description": "Server-Sent Events: meta → delta* → end",
+        },
+        **api_error_responses(403, response_media_type="application/json"),
+    },
+)
 async def stream_counsel_answer(
     request: CounselRequest,
     sessions: PortfolioSessionServiceDep,

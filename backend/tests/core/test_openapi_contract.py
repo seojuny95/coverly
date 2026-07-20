@@ -127,6 +127,23 @@ def test_openapi_exposes_discriminated_sse_events_and_json_errors() -> None:
     assert set(responses["422"]["content"]) == {"application/json"}
 
 
+def test_openapi_exposes_counsel_sse_events_the_client_must_validate() -> None:
+    # The frontend generates its stream validator from this schema, so the event
+    # union has to be reachable from the route rather than only from the code.
+    responses = app.openapi()["paths"]["/counsel/stream"]["post"]["responses"]
+
+    assert set(responses["200"]["content"]) == {"text/event-stream"}
+    stream_schema = responses["200"]["content"]["text/event-stream"]["schema"]
+    assert {item["$ref"] for item in stream_schema["oneOf"]} == {
+        "#/components/schemas/CounselMetaEvent",
+        "#/components/schemas/CounselDeltaEvent",
+        "#/components/schemas/CounselEndEvent",
+    }
+    assert stream_schema["discriminator"]["propertyName"] == "type"
+    assert set(responses["403"]["content"]) == {"application/json"}
+    assert set(responses["422"]["content"]) == {"application/json"}
+
+
 def test_request_validation_uses_common_error_envelope() -> None:
     app.dependency_overrides[get_portfolio_session_service] = lambda: object()
     try:
