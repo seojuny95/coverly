@@ -7,8 +7,10 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.modules.counsel.agent.definition import AgentStreamRunner, create_agent
-from app.modules.counsel.check_scope_and_rewrite import ScopeAndRewriteResult
+from app.modules.counsel.composer import compose_fact_answer
 from app.modules.counsel.context import CounselContext
+from app.modules.counsel.fact_executor import execute_fact_tasks
+from app.modules.counsel.planner import CounselPlan
 from app.modules.portfolio.schemas import PolicyInput
 
 _OUT_OF_SCOPE_ANSWER = (
@@ -42,7 +44,7 @@ def serialize_event(event: CounselStreamEvent) -> str:
 
 async def build_answer_stream(
     *,
-    check: ScopeAndRewriteResult,
+    check: CounselPlan,
     policies: list[PolicyInput],
     policy_rag_session_ids: tuple[str, ...],
     model: str,
@@ -62,6 +64,15 @@ async def build_answer_stream(
         yield serialize_event(CounselDeltaEvent(text=_OUT_OF_SCOPE_ANSWER))
         yield serialize_event(CounselEndEvent())
         return
+
+    fact_execution = execute_fact_tasks(check, policies)
+    fact_answer = compose_fact_answer(fact_execution)
+    if fact_answer is not None and check.response_mode in {"fact_only", "clarify"}:
+        yield serialize_event(CounselDeltaEvent(text=fact_answer))
+        yield serialize_event(CounselEndEvent())
+        return
+    if fact_answer is not None and check.response_mode == "fact_then_explanation":
+        yield serialize_event(CounselDeltaEvent(text=f"{fact_answer}\n\n"))
 
     context = CounselContext(policies=policies, policy_rag_session_ids=policy_rag_session_ids)
     agent = create_agent(model)

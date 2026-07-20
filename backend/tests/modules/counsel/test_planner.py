@@ -1,0 +1,96 @@
+from app.modules.counsel.planner import _INSTRUCTIONS, CounselTask, plan_counsel_turn
+from app.modules.counsel.schemas import CounselMessage
+
+
+def test_plan_counsel_turn_parses_fact_tasks() -> None:
+    def fake(_system: str, user: str) -> dict[str, object]:
+        assert "암진단비" in user
+        return {
+            "rewritten_question": "암진단비 가입금액을 알려줘.",
+            "in_scope": True,
+            "reason": "사용자 보험 담보 질문",
+            "tasks": [{"kind": "coverage_lookup", "coverage_names": ["암진단비"]}],
+            "response_mode": "fact_only",
+        }
+
+    plan = plan_counsel_turn("암진단비 얼마야?", [], complete=fake)
+
+    assert plan.rewritten_question == "암진단비 가입금액을 알려줘."
+    assert plan.tasks == [CounselTask(kind="coverage_lookup", coverage_names=["암진단비"])]
+    assert plan.response_mode == "fact_only"
+
+
+def test_plan_counsel_turn_defaults_optional_fields() -> None:
+    def fake(_system: str, _user: str) -> dict[str, object]:
+        return {"rewritten_question": "암진단비 알려줘", "in_scope": True, "reason": "보험 질문"}
+
+    plan = plan_counsel_turn("암진단비 알려줘", [], complete=fake)
+
+    assert plan.excluded_note is None
+    assert plan.tasks == []
+    assert plan.response_mode == "agent"
+
+
+def test_plan_counsel_turn_forces_out_of_scope_mode_without_tasks() -> None:
+    def fake(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "rewritten_question": "오늘 날씨 알려줘",
+            "in_scope": False,
+            "reason": "보험과 무관",
+            "tasks": [{"kind": "policy_count"}],
+            "response_mode": "fact_only",
+        }
+
+    plan = plan_counsel_turn("오늘 날씨 알려줘", [], complete=fake)
+
+    assert plan.tasks == []
+    assert plan.response_mode == "out_of_scope"
+
+
+def test_plan_counsel_turn_carries_the_dropped_out_of_scope_part_of_a_mixed_question() -> None:
+    def fake(_system: str, _user: str) -> dict[str, object]:
+        return {
+            "rewritten_question": "암진단비 합계를 알려줘.",
+            "in_scope": True,
+            "excluded_note": "오늘 날씨는 보험과 무관해 답변에서 뺐습니다.",
+            "reason": "보험 질문 + 무관한 질문 혼합",
+            "tasks": [{"kind": "coverage_total", "coverage_names": ["암진단비"]}],
+            "response_mode": "fact_only",
+        }
+
+    plan = plan_counsel_turn("암진단비 합계 알려주고 오늘 날씨도 알려줘", [], complete=fake)
+
+    assert plan.excluded_note == "오늘 날씨는 보험과 무관해 답변에서 뺐습니다."
+
+
+def test_plan_counsel_turn_uses_history_for_rewrite_context() -> None:
+    captured: dict[str, str] = {}
+
+    def fake(_system: str, user: str) -> dict[str, object]:
+        captured["user"] = user
+        return {
+            "rewritten_question": "암진단비 청구 방법을 알려줘.",
+            "in_scope": True,
+            "reason": "이전 담보 후속 질문",
+            "tasks": [{"kind": "claim_channel", "coverage_names": ["암진단비"]}],
+            "response_mode": "fact_then_explanation",
+        }
+
+    history = [
+        CounselMessage(role="user", content="암진단비 얼마야?"),
+        CounselMessage(role="assistant", content="암진단비가 확인돼요."),
+    ]
+
+    plan = plan_counsel_turn("청구는?", history, complete=fake)
+
+    assert "암진단비" in captured["user"]
+    assert plan.tasks[0].kind == "claim_channel"
+
+
+def test_instructions_keep_the_scope_clauses_that_fixed_live_regressions() -> None:
+    # Both clauses were added after live misclassifications (evals/counsel/dataset.json:
+    # policy_count_personal_scope, situational_illness_scope) and were once silently
+    # dropped in a prompt rewrite, which sent "차를 박았는데 어떻게 해?" back to
+    # out_of_scope. Pin them so a future rewrite has to be deliberate.
+    assert "이런 개인 정보 질문이 Coverly가 답하는 핵심 범위입니다" in _INSTRUCTIONS
+    assert '"보험"이라는 단어가 없어도' in _INSTRUCTIONS

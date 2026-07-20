@@ -5,7 +5,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.modules.counsel.router import get_agent_stream_runner, get_check_completer
+from app.modules.counsel.router import get_agent_stream_runner, get_plan_completer
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.models import PortfolioSessionSnapshot
@@ -63,7 +63,7 @@ def _parse_sse_events(body: str) -> list[dict[str, object]]:
 def test_stream_endpoint_streams_meta_then_deltas_then_end_when_in_scope() -> None:
     app = create_app()
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
-    app.dependency_overrides[get_check_completer] = lambda: _in_scope_completer("암진단비 알려줘")
+    app.dependency_overrides[get_plan_completer] = lambda: _in_scope_completer("암진단비 알려줘")
     app.dependency_overrides[get_agent_stream_runner] = lambda: _fake_agent_stream_runner(
         "암진단비가 ", "확인돼요."
     )
@@ -93,7 +93,7 @@ def test_stream_endpoint_streams_meta_then_deltas_then_end_when_in_scope() -> No
 def test_stream_endpoint_streams_a_refusal_when_out_of_scope() -> None:
     app = create_app()
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
-    app.dependency_overrides[get_check_completer] = _out_of_scope_completer
+    app.dependency_overrides[get_plan_completer] = _out_of_scope_completer
     client = TestClient(app)
 
     response = client.post(
@@ -115,7 +115,7 @@ def test_stream_endpoint_rejects_an_invalid_session() -> None:
     # failure — otherwise the real OpenAI client would run alongside it.
     app = create_app()
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
-    app.dependency_overrides[get_check_completer] = lambda: _in_scope_completer("암진단비 알려줘")
+    app.dependency_overrides[get_plan_completer] = lambda: _in_scope_completer("암진단비 알려줘")
     client = TestClient(app)
 
     response = client.post(

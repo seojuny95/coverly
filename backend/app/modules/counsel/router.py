@@ -11,10 +11,7 @@ from app.core.errors import ApiError
 from app.integrations.openai.client import JsonCompleter, structured_completer
 from app.modules.counsel.agent.definition import AgentStreamRunner, run_agent_streamed
 from app.modules.counsel.answer_stream import build_answer_stream
-from app.modules.counsel.check_scope_and_rewrite import (
-    ScopeAndRewriteResult,
-    check_scope_and_rewrite,
-)
+from app.modules.counsel.planner import CounselPlan, plan_counsel_turn
 from app.modules.counsel.schemas import CounselRequest
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.service import InvalidPortfolioSessionToken
@@ -22,15 +19,15 @@ from app.modules.portfolio.session.service import InvalidPortfolioSessionToken
 router = APIRouter(prefix="/counsel", tags=["counsel"])
 
 
-def get_check_completer() -> JsonCompleter:
-    return structured_completer(ScopeAndRewriteResult)
+def get_plan_completer() -> JsonCompleter:
+    return structured_completer(CounselPlan)
 
 
 def get_agent_stream_runner() -> AgentStreamRunner:
     return run_agent_streamed
 
 
-CheckCompleterDep = Annotated[JsonCompleter, Depends(get_check_completer)]
+PlanCompleterDep = Annotated[JsonCompleter, Depends(get_plan_completer)]
 AgentStreamRunnerDep = Annotated[AgentStreamRunner, Depends(get_agent_stream_runner)]
 
 
@@ -38,7 +35,7 @@ AgentStreamRunnerDep = Annotated[AgentStreamRunner, Depends(get_agent_stream_run
 async def stream_counsel_answer(
     request: CounselRequest,
     sessions: PortfolioSessionServiceDep,
-    check_completer: CheckCompleterDep,
+    plan_completer: PlanCompleterDep,
     agent_stream_runner: AgentStreamRunnerDep,
 ) -> StreamingResponse:
     """Resolve the session and scope, then stream the agent's answer as SSE."""
@@ -47,10 +44,10 @@ async def stream_counsel_answer(
         snapshot, check = await asyncio.gather(
             asyncio.to_thread(sessions.snapshot, request.session_id),
             asyncio.to_thread(
-                check_scope_and_rewrite,
+                plan_counsel_turn,
                 request.question,
                 request.history,
-                complete=check_completer,
+                complete=plan_completer,
             ),
         )
     except InvalidPortfolioSessionToken:

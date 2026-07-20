@@ -1,0 +1,159 @@
+"""Compose user-facing counsel text from deterministic fact execution."""
+
+from app.modules.counsel.fact_executor import FactExecution, FactTaskResult
+from app.modules.counsel.facts.coverages import (
+    CoverageMatch,
+    CoverageNameInfo,
+    UnmatchedCoverageName,
+)
+from app.modules.counsel.facts.policies import PolicyFact
+
+
+def compose_fact_answer(execution: FactExecution) -> str | None:
+    """Render deterministic facts into a user-facing answer."""
+
+    if not execution.results:
+        return None
+
+    sections = [_compose_result(result) for result in execution.results]
+    answer = "\n\n".join(section for section in sections if section)
+    return answer or None
+
+
+def _compose_result(result: FactTaskResult) -> str:
+    if result.task.kind == "policy_count" and result.policy_list is not None:
+        return f"현재 업로드된 보험은 {result.policy_list.count}건이에요."
+    if result.task.kind == "policy_list" and result.policy_list is not None:
+        return _policy_list_answer(result.policy_list.policies)
+    if result.task.kind == "coverage_list" and result.coverage_names is not None:
+        return _coverage_list_answer(result.coverage_names)
+    if result.task.kind == "coverage_lookup" and result.coverage_lookup is not None:
+        return _coverage_lookup_answer(
+            result.coverage_lookup.matches,
+            result.coverage_lookup.unmatched,
+        )
+    if result.task.kind == "coverage_total" and result.coverage_total is not None:
+        return _coverage_total_answer(result)
+    if result.task.kind == "overlap_check" and result.overlaps is not None:
+        return _overlap_answer(result)
+    if result.task.kind == "claim_channel" and result.claim_channels is not None:
+        return _claim_channel_answer(result)
+    if result.task.kind == "portfolio_review" and result.portfolio_bundle is not None:
+        return _portfolio_review_answer(result)
+    return ""
+
+
+def _policy_list_answer(policies: list[PolicyFact]) -> str:
+    if not policies:
+        return "현재 업로드된 보험은 없어요."
+    lines = []
+    for policy in policies:
+        info = policy.기본정보
+        insurer = info.보험사 or "보험사 미확인"
+        product = info.상품명 or "상품명 미확인"
+        lines.append(f"- {insurer} · {product}")
+    return "현재 확인된 보험은 다음과 같아요.\n" + "\n".join(lines)
+
+
+def _coverage_list_answer(coverage_names: list[CoverageNameInfo]) -> str:
+    if not coverage_names:
+        return "현재 자료에서 확인된 담보가 없어요."
+    lines = [f"- {item.담보명}" for item in coverage_names]
+    return "현재 확인된 담보명은 다음과 같아요.\n" + "\n".join(lines)
+
+
+def _coverage_lookup_answer(
+    matches: list[CoverageMatch],
+    unmatched: list[UnmatchedCoverageName],
+) -> str:
+    lines: list[str] = []
+    if matches:
+        lines.append("현재 자료에서 확인된 담보예요.")
+        for match in matches:
+            owner = " · ".join(part for part in (match.보험사, match.상품명) if part)
+            prefix = f"{owner}의 " if owner else ""
+            lines.append(f"- {prefix}{match.담보명}: {match.가입금액}")
+            explanation = match.보장내용 or match.해설
+            if explanation:
+                lines.append(f"  - 설명: {explanation}")
+    lines.extend(_unmatched_lines(unmatched))
+    return "\n".join(lines) if lines else "질문한 담보를 현재 자료에서 확인하지 못했어요."
+
+
+def _coverage_total_answer(result: FactTaskResult) -> str:
+    total = result.coverage_total
+    if total is None:
+        return ""
+
+    if not total.included:
+        # Without a single confirmed amount there is nothing to add up. Saying "0원"
+        # would state a total the data does not support.
+        lines = ["합산할 담보를 현재 자료에서 확인하지 못했어요."]
+        lines.extend(_unmatched_lines(total.unmatched))
+        return "\n".join(lines)
+
+    lines = [
+        f"확인 가능한 정액형 가입금액 합계는 {total.total:,}원이에요.",
+        "합산에 포함한 담보:",
+    ]
+    for item in total.included:
+        owner = " · ".join(part for part in (item.보험사, item.상품명) if part)
+        lines.append(f"- {owner} · {item.담보명}: {item.가입금액}")
+    if total.excluded:
+        lines.append("합산에서 제외한 담보:")
+        for excluded in total.excluded:
+            lines.append(f"- {excluded.담보명}: {excluded.reason}")
+    lines.extend(_unmatched_lines(total.unmatched))
+    return "\n".join(lines)
+
+
+def _overlap_answer(result: FactTaskResult) -> str:
+    overlaps = result.overlaps or []
+    if not overlaps:
+        return "현재 자료에서는 같은 담보명이 두 개 이상 확인된 항목이 없어요."
+    lines = ["같은 담보명이 두 개 이상 확인된 항목이에요."]
+    for item in overlaps:
+        lines.append(f"- {item.담보명}: {len(item.policies)}건")
+    return "\n".join(lines)
+
+
+def _claim_channel_answer(result: FactTaskResult) -> str:
+    channels = result.claim_channels
+    if channels is None:
+        return ""
+    lines: list[str] = []
+    if channels.channels.insurers:
+        lines.append("확인된 보험사 청구 채널이에요.")
+        for insurer in channels.channels.insurers:
+            lines.append(f"- {insurer.name}: {insurer.customer_center or '고객센터 미확인'}")
+    lines.extend(_unmatched_lines(channels.unmatched))
+    return "\n".join(lines) if lines else "청구 채널을 확인할 담보를 현재 자료에서 찾지 못했어요."
+
+
+def _portfolio_review_answer(result: FactTaskResult) -> str:
+    bundle = result.portfolio_bundle
+    if bundle is None:
+        return ""
+    lines = [
+        f"월납으로 확인된 보험료 합계는 {bundle.premium.monthly_total:,}원이에요.",
+        bundle.premium.note,
+        "핵심 보장 체크:",
+    ]
+    for item in bundle.essential_coverages:
+        amount = f" ({item.confirmed_amount:,}원)" if item.confirmed_amount is not None else ""
+        lines.append(f"- {item.label}: {item.status_label}{amount}")
+    lines.append(bundle.actual_loss_duplicates.review_note)
+    return "\n".join(lines)
+
+
+def _unmatched_lines(unmatched: list[UnmatchedCoverageName]) -> list[str]:
+    lines: list[str] = []
+    for item in unmatched:
+        if item.candidates:
+            candidates = ", ".join(item.candidates)
+            lines.append(
+                f"'{item.requested_name}'와 정확히 일치하는 담보는 없어요. 후보: {candidates}"
+            )
+        else:
+            lines.append(f"'{item.requested_name}'와 정확히 일치하는 담보는 없어요.")
+    return lines

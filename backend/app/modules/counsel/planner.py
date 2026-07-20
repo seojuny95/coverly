@@ -1,0 +1,107 @@
+"""LLM-backed turn planner for grounded counsel answers."""
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from app.integrations.openai.client import JsonCompleter
+from app.modules.counsel.schemas import CounselMessage
+
+CounselTaskKind = Literal[
+    "policy_count",
+    "policy_list",
+    "coverage_list",
+    "coverage_lookup",
+    "coverage_total",
+    "overlap_check",
+    "claim_channel",
+    "portfolio_review",
+]
+CounselResponseMode = Literal[
+    "agent",
+    "fact_only",
+    "fact_then_explanation",
+    "clarify",
+    "out_of_scope",
+]
+
+_INSTRUCTIONS = """이전 대화와 현재 질문을 보고 상담 실행 계획만 JSON으로 반환하세요.
+
+1. rewritten_question: 질문을 그 자체로 이해 가능한 독립된 질문으로 다시 쓰세요.
+   - 대명사, 생략된 주어·목적어만 이전 대화 내용으로 채우세요.
+   - 없는 사실이나 의도를 새로 지어내지 마세요.
+   - 이전 대화가 없거나 무관하면 원문을 그대로 반환하세요.
+   - 질문에 보험과 무관한 내용이 섞여 있으면(예: "암보험 얼마야? 날씨도 알려줘"),
+     그 부분은 빼고 보험 관련 부분만 남기세요.
+
+2. excluded_note: rewritten_question을 쓰면서 보험과 무관해서 뺀 내용이 있으면,
+   무엇을 왜 뺐는지 한 문장으로 적으세요. 뺀 내용이 없으면 null입니다.
+
+3. in_scope: 재작성한 질문이 다음 중 하나에 해당하면 true입니다.
+   - 사용자가 가입한 보험, 증권, 담보, 가입금액, 약관, 청구처럼 본인의 보험 정보에 관한 질문
+     (이런 개인 정보 질문이 Coverly가 답하는 핵심 범위입니다)
+   - 보험 제도나 용어에 관한 일반적인 질문
+   - Coverly의 기능, 답변 범위, 개인정보 처리 방식에 관한 질문
+   - 사용자가 질병, 진단, 사고, 부상처럼 자신에게 일어난 일을 말하며 "어떻게 해야
+     하나", "뭘 확인해야 하나"처럼 도움을 구하는 질문. "보험"이라는 단어가 없어도,
+     보유한 보장을 확인하는 게 도움이 되는 상황이면 in_scope=true입니다.
+   그 외의 질문(날씨, 잡담, 보험과 무관한 다른 주제 등)은 in_scope=false입니다.
+
+4. tasks: 사용자의 실제 보험 사실이 필요한 경우에만 작업을 고르세요.
+   - policy_count: 가입/업로드한 보험 개수
+   - policy_list: 보험사·상품 목록
+   - coverage_list: 담보명 목록
+   - coverage_lookup: 특정 담보 가입금액·설명 조회
+   - coverage_total: 특정 담보들의 정액 가입금액 합계
+   - overlap_check: 같은 담보명 중복 확인
+   - claim_channel: 청구 채널 확인
+   - portfolio_review: 월 보험료, 핵심 보장 체크, 실손형 중복 해석
+
+5. response_mode:
+   - out_of_scope: in_scope=false
+   - fact_only: 보험 사실만 답하면 충분함
+   - fact_then_explanation: 보험 사실을 먼저 말하고 쉬운 설명도 붙여야 함
+   - agent: 일반 보험 안내, 약관/RAG, 복잡한 상담처럼 agent가 필요한 경우
+   - clarify: 담보명이나 의도가 부족해 되묻는 게 맞는 경우
+
+보험 사실(보험명, 담보명, 금액, 합계, 중복 여부)을 직접 답하거나 추측하지 마세요.
+당신은 답변 작성자가 아니라 실행 계획 작성자입니다."""
+
+
+class CounselTask(BaseModel):
+    kind: CounselTaskKind
+    coverage_names: list[str] = Field(default_factory=list)
+    focus: str | None = None
+
+
+class CounselPlan(BaseModel):
+    rewritten_question: str
+    in_scope: bool
+    excluded_note: str | None = None
+    reason: str
+    tasks: list[CounselTask] = Field(default_factory=list)
+    response_mode: CounselResponseMode = "agent"
+
+
+def plan_counsel_turn(
+    question: str,
+    history: list[CounselMessage],
+    *,
+    complete: JsonCompleter,
+) -> CounselPlan:
+    """Rewrite, scope-check, and plan the counsel turn in one structured LLM call."""
+
+    raw = complete(_INSTRUCTIONS, _planner_user_prompt(question, history))
+    plan = CounselPlan.model_validate(raw)
+    if not plan.in_scope:
+        return plan.model_copy(update={"tasks": [], "response_mode": "out_of_scope"})
+    return plan
+
+
+def _planner_user_prompt(question: str, history: list[CounselMessage]) -> str:
+    history_text = (
+        "\n".join(f"{item.role}: {item.content}" for item in history)
+        if history
+        else "(이전 대화 없음)"
+    )
+    return f"이전 대화:\n{history_text}\n\n질문: {question}"
