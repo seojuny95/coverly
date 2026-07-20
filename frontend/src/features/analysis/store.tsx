@@ -26,6 +26,7 @@ export type InsuranceAnalysis = {
   selectedName?: string;
   portfolioSessionToken: string;
   portfolioSessionExpiresAt: string;
+  counselTurnsRemaining: number;
   insuranceDocuments: AnalyzedInsurance[];
 };
 
@@ -64,6 +65,11 @@ export function mergeInsuranceAnalysis(
     selectedName: next.selectedName ?? current.selectedName,
     portfolioSessionToken: next.portfolioSessionToken,
     portfolioSessionExpiresAt: next.portfolioSessionExpiresAt,
+    // Merging in another upload must never hand back spent question turns.
+    counselTurnsRemaining: Math.min(
+      current.counselTurnsRemaining,
+      next.counselTurnsRemaining,
+    ),
     insuranceDocuments: [...byId.values()],
   };
 }
@@ -120,6 +126,7 @@ export function InsuranceDataProvider({
               ...current,
               portfolioSessionToken: session.portfolioSessionToken,
               portfolioSessionExpiresAt: session.expiresAt,
+              counselTurnsRemaining: session.counselTurnsRemaining,
             }
           : current,
       );

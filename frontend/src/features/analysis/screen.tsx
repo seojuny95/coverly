@@ -74,6 +74,7 @@ export function InsuranceAnalysisPage({
         ? {
             portfolioSessionToken: analysis.portfolioSessionToken,
             expiresAt: analysis.portfolioSessionExpiresAt,
+            counselTurnsRemaining: analysis.counselTurnsRemaining,
           }
         : undefined,
     [analysis],
@@ -237,6 +238,7 @@ export function InsuranceAnalysisPage({
         <InsuranceChatbot
           portfolioSessionToken={analysis.portfolioSessionToken}
           sessionExpired={sessionExpired}
+          turnsRemaining={analysis.counselTurnsRemaining}
           mode={activeTab === "chat" ? "full" : "floating"}
           onExpand={() => setActiveTab("chat")}
         />

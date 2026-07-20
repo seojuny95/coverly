@@ -188,6 +188,8 @@ export function useUploadOrchestration({
         ? {
             portfolioSessionToken: currentAnalysis.portfolioSessionToken,
             expiresAt: currentAnalysis.portfolioSessionExpiresAt,
+            // Adding a policy must not hand back question turns already spent.
+            counselTurnsRemaining: currentAnalysis.counselTurnsRemaining,
           }
         : await sessionMutation.mutateAsync();
       portfolioSessionToken = portfolioSession.portfolioSessionToken;
@@ -318,6 +320,7 @@ export function useUploadOrchestration({
         generatedAt: new Date().toISOString(),
         portfolioSessionToken: portfolioSession.portfolioSessionToken,
         portfolioSessionExpiresAt: portfolioSession.expiresAt,
+        counselTurnsRemaining: portfolioSession.counselTurnsRemaining,
         insuranceDocuments,
       };
       shouldKeepProgress = await continueWithNameValidation(

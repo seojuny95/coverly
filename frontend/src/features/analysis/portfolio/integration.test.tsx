@@ -17,6 +17,7 @@ function fixture(): InsuranceAnalysis {
     generatedAt: "2026-07-11T00:00:00.000Z",
     portfolioSessionToken: "test-portfolio-token",
     portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+    counselTurnsRemaining: 10,
     insuranceDocuments: [
       {
         id: "health-1",
@@ -234,6 +235,7 @@ describe("portfolio features", () => {
             in_scope: true,
             rewritten_question: "암 진단비는?",
             excluded_note: null,
+            turns_remaining: 9,
           },
           { type: "delta", text: "암 진단비는 1,000만원이에요." },
           { type: "end" },

@@ -35,6 +35,7 @@ describe("BrandNavigation", () => {
         generatedAt: "2026-07-19T00:00:00.000Z",
         portfolioSessionToken: "test-token",
         portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+        counselTurnsRemaining: 10,
         insuranceDocuments: [
           {
             id: "policy-1",

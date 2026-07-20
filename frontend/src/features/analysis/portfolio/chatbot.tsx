@@ -10,11 +10,13 @@ import { useInsuranceChat } from "./use-chat";
 export function InsuranceChatbot({
   portfolioSessionToken,
   sessionExpired = false,
+  turnsRemaining: initialTurnsRemaining,
   mode = "floating",
   onExpand,
 }: {
   portfolioSessionToken: string;
   sessionExpired?: boolean;
+  turnsRemaining: number;
   mode?: "floating" | "full";
   onExpand?: () => void;
 }) {
@@ -30,6 +32,7 @@ export function InsuranceChatbot({
     suggestions,
     streaming,
     inputRef,
+    turnsRemaining,
     endRef,
     submit,
     sendQuestion,
@@ -37,6 +40,7 @@ export function InsuranceChatbot({
     portfolioSessionToken,
     sessionExpired,
     isChatVisible,
+    initialTurnsRemaining,
   });
 
   // autoFocus: false — this dialog already focuses the question input itself
@@ -114,13 +118,27 @@ export function InsuranceChatbot({
             분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.
           </div>
         ) : null}
+        {!sessionExpired && turnsRemaining <= 0 ? (
+          <div
+            role="status"
+            className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 mb-3 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950 motion-safe:duration-300"
+          >
+            <span aria-hidden className="mt-0.5 text-base">
+              💬
+            </span>
+            <span>
+              이 분석에서 할 수 있는 질문을 모두 사용했어요. 보험증권을 다시
+              올려 새로 분석하면 이어서 물어볼 수 있어요.
+            </span>
+          </div>
+        ) : null}
         {suggestions.length ? (
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
             {suggestions.map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
-                disabled={streaming || sessionExpired}
+                disabled={streaming || sessionExpired || turnsRemaining <= 0}
                 onClick={() => void sendQuestion(suggestion)}
                 className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
               >
@@ -130,25 +148,48 @@ export function InsuranceChatbot({
           </div>
         ) : null}
         <form onSubmit={submit}>
-          <label htmlFor="insurance-question" className="sr-only">
-            보험 질문
-          </label>
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <label htmlFor="insurance-question" className="sr-only">
+              보험 질문
+            </label>
+            <p
+              aria-live="polite"
+              className={`ml-auto text-xs tabular-nums transition-colors ${
+                turnsRemaining <= 0
+                  ? "text-zinc-400"
+                  : turnsRemaining <= 3
+                    ? "font-medium text-amber-700"
+                    : "text-zinc-500"
+              }`}
+            >
+              질문 {turnsRemaining}번 남음
+            </p>
+          </div>
           <div className="flex gap-2">
             <Input
               ref={inputRef}
               id="insurance-question"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              disabled={sessionExpired}
+              disabled={sessionExpired || turnsRemaining <= 0}
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="예: 겹치는 보장이 있나요?"
+              placeholder={
+                turnsRemaining <= 0
+                  ? "질문 횟수를 모두 사용했어요"
+                  : "예: 겹치는 보장이 있나요?"
+              }
               className="h-auto min-w-0 flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-blue-600 focus-visible:ring-0 disabled:bg-zinc-100 disabled:text-zinc-500"
             />
             <Button
               type="submit"
-              disabled={!question.trim() || streaming || sessionExpired}
+              disabled={
+                !question.trim() ||
+                streaming ||
+                sessionExpired ||
+                turnsRemaining <= 0
+              }
             >
               질문하기
             </Button>

@@ -14,10 +14,12 @@ export function useInsuranceChat({
   portfolioSessionToken,
   sessionExpired,
   isChatVisible,
+  initialTurnsRemaining,
 }: {
   portfolioSessionToken: string;
   sessionExpired: boolean;
   isChatVisible: boolean;
+  initialTurnsRemaining: number;
 }) {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessageData[]>([
@@ -29,6 +31,7 @@ export function useInsuranceChat({
   ]);
   const [suggestions, setSuggestions] = useState(INITIAL_SUGGESTIONS);
   const [streaming, setStreaming] = useState(false);
+  const [turnsRemaining, setTurnsRemaining] = useState(initialTurnsRemaining);
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const nextMessageId = useRef(1);
@@ -59,7 +62,7 @@ export function useInsuranceChat({
 
   async function sendQuestion(rawQuestion: string) {
     const text = rawQuestion.trim();
-    if (!text || streaming || sessionExpired) return;
+    if (!text || streaming || sessionExpired || turnsRemaining <= 0) return;
     const userId = nextMessageId.current;
     const assistantId = userId + 1;
     nextMessageId.current += 2;
@@ -85,14 +88,20 @@ export function useInsuranceChat({
               text: message.text + delta,
             }));
           },
+          onMeta: (meta) => setTurnsRemaining(meta.turns_remaining),
           onEnd: () => setSuggestions(INITIAL_SUGGESTIONS),
         },
         portfolioSessionToken,
       );
-    } catch {
+    } catch (error) {
+      // Another tab may have spent the last turn, so trust the server over local state.
+      const outOfTurns = isTurnLimitError(error);
+      if (outOfTurns) setTurnsRemaining(0);
       updateMessage(assistantId, (message) => ({
         ...message,
-        text: "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
+        text: outOfTurns
+          ? "이 분석에서 할 수 있는 질문을 모두 사용했어요."
+          : "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
       }));
       setSuggestions(INITIAL_SUGGESTIONS);
     } finally {
@@ -106,9 +115,19 @@ export function useInsuranceChat({
     messages,
     suggestions,
     streaming,
+    turnsRemaining,
     inputRef,
     endRef,
     submit,
     sendQuestion,
   };
+}
+
+function isTurnLimitError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "COUNSEL_TURN_LIMIT_REACHED"
+  );
 }

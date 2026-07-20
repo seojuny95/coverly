@@ -198,6 +198,7 @@ export interface components {
       | "reference_data_unavailable"
       | "INVALID_PORTFOLIO_SESSION"
       | "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED"
+      | "COUNSEL_TURN_LIMIT_REACHED"
       | "POLICY_UPLOAD_CANCELLED"
       | "portfolio_session_unavailable"
       | "INVALID_POLICY_SELECTION"
@@ -310,6 +311,8 @@ export interface components {
       rewritten_question: string;
       /** Excluded Note */
       excluded_note: string | null;
+      /** Turns Remaining */
+      turns_remaining: number;
     };
     /** CounselRequest */
     CounselRequest: {
@@ -654,6 +657,8 @@ export interface components {
       portfolioSessionToken: string;
       /** Expiresat */
       expiresAt: string;
+      /** Counselturnsremaining */
+      counselTurnsRemaining: number;
     };
     /** PortfolioSummaryRequest */
     PortfolioSummaryRequest: {

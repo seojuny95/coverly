@@ -11,7 +11,10 @@ type StreamHandlers = Parameters<typeof api.streamPortfolioQuestion>[2];
 async function openChat() {
   const user = userEvent.setup();
   renderWithProviders(
-    <InsuranceChatbot portfolioSessionToken="portfolio-token" />,
+    <InsuranceChatbot
+      portfolioSessionToken="portfolio-token"
+      turnsRemaining={10}
+    />,
   );
   await user.click(
     screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
@@ -24,7 +27,11 @@ describe("InsuranceChatbot", () => {
 
   it("keeps the full-tab conversation inside a scrollable panel", () => {
     renderWithProviders(
-      <InsuranceChatbot portfolioSessionToken="portfolio-token" mode="full" />,
+      <InsuranceChatbot
+        portfolioSessionToken="portfolio-token"
+        turnsRemaining={10}
+        mode="full"
+      />,
     );
 
     expect(
@@ -110,6 +117,7 @@ describe("InsuranceChatbot", () => {
     renderWithProviders(
       <InsuranceChatbot
         portfolioSessionToken="portfolio-token"
+        turnsRemaining={10}
         onExpand={onExpand}
       />,
     );
@@ -122,5 +130,36 @@ describe("InsuranceChatbot", () => {
     );
 
     expect(onExpand).toHaveBeenCalledOnce();
+  });
+});
+
+describe("InsuranceChatbot question limit", () => {
+  it("locks the composer and explains why once no turns are left", () => {
+    renderWithProviders(
+      <InsuranceChatbot
+        portfolioSessionToken="portfolio-token"
+        turnsRemaining={0}
+        mode="full"
+      />,
+    );
+
+    expect(screen.getByLabelText("보험 질문")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "질문하기" })).toBeDisabled();
+    expect(
+      screen.getByText(/할 수 있는 질문을 모두 사용했어요/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows how many questions are left while turns remain", () => {
+    renderWithProviders(
+      <InsuranceChatbot
+        portfolioSessionToken="portfolio-token"
+        turnsRemaining={3}
+        mode="full"
+      />,
+    );
+
+    expect(screen.getByText("질문 3번 남음")).toBeInTheDocument();
+    expect(screen.getByLabelText("보험 질문")).not.toBeDisabled();
   });
 });

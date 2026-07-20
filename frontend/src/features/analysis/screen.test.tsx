@@ -62,6 +62,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       selectedName: "테스트고객",
       insuranceDocuments: [
         {
@@ -132,6 +133,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       insuranceDocuments: [
         {
           id: "insurance-1",
@@ -188,6 +190,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       selectedName: "테스트고객A",
       insuranceDocuments: [
         {
@@ -262,6 +265,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       selectedName: "테스트고객",
       insuranceDocuments: [
         {
@@ -332,6 +336,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       selectedName: "테스트고객A",
       insuranceDocuments: [
         {
@@ -407,6 +412,7 @@ describe("InsuranceAnalysisPage", () => {
           JSON.stringify({
             portfolioSessionToken: "new-session-token",
             portfolioSessionExpiresAt: "invalid",
+            counselTurnsRemaining: 10,
             expiresAt: "2026-07-14T00:15:00+00:00",
           }),
         );
@@ -426,6 +432,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "old-session-token",
       portfolioSessionExpiresAt: "invalid",
+      counselTurnsRemaining: 10,
       insuranceDocuments: [
         {
           id: "insurance-1",
@@ -485,6 +492,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "expired-session-token",
       portfolioSessionExpiresAt: "invalid",
+      counselTurnsRemaining: 10,
       insuranceDocuments: [
         {
           id: "insurance-1",
@@ -543,6 +551,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       selectedName: "테스트고객",
       insuranceDocuments: [
         {
@@ -625,6 +634,7 @@ describe("InsuranceAnalysisPage", () => {
       generatedAt: "2026-07-09T07:30:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       selectedName: "테스트고객",
       insuranceDocuments: [
         {

@@ -13,6 +13,7 @@ function makeAnalysis(id: string): InsuranceAnalysis {
     generatedAt: "2026-07-12T00:00:00.000Z",
     portfolioSessionToken: "test-portfolio-token",
     portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+    counselTurnsRemaining: 10,
     insuranceDocuments: [
       { id, fileName: `${id}.pdf`, result: POLICY_RESULT_DEFAULTS },
     ],
@@ -46,6 +47,7 @@ describe("InsuranceDataProvider", () => {
       generatedAt: "2026-07-12T00:00:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       insuranceDocuments: [
         {
           id: "a",
@@ -67,6 +69,7 @@ describe("InsuranceDataProvider", () => {
       generatedAt: "2026-07-12T01:00:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       insuranceDocuments: [
         {
           id: "b",
@@ -95,6 +98,7 @@ describe("InsuranceDataProvider", () => {
       generatedAt: "2026-07-12T00:00:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       insuranceDocuments: [
         {
           id: "a",
@@ -116,6 +120,7 @@ describe("InsuranceDataProvider", () => {
       generatedAt: "2026-07-12T01:00:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       insuranceDocuments: [
         {
           id: "b",
@@ -145,6 +150,7 @@ describe("InsuranceDataProvider", () => {
       generatedAt: "2026-07-12T01:00:00.000Z",
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
       insuranceDocuments: [
         {
           id: "a",
@@ -179,6 +185,7 @@ describe("InsuranceDataProvider", () => {
         generatedAt: "2026-07-12T00:00:00.000Z",
         portfolioSessionToken: "old-token",
         portfolioSessionExpiresAt: "invalid",
+        counselTurnsRemaining: 10,
         insuranceDocuments: [],
       }),
     );
@@ -187,6 +194,7 @@ describe("InsuranceDataProvider", () => {
       result.current.replacePortfolioSession({
         portfolioSessionToken: "new-token",
         expiresAt: "2030-01-01T00:15:00.000Z",
+        counselTurnsRemaining: 10,
       }),
     );
 

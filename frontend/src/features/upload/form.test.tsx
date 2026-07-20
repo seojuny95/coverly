@@ -55,6 +55,7 @@ const secondInsuranceFile = new File(
 const createSession = vi.fn(async () => ({
   portfolioSessionToken: "test-portfolio-token",
   expiresAt: "2030-01-01T00:00:00.000Z",
+  counselTurnsRemaining: 10,
 }));
 
 function renderForm({

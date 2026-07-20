@@ -29,6 +29,7 @@ describe("usePortfolioSessionRefresh", () => {
     vi.mocked(refreshPortfolioSession).mockResolvedValue({
       portfolioSessionToken: "next-portfolio-token",
       expiresAt: "2026-07-14T00:15:00+00:00",
+      counselTurnsRemaining: 10,
     });
     const onRefreshed = vi.fn();
 
@@ -37,6 +38,7 @@ describe("usePortfolioSessionRefresh", () => {
         session: {
           portfolioSessionToken: "current-portfolio-token",
           expiresAt: "invalid",
+          counselTurnsRemaining: 10,
         },
         enabled: true,
         onRefreshed,
@@ -56,6 +58,7 @@ describe("usePortfolioSessionRefresh", () => {
     expect(onRefreshed).toHaveBeenCalledWith({
       portfolioSessionToken: "next-portfolio-token",
       expiresAt: "2026-07-14T00:15:00+00:00",
+      counselTurnsRemaining: 10,
     });
   });
 
@@ -71,6 +74,7 @@ describe("usePortfolioSessionRefresh", () => {
         session: {
           portfolioSessionToken: "expired-token",
           expiresAt: "invalid",
+          counselTurnsRemaining: 10,
         },
         enabled: true,
         onRefreshed: vi.fn(),
