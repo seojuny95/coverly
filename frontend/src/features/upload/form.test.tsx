@@ -609,6 +609,70 @@ describe("InsuranceUploadForm", () => {
     expect(navigateToAnalysis).toHaveBeenCalledOnce();
   });
 
+  test("keeps the completion beat visible before navigating after choosing a name", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
+      .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "document-a",
+        문자수: 32,
+        기본정보: {
+          보험사: "삼성화재",
+          상품명: "건강보험",
+          계약자: "테스트고객",
+          피보험자: "테스트고객",
+          보험분류: "제3보험",
+          상품태그: ["질병보험"],
+        },
+      })
+      .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "document-b",
+        문자수: 20,
+        기본정보: {
+          보험사: "현대해상화재보험",
+          상품명: "개인용자동차보험",
+          계약자: "테스트고객B",
+          피보험자: "테스트고객B",
+          보험분류: "손해보험",
+          상품태그: [],
+        },
+      });
+    const onAnalysisComplete = vi.fn();
+    const navigateToAnalysis = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      secondInsuranceFile,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText("피보험자가 여러 명 있어요"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /테스트고객B/ }));
+    await user.click(
+      screen.getByRole("button", { name: "선택한 피보험자로 보기" }),
+    );
+
+    expect(
+      await screen.findByText("다 읽었어요. 결과를 보여드릴게요."),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("피보험자가 여러 명 있어요"),
+    ).not.toBeInTheDocument();
+    expect(navigateToAnalysis).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(navigateToAnalysis).toHaveBeenCalledOnce();
+    });
+  });
+
   test("shows backend error details when upload fails", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi
