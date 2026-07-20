@@ -35,10 +35,6 @@ class FactExecution(BaseModel):
     results: list[FactTaskResult]
 
     @property
-    def has_results(self) -> bool:
-        return bool(self.results)
-
-    @property
     def has_unresolved_names(self) -> bool:
         """True when any requested coverage name did not resolve to a real coverage."""
 

@@ -60,3 +60,27 @@ def test_coverage_list_says_so_when_no_coverage_is_confirmed() -> None:
 
     assert answer is not None
     assert answer.strip() != "현재 확인된 담보명은 다음과 같아요."
+
+
+def _indemnity_policies() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "삼성화재", "상품명": "실손의료보험"},
+                "보장목록": [
+                    {"담보명": "실손의료비", "가입금액": "5,000만원", "지급유형": "실손"},
+                ],
+            }
+        ),
+    ]
+
+
+def test_claim_channel_answer_includes_the_medical_indemnity_service() -> None:
+    plan = _plan(CounselTask(kind="claim_channel", coverage_names=["실손의료비"]))
+
+    answer = compose_fact_answer(execute_fact_tasks(plan, _indemnity_policies()))
+
+    assert answer is not None
+    assert "실손24" in answer
+    assert "silson24" in answer

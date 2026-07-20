@@ -7,6 +7,7 @@ from app.modules.counsel.facts.coverages import (
     UnmatchedCoverageName,
 )
 from app.modules.counsel.facts.policies import PolicyFact
+from app.modules.reference_data.contracts import ClaimChannelMedicalIndemnity
 
 
 def compose_fact_answer(execution: FactExecution) -> str | None:
@@ -126,8 +127,25 @@ def _claim_channel_answer(result: FactTaskResult) -> str:
         lines.append("확인된 보험사 청구 채널이에요.")
         for insurer in channels.channels.insurers:
             lines.append(f"- {insurer.name}: {insurer.customer_center or '고객센터 미확인'}")
+    lines.extend(_medical_indemnity_lines(channels.channels.medical_indemnity))
     lines.extend(_unmatched_lines(channels.unmatched))
     return "\n".join(lines) if lines else "청구 채널을 확인할 담보를 현재 자료에서 찾지 못했어요."
+
+
+def _medical_indemnity_lines(service: ClaimChannelMedicalIndemnity | None) -> list[str]:
+    """Render the verified 실손 claim service, the same one the analysis screen shows."""
+
+    if service is None:
+        return []
+
+    lines = [f"실손의료비는 {service.name}로도 청구할 수 있어요."]
+    if service.description:
+        lines.append(f"- {service.description}")
+    if service.call_center:
+        lines.append(f"- 고객센터: {service.call_center}")
+    for link in service.links:
+        lines.append(f"- {link.label}: {link.url}")
+    return lines
 
 
 def _portfolio_review_answer(result: FactTaskResult) -> str:

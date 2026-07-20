@@ -508,3 +508,44 @@ def test_get_claim_channels_without_names_covers_the_whole_portfolio() -> None:
     insurers = {insurer.name for insurer in result.channels.insurers}
     assert insurers == {"현대해상", "삼성화재"}
     assert result.unmatched == []
+
+
+def _indemnity_policies() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p10",
+                "기본정보": {"보험사": "삼성화재", "상품명": "실손의료보험"},
+                "보장목록": [
+                    {"담보명": "실손의료비", "가입금액": "5,000만원", "지급유형": "실손"},
+                ],
+            }
+        ),
+    ]
+
+
+def test_get_claim_channels_surfaces_the_medical_indemnity_service_for_실손_coverage() -> None:
+    # 실손의료비 is claimed through 실손24, the same verified resource the analysis
+    # screen already shows. Counsel should not have to hardcode or omit it.
+    context = CounselContext(policies=_indemnity_policies())
+
+    result = _invoke_get_claim_channels(context, ["실손의료비"])
+
+    assert result.channels.medical_indemnity is not None
+    assert result.channels.medical_indemnity.name == "실손24"
+
+
+def test_get_claim_channels_omits_the_medical_indemnity_service_for_other_coverage() -> None:
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_get_claim_channels(context, ["암진단비"])
+
+    assert result.channels.medical_indemnity is None
+
+
+def test_get_claim_channels_without_names_includes_it_when_the_portfolio_has_실손() -> None:
+    context = CounselContext(policies=_indemnity_policies())
+
+    result = _invoke_get_claim_channels(context, [])
+
+    assert result.channels.medical_indemnity is not None
