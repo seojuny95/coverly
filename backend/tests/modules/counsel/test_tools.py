@@ -495,3 +495,16 @@ def test_get_claim_channels_returns_empty_when_no_coverage_matches() -> None:
 
     assert result.channels.insurers == []
     assert len(result.unmatched) == 1
+
+
+def test_get_claim_channels_without_names_covers_the_whole_portfolio() -> None:
+    # "실손의료비는 어디로 청구해?" reaches here with no coverage name when the
+    # planner does not fill one in. Every insurer on file is the right answer,
+    # not "we could not find a coverage to look up".
+    context = CounselContext(policies=_policies_with_indemnity_and_overlap())
+
+    result = _invoke_get_claim_channels(context, [])
+
+    insurers = {insurer.name for insurer in result.channels.insurers}
+    assert insurers == {"현대해상", "삼성화재"}
+    assert result.unmatched == []
