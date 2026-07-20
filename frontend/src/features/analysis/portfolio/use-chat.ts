@@ -4,10 +4,12 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import type { ChatMessageData } from "./chat-message";
 import { streamPortfolioQuestion, type ChatHistoryItem } from "./api";
 
+// Kept in step with the suggestion_* cases in backend/evals/counsel/dataset.json:
+// a question the product offers first has to be one it can actually answer.
 const INITIAL_SUGGESTIONS = [
-  "내 보험에서 확인된 강점은 뭐예요?",
   "겹치는 보장이 있는지 봐줄래요?",
-  "확인 가능한 보장금 합계는 얼마예요?",
+  "암 진단 시 얼마 받을 수 있어요?",
+  "실손의료비는 어디로 청구해요?",
 ];
 
 export function useInsuranceChat({

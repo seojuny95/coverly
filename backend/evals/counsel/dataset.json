@@ -586,6 +586,51 @@
           "expected_in_scope": true
         }
       ]
+    },
+    {
+      "id": "suggestion_overlap",
+      "intent": "상담 시작 화면의 추천 질문",
+      "turns": [
+        {
+          "question": "겹치는 보장이 있는지 봐줄래요?",
+          "expected_in_scope": true,
+          "must_include_any": [
+            "실손",
+            "겹",
+            "중복"
+          ]
+        }
+      ],
+      "notes": "화면이 처음에 권하는 질문. 우리가 먼저 권한 질문이 거절되거나 빈손으로 끝나면 안 되므로, use-chat.ts의 문구를 그대로 박제한다."
+    },
+    {
+      "id": "suggestion_claim_where",
+      "intent": "상담 시작 화면의 추천 질문",
+      "turns": [
+        {
+          "question": "실손의료비는 어디로 청구해요?",
+          "expected_in_scope": true,
+          "must_include_any": [
+            "실손24",
+            "청구"
+          ]
+        }
+      ],
+      "notes": "화면이 처음에 권하는 질문. 우리가 먼저 권한 질문이 거절되거나 빈손으로 끝나면 안 되므로, use-chat.ts의 문구를 그대로 박제한다."
+    },
+    {
+      "id": "suggestion_cancer",
+      "intent": "상담 시작 화면의 추천 질문",
+      "turns": [
+        {
+          "question": "암 진단 시 얼마 받을 수 있어요?",
+          "expected_in_scope": true,
+          "must_include_any": [
+            "만원"
+          ]
+        }
+      ],
+      "notes": "화면이 처음에 권하는 질문. 우리가 먼저 권한 질문이 거절되거나 빈손으로 끝나면 안 되므로, use-chat.ts의 문구를 그대로 박제한다."
     }
   ]
 }
