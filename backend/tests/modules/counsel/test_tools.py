@@ -99,6 +99,49 @@ def _policies() -> list[PolicyInput]:
     ]
 
 
+def _driver_policies() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p9",
+                "기본정보": {"보험사": "DB손해보험", "상품명": "참좋은운전자보험"},
+                "보장목록": [
+                    {
+                        "담보명": "자동차사고변호사선임비용",
+                        "가입금액": "3,000만원",
+                        "가입금액숫자": 30_000_000,
+                        "지급유형": "실손",
+                    },
+                    {
+                        "담보명": "교통사고처리지원금",
+                        "가입금액": "1억원",
+                        "지급유형": "실손",
+                    },
+                ],
+            }
+        ),
+    ]
+
+
+def _symbol_named_policies() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p8",
+                "기본정보": {"보험사": "미확인보험사", "상품명": "미확인상품"},
+                "보장목록": [
+                    {
+                        "담보명": "---",
+                        "가입금액": "1,000만원",
+                        "가입금액숫자": 10_000_000,
+                        "지급유형": "정액",
+                    },
+                ],
+            }
+        ),
+    ]
+
+
 def test_returns_basic_info_for_every_policy_with_an_explicit_count() -> None:
     policies = [
         PolicyInput.model_validate(
@@ -282,9 +325,46 @@ def test_find_coverages_does_not_confuse_substring_names() -> None:
     assert result.matches == []
     assert len(result.unmatched) == 1
     assert result.unmatched[0].requested_name == "암진단비"
-    # Prefix candidates surface "암진단비(유사암제외)" (starts with 암진단비) but never
-    # "유사암진단비" (starts with 유사, not 암진단비) — no substring confusion.
-    assert result.unmatched[0].candidates == ["암진단비(유사암제외)"]
+    # Both are offered as candidates to ask back with — the user did say 암진단비, and
+    # both coverages contain it. Candidates are never auto-selected, so widening them
+    # cannot misattribute an amount; only `matches` above carries that risk.
+    assert result.unmatched[0].candidates == ["암진단비(유사암제외)", "유사암진단비"]
+
+
+def test_find_coverages_absorbs_spacing_and_notation_differences() -> None:
+    # Users type spacing and full-width variants of the same coverage. Notation
+    # differences are absorbed, but the meaningful "(유사암제외)" qualifier is kept.
+    context = CounselContext(policies=_policies())
+
+    result = _invoke_find_coverages(context, ["암 진단비（유사암 제외）"])
+
+    assert len(result.matches) == 1
+    assert result.matches[0].담보명 == "암진단비(유사암제외)"
+    assert result.unmatched == []
+
+
+def test_find_coverages_suggests_candidates_containing_every_requested_word() -> None:
+    # "변호사 비용" is not a prefix of the held "자동차사고변호사선임비용", so prefix-only
+    # candidates found nothing. Coverages containing every requested word must surface.
+    context = CounselContext(policies=_driver_policies())
+
+    result = _invoke_find_coverages(context, ["변호사 비용"])
+
+    assert result.matches == []
+    assert result.unmatched[0].candidates == ["자동차사고변호사선임비용"]
+
+
+def test_find_coverages_never_matches_names_with_no_canonical_identity() -> None:
+    # Canonicalization strips punctuation, so a symbol-only request and a symbol-only
+    # coverage name both reduce to an empty key. An empty key is not an identity and
+    # must never match, or an unrelated amount would be attributed to the request.
+    context = CounselContext(policies=_symbol_named_policies())
+
+    result = _invoke_find_coverages(context, ["???"])
+
+    assert result.matches == []
+    assert result.unmatched[0].requested_name == "???"
+    assert result.unmatched[0].candidates == []
 
 
 def test_find_coverages_reports_unmatched_names_without_guessing() -> None:

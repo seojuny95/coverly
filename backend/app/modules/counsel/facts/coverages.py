@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.modules.coverage.contracts import CoverageType
+from app.modules.coverage.matching import canonicalize_coverage_name
 from app.modules.portfolio.schemas import PolicyInput
 
 CoverageExplanationBasis = Literal["policy_wording", "generated_guidance", "none"]
@@ -103,7 +104,7 @@ def find_coverage_facts(
     policies: list[PolicyInput],
     coverage_names: list[str],
 ) -> FindCoveragesResult:
-    """Exact-match coverage names across policies; report candidates, never guess."""
+    """Match coverage names by canonical identity; report candidates, never guess."""
 
     matches, unmatched = match_coverage_names(policies, coverage_names)
     return FindCoveragesResult(matches=matches, unmatched=unmatched)
@@ -170,16 +171,19 @@ def match_coverage_names(
     policies: list[PolicyInput],
     coverage_names: list[str],
 ) -> tuple[list[CoverageMatch], list[UnmatchedCoverageName]]:
-    """Exact-match coverage_names across policies; report candidates, never guess."""
+    """Match coverage_names by canonical identity; report candidates, never guess."""
 
     all_names = _all_coverage_names(policies)
-    requested = {name.strip() for name in coverage_names}
+    requested = {name.strip() for name in coverage_names if name.strip()}
+    key_by_request = {name: _canonical_key(name) for name in requested}
+    requested_keys = {key for key in key_by_request.values() if key}
     matches: list[CoverageMatch] = []
-    found_names: set[str] = set()
+    found_keys: set[str] = set()
 
     for policy in policies:
         for coverage in policy.보장목록:
-            if coverage.담보명 not in requested:
+            coverage_key = _canonical_key(coverage.담보명)
+            if coverage_key not in requested_keys:
                 continue
             matches.append(
                 CoverageMatch(
@@ -197,16 +201,47 @@ def match_coverage_names(
                     설명근거=_explanation_basis(coverage.보장내용, coverage.해설),
                 )
             )
-            found_names.add(coverage.담보명)
+            found_keys.add(coverage_key)
 
     unmatched = [
         UnmatchedCoverageName(
             requested_name=name,
-            candidates=sorted(c for c in all_names if c.startswith(name)),
+            candidates=_candidate_names(name, all_names),
         )
-        for name in sorted(requested - found_names)
+        for name in sorted(requested)
+        if key_by_request[name] not in found_keys
     ]
     return matches, unmatched
+
+
+def _canonical_key(name: str) -> str:
+    """Reduce a coverage name to its shared canonical identity.
+
+    Absorbs spacing, full-width, and notation differences while keeping
+    meaningful distinctions such as (유사암제외) intact.
+    """
+
+    return canonicalize_coverage_name(name).normalized_key
+
+
+def _candidate_names(requested_name: str, all_names: set[str]) -> list[str]:
+    """Suggest coverages containing every requested word, so the caller can ask back.
+
+    These are suggestions only — a candidate is never matched automatically,
+    so a wide net here cannot misattribute an amount to the wrong coverage.
+    """
+
+    words = [_canonical_key(word) for word in requested_name.split()]
+    requested_words = [word for word in words if word]
+    if not requested_words:
+        return []
+
+    candidates = []
+    for name in all_names:
+        name_key = _canonical_key(name)
+        if all(word in name_key for word in requested_words):
+            candidates.append(name)
+    return sorted(candidates)
 
 
 def _all_coverage_names(policies: list[PolicyInput]) -> set[str]:

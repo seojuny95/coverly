@@ -39,9 +39,9 @@ def find_coverages(
     Args:
         coverage_names: 조회할 정확한 담보명 목록입니다. 정확한 철자가
             확실하지 않으면(예: "(유사암제외)" 같은 접미사) 먼저
-            list_coverage_names를 호출하세요. 정확히 일치하지 않는 이름은
-            임의로 추측하거나 합쳐지지 않고, 같은 접두어를 가진 후보
-            이름으로 보고됩니다.
+            list_coverage_names를 호출하세요. 띄어쓰기나 표기 차이는 자동으로
+            흡수되지만, 일치하지 않는 이름은 임의로 추측하거나 합쳐지지 않고
+            요청한 낱말을 모두 포함한 후보 이름으로 보고됩니다.
     """
 
     return coverage_facts.find_coverage_facts(wrapper.context.policies, coverage_names)
