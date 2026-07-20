@@ -1,10 +1,11 @@
-from types import SimpleNamespace
+import json
+from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.modules.counsel.router import get_agent_runner, get_check_completer
+from app.modules.counsel.router import get_agent_stream_runner, get_check_completer
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.models import PortfolioSessionSnapshot
@@ -43,18 +44,29 @@ def _out_of_scope_completer() -> object:
     }
 
 
-def _fake_agent_runner(answer: str) -> Any:
-    async def run(_agent: object, _input_text: str, _context: object) -> object:
-        return SimpleNamespace(final_output=answer)
+def _fake_agent_stream_runner(*chunks: str) -> Any:
+    async def run(_agent: object, _input_text: str, _context: object) -> AsyncIterator[str]:
+        for chunk in chunks:
+            yield chunk
 
     return run
 
 
-def test_stream_endpoint_returns_the_agent_answer_when_in_scope() -> None:
+def _parse_sse_events(body: str) -> list[dict[str, object]]:
+    return [
+        json.loads(line.removeprefix("data: "))
+        for line in body.splitlines()
+        if line.startswith("data: ")
+    ]
+
+
+def test_stream_endpoint_streams_meta_then_deltas_then_end_when_in_scope() -> None:
     app = create_app()
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
     app.dependency_overrides[get_check_completer] = lambda: _in_scope_completer("암진단비 알려줘")
-    app.dependency_overrides[get_agent_runner] = lambda: _fake_agent_runner("암진단비가 확인돼요.")
+    app.dependency_overrides[get_agent_stream_runner] = lambda: _fake_agent_stream_runner(
+        "암진단비가 ", "확인돼요."
+    )
     client = TestClient(app)
 
     response = client.post(
@@ -63,15 +75,22 @@ def test_stream_endpoint_returns_the_agent_answer_when_in_scope() -> None:
     )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "answer": "암진단비가 확인돼요.",
-        "in_scope": True,
-        "rewritten_question": "암진단비 알려줘",
-        "excluded_note": None,
-    }
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = _parse_sse_events(response.text)
+    assert events == [
+        {
+            "type": "meta",
+            "in_scope": True,
+            "rewritten_question": "암진단비 알려줘",
+            "excluded_note": None,
+        },
+        {"type": "delta", "text": "암진단비가 "},
+        {"type": "delta", "text": "확인돼요."},
+        {"type": "end"},
+    ]
 
 
-def test_stream_endpoint_refuses_when_out_of_scope() -> None:
+def test_stream_endpoint_streams_a_refusal_when_out_of_scope() -> None:
     app = create_app()
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
     app.dependency_overrides[get_check_completer] = _out_of_scope_completer
@@ -83,9 +102,11 @@ def test_stream_endpoint_refuses_when_out_of_scope() -> None:
     )
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["in_scope"] is False
-    assert "answer" in body
+    events = _parse_sse_events(response.text)
+    assert events[0]["type"] == "meta"
+    assert events[0]["in_scope"] is False
+    assert events[-1] == {"type": "end"}
+    assert any(event["type"] == "delta" for event in events)
 
 
 def test_stream_endpoint_rejects_an_invalid_session() -> None:

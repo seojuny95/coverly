@@ -1,8 +1,8 @@
 """Agent definition and run wiring for grounded insurance counseling."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Callable
 
-from agents import Agent, Runner, RunResult
+from agents import Agent, Runner
 
 from app.modules.counsel.agent.tools.claims import get_claim_channels
 from app.modules.counsel.agent.tools.coverages import (
@@ -46,14 +46,22 @@ def create_agent(model: str) -> Agent[CounselContext]:
     )
 
 
-AgentRunner = Callable[[Agent[CounselContext], str, CounselContext], Awaitable[RunResult]]
+AgentStreamRunner = Callable[[Agent[CounselContext], str, CounselContext], AsyncIterator[str]]
 
 
-async def run_agent(
+async def run_agent_streamed(
     agent: Agent[CounselContext],
     input_text: str,
     context: CounselContext,
-) -> RunResult:
-    """Thin, injectable wrapper around Runner.run so tests can fake it."""
+) -> AsyncIterator[str]:
+    """Thin, injectable wrapper around Runner.run_streamed so tests can fake it.
 
-    return await Runner.run(agent, input=input_text, context=context)
+    Yields the final answer's text as it's generated, token by token.
+    """
+
+    result = Runner.run_streamed(agent, input=input_text, context=context)
+    async for event in result.stream_events():
+        if event.type != "raw_response_event":
+            continue
+        if event.data.type == "response.output_text.delta":
+            yield event.data.delta

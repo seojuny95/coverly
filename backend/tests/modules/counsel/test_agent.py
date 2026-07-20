@@ -1,10 +1,12 @@
 import asyncio
+from collections.abc import AsyncIterator
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 from agents import Runner
 
-from app.modules.counsel.agent.definition import create_agent, run_agent
+from app.modules.counsel.agent.definition import create_agent, run_agent_streamed
 from app.modules.counsel.context import CounselContext
 
 
@@ -35,24 +37,45 @@ def test_create_agent_tells_the_model_not_to_mix_amounts_across_sources() -> Non
     assert "섞어 쓰지 않습니다" in instructions
 
 
-def test_run_agent_forwards_input_and_context_to_runner_run(
+def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
 
-    async def fake_run(agent: object, *, input: str, context: object) -> object:
+    class _FakeStreamingResult:
+        async def stream_events(self) -> AsyncIterator[object]:
+            yield SimpleNamespace(
+                type="raw_response_event",
+                data=SimpleNamespace(type="response.output_text.delta", delta="안녕"),
+            )
+            # Non-text raw events and other event kinds must be skipped, not yielded.
+            yield SimpleNamespace(type="agent_updated_stream_event")
+            yield SimpleNamespace(
+                type="raw_response_event",
+                data=SimpleNamespace(type="response.completed"),
+            )
+            yield SimpleNamespace(
+                type="raw_response_event",
+                data=SimpleNamespace(type="response.output_text.delta", delta="하세요"),
+            )
+
+    def fake_run_streamed(agent: object, *, input: str, context: object) -> object:
         captured["agent"] = agent
         captured["input"] = input
         captured["context"] = context
-        return "fake-result"
+        return _FakeStreamingResult()
 
-    monkeypatch.setattr(Runner, "run", cast(Any, fake_run))
+    monkeypatch.setattr(Runner, "run_streamed", cast(Any, fake_run_streamed))
 
     agent = create_agent("gpt-4.1-mini")
     context = CounselContext(policies=[])
-    result = asyncio.run(run_agent(agent, "암진단비 알려줘", context))
 
-    assert cast(Any, result) == "fake-result"
+    async def collect() -> list[str]:
+        return [chunk async for chunk in run_agent_streamed(agent, "암진단비 알려줘", context)]
+
+    chunks = asyncio.run(collect())
+
+    assert chunks == ["안녕", "하세요"]
     assert captured["agent"] is agent
     assert captured["input"] == "암진단비 알려줘"
     assert captured["context"] is context
