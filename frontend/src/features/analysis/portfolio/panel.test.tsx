@@ -491,12 +491,12 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
       name: "실손24 홈페이지",
     }),
   ).toHaveAttribute("href", "https://www.silson24.or.kr/claim/web/");
-  const insurerChannels = screen
-    .getByText("가입한 보험사별 청구 채널")
-    .closest("details");
-  expect(insurerChannels).not.toHaveAttribute("open");
-  await user.click(screen.getByText("가입한 보험사별 청구 채널"));
-  expect(insurerChannels).toHaveAttribute("open");
+  const insurerChannelsTrigger = screen.getByRole("button", {
+    name: /가입한 보험사별 청구 채널/,
+  });
+  expect(insurerChannelsTrigger).toHaveAttribute("aria-expanded", "false");
+  await user.click(insurerChannelsTrigger);
+  expect(insurerChannelsTrigger).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByText("삼성화재")).toBeInTheDocument();
   expect(screen.getByText("메리츠화재")).toBeInTheDocument();
   expect(screen.getAllByRole("link", { name: "청구 링크" })[0]).toHaveAttribute(

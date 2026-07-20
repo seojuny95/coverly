@@ -1,4 +1,7 @@
+"use client";
+
 import { ExternalLink } from "lucide-react";
+import { useId, useState } from "react";
 
 import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
@@ -135,26 +138,56 @@ function ClaimChannelOptions({
       ) : null}
 
       {claimChannels.insurers?.length ? (
-        <details className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
-            <span>
-              <span className="text-sm font-semibold text-zinc-900">
-                가입한 보험사별 청구 채널
-              </span>
-              <span className="mt-1 block text-xs text-zinc-500">
-                가입한 보험사의 접수 링크와 고객센터만 모았어요.
-              </span>
-            </span>
-            <Badge
-              variant="neutral"
-              className="h-auto px-2.5 py-1 text-[11px] font-medium"
-            >
-              {claimChannels.insurers.length}곳
-            </Badge>
-          </summary>
+        <InsurerChannelList insurers={claimChannels.insurers} />
+      ) : null}
+    </div>
+  );
+}
 
-          <ul className="mt-3 divide-y divide-zinc-100 border-t border-zinc-100 text-xs leading-5 text-zinc-600">
-            {claimChannels.insurers.map((insurer) => (
+function InsurerChannelList({
+  insurers,
+}: {
+  insurers: NonNullable<ClaimChannelBlock["insurers"]>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const panelId = useId();
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full cursor-pointer items-center justify-between gap-3 text-left"
+      >
+        <span>
+          <span className="text-sm font-semibold text-zinc-900">
+            가입한 보험사별 청구 채널
+          </span>
+          <span className="mt-1 block text-xs text-zinc-500">
+            가입한 보험사의 접수 링크와 고객센터만 모았어요.
+          </span>
+        </span>
+        <Badge
+          variant="neutral"
+          className="h-auto px-2.5 py-1 text-[11px] font-medium"
+        >
+          {insurers.length}곳
+        </Badge>
+      </button>
+
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <ul
+            id={panelId}
+            className="mt-3 divide-y divide-zinc-100 border-t border-zinc-100 text-xs leading-5 text-zinc-600"
+          >
+            {insurers.map((insurer) => (
               <li key={insurer.name} className="py-3 first:pt-3 last:pb-0">
                 <div className="px-1">
                   <p className="font-semibold text-zinc-900">{insurer.name}</p>
@@ -174,8 +207,8 @@ function ClaimChannelOptions({
               </li>
             ))}
           </ul>
-        </details>
-      ) : null}
+        </div>
+      </div>
     </div>
   );
 }
