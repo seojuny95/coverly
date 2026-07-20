@@ -6,7 +6,7 @@ FastAPI + uv 백엔드. 전체 프로젝트 가이드: [../AGENTS.md](../AGENTS.
 
 ## 프로젝트 소개
 
-Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 약관 기반 Q&A를 담당하는 백엔드 앱이다. 분류·상담·Q&A 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 증권 파싱·세션 추가(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 Q&A(`POST /qa/stream`)다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
+Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 근거 기반 상담을 담당하는 백엔드 앱이다. 분류·상담·답변 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 증권 파싱·세션 추가(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 상담(`POST /counsel/stream`)이다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
 
 ## Development Commands
 
@@ -30,10 +30,13 @@ app/
 │   ├── policy/              # 증권 파싱·분류·요약·담보 해설
 │   ├── portfolio/           # 다건 증권 집계, 총평 생성, 단일 토큰 세션
 │   │   └── session/         # 세션 토큰, 구조화 증권 저장, 분석 캐시
-│   ├── consultation/        # 상담 응답 공용 계약과 안전 규칙
-│   ├── qa/                  # 근거 기반 Q&A
+│   ├── consultation/        # 상담 응답 공용 계약
+│   ├── counsel/             # 근거 기반 상담 (POST /counsel/stream)
+│   │   ├── planner/         # 범위 판단·질문 재작성·수행할 fact 작업 계획
+│   │   ├── facts/           # 저장된 증권에 대한 순수 조회 (LLM 없음)
+│   │   ├── answer/          # executor → composer → escalation → stream
+│   │   └── agent/           # 설명·해석 담당 agent와 도구
 │   ├── coverage/            # 담보 분류·매칭·설명
-│   ├── evidence/            # 분석/Q&A 공용 근거 카탈로그
 │   └── reference_data/      # 참조 데이터 계약·검증·조회 조정
 ├── rag/                     # 공유 런타임 RAG subsystem
 │   ├── official/            # 공식 약관·제도 RAG
@@ -43,13 +46,14 @@ app/
     └── postgres/            # pgvector / 세션 / 참조 데이터 Postgres 구현
 
 backend/evals/
+├── counsel/                 # 실제 /counsel/stream을 태우는 라이브 러너 + 케이스
 └── rag/
     ├── official/            # official retrieval/generation eval runners + datasets
     └── policy/              # policy retrieval/generation eval runners + datasets
 
 tests/
 ├── core/                    # 앱 조립, 미들웨어, 공용 규칙 테스트
-├── modules/                 # policy, portfolio, qa 등 기능별 테스트
+├── modules/                 # policy, portfolio, counsel 등 기능별 테스트
 ├── rag/                     # official / policy 런타임 RAG 테스트
 ├── evals/                   # 평가 runner와 metric 테스트
 └── integrations/            # Postgres 등 외부 연동 구현 테스트
@@ -57,16 +61,16 @@ tests/
 
 FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별 엔드포인트 묶음에만 쓰고, `Depends`는 실제로 필요한 경우에만 라우터/핸들러에서 국소적으로 사용한다. 서로 다른 기능을 조합하는 업로드 HTTP 흐름은 `modules/upload`가 소유하며, `modules/policy`는 파싱 도메인에 집중한다. 전역 의존성 주입은 기본 패턴이 아니며, 앱 수명 주기 연결은 최상위 `app/lifespan.py`에서 처리한다. `lifespan`은 공용 캐시 워밍, 초기화, 종료 정리에 사용하고 `create_app()`에서 연결한다.
 
-의존 방향은 대체로 `modules -> core/integrations/rag`, `rag -> integrations/core`, `integrations -> 외부 시스템`이다. `portfolio`와 `qa`는 서버 응답을 생성하는 계층이고, `consultation`, `coverage`, `evidence`, `reference_data`는 여러 기능이 공유하는 계약·순수 로직·조회 조정을 담는다. `core`는 비즈니스 모듈을 참조하지 않고, 기능 모듈의 import graph는 순환하지 않아야 한다. OpenAI·Postgres 같은 vendor client는 `integrations` 경계를 거치며, 이 규칙들은 `tests/test_architecture.py`로 강제한다. `app`는 평가 코드를 참조하지 않는다.
+의존 방향은 대체로 `modules -> core/integrations/rag`, `rag -> integrations/core`, `integrations -> 외부 시스템`이다. `portfolio`와 `counsel`은 서버 응답을 생성하는 계층이고, `consultation`, `coverage`, `reference_data`는 여러 기능이 공유하는 계약·순수 로직·조회 조정을 담는다. `core`는 비즈니스 모듈을 참조하지 않고, 기능 모듈의 import graph는 순환하지 않아야 한다. OpenAI·Postgres 같은 vendor client는 `integrations` 경계를 거치며, 이 규칙들은 `tests/test_architecture.py`로 강제한다. `app`는 평가 코드를 참조하지 않는다.
 
-참조 데이터, 임시 포트폴리오 세션, RAG 테이블 경계와 Supabase migration을 포함한 DB 원본 정의는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다. 분석과 Q&A는 프론트엔드가 증권 전체를 다시 보내는 방식보다 세션 토큰과 선택 문서 ID로 서버 저장 사실을 조회하는 방식을 우선한다.
+참조 데이터, 임시 포트폴리오 세션, RAG 테이블 경계와 Supabase migration을 포함한 DB 원본 정의는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다. 분석과 상담은 프론트엔드가 증권 전체를 다시 보내는 방식보다 세션 토큰과 선택 문서 ID로 서버 저장 사실을 조회하는 방식을 우선한다.
 
 전역 원칙(내 편·판매원 아님, grounding)은 [../AGENTS.md](../AGENTS.md)에 있고, 아래는 백엔드에서 그걸 강제하는 규칙이다.
 
 - **특정 보험사·상품 전용 로직 금지.** 코드에 보험사/상품 이름이 등장하면 안 된다. 회사별 차이는 일반 로직 + 참조 데이터만으로 흡수한다.
 - **규칙에 매직넘버 금지.** 분류·판정 규칙은 "용어 존재 여부" 같은 이진 판단만 쓴다. 점수·가중치·임계값이 필요해지는 순간, 그건 규칙이 아니라 LLM fallback으로 보낸다.
-- **판매·권유를 생성하지 않는다.** 분석·상담·Q&A 생성(LLM 포함)은 상품 가입 권유나 금액 상향 압박을 출력하지 않는다. 금액 검토는 "적정하다/부족하다"는 단정 대신 "확인해볼 질문"으로 제시한다. (루트 "내 편, 판매원 아님" 원칙의 강제)
-- **근거 수준을 응답 구조로 드러낸다.** 확정 판단 대신 확인된 사실 / 일반 가이드 / 확인 불가를 구분한다(예: Q&A 섹션의 `basis`, 금액 검토의 `confidence`). 근거 없이 단정하는 필드를 새로 만들지 않는다. (루트 grounding 원칙의 강제)
+- **판매·권유를 생성하지 않는다.** 분석·상담 생성(LLM 포함)은 상품 가입 권유나 금액 상향 압박을 출력하지 않는다. 금액 검토는 "적정하다/부족하다"는 단정 대신 "확인해볼 질문"으로 제시한다. (루트 "내 편, 판매원 아님" 원칙의 강제)
+- **근거 수준을 응답 구조로 드러낸다.** 확정 판단 대신 확인된 사실 / 일반 가이드 / 확인 불가를 구분한다. 담보 설명은 증권 원문인지 생성된 안내인지 `설명근거`로 구분하고, 상담 답변은 사용자가 담보를 직접 지목했을 때만 결정적으로 단정하며 그 외에는 agent가 확인이 필요한 부분을 함께 밝힌다. 근거 없이 단정하는 필드를 새로 만들지 않는다. (루트 grounding 원칙의 강제)
 - **LLM 프롬프트는 별도 기준을 따른다.** 프롬프트 작성, 코드 내 유지/파일 분리 기준, 평가 방식은 [PROMPTING.md](PROMPTING.md)를 먼저 확인한다.
 
 - **평가와 런타임을 분리한다.** `backend/evals`는 품질 측정 전용이고, `tests/`는 correctness를 검증한다. `app`는 `evals`를 import하지 않는다.

@@ -8,7 +8,7 @@ Next.js App Router + TypeScript 프론트엔드. 전체 프로젝트 가이드: 
 
 ## 프로젝트 소개
 
-Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 AI가 정리한 보험 종류별 정리·보장금 합계·상담 전 검토·근거 기반 Q&A를 보여준다. "보험을 팔지 않는 내 편 AI 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
+Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 AI가 정리한 보험 종류별 정리·보장금 합계·상담 전 검토·근거 기반 상담을 보여준다. "보험을 팔지 않는 내 편 AI 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
 
 ## Development Commands
 
@@ -36,7 +36,7 @@ src/
 ├── features/
 │   ├── upload/                  # 업로드 폼, 진행 화면, 업로드 API
 │   └── analysis/                # 분석 화면, 세션, 인메모리 상태, 이탈 경고
-│       └── portfolio/           # 보장 합계, 상담 전 검토, Q&A
+│       └── portfolio/           # 보장 합계, 상담 전 검토, 상담 대화
 ├── shared/
 │   ├── api/                     # OpenAPI 생성 타입, 계약 별칭, 공통 API 처리
 │   ├── components/              # 앱 전역 공용 UI
@@ -46,7 +46,7 @@ src/
 ```
 
 - 화면에 표시하는 증권·분석 데이터와 `portfolioSessionToken`은 `features/analysis/store.tsx`의 인메모리 React Context(`InsuranceDataProvider`)가 관리한다(업로드 → 분석 전달). 브라우저의 localStorage, sessionStorage, IndexedDB에는 저장하지 않으므로 새로고침·화면 이탈 시 사라지며, 그 전에 경고한다.
-- 업로드가 시작되면 프론트엔드는 포트폴리오 세션 토큰 하나를 만들고 이후 업로드·분석·Q&A에 재사용한다. 분석과 Q&A 요청에는 모든 증권을 반복 전송하지 않고 토큰과 필요한 문서 ID만 보낸다. PII를 최소화한 구조화 증권과 분석 캐시는 서버가 Supabase `private` 스키마에 만료 시각까지 임시 저장하며, 토큰 삭제 시 함께 정리한다.
+- 업로드가 시작되면 프론트엔드는 포트폴리오 세션 토큰 하나를 만들고 이후 업로드·분석·상담에 재사용한다. 분석과 상담 요청에는 모든 증권을 반복 전송하지 않고 토큰과 필요한 문서 ID만 보낸다. PII를 최소화한 구조화 증권과 분석 캐시는 서버가 Supabase `private` 스키마에 만료 시각까지 임시 저장하며, 토큰 삭제 시 함께 정리한다.
 - 서버 데이터 패칭은 **react-query**로 통일한다(조회는 `useQuery`, 생성/전송은 `useMutation`). 앱 전역 `QueryClientProvider`는 `app/providers.tsx`에 둔다. 캐시는 인메모리 전용(persister 없음)이라 서비스 탭 전환에는 유지되고 새로고침에는 사라진다.
 - 백엔드 OpenAPI를 API 계약의 단일 정보원으로 삼는다. `scripts/generate-api-types.mjs`가 백엔드 앱의 OpenAPI에서 `shared/api/generated.ts`를 만들며, 생성 파일은 직접 수정하지 않는다. 읽기 쉬운 계약 별칭은 `shared/api/contracts.ts`, base URL과 공통 오류 처리는 `shared/api/client.ts`에 둔다.
 - 백엔드 호출 함수는 사용하는 기능 폴더의 `api.ts` 또는 목적이 드러나는 `*-api.ts`에 모은다. 요청·응답 필드를 수동 타입으로 다시 선언하지 않고 `shared/api`의 생성 계약을 사용한다.

@@ -48,7 +48,7 @@ pnpm api:check && pnpm test && pnpm lint && pnpm typecheck && pnpm format:check 
 - **아키텍처 경계**: frontend/backend, 런타임/eval, domain/integration, UI/API 경계가 섞이지 않았는지 확인한다. 경계를 넘는 shortcut은 후속 비용이 크므로 리뷰에서 막는다.
 - **하드코딩 경계**: 상품명·보험사명·금액·출처·운영 데이터가 코드에 억지로 박히지 않았는지 본다. 변경 가능한 참조 사실은 Supabase/참조 데이터 경계를 따른다.
 - **프레임워크 관용성**: FastAPI, Next.js, React, react-query, Supabase 등 사용 중인 도구가 권장하는 방향과 맞는지 본다. 프레임워크 기능을 우회한 custom infrastructure는 이유가 명확해야 한다.
-- **근거와 안전성**: 보험 판단·LLM 응답·Q&A가 grounding, PII 마스킹, 판매 권유 금지 원칙을 깨지 않는지 확인한다.
+- **근거와 안전성**: 보험 판단·LLM 응답·상담 답변이 grounding, PII 마스킹, 판매 권유 금지 원칙을 깨지 않는지 확인한다.
 - **보안·개인정보**: 보험증권, 주민등록번호, 연락처, 계좌, 병력, 주소, 계약번호 같은 민감정보가 로그·에러·분석 이벤트·브라우저 저장소·테스트 fixture·커밋에 남지 않는지 확인한다. 시크릿은 환경변수/secret store만 사용하고, `NEXT_PUBLIC_*` 노출 여부를 반드시 본다.
 - **테스트 가능성**: 외부 API, LLM, DB에 직접 묶이지 않고 stub/fixture로 결정적 테스트가 가능한지 본다. 회귀 가능성이 있는 변경은 테스트를 요구한다.
 - **운영 관측성**: 실패가 조용한 fallback으로 숨지 않고 오류, 확인 불가 응답, 로그, 테스트 중 하나로 드러나는지 확인한다.

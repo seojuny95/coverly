@@ -67,8 +67,8 @@ Coverly의 LLM 프롬프트는 사용자의 보험 정보를 근거 기반으로
 | 담보 일반 해설 | 파일 후보 | 사용자 설명 톤, 공식자료 근거 제한, 설명 불가 정책을 사람이 읽어야 함 |
 | 상담사형 분석 생성 | 파일 권장 | 제품 포지션, 금지 문구, evidence 사용 규칙이 길고 중요 |
 | 공식자료 RAG 응답 | 파일 권장 | citation discipline, no-evidence 정책, 약관 왜곡 방지 규칙이 중요 |
-| 일반 상담형 QA | 파일 권장 | 대화 이력, confirmed facts, guidance, limitations 역할 분리가 필요 |
-| 일반 상담형 스트리밍 QA | 파일 권장 | non-stream과 품질 계약을 맞추고 `CLARIFY`, citation 후처리 규칙을 명확히 해야 함 |
+| 상담 turn planner | 파일 유지 | 범위 기준과 재작성 규칙이 길고, 라이브에서 드러난 오분류를 사람이 읽고 고쳐야 함. `counsel/planner/instructions.md` |
+| 상담 agent 지시문 | 코드 유지 | 짧고 도구 목록과 강하게 결합 |
 
 ## 파일로 분리할 때의 규칙
 
@@ -82,7 +82,7 @@ Coverly의 LLM 프롬프트는 사용자의 보험 정보를 근거 기반으로
 backend/app/modules/policy/...
 backend/app/modules/portfolio/...
 backend/app/modules/consultation/...
-backend/app/modules/qa/...
+backend/app/modules/counsel/...
 backend/app/rag/official/...
 backend/app/rag/policy/...
 ```
@@ -121,8 +121,8 @@ backend/app/rag/policy/...
 | RAG 답변 | citation 정확도, no-evidence 판정, retrieval hit 적합도, 약관 왜곡 수 |
 | Policy RAG 생성 | 고정 evidence 기반 답변 계약, citation precision, 금지 근거 미사용, PII 마스킹 유지, 판매·지급 단정 방지 |
 | 상담/분석 생성 | evidence 일치율, 판매·공포 문구 발생률, 중복 insight, next action 품질 |
-| Q&A planner | planner 호출률, 지시어 해소 정확도, 복합 질문 분리, 도메인 밖 질문 제한, planner 장애 시 fallback 안정성 |
-| 스트리밍 | non-stream parity, citation 후처리 성공률, `CLARIFY` 처리, fallback 안정성, 질문 추천 형식 |
+| 상담 turn planner | 범위 판단 정확도, 지시어 해소 정확도, 담보명 추출 정확도, 되묻기 선택 적절성 |
+| 상담 답변 경로 | 결정적 즉답과 agent 승격의 분기 정확도, 확정 단정 방지, 케이스별 통과율(반복 실행 기준) |
 
 RAG 평가는 retrieval과 generation을 분리해서 본다.
 Retrieval 평가는 질문에 맞는 근거를 찾아오는지 측정하고, generation 평가는 이미 주어진 고정 근거만으로 답변 계약을 지키는지 측정한다.
@@ -141,7 +141,7 @@ test 결과를 본 뒤 같은 test에 맞춰 수정하지 않으며,
 추가 개선이 필요하면 해당 실패 유형은 다음 practice에 반영하고 새로운 test로 다시 검증한다.
 질문을 읽지 않고 첫 근거만 고르는 baseline도 함께 측정해 평가셋 자체가 지나치게 쉽지 않은지 확인한다.
 
-Policy RAG generation은 공용 상담 생성기가 아니라 `backend/app/rag/policy/generation.py`의 독립 생성기를 사용한다. 평가 러너도 이 생성기를 직접 호출해 검색 품질이나 공용 QA 후처리 변경 없이 policy 답변 계약만 측정한다.
+Policy RAG generation은 공용 상담 생성기가 아니라 `backend/app/rag/policy/generation.py`의 독립 생성기를 사용한다. 평가 러너도 이 생성기를 직접 호출해 검색 품질이나 공용 상담 후처리 변경 없이 policy 답변 계약만 측정한다.
 
 ## 평가 실행
 
@@ -165,11 +165,10 @@ uv run python -m evals.rag.policy.generation --set test
 - 보험사 추출은 특정 보험사 alias, 도메인, 브랜드 전용 데이터로 보정하지 않는다. false positive가 더 위험하므로 LLM fallback과 grounding에 맡긴다.
 - 프롬프트 구조화는 실제 API 비교로 검증한다. 기본정보 보완 추출처럼 구조화가 timeout이나 품질 저하를 만들면 적용하지 않는다.
 - 포트폴리오 총평은 자유 문장 생성이 아니라 Pydantic `Literal` 스키마에 정의된 중립 문장을 선택하는 방식으로 생성한다. LLM 입력에는 보험료 권장 범위·높고 낮음 같은 비교 판단을 전달하지 않고, 선택된 문장은 현재 요약 사실에 맞는지 서버가 다시 검증한다. 보험료·보장·다음 확인 takeaway는 결정적 계산 결과를 사용한다.
-- Q&A는 외부 API 기준으로 `POST /qa/stream` 하나만 유지한다. `stream`은 전송 방식이고, 답변 도메인 모델은 하나로 본다.
-- 단순한 보험 사실 질문은 planner를 거치지 않고 결정적 fast path를 우선한다. planner는 지시어 해소, 복합 질문 분리, 명백한 도메인 밖 질문, 인사처럼 대화 turn을 정리해야 할 때만 호출한다.
-- planner 입력에는 최근 12개 대화만 넣고, 주민등록번호 형태뿐 아니라 전화번호와 이메일도 외부 모델 호출 전에 마스킹한다.
-- planner가 실패해도 명백한 도메인 밖 질문은 보험 상담 답변으로 흘려보내지 않는다. 복합 질문에 외부 도메인이 섞이면 가능한 범위에서 보험 부분과 외부 도메인 부분을 나누고, 외부 도메인 부분은 정중하게 제한한다.
-- 후속 질문 추천은 사용자가 그대로 누를 수 있는 질문 원문만 사용한다. `~해 보세요`, `~확인해 주세요` 같은 행동 제안 문장은 추천 질문에 넣지 않고, 최대 3개만 반환한다.
-- Q&A 응답 속도는 실제 시간 임계값보다 호출 경로로 먼저 관리한다. 단순 가입금액·보유 목록·청구 채널 질문은 planner completer, policy RAG, 상담 LLM을 호출하지 않아야 한다.
-- planner만으로 끝나는 인사·도메인 밖 질문·되묻기 turn은 포트폴리오 facts/catalog 계산을 만들지 않는다.
-- 복합 질문 안의 보험 질문들은 서로 독립된 resolved question으로 답할 수 있을 때 병렬로 처리하고, 사용자에게 보여주는 답변 순서는 원문 질문 순서를 유지한다.
+- 상담은 외부 API 기준으로 `POST /counsel/stream` 하나만 유지한다. `stream`은 전송 방식이고, 답변 도메인 모델은 하나로 본다.
+- 상담 turn은 planner LLM을 정확히 한 번 호출해 범위·재작성·수행할 fact 작업·응답 방식을 함께 정한다. 범위 확인과 재작성을 별도 호출로 쪼개지 않는다.
+- 보험 사실(금액, 개수, 합계, 중복, 청구 채널)은 planner가 계획하고 결정적 코드가 계산한다. LLM이 사실을 만들지 않는다.
+- 결정적 계산 결과를 확정 사실로 바로 답하는 것은 사용자가 담보명을 직접 말했고 모든 이름이 해소됐을 때만 허용한다. 그 외에는 계산 결과를 agent에 넘겨 근거 수준을 드러내며 답하게 한다.
+- planner가 실패해도 명백한 도메인 밖 질문은 보험 상담 답변으로 흘려보내지 않는다. 복합 질문에 외부 도메인이 섞이면 보험 부분만 남기고, 뺀 내용은 사용자에게 알린다.
+- 상담 응답 속도는 실제 시간 임계값보다 호출 경로로 먼저 관리한다. 담보명을 직접 말한 가입금액·보유 목록·청구 채널 질문은 planner 이후 agent와 RAG를 호출하지 않고 끝나야 한다.
+- 범위 밖 질문과 되묻기로 끝나는 turn은 agent를 호출하지 않는다.
