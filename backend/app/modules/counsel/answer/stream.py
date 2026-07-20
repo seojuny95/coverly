@@ -41,7 +41,7 @@ async def build_answer_stream(
     yield serialize_event(
         CounselMetaEvent(
             in_scope=plan.in_scope,
-            rewritten_question=plan.rewritten_question,
+            rewritten_question=plan.question_to_answer,
             excluded_note=plan.excluded_note,
             turns_remaining=turns_remaining,
         )
@@ -83,7 +83,7 @@ async def build_answer_stream(
 
     context = CounselContext(policies=policies, policy_rag_session_ids=policy_rag_session_ids)
     agent_input = build_agent_input(
-        plan.rewritten_question,
+        plan.question_to_answer,
         history=history,
         facts=agent_facts,
         facts_shown=route.shows_facts,

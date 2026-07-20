@@ -30,12 +30,39 @@ class CounselTask(BaseModel):
 
 
 class CounselPlan(BaseModel):
+    question_without_history: str = ""
+    """The turn tidied up on its own, with nothing borrowed from earlier turns."""
+
     rewritten_question: str
+    """The turn with its back-references resolved from the conversation."""
+
+    needs_history: bool = True
+    """Whether this turn can only be understood by looking at earlier turns.
+
+    Defaults to true so a plan that carries only one rewrite -- an older
+    payload, a test fixture -- answers the rewritten question as before.
+    """
+
     in_scope: bool
     excluded_note: str | None = None
     reason: str
     tasks: list[CounselTask] = Field(default_factory=list)
     response_mode: CounselResponseMode = "agent"
+
+    @property
+    def question_to_answer(self) -> str:
+        """The question this turn actually answers.
+
+        Asking for both versions is what keeps a changed topic intact. A single
+        rewrite has to fold the conversation into one sentence, and when it
+        cannot, it substitutes the earlier question instead -- "오늘 날씨 어때?"
+        came back as an answer about 교통사고처리지원금. The history-free version
+        cannot borrow from an old topic because it was written without seeing one.
+        """
+
+        if self.needs_history or not self.question_without_history:
+            return self.rewritten_question
+        return self.question_without_history
 
     @property
     def requested_coverage_names(self) -> list[str]:
