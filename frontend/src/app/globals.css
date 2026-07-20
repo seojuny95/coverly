@@ -397,6 +397,17 @@
   .evidence-result-row {
     background: #f4f7ff;
   }
+
+  /* Both start hidden and are only revealed by their animation, so without
+     one they need the drawn end state the loop peaks at. */
+  .evidence-signal {
+    stroke-dashoffset: -0.08;
+    opacity: 1;
+  }
+
+  .evidence-glow {
+    opacity: 0.85;
+  }
 }
 
 .dark {
