@@ -3,7 +3,10 @@
 from agents import RunContextWrapper, function_tool
 
 from app.modules.counsel.context import CounselContext
-from app.modules.counsel.facts.policies import PolicyListResult, list_policy_facts
+from app.modules.counsel.facts import policies as policy_facts
+from app.modules.counsel.facts.policies import list_policy_facts
+
+PolicyListResult = policy_facts.PolicyListResult
 
 
 @function_tool

@@ -3,7 +3,10 @@
 from agents import RunContextWrapper, function_tool
 
 from app.modules.counsel.context import CounselContext
-from app.modules.counsel.facts.claims import ClaimChannelsResult, get_claim_channel_facts
+from app.modules.counsel.facts import claims as claim_facts
+from app.modules.counsel.facts.claims import get_claim_channel_facts
+
+ClaimChannelsResult = claim_facts.ClaimChannelsResult
 
 
 @function_tool
