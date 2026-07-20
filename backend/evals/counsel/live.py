@@ -215,9 +215,76 @@ def run_case(client: TestClient, recorder: Recorder, case: dict[str, Any]) -> li
     return results
 
 
+@dataclass
+class TurnReport:
+    """One dataset turn across every run, so flakiness is visible."""
+
+    case_id: str
+    turn_index: int
+    question: str
+    runs: list[TurnResult] = field(default_factory=list)
+
+    @property
+    def passes(self) -> int:
+        return sum(1 for run in self.runs if run.passed)
+
+    @property
+    def is_stable_pass(self) -> bool:
+        return self.passes == len(self.runs)
+
+    @property
+    def is_stable_fail(self) -> bool:
+        return self.passes == 0
+
+    def failure_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for run in self.runs:
+            for failure in run.failures:
+                counts[failure] = counts.get(failure, 0) + 1
+        return counts
+
+
+def collect_reports(results: list[TurnResult]) -> list[TurnReport]:
+    reports: dict[tuple[str, int], TurnReport] = {}
+    for result in results:
+        key = (result.case_id, result.turn_index)
+        report = reports.get(key)
+        if report is None:
+            report = TurnReport(
+                case_id=result.case_id,
+                turn_index=result.turn_index,
+                question=result.question,
+            )
+            reports[key] = report
+        report.runs.append(result)
+    return list(reports.values())
+
+
+def print_report(reports: list[TurnReport], runs: int) -> None:
+    stable_pass = [r for r in reports if r.is_stable_pass]
+    stable_fail = [r for r in reports if r.is_stable_fail]
+    flaky = [r for r in reports if not r.is_stable_pass and not r.is_stable_fail]
+
+    print(f"\n턴 {len(reports)}개 × {runs}회")
+    print(f"  안정 통과 {len(stable_pass)}   불안정 {len(flaky)}   항상 실패 {len(stable_fail)}\n")
+
+    for label, group in (("불안정", flaky), ("항상 실패", stable_fail), ("안정 통과", stable_pass)):
+        if not group:
+            continue
+        print(f"--- {label}")
+        for report in sorted(group, key=lambda r: (r.case_id, r.turn_index)):
+            print(
+                f"  [{report.passes}/{runs}] {report.case_id}#{report.turn_index} {report.question}"
+            )
+            for failure, count in sorted(report.failure_counts().items()):
+                print(f"         {failure}  ({count}회)")
+        print()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run live counsel eval cases")
     parser.add_argument("--case", action="append", help="case id (repeatable)")
+    parser.add_argument("--runs", type=int, default=1, help="repeat every case N times")
     parser.add_argument("--json", dest="json_path", help="write full results as JSON")
     args = parser.parse_args()
 
@@ -231,28 +298,23 @@ def main() -> None:
     client = build_client(recorder)
 
     results: list[TurnResult] = []
-    for case in cases:
-        print(f"▶ {case['id']}", flush=True)
-        try:
-            results.extend(run_case(client, recorder, case))
-        except Exception as error:  # noqa: BLE001 - report, don't abort the suite
-            print(f"  ! 실행 실패: {error}", flush=True)
+    for run_index in range(1, args.runs + 1):
+        for case in cases:
+            label = f"▶ {case['id']}" + (f" ({run_index}/{args.runs})" if args.runs > 1 else "")
+            print(label, flush=True)
+            try:
+                results.extend(run_case(client, recorder, case))
+            except Exception as error:  # noqa: BLE001 - report, don't abort the suite
+                print(f"  ! 실행 실패: {error}", flush=True)
 
-    passed = sum(1 for result in results if result.passed)
-    print(f"\n{passed}/{len(results)} turns passed\n")
-    for result in results:
-        mark = "PASS" if result.passed else "FAIL"
-        print(f"[{mark}] {result.case_id}#{result.turn_index} {result.question}")
-        if result.failures:
-            for failure in result.failures:
-                print(f"       - {failure}")
+    print_report(collect_reports(results), args.runs)
 
     if args.json_path:
         payload = [result.__dict__ for result in results]
         Path(args.json_path).write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        print(f"\nJSON: {args.json_path}")
+        print(f"JSON: {args.json_path}")
 
 
 if __name__ == "__main__":
