@@ -24,7 +24,7 @@ from agents import Agent, Runner
 from fastapi.testclient import TestClient
 
 from app.integrations.openai import ConversationMessage
-from app.integrations.openai.client import configure_agent_sdk_credentials, structured_completer
+from app.integrations.openai.client import structured_completer
 from app.main import create_app
 from app.modules.counsel.context import CounselContext
 from app.modules.counsel.planner import CounselPlan
@@ -111,11 +111,6 @@ class Recorder:
 
 
 def build_client(recorder: Recorder) -> TestClient:
-    # The runner drives the app without its lifespan, so hand the agents SDK
-    # its credentials here -- otherwise every agent turn dies on a missing key
-    # while the planner, which reads settings directly, keeps working.
-    configure_agent_sdk_credentials()
-
     app = create_app()
     policies = load_fixture_policies()
     app.dependency_overrides[get_portfolio_session_service] = lambda: FixtureSessions(policies)
@@ -153,7 +148,12 @@ class TurnResult:
         return not self.failures
 
 
-def _check(turn: dict[str, Any], meta: dict[str, Any], answer: str) -> list[str]:
+def _check(
+    turn: dict[str, Any],
+    meta: dict[str, Any],
+    plan: dict[str, Any] | None,
+    answer: str,
+) -> list[str]:
     failures: list[str] = []
 
     expected_scope = turn.get("expected_in_scope")
@@ -172,7 +172,11 @@ def _check(turn: dict[str, Any], meta: dict[str, Any], answer: str) -> list[str]
         if token in answer:
             failures.append(f"must_not_include 위반: {token}")
 
-    rewrite = meta.get("rewritten_question") or ""
+    # Judge the planner's own rewrite, not the meta event. The event carries
+    # whichever version the turn answers, and on a self-contained turn that is
+    # the history-free sentence, which cannot carry an old topic by
+    # construction -- checking it would pass a contaminated rewrite unnoticed.
+    rewrite = str((plan or {}).get("rewritten_question") or "")
     rewrite_any = turn.get("expect_rewrite_contains_any") or []
     if rewrite_any and not any(token in rewrite for token in rewrite_any):
         failures.append(f"재작성에 {rewrite_any} 없음: {rewrite!r}")
@@ -217,7 +221,7 @@ def run_case(client: TestClient, recorder: Recorder, case: dict[str, Any]) -> li
                 answer=answer,
                 plan=recorder.current.plan,
                 tools=list(recorder.current.tools),
-                failures=_check(turn, meta, answer),
+                failures=_check(turn, meta, recorder.current.plan, answer),
             )
         )
 
@@ -307,17 +311,20 @@ def main() -> None:
         cases = [case for case in cases if case["id"] in wanted]
 
     recorder = Recorder()
-    client = build_client(recorder)
 
     results: list[TurnResult] = []
-    for run_index in range(1, args.runs + 1):
-        for case in cases:
-            label = f"▶ {case['id']}" + (f" ({run_index}/{args.runs})" if args.runs > 1 else "")
-            print(label, flush=True)
-            try:
-                results.extend(run_case(client, recorder, case))
-            except Exception as error:  # noqa: BLE001 - report, don't abort the suite
-                print(f"  ! 실행 실패: {error}", flush=True)
+    # Entering the client runs the app's lifespan, which is what hands the
+    # agents SDK its key and warms the shared caches. Without it the planner
+    # still runs while every agent turn dies on a missing credential.
+    with build_client(recorder) as client:
+        for run_index in range(1, args.runs + 1):
+            for case in cases:
+                suffix = f" ({run_index}/{args.runs})" if args.runs > 1 else ""
+                print(f"▶ {case['id']}{suffix}", flush=True)
+                try:
+                    results.extend(run_case(client, recorder, case))
+                except Exception as error:  # noqa: BLE001 - report, don't abort the suite
+                    print(f"  ! 실행 실패: {error}", flush=True)
 
     print_report(collect_reports(results), args.runs)
 

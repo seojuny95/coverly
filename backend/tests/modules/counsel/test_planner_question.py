@@ -1,3 +1,9 @@
+import asyncio
+import json
+from collections.abc import AsyncIterator
+from typing import Any
+
+from app.modules.counsel.answer import build_answer_stream
 from app.modules.counsel.planner import CounselPlan
 
 
@@ -36,3 +42,42 @@ def test_an_out_of_scope_turn_keeps_its_own_question() -> None:
     )
 
     assert plan.question_to_answer == "오늘 서울 날씨 어때?"
+
+
+def test_the_agent_is_asked_the_self_contained_question_not_the_resolved_rewrite() -> None:
+    # The motivating bug end to end: a topic change the planner still judged
+    # in scope, whose rewrite had swallowed the previous turn's question.
+    asked: list[str] = []
+
+    async def capture_runner(_agent: Any, conversation: Any, _context: Any) -> AsyncIterator[str]:
+        asked.append(str(conversation[-1]["content"]))
+        yield "답변"
+
+    plan = _plan(
+        needs_history=False,
+        question_without_history="면책기간이 뭐야?",
+        rewritten_question="암진단비(유사암제외) 얼마야?",
+    )
+
+    events = asyncio.run(
+        _collect(
+            build_answer_stream(
+                question="면책기간이 뭐야?",
+                history=[],
+                plan=plan,
+                policies=[],
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                turns_remaining=9,
+                agent_stream_runner=capture_runner,
+            )
+        )
+    )
+
+    assert "면책기간" in asked[0]
+    assert "암진단비" not in asked[0]
+    assert events[0]["rewritten_question"] == "면책기간이 뭐야?"
+
+
+async def _collect(events: AsyncIterator[str]) -> list[dict[str, Any]]:
+    return [json.loads(event.removeprefix("data: ").strip()) async for event in events]
