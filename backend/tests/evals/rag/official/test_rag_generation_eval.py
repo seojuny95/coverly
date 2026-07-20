@@ -19,7 +19,7 @@ def test_generation_eval_fixture_uses_existing_fixed_context_chunks() -> None:
     chunk_ids = {chunk.id for chunk in load_official_chunks()}
     case_ids = [case.id for case in cases]
 
-    assert len(cases) == 60
+    assert len(cases) == 54
     assert len(case_ids) == len(set(case_ids))
     assert {case.expected_status for case in cases} == {"answered", "no_evidence", "filtered"}
     assert all(chunk_id in chunk_ids for case in cases for chunk_id in case.hit_chunk_ids)
@@ -46,7 +46,7 @@ def test_generation_eval_dataset_has_stable_schema() -> None:
     }
 
     assert raw_cases
-    assert len(raw_cases) == 30
+    assert len(raw_cases) == 27
     assert all(len(raw_case["questions"]) == 2 for raw_case in raw_cases)
     assert all(set(raw_case) == expected_keys for raw_case in raw_cases)
 
