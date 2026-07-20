@@ -5,6 +5,7 @@ from typing import cast
 
 from app.modules.counsel.answer import build_answer_stream
 from app.modules.counsel.planner import CounselPlan, CounselTask
+from app.modules.counsel.schemas import CounselMessage
 from app.modules.portfolio.schemas import PolicyInput
 
 
@@ -26,6 +27,7 @@ def test_streams_meta_then_agent_deltas_then_end_when_in_scope() -> None:
         _collect(
             build_answer_stream(
                 question=check.rewritten_question,
+                history=[],
                 plan=check,
                 policies=[],
                 policy_rag_session_ids=(),
@@ -64,6 +66,7 @@ def test_streams_the_refusal_message_without_running_the_agent_when_out_of_scope
         _collect(
             build_answer_stream(
                 question=check.rewritten_question,
+                history=[],
                 plan=check,
                 policies=[],
                 policy_rag_session_ids=(),
@@ -102,6 +105,7 @@ def test_streams_fact_answer_without_running_agent_for_fact_only_plan() -> None:
         _collect(
             build_answer_stream(
                 question=check.rewritten_question,
+                history=[],
                 plan=check,
                 policies=[
                     PolicyInput.model_validate(
@@ -136,6 +140,7 @@ def test_streams_fact_answer_before_agent_for_fact_then_explanation_plan() -> No
         _collect(
             build_answer_stream(
                 question=check.rewritten_question,
+                history=[],
                 plan=check,
                 policies=[
                     PolicyInput.model_validate(
@@ -188,6 +193,7 @@ def test_closing_the_stream_early_propagates_into_the_agent_stream_runner() -> N
             AsyncGenerator[str, None],
             build_answer_stream(
                 question=check.rewritten_question,
+                history=[],
                 plan=check,
                 policies=[],
                 policy_rag_session_ids=(),
@@ -205,3 +211,78 @@ def test_closing_the_stream_early_propagates_into_the_agent_stream_runner() -> N
     asyncio.run(consume_meta_and_first_delta_then_stop())
 
     assert cleaned_up is True
+
+
+def _cancer_policies() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "테스트보험사", "상품명": "건강보험"},
+                "보장목록": [
+                    {
+                        "담보명": "암진단비(유사암제외)",
+                        "가입금액": "4,000만원",
+                        "가입금액숫자": 40_000_000,
+                        "지급유형": "정액",
+                    },
+                ],
+            }
+        ),
+    ]
+
+
+def _disease_question_plan() -> CounselPlan:
+    return CounselPlan(
+        rewritten_question="암진단비(유사암제외) 보장금액은 얼마인가요?",
+        in_scope=True,
+        reason="보험 질문",
+        response_mode="fact_only",
+        tasks=[CounselTask(kind="coverage_lookup", coverage_names=["암진단비(유사암제외)"])],
+    )
+
+
+def test_a_coverage_only_the_rewrite_names_does_not_end_on_a_stated_amount() -> None:
+    # The user said "갑상선암"; the coverage name exists only in the planner's own
+    # rewrite. Treating that as the user naming it would state an amount for a
+    # disease whose coverage depends on the policy wording.
+    events = asyncio.run(
+        _collect(
+            build_answer_stream(
+                question="갑상선암 걸리면 얼마 받아?",
+                history=[],
+                plan=_disease_question_plan(),
+                policies=_cancer_policies(),
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                agent_stream_runner=_fake_agent_stream_runner,
+            )
+        )
+    )
+
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert "4,000만원" not in text
+    assert "확인돼요." in text
+
+
+def test_a_coverage_the_user_named_in_an_earlier_turn_still_answers_from_facts() -> None:
+    events = asyncio.run(
+        _collect(
+            build_answer_stream(
+                question="그거 얼마였지?",
+                history=[
+                    CounselMessage(role="user", content="암진단비(유사암제외) 얼마야?"),
+                    CounselMessage(role="assistant", content="4,000만원이에요."),
+                ],
+                plan=_disease_question_plan(),
+                policies=_cancer_policies(),
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                agent_stream_runner=_fake_agent_stream_runner,
+            )
+        )
+    )
+
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert "4,000만원" in text
+    assert "확인돼요." not in text

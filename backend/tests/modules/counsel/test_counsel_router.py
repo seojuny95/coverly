@@ -110,9 +110,6 @@ def test_stream_endpoint_streams_a_refusal_when_out_of_scope() -> None:
 
 
 def test_stream_endpoint_rejects_an_invalid_session() -> None:
-    # asyncio.gather starts both tasks concurrently, so the check-completer must
-    # still be overridden even though this test only cares about the session
-    # failure — otherwise the real OpenAI client would run alongside it.
     app = create_app()
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
     app.dependency_overrides[get_plan_completer] = lambda: _in_scope_completer("암진단비 알려줘")
@@ -124,3 +121,29 @@ def test_stream_endpoint_rejects_an_invalid_session() -> None:
     )
 
     assert response.status_code == 403
+
+
+def test_an_invalid_session_never_sends_the_question_to_the_planner() -> None:
+    # The session token is an access boundary. Planning happens after it passes,
+    # so an unauthorized request never puts the question or history on the wire.
+    planned: list[str] = []
+
+    def recording_completer() -> object:
+        def complete(_system: str, user: str) -> dict[str, object]:
+            planned.append(user)
+            return {"rewritten_question": "x", "in_scope": True, "reason": "r"}
+
+        return complete
+
+    app = create_app()
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+    app.dependency_overrides[get_plan_completer] = recording_completer
+    client = TestClient(app)
+
+    response = client.post(
+        "/counsel/stream",
+        json={"question": "암진단비 알려줘", "history": [], "session_id": "bad-session"},
+    )
+
+    assert response.status_code == 403
+    assert planned == []

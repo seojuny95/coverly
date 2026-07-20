@@ -15,6 +15,7 @@ from app.modules.counsel.composer import compose_fact_answer
 from app.modules.counsel.context import CounselContext
 from app.modules.counsel.fact_executor import execute_fact_tasks
 from app.modules.counsel.planner import CounselPlan
+from app.modules.counsel.schemas import CounselMessage
 from app.modules.portfolio.schemas import PolicyInput
 
 _OUT_OF_SCOPE_ANSWER = (
@@ -26,6 +27,7 @@ _OUT_OF_SCOPE_ANSWER = (
 async def build_answer_stream(
     *,
     question: str,
+    history: list[CounselMessage],
     plan: CounselPlan,
     policies: list[PolicyInput],
     policy_rag_session_ids: tuple[str, ...],
@@ -53,7 +55,7 @@ async def build_answer_stream(
         plan,
         execution,
         composed,
-        asked_texts=(question, plan.rewritten_question),
+        asked_texts=_texts_the_user_wrote(question, history),
     )
 
     if route.fact_answer is not None:
@@ -76,3 +78,15 @@ async def build_answer_stream(
         yield serialize_event(CounselDeltaEvent(text=chunk))
 
     yield serialize_event(CounselEndEvent())
+
+
+def _texts_the_user_wrote(question: str, history: list[CounselMessage]) -> tuple[str, ...]:
+    """Everything the user actually typed this conversation.
+
+    The planner's rewrite is deliberately excluded: it is the model's own words,
+    so treating it as evidence of what the user named would let the planner
+    authorize its own guess.
+    """
+
+    earlier = tuple(item.content for item in history if item.role == "user")
+    return (question, *earlier)

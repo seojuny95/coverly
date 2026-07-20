@@ -40,16 +40,10 @@ async def stream_counsel_answer(
 ) -> StreamingResponse:
     """Resolve the session, plan the turn, then stream the answer as SSE."""
 
+    # The session token is an access boundary, so it is checked before the
+    # question and history are sent anywhere.
     try:
-        snapshot, plan = await asyncio.gather(
-            asyncio.to_thread(sessions.snapshot, request.session_id),
-            asyncio.to_thread(
-                plan_counsel_turn,
-                request.question,
-                request.history,
-                complete=plan_completer,
-            ),
-        )
+        snapshot = await asyncio.to_thread(sessions.snapshot, request.session_id)
     except InvalidPortfolioSessionToken:
         raise ApiError(
             status_code=403,
@@ -57,8 +51,16 @@ async def stream_counsel_answer(
             message="분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
         ) from None
 
+    plan = await asyncio.to_thread(
+        plan_counsel_turn,
+        request.question,
+        request.history,
+        complete=plan_completer,
+    )
+
     events = build_answer_stream(
         question=request.question,
+        history=request.history,
         plan=plan,
         policies=list(snapshot.policies),
         policy_rag_session_ids=snapshot.rag_session_ids,

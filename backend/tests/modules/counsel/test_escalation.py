@@ -122,3 +122,45 @@ def test_agent_input_carries_what_was_shown_and_whether_to_hedge() -> None:
     assert "금액을 확정해서" not in shown
     assert "금액을 확정해서" in hedged
     assert plain == "질문"
+
+
+def test_llm_rewrite_alone_is_not_evidence_the_user_named_the_coverage() -> None:
+    # The planner may rewrite "갑상선암 걸리면?" into a coverage name. That is the
+    # model's own inference, so it must not unlock a settled amount.
+    plan = CounselPlan(
+        rewritten_question="암진단비(유사암제외) 보장금액은 얼마인가요?",
+        in_scope=True,
+        reason="보험 질문",
+        response_mode="fact_only",
+        tasks=[CounselTask(kind="coverage_lookup", coverage_names=["암진단비(유사암제외)"])],
+    )
+    execution = execute_fact_tasks(plan, _policies())
+    composed = compose_fact_answer(execution)
+
+    route = route_answer(plan, execution, composed, asked_texts=("갑상선암 걸리면 얼마 받아?",))
+
+    assert route.fact_answer is None
+    assert route.run_agent is True
+    assert route.needs_hedge is True
+
+
+def test_a_coverage_named_in_an_earlier_user_turn_still_counts_as_named() -> None:
+    plan = CounselPlan(
+        rewritten_question="암진단비(유사암제외)는 어디에 청구하나요?",
+        in_scope=True,
+        reason="보험 질문",
+        response_mode="fact_only",
+        tasks=[CounselTask(kind="coverage_lookup", coverage_names=["암진단비(유사암제외)"])],
+    )
+    execution = execute_fact_tasks(plan, _policies())
+    composed = compose_fact_answer(execution)
+
+    route = route_answer(
+        plan,
+        execution,
+        composed,
+        asked_texts=("그거 어디에 청구해?", "암진단비(유사암제외) 얼마야?"),
+    )
+
+    assert route.fact_answer is not None
+    assert route.run_agent is False
