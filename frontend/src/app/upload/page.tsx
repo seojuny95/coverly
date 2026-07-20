@@ -10,7 +10,9 @@ export default function UploadPage() {
         </p>
       </header>
 
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center py-12 sm:py-16">
+      {/* Top-anchored, not centered: centering re-balances the whole column
+          when the guide expands, dragging the heading upward. */}
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col py-12 sm:py-16">
         <section className="mx-auto w-full max-w-2xl text-center">
           <div className="mb-5 flex justify-center">
             <SectionLabel>보험증권 연결</SectionLabel>
