@@ -5,7 +5,7 @@ import { useDialogA11y } from "../use-dialog-a11y";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { ChatMessage } from "./chat-message";
-import { useQaChat } from "./use-chat";
+import { useInsuranceChat } from "./use-chat";
 
 export function InsuranceChatbot({
   portfolioSessionToken,
@@ -33,7 +33,7 @@ export function InsuranceChatbot({
     endRef,
     submit,
     sendQuestion,
-  } = useQaChat({
+  } = useInsuranceChat({
     portfolioSessionToken,
     sessionExpired,
     isChatVisible,

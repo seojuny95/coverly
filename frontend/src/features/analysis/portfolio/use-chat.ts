@@ -10,7 +10,7 @@ const INITIAL_SUGGESTIONS = [
   "확인 가능한 보장금 합계는 얼마예요?",
 ];
 
-export function useQaChat({
+export function useInsuranceChat({
   portfolioSessionToken,
   sessionExpired,
   isChatVisible,
