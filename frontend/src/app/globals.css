@@ -254,6 +254,14 @@
   opacity: 0.48;
 }
 
+.evidence-result-row-2 {
+  animation-delay: 180ms;
+}
+
+.evidence-result-row-3 {
+  animation-delay: 360ms;
+}
+
 @keyframes evidence-scan {
   0%,
   4% {
