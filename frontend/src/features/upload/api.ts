@@ -32,6 +32,14 @@ const GENERIC_UPLOAD_MESSAGE =
 const SERVER_UPLOAD_MESSAGE =
   "서버에서 파일을 처리하지 못했어요. 잠시 후 다시 시도해주세요.";
 
+// The backend runs several sequential LLM calls (summary, coverage
+// extraction, indexing), each with its own retry budget, so a legitimate
+// parse can run well past the "보통 1~2분" the UI sets as the typical
+// expectation (progress.tsx). This only needs to catch a truly stalled
+// connection (dead socket, captive portal) — not shave time off slow but
+// working uploads — so it is set generously above that typical range.
+const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+
 export class UploadInsuranceError extends Error {
   readonly code: UploadErrorCode;
   readonly requestId?: string;
@@ -82,6 +90,7 @@ export async function uploadInsurance({
     response = await fetch(apiUrl("/policies/parse"), {
       method: "POST",
       body: formData,
+      signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
     });
   } catch {
     throw new UploadInsuranceError({

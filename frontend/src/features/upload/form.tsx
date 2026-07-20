@@ -1,6 +1,6 @@
 "use client";
 
-import { type DragEvent, useState } from "react";
+import { type DragEvent, useEffect, useState } from "react";
 import type { AnalyzedInsurance, InsuranceAnalysis } from "../analysis/store";
 import { uploadInsurance as uploadInsuranceRequest } from "./api";
 import {
@@ -30,6 +30,7 @@ type InsuranceUploadFormProps = {
   fixedSelectedName?: string;
   existingDocuments?: AnalyzedInsurance[];
   surface?: "page" | "modal";
+  onUploadInFlightChange?: (isUploadInFlight: boolean) => void;
   createSession?: () => Promise<PortfolioSessionResult>;
   deleteSessionDocuments?: (
     portfolioSessionToken: string,
@@ -47,13 +48,16 @@ export function InsuranceUploadForm({
   fixedSelectedName,
   existingDocuments = [],
   surface = "page",
+  onUploadInFlightChange,
   createSession = createPortfolioSession,
   deleteSessionDocuments = deletePortfolioSessionDocuments,
 }: InsuranceUploadFormProps) {
   const activeUploadInsurance = uploadInsurance ?? uploadInsuranceRequest;
   const {
     selectedUploadFiles,
+    isCheckingPasswords,
     isAnalyzing,
+    isCompleting,
     analysisProgress,
     pendingAnalysis,
     selectedName,
@@ -74,6 +78,13 @@ export function InsuranceUploadForm({
     createSession,
     deleteSessionDocuments,
   });
+
+  // Surfaces that can be dismissed (the modal) must not tear the form down
+  // mid-upload: the completion beat would be cancelled and the uploaded
+  // policies would be lost while the server still holds them.
+  useEffect(() => {
+    onUploadInFlightChange?.(isAnalyzing || isCompleting);
+  }, [isAnalyzing, isCompleting, onUploadInFlightChange]);
 
   // Drag-hover styling is purely presentational, so it stays local; the drop
   // handler just forwards the files to the orchestration hook.
@@ -116,6 +127,7 @@ export function InsuranceUploadForm({
             selectedFile.status === "done" ? "done" : ("reading" as const),
         }))}
         surface={surface}
+        isCompleting={isCompleting}
       />
     );
   }
@@ -236,7 +248,8 @@ export function InsuranceUploadForm({
                 selectedUploadFiles.length === 0 ||
                 isAnalyzing ||
                 Boolean(pendingAnalysis) ||
-                (hasPasswordRetryFiles && hasMissingPasswords)
+                (hasPasswordRetryFiles && hasMissingPasswords) ||
+                isCheckingPasswords
               }
               className={`self-stretch ${isModal ? "" : "sm:self-end"}`}
             >

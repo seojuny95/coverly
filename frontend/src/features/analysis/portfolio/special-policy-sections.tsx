@@ -19,7 +19,7 @@ export function SpecialPolicySections({
         {analyses.map((analysis) => (
           <article
             key={analysis.kind}
-            className="analysis-overview-reveal overflow-hidden rounded-2xl border border-zinc-200 bg-white"
+            className="animate-enter overflow-hidden rounded-2xl border border-zinc-200 bg-white"
           >
             <div className="border-b border-zinc-100 bg-zinc-50 px-5 py-4">
               <div className="flex items-center justify-between gap-3">

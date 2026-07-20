@@ -220,7 +220,7 @@ export function InsuranceChatbot({
       aria-label="내 보험 질문"
       aria-modal="false"
       tabIndex={-1}
-      className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-white shadow-2xl sm:inset-x-auto sm:top-auto sm:right-8 sm:bottom-8 sm:h-[min(78vh,46rem)] sm:w-[min(32rem,calc(100vw-4rem))] sm:rounded-2xl sm:border sm:border-zinc-200"
+      className="animate-enter fixed inset-0 z-40 flex flex-col overflow-hidden bg-white shadow-2xl sm:inset-x-auto sm:top-auto sm:right-8 sm:bottom-8 sm:h-[min(78vh,46rem)] sm:w-[min(32rem,calc(100vw-4rem))] sm:rounded-2xl sm:border sm:border-zinc-200"
     >
       {chat}
     </aside>

@@ -10,6 +10,9 @@ const ANALYSIS_STEP_MESSAGES = [
 
 const LONG_WAIT_MESSAGE = "파일이 길수록 조금 더 걸려요. 지금도 읽고 있어요.";
 const ALMOST_DONE_MESSAGE = "거의 다 왔어요. 조금만 더 기다려주세요.";
+// States only that reading finished — must not assert anything about the
+// analysis results, which haven't been shown yet.
+const COMPLETE_MESSAGE = "다 읽었어요. 결과를 보여드릴게요.";
 
 // Full-screen (page) / inline (modal) progress view shown while uploads are in
 // flight. Owns its own trickle/message/elapsed timers; the caller only feeds it
@@ -18,10 +21,12 @@ export function AnalysisProgress({
   progress,
   files,
   surface,
+  isCompleting = false,
 }: {
   progress: { completed: number; total: number };
   files: Array<{ name: string; status: "done" | "reading" }>;
   surface: "page" | "modal";
+  isCompleting?: boolean;
 }) {
   const milestonePercent =
     progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
@@ -66,9 +71,13 @@ export function AnalysisProgress({
         ? [LONG_WAIT_MESSAGE]
         : []),
   ];
-  const statusMessage = statusMessages[messageIndex % statusMessages.length];
+  const statusMessage = isCompleting
+    ? COMPLETE_MESSAGE
+    : statusMessages[messageIndex % statusMessages.length];
   // Real milestones floor the trickle so completed files always show through.
-  const percent = Math.round(Math.max(displayPercent, milestonePercent));
+  const percent = isCompleting
+    ? 100
+    : Math.round(Math.max(displayPercent, milestonePercent));
   const fileListClassName =
     files.length === 1
       ? "mt-5 grid w-full max-w-md grid-cols-1 gap-1.5 text-left"
@@ -80,7 +89,7 @@ export function AnalysisProgress({
       className={`${
         surface === "modal"
           ? "flex w-full max-w-none flex-col items-center py-8 text-center"
-          : "fixed inset-0 z-50 flex items-center justify-center bg-white px-6 py-10 text-center"
+          : "animate-enter-overlay fixed inset-0 z-50 flex items-center justify-center bg-white px-6 py-10 text-center"
       }`}
     >
       {surface === "page" ? (
@@ -88,7 +97,7 @@ export function AnalysisProgress({
           <BrandMark />
         </span>
       ) : null}
-      <div className="flex w-full max-w-[760px] flex-col items-center">
+      <div className="animate-enter flex w-full max-w-[760px] flex-col items-center delay-150">
         <div className="analysis-pixel-loader grid size-16 grid-cols-3 gap-1.5 rounded-2xl border border-zinc-200 bg-white p-3 shadow-[7px_7px_0_#e8edff]">
           {Array.from({ length: 9 }).map((_, index) => (
             <span key={index} />
@@ -136,7 +145,7 @@ export function AnalysisProgress({
         ) : null}
         <p
           key={statusMessage}
-          className="analysis-status-message mt-6 text-sm leading-6 text-zinc-500"
+          className="animate-enter mt-6 text-sm leading-6 text-zinc-500"
         >
           {statusMessage}
         </p>

@@ -41,11 +41,18 @@ def _unmatched_with_candidates(execution: FactExecution) -> list[UnmatchedCovera
 
 
 def _candidate_question(unmatched: list[UnmatchedCoverageName]) -> str:
+    """Ask which coverage was meant, listing the near misses.
+
+    Neither the requested name nor the last candidate takes a 조사: both come
+    from data, and a 한글 particle changes with the last syllable of the word
+    before it, so a fixed one is wrong half the time.
+    """
+
     lines: list[str] = []
     for item in unmatched:
         candidates = ", ".join(item.candidates)
         lines.append(
-            f"'{item.requested_name}'와 가까운 담보는 {candidates}예요. "
+            f"'{item.requested_name}'에 가까운 담보예요 — {candidates}. "
             "어느 쪽을 말씀하시는 걸까요?"
         )
     return "\n".join(lines)

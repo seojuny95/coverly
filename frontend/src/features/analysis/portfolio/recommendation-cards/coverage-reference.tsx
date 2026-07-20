@@ -24,8 +24,10 @@ export function CoverageReference({
         aria-label="권장금액을 다시 확인하고 있어요"
         aria-busy="true"
         aria-live="polite"
-        className="h-28 animate-pulse rounded-2xl bg-zinc-100"
-      />
+        className="animate-enter"
+      >
+        <div className="h-56 animate-pulse rounded-2xl bg-zinc-100" />
+      </div>
     );
   }
 
@@ -42,7 +44,7 @@ export function CoverageReference({
     formatReferenceAmount(item.reference_min_amount, item.reference_max_amount);
 
   return (
-    <Card className="border-transparent p-4 ring-1 ring-zinc-200">
+    <Card className="animate-enter border-transparent p-4 ring-1 ring-zinc-200">
       <div
         className={cn(
           "grid gap-4",

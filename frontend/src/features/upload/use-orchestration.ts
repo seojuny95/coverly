@@ -19,6 +19,7 @@ import {
 } from "../analysis/policy-identity";
 import { UploadInsuranceError } from "./api";
 import type { SelectedUploadFile, UploadInsurance } from "./types";
+import { useCompletionBeat } from "./use-completion-beat";
 import { useSelectedFiles } from "./use-selected-files";
 import {
   ROLLBACK_ERROR_MESSAGE,
@@ -87,6 +88,7 @@ export function useUploadOrchestration({
       setAnalysis(analysis);
       router.push("/analysis");
     });
+  const { isCompleting, runAfterBeat } = useCompletionBeat();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState({
     completed: 0,
@@ -103,6 +105,7 @@ export function useUploadOrchestration({
   const {
     selectedUploadFiles,
     setSelectedUploadFiles,
+    isCheckingPasswords,
     error,
     setError,
     inputRef,
@@ -146,7 +149,12 @@ export function useUploadOrchestration({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (selectedUploadFiles.length === 0 || isAnalyzing || pendingAnalysis)
+    if (
+      selectedUploadFiles.length === 0 ||
+      isAnalyzing ||
+      pendingAnalysis ||
+      isCheckingPasswords
+    )
       return;
 
     if (!(await resolvePendingCleanup())) return;
@@ -429,8 +437,10 @@ export function useUploadOrchestration({
           getInsuredPersonName(insuranceDocument) === personName,
       ),
     };
-    completeAnalysis(filteredAnalysis);
-    navigateToAnalysis();
+    runAfterBeat(() => {
+      completeAnalysis(filteredAnalysis);
+      navigateToAnalysis();
+    });
   };
 
   const handleNameSelectionSubmit = async () => {
@@ -448,17 +458,20 @@ export function useUploadOrchestration({
         pendingAnalysis.portfolioSessionToken,
         excludedDocumentIds,
       );
+      // No setIsAnalyzing(false) here: the progress screen must stay up through
+      // the completion beat, or the name-selection panel flashes back.
       saveSelectedNameAnalysis(pendingAnalysis, selectedName);
     } catch {
       setError(ROLLBACK_ERROR_MESSAGE);
-    } finally {
       setIsAnalyzing(false);
     }
   };
 
   return {
     selectedUploadFiles,
+    isCheckingPasswords,
     isAnalyzing,
+    isCompleting,
     analysisProgress,
     pendingAnalysis,
     selectedName,

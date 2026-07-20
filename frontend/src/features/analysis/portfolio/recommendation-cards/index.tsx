@@ -33,10 +33,7 @@ export function RecommendedInsuranceCards({
 
   return (
     <article
-      className={cn(
-        cardVariants(),
-        "analysis-overview-reveal analysis-overview-delay-1 p-5 sm:p-6",
-      )}
+      className={cn(cardVariants(), "animate-enter p-5 delay-100 sm:p-6")}
     >
       <div>
         <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">

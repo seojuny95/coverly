@@ -192,13 +192,22 @@ def _portfolio_review_answer(result: FactTaskResult) -> str:
 
 
 def _unmatched_lines(unmatched: list[UnmatchedCoverageName]) -> list[str]:
+    """Lead with what was found, so a near miss does not read as a dead end.
+
+    The coverage name is followed by punctuation rather than a 조사: a 한글
+    particle changes with the last syllable of the word it attaches to, and the
+    name comes from whatever the user typed, so any fixed particle is wrong
+    half the time ("'암 진단'와" instead of "'암 진단'과").
+    """
+
     lines: list[str] = []
     for item in unmatched:
         if item.candidates:
             candidates = ", ".join(item.candidates)
             lines.append(
-                f"'{item.requested_name}'와 정확히 일치하는 담보는 없어요. 후보: {candidates}"
+                f"'{item.requested_name}': 이름이 똑같은 담보는 없지만, "
+                f"비슷한 담보가 있어요 — {candidates}"
             )
         else:
-            lines.append(f"'{item.requested_name}'와 정확히 일치하는 담보는 없어요.")
+            lines.append(f"'{item.requested_name}': 이름이 똑같은 담보를 찾지 못했어요.")
     return lines

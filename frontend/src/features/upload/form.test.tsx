@@ -120,12 +120,22 @@ describe("InsuranceUploadForm", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const guide = screen.getByTestId("policy-document-guide");
-    expect(guide).not.toHaveAttribute("open");
+    const trigger = screen.getByRole("button", {
+      name: "보험증권을 어디서 받는지 모르겠어요",
+    });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
 
-    await user.click(screen.getByText("보험증권을 어디서 받는지 모르겠어요"));
+    // jsdom's accessibility-tree queries don't honor `inert`, so a collapsed
+    // link is still findable by role here; assert the `inert` ancestor
+    // directly to prove it is actually removed from the tab order.
+    const collapsedLink = screen.getByRole("link", {
+      name: "가입한 보험사 확인 (새 창에서 열기)",
+    });
+    expect(collapsedLink.closest("[inert]")).not.toBeNull();
 
-    expect(guide).toHaveAttribute("open");
+    await user.click(trigger);
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(
       screen.getByText("보험증권을 이렇게 받을 수 있어요"),
     ).toBeInTheDocument();
@@ -136,11 +146,29 @@ describe("InsuranceUploadForm", () => {
     const insurerLookupLink = screen.getByRole("link", {
       name: "가입한 보험사 확인 (새 창에서 열기)",
     });
+    expect(insurerLookupLink.closest("[inert]")).toBeNull();
     expect(insurerLookupLink).toHaveAttribute(
       "href",
       "https://cont.insure.or.kr/cont_web/intro.do",
     );
     expect(insurerLookupLink).toHaveAttribute("target", "_blank");
+  });
+
+  test("toggles the policy document guide from the keyboard", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    const trigger = screen.getByRole("button", {
+      name: "보험증권을 어디서 받는지 모르겠어요",
+    });
+    trigger.focus();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    await user.keyboard("{Enter}");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    await user.keyboard(" ");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
   test("selects a PDF through the file picker", async () => {
@@ -193,9 +221,11 @@ describe("InsuranceUploadForm", () => {
     });
 
     expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "내 보험 분석하기" }),
-    ).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "내 보험 분석하기" }),
+      ).toBeEnabled(),
+    );
   });
 
   test("shows a clear error when a drop contains no file", () => {
@@ -215,7 +245,7 @@ describe("InsuranceUploadForm", () => {
     ).toBeDisabled();
   });
 
-  test("selects multiple PDFs through drag and drop", () => {
+  test("selects multiple PDFs through drag and drop", async () => {
     renderForm();
 
     fireEvent.drop(screen.getByTestId("insurance-upload-dropzone"), {
@@ -227,12 +257,14 @@ describe("InsuranceUploadForm", () => {
     expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
     expect(screen.getByText("second-insurance.pdf")).toBeInTheDocument();
     expect(screen.getByText("2개 · 0.02 KB")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "내 보험 분석하기" }),
-    ).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "내 보험 분석하기" }),
+      ).toBeEnabled(),
+    );
   });
 
-  test("does not enforce the server file type rule in the browser", () => {
+  test("does not enforce the server file type rule in the browser", async () => {
     renderForm();
 
     fireEvent.drop(screen.getByTestId("insurance-upload-dropzone"), {
@@ -242,9 +274,11 @@ describe("InsuranceUploadForm", () => {
     });
 
     expect(screen.getByText("note.txt")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "내 보험 분석하기" }),
-    ).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "내 보험 분석하기" }),
+      ).toBeEnabled(),
+    );
   });
 
   test("does not enforce the server size limit in the browser", async () => {
@@ -364,6 +398,39 @@ describe("InsuranceUploadForm", () => {
       );
     });
     expect(navigateToAnalysis).toHaveBeenCalledOnce();
+  });
+
+  test("keeps the completion beat on screen before navigating to analysis", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
+      status: "accepted",
+      documentId: "test-document-id",
+      문자수: 20,
+      기본정보: {
+        보험사: "삼성화재",
+        상품명: "건강보험",
+        계약자: "테스트고객",
+        피보험자: "테스트고객",
+        보험분류: "제3보험",
+        상품태그: ["질병보험"],
+      },
+    });
+    const onAnalysisComplete = vi.fn();
+    const navigateToAnalysis = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText("다 읽었어요. 결과를 보여드릴게요."),
+    ).toBeVisible();
+    expect(navigateToAnalysis).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(navigateToAnalysis).toHaveBeenCalledOnce();
+    });
   });
 
   test("requires a name before saving the analysis", async () => {
@@ -576,6 +643,70 @@ describe("InsuranceUploadForm", () => {
     expect(navigateToAnalysis).toHaveBeenCalledOnce();
   });
 
+  test("keeps the completion beat visible before navigating after choosing a name", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
+      .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "document-a",
+        문자수: 32,
+        기본정보: {
+          보험사: "삼성화재",
+          상품명: "건강보험",
+          계약자: "테스트고객",
+          피보험자: "테스트고객",
+          보험분류: "제3보험",
+          상품태그: ["질병보험"],
+        },
+      })
+      .mockResolvedValueOnce({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "document-b",
+        문자수: 20,
+        기본정보: {
+          보험사: "현대해상화재보험",
+          상품명: "개인용자동차보험",
+          계약자: "테스트고객B",
+          피보험자: "테스트고객B",
+          보험분류: "손해보험",
+          상품태그: [],
+        },
+      });
+    const onAnalysisComplete = vi.fn();
+    const navigateToAnalysis = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      secondInsuranceFile,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText("피보험자가 여러 명 있어요"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /테스트고객B/ }));
+    await user.click(
+      screen.getByRole("button", { name: "선택한 피보험자로 보기" }),
+    );
+
+    expect(
+      await screen.findByText("다 읽었어요. 결과를 보여드릴게요."),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("피보험자가 여러 명 있어요"),
+    ).not.toBeInTheDocument();
+    expect(navigateToAnalysis).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(navigateToAnalysis).toHaveBeenCalledOnce();
+    });
+  });
+
   test("shows backend error details when upload fails", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi
@@ -693,6 +824,57 @@ describe("InsuranceUploadForm", () => {
     expect(uploadInsurance).not.toHaveBeenCalled();
   });
 
+  test("blocks submit while the password pre-check is still running", async () => {
+    const user = userEvent.setup();
+    vi.mocked(isPdfPasswordProtected).mockReturnValue(new Promise(() => {}));
+    renderForm();
+
+    await user.upload(
+      screen.getByLabelText("PDF 파일 선택"),
+      new File(["x"], "insurance.pdf", { type: "application/pdf" }),
+    );
+
+    expect(screen.getByText("확인 중")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeDisabled();
+  });
+
+  test("unlocks submit when the password pre-check fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(isPdfPasswordProtected).mockRejectedValue(
+      new Error("pdf worker unavailable"),
+    );
+    renderForm();
+
+    await user.upload(
+      screen.getByLabelText("PDF 파일 선택"),
+      new File(["x"], "insurance.pdf", { type: "application/pdf" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText("확인 중")).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeEnabled();
+  });
+
+  test("lets the user type a password and submit once the pre-check flags an encrypted PDF", async () => {
+    const user = userEvent.setup();
+    vi.mocked(isPdfPasswordProtected).mockResolvedValueOnce(true);
+    renderForm();
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+
+    expect(await screen.findByText("비밀번호 필요")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("PDF 비밀번호"), "900101");
+
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeEnabled();
+  });
+
   test("asks for a password only for encrypted PDFs and retries with it", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi
@@ -780,6 +962,66 @@ describe("InsuranceUploadForm", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("읽을 수 없는 PDF")).not.toBeInTheDocument();
+  });
+
+  test("rolls back an already-succeeded upload when another file in the batch times out, and clears the in-flight state", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
+      .mockImplementation(async (input) => {
+        if (input.file === secondInsuranceFile) {
+          // A stalled connection surfaces through api.ts as the same
+          // UPLOAD_NETWORK_ERROR a plain connection failure produces.
+          throw new UploadInsuranceError({
+            code: "UPLOAD_NETWORK_ERROR",
+            userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+          });
+        }
+        return {
+          ...POLICY_PARSE_RESPONSE_DEFAULTS,
+          status: "accepted",
+          documentId: "document-a",
+          문자수: 32,
+          기본정보: {
+            보험사: "삼성화재",
+            상품명: "건강보험",
+            계약자: "테스트고객",
+            피보험자: "테스트고객",
+            보험분류: "제3보험",
+            상품태그: [],
+          },
+        };
+      });
+    const { deleteSessionDocuments } = renderForm({ uploadInsurance });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      secondInsuranceFile,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+
+    // The already-succeeded document must be rolled back, not left orphaned
+    // server-side, exactly like any other unexpected upload failure. Both
+    // pre-assigned document ids are cleaned up, since the batch reserves an
+    // id per file up front.
+    await waitFor(() => {
+      expect(deleteSessionDocuments).toHaveBeenCalledWith(
+        "test-portfolio-token",
+        [expect.any(String), expect.any(String)],
+      );
+    });
+
+    // isAnalyzing must resolve to false so the form (and, in the modal
+    // surface, its close controls) become interactive again.
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeEnabled();
   });
 
   test("rejects duplicate policies in the same upload batch", async () => {

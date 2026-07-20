@@ -173,67 +173,71 @@ export function InsuranceAnalysisPage({
           </TabButton>
         </nav>
         {sessionExpired ? <PolicySessionExpiredNotice /> : null}
-        {activeTab === "insurance" ? (
-          <InsuranceListPanel
-            selectedName={analysis.selectedName}
-            generatedAt={analysis.generatedAt}
-            groupedInsuranceDocuments={groupedInsuranceDocuments}
-            coverageTotalStatus={portfolioSummary.state.status}
-            coverageTotalSummary={
-              portfolioSummary.state.status === "success"
-                ? portfolioSummary.state.summary
-                : undefined
-            }
-            onRetryCoverageTotal={portfolioSummary.retry}
-            isExpanded={isExpanded}
-            onToggle={toggleInsurance}
-            onOpenUploadModal={openUploadModal}
-          />
-        ) : activeTab === "analysis" ? (
-          <div
-            id="analysis-tabpanel"
-            role="tabpanel"
-            aria-labelledby="analysis-tab"
-            tabIndex={0}
-          >
-            <div className="mb-7">
-              <SectionLabel>내 보험 분석</SectionLabel>
-              <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
-                가입한 보험을 한눈에 확인해요
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-zinc-500">
-                전체 보험에서 사망·3대 진단비·실손의료비를 확인하고, 보험 종류별
-                보장도 함께 정리해요.
-              </p>
-            </div>
-            <PortfolioAnalysisPanel
-              status={portfolioSummary.state.status}
-              summary={
+        {/* Deliberately no flex/height classes: flex-1 here would compete with
+            InsuranceChatbot's full-mode root and halve the chat scroll area. */}
+        <div key={activeTab} className="animate-enter">
+          {activeTab === "insurance" ? (
+            <InsuranceListPanel
+              selectedName={analysis.selectedName}
+              generatedAt={analysis.generatedAt}
+              groupedInsuranceDocuments={groupedInsuranceDocuments}
+              coverageTotalStatus={portfolioSummary.state.status}
+              coverageTotalSummary={
                 portfolioSummary.state.status === "success"
                   ? portfolioSummary.state.summary
                   : undefined
               }
-              deathBenefitContext={deathBenefitContext}
-              onDeathBenefitContextChange={setDeathBenefitContext}
-              isDeathBenefitRefreshing={portfolioSummary.isRefreshing}
-              policyCount={insuranceDocuments.length}
-              onRetry={portfolioSummary.retry}
+              onRetryCoverageTotal={portfolioSummary.retry}
+              isExpanded={isExpanded}
+              onToggle={toggleInsurance}
+              onOpenUploadModal={openUploadModal}
             />
-          </div>
-        ) : (
-          <div>
-            <div className="mb-7">
-              <SectionLabel>근거 기반 Q&A</SectionLabel>
-              <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
-                내 보험을 AI 상담사와 함께 살펴봐요
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-zinc-500">
-                올린 보험증권에서 확인한 내용을 근거로 답하고, 확인하기 어려운
-                내용은 한계도 함께 알려드려요.
-              </p>
+          ) : activeTab === "analysis" ? (
+            <div
+              id="analysis-tabpanel"
+              role="tabpanel"
+              aria-labelledby="analysis-tab"
+              tabIndex={0}
+            >
+              <div className="mb-7">
+                <SectionLabel>내 보험 분석</SectionLabel>
+                <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
+                  가입한 보험을 한눈에 확인해요
+                </h1>
+                <p className="mt-3 text-sm leading-6 text-zinc-500">
+                  전체 보험에서 사망·3대 진단비·실손의료비를 확인하고, 보험
+                  종류별 보장도 함께 정리해요.
+                </p>
+              </div>
+              <PortfolioAnalysisPanel
+                status={portfolioSummary.state.status}
+                summary={
+                  portfolioSummary.state.status === "success"
+                    ? portfolioSummary.state.summary
+                    : undefined
+                }
+                deathBenefitContext={deathBenefitContext}
+                onDeathBenefitContextChange={setDeathBenefitContext}
+                isDeathBenefitRefreshing={portfolioSummary.isRefreshing}
+                policyCount={insuranceDocuments.length}
+                onRetry={portfolioSummary.retry}
+              />
             </div>
-          </div>
-        )}
+          ) : (
+            <div>
+              <div className="mb-7">
+                <SectionLabel>근거 기반 Q&A</SectionLabel>
+                <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">
+                  내 보험을 AI 상담사와 함께 살펴봐요
+                </h1>
+                <p className="mt-3 text-sm leading-6 text-zinc-500">
+                  올린 보험증권에서 확인한 내용을 근거로 답하고, 확인하기 어려운
+                  내용은 한계도 함께 알려드려요.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
         <InsuranceChatbot
           portfolioSessionToken={analysis.portfolioSessionToken}

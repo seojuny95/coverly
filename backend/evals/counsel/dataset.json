@@ -619,14 +619,15 @@
       "notes": "화면이 처음에 권하는 질문. 우리가 먼저 권한 질문이 거절되거나 빈손으로 끝나면 안 되므로, use-chat.ts의 문구를 그대로 박제한다."
     },
     {
-      "id": "suggestion_cancer",
+      "id": "suggestion_gaps",
       "intent": "상담 시작 화면의 추천 질문",
       "turns": [
         {
-          "question": "암 진단 시 얼마 받을 수 있어요?",
+          "question": "내 보험에서 비어 있는 보장이 있나요?",
           "expected_in_scope": true,
           "must_include_any": [
-            "만원"
+            "보장",
+            "담보"
           ]
         }
       ],
