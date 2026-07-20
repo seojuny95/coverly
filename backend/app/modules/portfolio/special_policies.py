@@ -190,14 +190,17 @@ def _special_policy_overview(checks: list[SpecialCoverageCheck]) -> str:
             "담보명은 확인됐지만 주요 보장 영역과 연결되는 항목은 현재 자료에서 "
             "찾지 못했어요. 실제 가입 여부는 증권 원문을 더 확인해야 해요."
         )
+    # Labels are followed by punctuation, never a 조사: which label lands last in
+    # the join depends on the uploaded policy, and a 한글 particle changes with
+    # the syllable before it ("내 차량 손해이 모두 확인돼요").
     if not missing:
         return (
-            f"{', '.join(confirmed)}이 모두 확인돼요. 다만 지급 범위와 한도, "
+            f"모두 확인된 항목이에요: {', '.join(confirmed)}. 다만 지급 범위와 한도, "
             "면책 조건은 각 증권과 약관을 더 확인해야 해요."
         )
     return (
-        f"{', '.join(confirmed)}은 확인돼요. {', '.join(missing)}은 현재 자료에서 "
-        "찾지 못했으며, 이것만으로 미가입이라고 단정할 수는 없어요."
+        f"확인된 항목이에요: {', '.join(confirmed)}. 현재 자료에서 찾지 못한 항목이에요: "
+        f"{', '.join(missing)}. 이것만으로 미가입이라고 단정할 수는 없어요."
     )
 
 
