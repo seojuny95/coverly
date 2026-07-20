@@ -24,7 +24,7 @@ from agents import Agent, Runner
 from fastapi.testclient import TestClient
 
 from app.integrations.openai import ConversationMessage
-from app.integrations.openai.client import structured_completer
+from app.integrations.openai.client import configure_agent_sdk_credentials, structured_completer
 from app.main import create_app
 from app.modules.counsel.context import CounselContext
 from app.modules.counsel.planner import CounselPlan
@@ -111,6 +111,11 @@ class Recorder:
 
 
 def build_client(recorder: Recorder) -> TestClient:
+    # The runner drives the app without its lifespan, so hand the agents SDK
+    # its credentials here -- otherwise every agent turn dies on a missing key
+    # while the planner, which reads settings directly, keeps working.
+    configure_agent_sdk_credentials()
+
     app = create_app()
     policies = load_fixture_policies()
     app.dependency_overrides[get_portfolio_session_service] = lambda: FixtureSessions(policies)
