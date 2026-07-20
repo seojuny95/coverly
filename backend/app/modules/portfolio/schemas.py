@@ -29,6 +29,8 @@ __all__ = [
     "SourceReliability",
 ]
 
+CoveragePeriod = dict[str, str]
+
 
 class CoverageInput(BaseModel):
     """Coverage fields accepted from the current and extended parse response."""
@@ -78,6 +80,9 @@ class PolicyInfoInput(BaseModel):
     상품명: str | None = None
     보험분류: str | None = None
     상품태그: list[str] = Field(default_factory=list)
+    보험기간: CoveragePeriod | None = None
+    만기일: str | None = None
+    납입기간: str | None = None
     피보험자정보: PolicyInsuredDemographicsInput | None = None
     보험료: PremiumInput | None = None
 

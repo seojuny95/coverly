@@ -15,7 +15,7 @@ def test_no_history_returns_the_original_question_and_scope_decision() -> None:
 def test_with_history_rewrites_and_classifies_in_one_call() -> None:
     captured: dict[str, str] = {}
 
-    def fake(system: str, user: str) -> dict[str, object]:
+    def fake(_system: str, user: str) -> dict[str, object]:
         captured["user"] = user
         return {
             "rewritten_question": "암진단비 청구는 어떻게 하나요?",

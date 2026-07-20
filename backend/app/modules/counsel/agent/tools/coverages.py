@@ -1,32 +1,14 @@
 """Agent SDK tools for coverage discovery, lookup, totals, and overlaps."""
 
-from collections import defaultdict
-
 from agents import RunContextWrapper, function_tool
-from pydantic import BaseModel
 
 from app.modules.counsel.context import CounselContext
-from app.modules.portfolio.schemas import PolicyInput
+from app.modules.counsel.facts import coverages as coverage_facts
 
-
-def _all_coverage_names(policies: list[PolicyInput]) -> set[str]:
-    return {coverage.담보명 for policy in policies for coverage in policy.보장목록}
-
-
-class CoverageNameInfo(BaseModel):
-    담보명: str
-    지급유형: str | None
-
-
-def _coverage_name_infos(policies: list[PolicyInput]) -> list[CoverageNameInfo]:
-    types_by_name: dict[str, str | None] = {}
-    for policy in policies:
-        for coverage in policy.보장목록:
-            types_by_name.setdefault(coverage.담보명, coverage.지급유형)
-    return [
-        CoverageNameInfo(담보명=name, 지급유형=types_by_name[name])
-        for name in sorted(types_by_name)
-    ]
+CoverageNameInfo = coverage_facts.CoverageNameInfo
+CoverageTotalResult = coverage_facts.CoverageTotalResult
+FindCoveragesResult = coverage_facts.FindCoveragesResult
+OverlappingCoverage = coverage_facts.OverlappingCoverage
 
 
 @function_tool
@@ -40,63 +22,7 @@ def list_coverage_names(wrapper: RunContextWrapper[CounselContext]) -> list[Cove
     보장"처럼 카테고리 이름 자체를 담보명으로 넘기지 마세요.
     """
 
-    return _coverage_name_infos(wrapper.context.policies)
-
-
-class CoverageMatch(BaseModel):
-    보험사: str | None
-    상품명: str | None
-    담보명: str
-    가입금액: str
-    가입금액숫자: int | None
-    지급유형: str | None
-
-
-class UnmatchedCoverageName(BaseModel):
-    requested_name: str
-    candidates: list[str]
-
-
-def match_coverage_names(
-    policies: list[PolicyInput],
-    coverage_names: list[str],
-) -> tuple[list[CoverageMatch], list[UnmatchedCoverageName]]:
-    """Exact-match coverage_names across policies; report candidates, never guess."""
-
-    all_names = _all_coverage_names(policies)
-    requested = {name.strip() for name in coverage_names}
-    matches: list[CoverageMatch] = []
-    found_names: set[str] = set()
-
-    for policy in policies:
-        for coverage in policy.보장목록:
-            if coverage.담보명 not in requested:
-                continue
-            matches.append(
-                CoverageMatch(
-                    보험사=policy.기본정보.보험사,
-                    상품명=policy.기본정보.상품명,
-                    담보명=coverage.담보명,
-                    가입금액=coverage.가입금액,
-                    가입금액숫자=coverage.가입금액숫자,
-                    지급유형=coverage.지급유형,
-                )
-            )
-            found_names.add(coverage.담보명)
-
-    unmatched = [
-        UnmatchedCoverageName(
-            requested_name=name,
-            candidates=sorted(c for c in all_names if c.startswith(name)),
-        )
-        for name in sorted(requested - found_names)
-    ]
-    return matches, unmatched
-
-
-class FindCoveragesResult(BaseModel):
-    matches: list[CoverageMatch]
-    unmatched: list[UnmatchedCoverageName]
+    return coverage_facts.list_coverage_name_facts(wrapper.context.policies)
 
 
 @function_tool
@@ -118,22 +44,7 @@ def find_coverages(
             이름으로 보고됩니다.
     """
 
-    matches, unmatched = match_coverage_names(wrapper.context.policies, coverage_names)
-    return FindCoveragesResult(matches=matches, unmatched=unmatched)
-
-
-class ExcludedCoverage(BaseModel):
-    보험사: str | None
-    상품명: str | None
-    담보명: str
-    reason: str
-
-
-class CoverageTotalResult(BaseModel):
-    total: int
-    included: list[CoverageMatch]
-    excluded: list[ExcludedCoverage]
-    unmatched: list[UnmatchedCoverageName]
+    return coverage_facts.find_coverage_facts(wrapper.context.policies, coverage_names)
 
 
 @function_tool
@@ -158,36 +69,7 @@ def calculate_coverage_total(
             list_coverage_names를 호출하세요.
     """
 
-    matches, unmatched = match_coverage_names(wrapper.context.policies, coverage_names)
-
-    included = [item for item in matches if item.가입금액숫자 is not None]
-    excluded = [
-        ExcludedCoverage(
-            보험사=item.보험사,
-            상품명=item.상품명,
-            담보명=item.담보명,
-            reason="실손형이거나 고정 가입금액이 확인되지 않아 합계에서 제외했습니다.",
-        )
-        for item in matches
-        if item.가입금액숫자 is None
-    ]
-    total = sum(item.가입금액숫자 for item in included if item.가입금액숫자 is not None)
-    return CoverageTotalResult(
-        total=total, included=included, excluded=excluded, unmatched=unmatched
-    )
-
-
-class OverlapEntry(BaseModel):
-    보험사: str | None
-    상품명: str | None
-    가입금액: str
-    가입금액숫자: int | None
-    지급유형: str | None
-
-
-class OverlappingCoverage(BaseModel):
-    담보명: str
-    policies: list[OverlapEntry]
+    return coverage_facts.calculate_coverage_total_fact(wrapper.context.policies, coverage_names)
 
 
 @function_tool
@@ -199,21 +81,4 @@ def find_overlapping_coverages(
     중복 여부만 사실대로 알려주고, 해지하거나 줄이라고 권유하지 마세요.
     """
 
-    groups: dict[str, list[OverlapEntry]] = defaultdict(list)
-    for policy in wrapper.context.policies:
-        for coverage in policy.보장목록:
-            groups[coverage.담보명].append(
-                OverlapEntry(
-                    보험사=policy.기본정보.보험사,
-                    상품명=policy.기본정보.상품명,
-                    가입금액=coverage.가입금액,
-                    가입금액숫자=coverage.가입금액숫자,
-                    지급유형=coverage.지급유형,
-                )
-            )
-
-    return [
-        OverlappingCoverage(담보명=name, policies=entries)
-        for name, entries in sorted(groups.items())
-        if len(entries) > 1
-    ]
+    return coverage_facts.find_overlapping_coverage_facts(wrapper.context.policies)

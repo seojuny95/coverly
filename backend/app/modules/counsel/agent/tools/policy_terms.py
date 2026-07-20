@@ -25,6 +25,7 @@ class _ChunkEvidence:
     fact: str
 
     def model_dump(self, *, mode: Literal["json"]) -> dict[str, object]:
+        del mode
         return {"id": self.id, "fact": self.fact}
 
 
