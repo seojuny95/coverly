@@ -212,3 +212,34 @@ def test_stream_endpoint_refuses_once_the_session_runs_out_of_turns() -> None:
     assert response.json()["error"]["code"] == "COUNSEL_TURN_LIMIT_REACHED"
     # the limit must bite before the planner spends a call
     assert planned == []
+
+
+def test_the_planner_never_receives_identifiers_the_user_typed() -> None:
+    seen: list[str] = []
+
+    def recording_completer() -> object:
+        def complete(_system: str, user: str) -> dict[str, object]:
+            seen.append(user)
+            return {"rewritten_question": "확인할게요", "in_scope": True, "reason": "r"}
+
+        return complete
+
+    app = create_app()
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+    app.dependency_overrides[get_plan_completer] = recording_completer
+    app.dependency_overrides[get_agent_stream_runner] = lambda: _fake_agent_stream_runner("네.")
+    client = TestClient(app)
+
+    client.post(
+        "/counsel/stream",
+        json={
+            "question": "제 번호는 010-1234-5678이고 주민번호는 900101-1234567이에요",
+            "history": [{"role": "user", "content": "메일은 a@b.com 이에요"}],
+            "session_id": "valid-session",
+        },
+    )
+
+    prompt = "".join(seen)
+    assert "010-1234-5678" not in prompt
+    assert "900101-1234567" not in prompt
+    assert "a@b.com" not in prompt

@@ -186,3 +186,10 @@ def test_openapi_reuses_shared_claim_and_reference_source_contracts() -> None:
         "$ref": "#/components/schemas/ReferenceSource"
     }
     assert "PremiumBenchmarkSource" not in schemas
+
+
+def test_counsel_stream_declares_the_turn_limit_response() -> None:
+    responses = app.openapi()["paths"]["/counsel/stream"]["post"]["responses"]
+
+    assert "429" in responses
+    assert set(responses["429"]["content"]) == {"application/json"}

@@ -7,11 +7,11 @@ degrades to 확인필요/부분 instead of breaking the upload).
 """
 
 import json
-import os
 from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, cast
 
+from agents import set_default_openai_key, set_tracing_disabled
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -93,18 +93,21 @@ def dump_prompt_json(payload: object) -> str:
 
 
 def configure_agent_sdk_credentials() -> None:
-    """Publish the configured key so SDKs that read the environment can see it.
+    """Hand the configured key to the agents SDK and switch its tracing off.
 
-    pydantic-settings loads .env into Settings, not into os.environ, but the
-    agents SDK builds its own OpenAI client from the environment. Without this
-    the planner answers from .env while the agent fails at request time -- the
-    app boots fine and only half of it works.
+    pydantic-settings loads .env into Settings, not into os.environ, so the SDK
+    would otherwise build its client without a key. Passing it through the SDK's
+    own entry point avoids exporting a secret process-wide, where child
+    processes and environment dumps would pick it up.
 
-    A missing key is left absent rather than written as an empty string: the SDK
-    would then fail as "invalid key" instead of "not configured". Nothing is
-    raised here because every OpenAI call site already raises at use time.
+    Tracing is disabled because it ships the conversation -- the user's question
+    and the policy facts the tools returned -- to OpenAI's trace store. That is
+    an export of personal data the product never asked for, and it is on by
+    default in this SDK.
     """
+
+    set_tracing_disabled(True)
 
     api_key = get_settings().openai_api_key
     if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
+        set_default_openai_key(api_key, use_for_tracing=False)

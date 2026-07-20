@@ -12,6 +12,7 @@ from app.core.responses import EventStreamOpenAPIResponse
 from app.integrations.openai.client import JsonCompleter, structured_completer
 from app.modules.counsel.agent.definition import AgentStreamRunner, run_agent_streamed
 from app.modules.counsel.answer import CounselStreamEvent, build_answer_stream
+from app.modules.counsel.pii import mask_counsel_pii, masked_history
 from app.modules.counsel.planner import CounselPlan, plan_counsel_turn
 from app.modules.counsel.schemas import CounselRequest
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
@@ -43,7 +44,7 @@ AgentStreamRunnerDep = Annotated[AgentStreamRunner, Depends(get_agent_stream_run
             "model": CounselStreamEvent,
             "description": "Server-Sent Events: meta → delta* → end",
         },
-        **api_error_responses(403, response_media_type="application/json"),
+        **api_error_responses(403, 429, response_media_type="application/json"),
     },
 )
 async def stream_counsel_answer(
@@ -83,17 +84,22 @@ async def stream_counsel_answer(
             ),
         ) from None
 
+    # Mask once, here, so every downstream model call and anything an exporter
+    # might carry sees the same masked text.
+    question = mask_counsel_pii(request.question)
+    history = masked_history(request.history)
+
     plan = await asyncio.to_thread(
         plan_counsel_turn,
-        request.question,
-        request.history,
+        question,
+        history,
         complete=plan_completer,
     )
 
     events = build_answer_stream(
         turns_remaining=turns_remaining,
-        question=request.question,
-        history=request.history,
+        question=question,
+        history=history,
         plan=plan,
         policies=list(snapshot.policies),
         policy_rag_session_ids=snapshot.rag_session_ids,
