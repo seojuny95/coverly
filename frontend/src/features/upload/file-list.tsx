@@ -4,6 +4,10 @@ import { Card } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import type { FileReadStatus, SelectedUploadFile } from "./types";
 
+// Per-row stagger, capped at 150ms so a long file list doesn't push the
+// last row's entrance noticeably later than the first.
+const ENTER_DELAY_CLASSES = ["delay-0", "delay-75", "delay-150"];
+
 // The list of PDFs the user has picked (before submitting), with per-file
 // status/error badges and a remove button. Presentational: all state lives in
 // the parent form; this only renders and reports removals.
@@ -48,8 +52,12 @@ export function SelectedFileList({
         </p>
       </div>
       <ul className="mt-3 space-y-2">
-        {files.map((selectedFile) => {
+        {files.map((selectedFile, index) => {
           const needsPassword = isPasswordError(selectedFile.errorCode);
+          const enterDelayClassName =
+            ENTER_DELAY_CLASSES[
+              Math.min(index, ENTER_DELAY_CLASSES.length - 1)
+            ];
           const shouldAutoFocusPassword =
             needsPassword && !selectedFile.password && !disableRemove;
           const rowClassName = needsPassword
@@ -64,7 +72,7 @@ export function SelectedFileList({
           return (
             <li
               key={selectedFile.id}
-              className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${rowClassName}`}
+              className={`animate-enter flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${enterDelayClassName} ${rowClassName}`}
             >
               <span className="min-w-0 flex-1">
                 <span className="flex min-w-0 flex-wrap items-center gap-2">
