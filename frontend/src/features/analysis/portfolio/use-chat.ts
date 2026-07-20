@@ -8,7 +8,7 @@ import { streamPortfolioQuestion, type ChatHistoryItem } from "./api";
 // a question the product offers first has to be one it can actually answer.
 const INITIAL_SUGGESTIONS = [
   "겹치는 보장이 있는지 봐줄래요?",
-  "암 진단 시 얼마 받을 수 있어요?",
+  "내 보험에서 비어 있는 보장이 있나요?",
   "실손의료비는 어디로 청구해요?",
 ];
 
