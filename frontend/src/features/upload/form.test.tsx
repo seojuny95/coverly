@@ -125,6 +125,14 @@ describe("InsuranceUploadForm", () => {
     });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
 
+    // jsdom's accessibility-tree queries don't honor `inert`, so a collapsed
+    // link is still findable by role here; assert the `inert` ancestor
+    // directly to prove it is actually removed from the tab order.
+    const collapsedLink = screen.getByRole("link", {
+      name: "가입한 보험사 확인 (새 창에서 열기)",
+    });
+    expect(collapsedLink.closest("[inert]")).not.toBeNull();
+
     await user.click(trigger);
 
     expect(trigger).toHaveAttribute("aria-expanded", "true");
@@ -138,6 +146,7 @@ describe("InsuranceUploadForm", () => {
     const insurerLookupLink = screen.getByRole("link", {
       name: "가입한 보험사 확인 (새 창에서 열기)",
     });
+    expect(insurerLookupLink.closest("[inert]")).toBeNull();
     expect(insurerLookupLink).toHaveAttribute(
       "href",
       "https://cont.insure.or.kr/cont_web/intro.do",
