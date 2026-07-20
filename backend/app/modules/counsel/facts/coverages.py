@@ -1,13 +1,12 @@
 """Deterministic coverage facts for counsel."""
 
-from collections import defaultdict
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.modules.coverage.contracts import CoverageType
 from app.modules.coverage.matching import canonicalize_coverage_name
-from app.modules.portfolio.schemas import PolicyInput
+from app.modules.portfolio.schemas import CoverageInput, PolicyInput
 
 CoverageExplanationBasis = Literal["policy_wording", "generated_guidance", "none"]
 
@@ -139,6 +138,18 @@ def calculate_coverage_total_fact(
     )
 
 
+class _OverlapGroup(BaseModel):
+    """Every row that shares one canonical coverage identity."""
+
+    담보명: str
+    contract_ids: set[str] = Field(default_factory=set)
+    entries: list[OverlapEntry] = Field(default_factory=list)
+
+    @property
+    def spans_two_contracts(self) -> bool:
+        return len(self.contract_ids) > 1
+
+
 def find_overlapping_coverage_facts(
     policies: list[PolicyInput],
 ) -> list[OverlappingCoverage]:
@@ -149,41 +160,50 @@ def find_overlapping_coverage_facts(
     limit -- and calling that an overlap tells the user they bought the same
     protection twice.
 
-    Names are compared by canonical identity so a line break inside a name does
-    not hide a real overlap, while a meaningful qualifier such as (감액없음)
-    still keeps two coverages apart.
+    Names are compared by canonical identity, so a line break inside a PDF name
+    ("배상책 임") does not hide a real overlap, while a qualifier that changes
+    what pays out, such as (유사암제외), keeps two coverages apart.
     """
 
-    groups: dict[str, list[OverlapEntry]] = defaultdict(list)
-    display_names: dict[str, str] = {}
-    contracts: dict[str, set[str]] = defaultdict(set)
+    groups = _group_by_coverage_identity(policies)
+
+    overlapping = [group for group in groups.values() if group.spans_two_contracts]
+    overlapping.sort(key=lambda group: group.담보명)
+    return [
+        OverlappingCoverage(담보명=group.담보명, policies=group.entries) for group in overlapping
+    ]
+
+
+def _group_by_coverage_identity(policies: list[PolicyInput]) -> dict[str, _OverlapGroup]:
+    groups: dict[str, _OverlapGroup] = {}
 
     for index, policy in enumerate(policies):
-        contract_id = policy.id or f"index-{index}"
+        # Two unsaved policies could both arrive without an id; keep them apart.
+        contract_id = policy.id or f"unsaved-{index}"
+
         for coverage in policy.보장목록:
             key = _canonical_key(coverage.담보명)
             if not key:
                 continue
-            display_names.setdefault(key, coverage.담보명)
-            contracts[key].add(contract_id)
-            groups[key].append(
-                OverlapEntry(
-                    policy_id=policy.id,
-                    보험사=policy.기본정보.보험사,
-                    상품명=policy.기본정보.상품명,
-                    가입금액=coverage.가입금액,
-                    가입금액숫자=coverage.가입금액숫자,
-                    지급유형=coverage.지급유형,
-                    유형=coverage.유형,
-                    보장분류=coverage.보장분류,
-                )
-            )
 
-    return [
-        OverlappingCoverage(담보명=display_names[key], policies=entries)
-        for key, entries in sorted(groups.items(), key=lambda item: display_names[item[0]])
-        if len(contracts[key]) > 1
-    ]
+            group = groups.setdefault(key, _OverlapGroup(담보명=coverage.담보명))
+            group.contract_ids.add(contract_id)
+            group.entries.append(_overlap_entry(policy, coverage))
+
+    return groups
+
+
+def _overlap_entry(policy: PolicyInput, coverage: CoverageInput) -> OverlapEntry:
+    return OverlapEntry(
+        policy_id=policy.id,
+        보험사=policy.기본정보.보험사,
+        상품명=policy.기본정보.상품명,
+        가입금액=coverage.가입금액,
+        가입금액숫자=coverage.가입금액숫자,
+        지급유형=coverage.지급유형,
+        유형=coverage.유형,
+        보장분류=coverage.보장분류,
+    )
 
 
 def match_coverage_names(
