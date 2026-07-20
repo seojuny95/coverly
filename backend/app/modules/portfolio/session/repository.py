@@ -28,6 +28,21 @@ class PortfolioPolicySelectionNotFound(Exception):
 class PortfolioSessionRepository(Protocol):
     def create(self, session: NewPortfolioSession) -> None: ...
 
+    def consume_counsel_turn(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
+        """Claim one counsel turn, returning how many remain.
+
+        None means the session is gone or the cap is already reached. The check
+        and the increment happen together so two concurrent requests cannot both
+        take the last turn.
+        """
+        ...
+
     def reserve_document(
         self,
         session_id: str,
@@ -48,6 +63,16 @@ class PortfolioSessionRepository(Protocol):
     ) -> CompleteDocumentResult: ...
 
     def release_document(self, reservation: PolicyDocumentReservation) -> None: ...
+
+    def counsel_turns_remaining(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
+        """How many counsel turns this session has left, or None if it is gone."""
+        ...
 
     def snapshot(
         self,

@@ -9,10 +9,18 @@ from app.modules.counsel.router import get_agent_stream_runner, get_plan_complet
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.models import PortfolioSessionSnapshot
-from app.modules.portfolio.session.service import InvalidPortfolioSessionToken
+from app.modules.portfolio.session.service import (
+    CounselTurnLimitReached,
+    InvalidPortfolioSessionToken,
+)
 
 
 class _Sessions:
+    def consume_counsel_turn(self, token: str, **_kwargs: object) -> int:
+        if token != "valid-session":
+            raise InvalidPortfolioSessionToken
+        return 9
+
     def snapshot(self, token: str, **_kwargs: object) -> PortfolioSessionSnapshot:
         if token != "valid-session":
             raise InvalidPortfolioSessionToken
@@ -83,6 +91,7 @@ def test_stream_endpoint_streams_meta_then_deltas_then_end_when_in_scope() -> No
             "in_scope": True,
             "rewritten_question": "암진단비 알려줘",
             "excluded_note": None,
+            "turns_remaining": 9,
         },
         {"type": "delta", "text": "암진단비가 "},
         {"type": "delta", "text": "확인돼요."},
@@ -146,4 +155,60 @@ def test_an_invalid_session_never_sends_the_question_to_the_planner() -> None:
     )
 
     assert response.status_code == 403
+    assert planned == []
+
+
+class _LimitedSessions(_Sessions):
+    def __init__(self, remaining: int | None) -> None:
+        self.remaining = remaining
+        self.consumed = 0
+
+    def consume_counsel_turn(self, token: str, **_kwargs: object) -> int:
+        if token != "valid-session":
+            raise InvalidPortfolioSessionToken
+        if self.remaining is None:
+            raise CounselTurnLimitReached
+        self.consumed += 1
+        return self.remaining
+
+
+def test_stream_endpoint_reports_how_many_turns_are_left() -> None:
+    app = create_app()
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _LimitedSessions(7)
+    app.dependency_overrides[get_plan_completer] = lambda: _in_scope_completer("암진단비 알려줘")
+    app.dependency_overrides[get_agent_stream_runner] = lambda: _fake_agent_stream_runner("네.")
+    client = TestClient(app)
+
+    response = client.post(
+        "/counsel/stream",
+        json={"question": "암진단비 알려줘", "history": [], "session_id": "valid-session"},
+    )
+
+    meta = _parse_sse_events(response.text)[0]
+    assert meta["turns_remaining"] == 7
+
+
+def test_stream_endpoint_refuses_once_the_session_runs_out_of_turns() -> None:
+    planned: list[str] = []
+
+    def recording_completer() -> object:
+        def complete(_system: str, user: str) -> dict[str, object]:
+            planned.append(user)
+            return {"rewritten_question": "x", "in_scope": True, "reason": "r"}
+
+        return complete
+
+    app = create_app()
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _LimitedSessions(None)
+    app.dependency_overrides[get_plan_completer] = recording_completer
+    client = TestClient(app)
+
+    response = client.post(
+        "/counsel/stream",
+        json={"question": "암진단비 알려줘", "history": [], "session_id": "valid-session"},
+    )
+
+    assert response.status_code == 429
+    assert response.json()["error"]["code"] == "COUNSEL_TURN_LIMIT_REACHED"
+    # the limit must bite before the planner spends a call
     assert planned == []

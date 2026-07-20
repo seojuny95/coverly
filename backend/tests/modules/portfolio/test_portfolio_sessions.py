@@ -19,6 +19,7 @@ from app.modules.portfolio.session.repository import (
     ReserveDocumentResult,
 )
 from app.modules.portfolio.session.service import (
+    CounselTurnLimitReached,
     InvalidPortfolioSessionToken,
     PortfolioSessionDocumentCancelled,
     PortfolioSessionDocumentConflict,
@@ -37,6 +38,32 @@ class _Repository:
         self.version = 0
         self.cancelled_document_ids: set[str] = set()
         self.reservations: dict[str, tuple[str, datetime]] = {}
+        self.counsel_turns_used = 0
+
+    def counsel_turns_remaining(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
+        if self.session is None or self.session.id != session_id:
+            return None
+        return max(0, max_turns - self.counsel_turns_used)
+
+    def consume_counsel_turn(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
+        if self.session is None or self.session.id != session_id:
+            return None
+        if self.counsel_turns_used >= max_turns:
+            return None
+        self.counsel_turns_used += 1
+        return max_turns - self.counsel_turns_used
 
     def create(self, session: NewPortfolioSession) -> None:
         self.session = session
@@ -577,3 +604,38 @@ def _empty_pipeline_result() -> PipelineResult:
         "분석상태": "완료",
         "문자수": 1,
     }
+
+
+def test_counsel_turns_run_out_after_the_configured_limit() -> None:
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+
+    remaining = [
+        sessions.consume_counsel_turn(access.token, max_turns=3, now=now) for _ in range(3)
+    ]
+
+    assert remaining == [2, 1, 0]
+    with pytest.raises(CounselTurnLimitReached):
+        sessions.consume_counsel_turn(access.token, max_turns=3, now=now)
+
+
+def test_adding_a_policy_document_does_not_restore_counsel_turns() -> None:
+    # The cap belongs to the session, not to what is in it. Uploading another
+    # policy must not hand the user a fresh allowance.
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+    sessions.consume_counsel_turn(access.token, max_turns=2, now=now)
+
+    repository.documents["document-1"] = StoredPolicyDocument(
+        id="document-1",
+        policy=PolicyInput.model_validate({"id": "document-1", "기본정보": {}, "보장목록": []}),
+        rag_session_id=None,
+    )
+
+    assert sessions.consume_counsel_turn(access.token, max_turns=2, now=now) == 0
+    with pytest.raises(CounselTurnLimitReached):
+        sessions.consume_counsel_turn(access.token, max_turns=2, now=now)

@@ -55,6 +55,50 @@ class PgPortfolioSessionRepository:
                 ),
             )
 
+    def consume_counsel_turn(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
+        """Claim one counsel turn, returning how many remain, or None if refused.
+
+        The guard is in the UPDATE itself, so two concurrent requests cannot both
+        take the last turn the way a separate read-then-write could.
+        """
+
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                """UPDATE private.portfolio_sessions
+                      SET counsel_turns_used = counsel_turns_used + 1
+                    WHERE id = %s
+                      AND expires_at > %s
+                      AND counsel_turns_used < %s
+                RETURNING counsel_turns_used""",
+                (session_id, now, max_turns),
+            ).fetchone()
+        if row is None:
+            return None
+        return max_turns - int(row["counsel_turns_used"])
+
+    def counsel_turns_remaining(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                """SELECT counsel_turns_used FROM private.portfolio_sessions
+                    WHERE id = %s AND expires_at > %s""",
+                (session_id, now),
+            ).fetchone()
+        if row is None:
+            return None
+        return max(0, max_turns - int(row["counsel_turns_used"]))
+
     def reserve_document(
         self,
         session_id: str,

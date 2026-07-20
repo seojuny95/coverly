@@ -40,6 +40,10 @@ class InvalidPortfolioSessionToken(InvalidPolicySessionToken):
     """The portfolio session is invalid, expired, or no longer stored."""
 
 
+class CounselTurnLimitReached(Exception):
+    """This session has used every counsel turn it is allowed."""
+
+
 class PortfolioSessionDocumentLimitExceeded(Exception):
     """The portfolio already contains the maximum number of documents."""
 
@@ -201,6 +205,50 @@ class PortfolioSessionService:
                 "Portfolio document reservation release failed with %s",
                 type(exc).__name__,
             )
+
+    def consume_counsel_turn(
+        self,
+        token: str,
+        *,
+        max_turns: int,
+        now: datetime | None = None,
+    ) -> int:
+        """Claim one counsel turn for this session and return the remaining count.
+
+        The counter lives on the session, so adding policy documents later never
+        restores turns.
+        """
+
+        current = now or datetime.now(UTC)
+        claims = self._verify(token, now=current)
+        remaining = self._repository.consume_counsel_turn(
+            claims.session_id,
+            now=current,
+            max_turns=max_turns,
+        )
+        if remaining is None:
+            raise CounselTurnLimitReached
+        return remaining
+
+    def counsel_turns_remaining(
+        self,
+        token: str,
+        *,
+        max_turns: int,
+        now: datetime | None = None,
+    ) -> int:
+        """Report the remaining counsel turns so a reloaded page shows the truth."""
+
+        current = now or datetime.now(UTC)
+        claims = self._verify(token, now=current)
+        remaining = self._repository.counsel_turns_remaining(
+            claims.session_id,
+            now=current,
+            max_turns=max_turns,
+        )
+        if remaining is None:
+            raise InvalidPortfolioSessionToken
+        return remaining
 
     def snapshot(
         self,

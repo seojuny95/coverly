@@ -15,7 +15,10 @@ from app.modules.counsel.answer import CounselStreamEvent, build_answer_stream
 from app.modules.counsel.planner import CounselPlan, plan_counsel_turn
 from app.modules.counsel.schemas import CounselRequest
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
-from app.modules.portfolio.session.service import InvalidPortfolioSessionToken
+from app.modules.portfolio.session.service import (
+    CounselTurnLimitReached,
+    InvalidPortfolioSessionToken,
+)
 
 router = APIRouter(prefix="/counsel", tags=["counsel"])
 
@@ -51,6 +54,8 @@ async def stream_counsel_answer(
 ) -> StreamingResponse:
     """Resolve the session, plan the turn, then stream the answer as SSE."""
 
+    settings = get_settings()
+
     # The session token is an access boundary, so it is checked before the
     # question and history are sent anywhere.
     try:
@@ -62,6 +67,22 @@ async def stream_counsel_answer(
             message="분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
         ) from None
 
+    try:
+        turns_remaining = await asyncio.to_thread(
+            sessions.consume_counsel_turn,
+            request.session_id,
+            max_turns=settings.counsel_max_turns_per_session,
+        )
+    except CounselTurnLimitReached:
+        raise ApiError(
+            status_code=429,
+            code="COUNSEL_TURN_LIMIT_REACHED",
+            message=(
+                f"이 분석에서는 질문을 {settings.counsel_max_turns_per_session}번까지 할 수 "
+                "있어요. 새 증권을 올려 분석을 다시 시작하면 질문을 이어갈 수 있어요."
+            ),
+        ) from None
+
     plan = await asyncio.to_thread(
         plan_counsel_turn,
         request.question,
@@ -70,12 +91,13 @@ async def stream_counsel_answer(
     )
 
     events = build_answer_stream(
+        turns_remaining=turns_remaining,
         question=request.question,
         history=request.history,
         plan=plan,
         policies=list(snapshot.policies),
         policy_rag_session_ids=snapshot.rag_session_ids,
-        model=get_settings().openai_model,
+        model=settings.openai_model,
         agent_stream_runner=agent_stream_runner,
     )
     return StreamingResponse(events, media_type="text/event-stream")

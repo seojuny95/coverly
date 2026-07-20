@@ -17,6 +17,7 @@ class PortfolioSessionRequest(BaseModel):
 class PortfolioSessionResponse(BaseModel):
     portfolio_session_token: str = Field(serialization_alias="portfolioSessionToken")
     expires_at: str = Field(serialization_alias="expiresAt")
+    counsel_turns_remaining: int = Field(serialization_alias="counselTurnsRemaining")
 
 
 class PortfolioSessionDeleteResponse(BaseModel):

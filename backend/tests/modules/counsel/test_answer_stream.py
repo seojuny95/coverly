@@ -32,6 +32,7 @@ def test_streams_meta_then_agent_deltas_then_end_when_in_scope() -> None:
                 policies=[],
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=_fake_agent_stream_runner,
             )
         )
@@ -43,6 +44,7 @@ def test_streams_meta_then_agent_deltas_then_end_when_in_scope() -> None:
             "in_scope": True,
             "rewritten_question": "암진단비 알려줘",
             "excluded_note": None,
+            "turns_remaining": 9,
         },
         {"type": "delta", "text": "암진단비가 "},
         {"type": "delta", "text": "확인돼요."},
@@ -71,6 +73,7 @@ def test_streams_the_refusal_message_without_running_the_agent_when_out_of_scope
                 policies=[],
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=unexpected_runner,
             )
         )
@@ -117,6 +120,7 @@ def test_streams_fact_answer_without_running_agent_for_fact_only_plan() -> None:
                 ],
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=unexpected_runner,
             )
         )
@@ -161,6 +165,7 @@ def test_streams_fact_answer_before_agent_for_fact_then_explanation_plan() -> No
                 ],
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=_fake_agent_stream_runner,
             )
         )
@@ -198,6 +203,7 @@ def test_closing_the_stream_early_propagates_into_the_agent_stream_runner() -> N
                 policies=[],
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=slow_agent_stream_runner,
             ),
         )
@@ -255,6 +261,7 @@ def test_a_coverage_only_the_rewrite_names_does_not_end_on_a_stated_amount() -> 
                 policies=_cancer_policies(),
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=_fake_agent_stream_runner,
             )
         )
@@ -278,6 +285,7 @@ def test_a_coverage_the_user_named_in_an_earlier_turn_still_answers_from_facts()
                 policies=_cancer_policies(),
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=_fake_agent_stream_runner,
             )
         )
@@ -310,6 +318,7 @@ def test_clarify_asks_the_user_back_instead_of_handing_off_to_the_agent() -> Non
                 policies=_cancer_policies(),
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=_fake_agent_stream_runner,
             )
         )
@@ -331,6 +340,7 @@ def test_clarify_with_nothing_planned_still_asks_something() -> None:
                 policies=_cancer_policies(),
                 policy_rag_session_ids=(),
                 model="gpt-4.1-mini",
+                turns_remaining=9,
                 agent_stream_runner=_fake_agent_stream_runner,
             )
         )

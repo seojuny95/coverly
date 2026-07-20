@@ -11,6 +11,7 @@ class CounselMetaEvent(BaseModel):
     in_scope: bool
     rewritten_question: str
     excluded_note: str | None
+    turns_remaining: int
 
 
 class CounselDeltaEvent(BaseModel):

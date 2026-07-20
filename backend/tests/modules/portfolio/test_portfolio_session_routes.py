@@ -17,6 +17,9 @@ class _Sessions:
     def create(self) -> PortfolioSessionAccess:
         return _access("created-token")
 
+    def counsel_turns_remaining(self, token: str, **_kwargs: object) -> int:
+        return 8
+
     def refresh(self, token: str) -> PortfolioSessionAccess:
         self.refreshed.append(token)
         return _access("refreshed-token")

@@ -22,6 +22,7 @@ type ApiErrorCode = Literal[
     "reference_data_unavailable",
     "INVALID_PORTFOLIO_SESSION",
     "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
+    "COUNSEL_TURN_LIMIT_REACHED",
     "POLICY_UPLOAD_CANCELLED",
     "portfolio_session_unavailable",
     "INVALID_POLICY_SELECTION",

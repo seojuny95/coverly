@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.core.config import get_settings
 from app.core.errors import api_error_responses
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.http import expired_portfolio_session_error
@@ -30,6 +31,7 @@ def create_portfolio_session(
     return PortfolioSessionResponse(
         portfolio_session_token=access.token,
         expires_at=access.expires_at.isoformat(),
+        counsel_turns_remaining=get_settings().counsel_max_turns_per_session,
     )
 
 
@@ -46,9 +48,14 @@ def refresh_portfolio_session(
         access = sessions.refresh(request.portfolio_session_token)
     except InvalidPortfolioSessionToken:
         raise expired_portfolio_session_error() from None
+    max_turns = get_settings().counsel_max_turns_per_session
     return PortfolioSessionResponse(
         portfolio_session_token=access.token,
         expires_at=access.expires_at.isoformat(),
+        counsel_turns_remaining=sessions.counsel_turns_remaining(
+            access.token,
+            max_turns=max_turns,
+        ),
     )
 
 

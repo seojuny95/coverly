@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     policy_rag_max_ttl_seconds: int = 2 * 60 * 60
     policy_rag_session_secret: str = ""
     portfolio_session_max_documents: int = 50
+    counsel_max_turns_per_session: int = 10
     policy_upload_reservation_ttl_seconds: int = 15 * 60
 
     model_config = SettingsConfigDict(

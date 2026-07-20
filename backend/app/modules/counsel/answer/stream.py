@@ -33,6 +33,7 @@ async def build_answer_stream(
     policies: list[PolicyInput],
     policy_rag_session_ids: tuple[str, ...],
     model: str,
+    turns_remaining: int,
     agent_stream_runner: AgentStreamRunner,
 ) -> AsyncIterator[str]:
     """Yield serialized SSE events: one meta event, then deltas, then end."""
@@ -42,6 +43,7 @@ async def build_answer_stream(
             in_scope=plan.in_scope,
             rewritten_question=plan.rewritten_question,
             excluded_note=plan.excluded_note,
+            turns_remaining=turns_remaining,
         )
     )
 
