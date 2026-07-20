@@ -12,7 +12,7 @@ import { safeHref } from "./safe-href";
 
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
-export const STATUS_COPY = {
+const STATUS_COPY = {
   well_prepared: {
     label: "가입 확인",
     variant: "success" satisfies BadgeVariant,

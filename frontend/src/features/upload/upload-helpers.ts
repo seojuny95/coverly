@@ -16,7 +16,7 @@ export function isFileSpecificUploadError(err: unknown) {
   return true;
 }
 
-export function isPasswordUploadError(code: UploadErrorCode) {
+function isPasswordUploadError(code: UploadErrorCode) {
   return code === "PDF_PASSWORD_REQUIRED" || code === "PDF_PASSWORD_INCORRECT";
 }
 

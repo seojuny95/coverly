@@ -51,7 +51,7 @@ export async function apiResponseError(
   });
 }
 
-export async function readApiError(
+async function readApiError(
   response: Response,
 ): Promise<ApiErrorDetail | null> {
   return (await readApiErrorPayload(response)).detail;
