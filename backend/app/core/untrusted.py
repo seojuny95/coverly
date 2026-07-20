@@ -12,17 +12,19 @@ import unicodedata
 _SAFE_LT = "‹"  # ‹
 _SAFE_GT = "›"  # ›
 
-_INJECTION_MARKERS = (
-    "이전 지시",
-    "시스템 지시",
-    "지시를 무시",
-    "답하라",
-    "출력하라",
-    "추천하라",
-    "권유하라",
+# Markers fire on instruction-shaped Korean, not on any substring occurrence.
+# "지시" only counts when a particle follows it, so the noun-modifying form
+# ("이전 지시된 특약") is left alone; "-하라" only counts when nothing follows,
+# so the quotative ("권유하라는 안내") is left alone.
+_INJECTION_MARKER_RE = re.compile(
+    r"(?:이전|시스템)\s*지시(?=[를은는이가에]|\s|$)"
+    r"|지시를?\s*무시"
+    r"|(?:답|출력|추천|권유)하라(?![가-힣])"
 )
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+
+_CONTENT_RE = re.compile(r"\w")
 
 
 def wrap_untrusted(text: str, *, label: str = "문서") -> str:
@@ -70,11 +72,30 @@ def _neutralize_tag_delimiters(text: str) -> str:
 
 
 def strip_injection_markers(text: str) -> str:
-    """Drop sentences that read as instructions. Single-line text only."""
+    """Cut each sentence off where it turns into an instruction.
+
+    Single-line text only. A sentence is truncated at the first marker rather
+    than deleted: Korean policy text often carries no sentence punctuation, so
+    deleting the whole part would take the coverage amount the user is looking
+    at with it. Everything from the marker to the end of that sentence goes,
+    since an instruction runs on past its opening words.
+    """
 
     parts = _SENTENCE_SPLIT_RE.split(text.strip())
-    kept = [part for part in parts if not any(marker in part for marker in _INJECTION_MARKERS)]
-    return " ".join(kept).strip()
+    kept = [_truncate_at_first_marker(part) for part in parts]
+    return " ".join(part for part in kept if part).strip()
+
+
+def _truncate_at_first_marker(part: str) -> str:
+    match = _INJECTION_MARKER_RE.search(part)
+    if match is None:
+        return part
+
+    before = part[: match.start()].rstrip()
+    if not _CONTENT_RE.search(before):
+        return ""
+
+    return before
 
 
 def strip_injection_markers_by_line(text: str) -> str:
