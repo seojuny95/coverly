@@ -245,6 +245,30 @@
       ]
     },
     {
+      "id": "out_of_scope_after_insurance_turns",
+      "intent": "범위 밖 거절 — 앞선 보험 대화에 끌려가지 않는지",
+      "turns": [
+        {
+          "question": "교통사고처리지원금 얼마야?",
+          "expected_in_scope": true,
+          "must_include_any": [
+            "교통사고"
+          ]
+        },
+        {
+          "question": "오늘 서울 날씨 어때?",
+          "expected_in_scope": false,
+          "must_include_any": [
+            "보험 상담 범위"
+          ],
+          "must_not_include": [
+            "교통사고처리지원금"
+          ]
+        }
+      ],
+      "notes": "2026-07-20 프론트엔드 라이브 확인에서 발견. 단일턴 날씨 질문은 거절되지만, 앞 턴이 보험 대화였으면 플래너가 날씨 질문을 앞 담보 질문으로 재작성해 in_scope=true로 통과시키고 이전 주제를 계속 답했다. instructions.md에 '이전 대화가 보험 이야기였는지와 무관하게 이번 질문만 보고 정하세요'가 이미 있는데도 재현됨 — 재작성 단계가 history를 보며 주제를 끌고 오는 게 원인으로 보인다. 미수정, 기록만."
+    },
+    {
       "id": "mixed_scope",
       "intent": "보험 + 무관 내용 혼합 — 무관한 부분만 제외하고 안내",
       "turns": [
