@@ -1161,6 +1161,15 @@ export interface operations {
           "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
+      /** @description Coverly API error */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
     };
   };
   health_health_get: {
