@@ -76,7 +76,7 @@ def test_the_agent_is_asked_the_self_contained_question_not_the_resolved_rewrite
 
     assert "면책기간" in asked[0]
     assert "암진단비" not in asked[0]
-    assert events[0]["rewritten_question"] == "면책기간이 뭐야?"
+    assert events[0]["answered_question"] == "면책기간이 뭐야?"
 
 
 async def _collect(events: AsyncIterator[str]) -> list[dict[str, Any]]:

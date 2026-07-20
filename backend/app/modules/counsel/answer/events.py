@@ -9,8 +9,17 @@ from pydantic import BaseModel, Field
 class CounselMetaEvent(BaseModel):
     type: Literal["meta"] = "meta"
     in_scope: bool
-    rewritten_question: str
+
+    answered_question: str
+    """The question this turn is answering, as the planner tidied it up.
+
+    Not always the history-resolved rewrite: a turn that stands on its own is
+    answered as its own sentence, so naming this field after the rewrite would
+    describe a value it often does not carry.
+    """
+
     excluded_note: str | None
+    """What the planner dropped from the question for being outside insurance."""
     turns_remaining: int
 
 

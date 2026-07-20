@@ -135,7 +135,9 @@ class TurnResult:
     intent: str
     turn_index: int
     question: str
-    rewritten: str
+    answered: str
+    """The question the turn actually answered, from the meta event."""
+
     in_scope: bool
     excluded_note: str | None
     answer: str
@@ -215,7 +217,7 @@ def run_case(client: TestClient, recorder: Recorder, case: dict[str, Any]) -> li
                 intent=case.get("intent", ""),
                 turn_index=index,
                 question=question,
-                rewritten=meta.get("rewritten_question", ""),
+                answered=meta.get("answered_question", ""),
                 in_scope=bool(meta["in_scope"]),
                 excluded_note=meta.get("excluded_note"),
                 answer=answer,

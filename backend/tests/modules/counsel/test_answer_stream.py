@@ -42,7 +42,7 @@ def test_streams_meta_then_agent_deltas_then_end_when_in_scope() -> None:
         {
             "type": "meta",
             "in_scope": True,
-            "rewritten_question": "암진단비 알려줘",
+            "answered_question": "암진단비 알려줘",
             "excluded_note": None,
             "turns_remaining": 9,
         },

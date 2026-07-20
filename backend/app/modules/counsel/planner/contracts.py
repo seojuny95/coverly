@@ -30,11 +30,11 @@ class CounselTask(BaseModel):
 
 
 class CounselPlan(BaseModel):
+    # Declaration order is generation order for structured output, so it follows
+    # instructions.md: the model decides whether it needs the conversation before
+    # it writes the sentence that uses one.
     question_without_history: str = ""
     """The turn tidied up on its own, with nothing borrowed from earlier turns."""
-
-    rewritten_question: str
-    """The turn with its back-references resolved from the conversation."""
 
     needs_history: bool = True
     """Whether this turn can only be understood by looking at earlier turns.
@@ -43,8 +43,11 @@ class CounselPlan(BaseModel):
     payload, a test fixture -- answers the rewritten question as before.
     """
 
-    in_scope: bool
+    rewritten_question: str
+    """The turn with its back-references resolved from the conversation."""
+
     excluded_note: str | None = None
+    in_scope: bool
     reason: str
     tasks: list[CounselTask] = Field(default_factory=list)
     response_mode: CounselResponseMode = "agent"

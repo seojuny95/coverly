@@ -41,7 +41,7 @@ async def build_answer_stream(
     yield serialize_event(
         CounselMetaEvent(
             in_scope=plan.in_scope,
-            rewritten_question=plan.question_to_answer,
+            answered_question=plan.question_to_answer,
             excluded_note=plan.excluded_note,
             turns_remaining=turns_remaining,
         )

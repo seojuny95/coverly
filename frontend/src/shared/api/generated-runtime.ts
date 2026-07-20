@@ -86,7 +86,7 @@ export const COUNSEL_STREAM_JSON_SCHEMA = {
               "discriminator enum property added by openapi-typescript",
           },
           in_scope: { type: "boolean", title: "In Scope" },
-          rewritten_question: { type: "string", title: "Rewritten Question" },
+          answered_question: { type: "string", title: "Answered Question" },
           excluded_note: {
             anyOf: [{ type: "string" }, { type: "null" }],
             title: "Excluded Note",
@@ -96,7 +96,7 @@ export const COUNSEL_STREAM_JSON_SCHEMA = {
         type: "object",
         required: [
           "in_scope",
-          "rewritten_question",
+          "answered_question",
           "excluded_note",
           "turns_remaining",
           "type",
