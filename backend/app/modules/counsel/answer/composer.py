@@ -1,4 +1,6 @@
-"""Compose user-facing counsel text from deterministic fact execution."""
+"""Compose counsel text from deterministic fact execution."""
+
+from collections.abc import Iterable
 
 from app.modules.counsel.answer.executor import FactExecution, FactTaskResult
 from app.modules.counsel.facts.coverages import (
@@ -9,14 +11,28 @@ from app.modules.counsel.facts.coverages import (
 from app.modules.counsel.facts.policies import PolicyFact
 from app.modules.reference_data.contracts import ClaimChannelMedicalIndemnity
 
+# coverage_list exists so the agent can find the exact spelling of a coverage.
+# A real portfolio holds around eighty of them, and printing that catalog answers
+# no question the user asked, so it is written for the agent only.
+_AGENT_ONLY_TASKS: frozenset[str] = frozenset({"coverage_list"})
+
 
 def compose_fact_answer(execution: FactExecution) -> str | None:
-    """Render deterministic facts into a user-facing answer."""
+    """Render the facts the user should see."""
 
-    if not execution.results:
-        return None
+    return _render(
+        result for result in execution.results if result.task.kind not in _AGENT_ONLY_TASKS
+    )
 
-    sections = [_compose_result(result) for result in execution.results]
+
+def compose_agent_facts(execution: FactExecution) -> str | None:
+    """Render every resolved fact, including the ones kept off the screen."""
+
+    return _render(execution.results)
+
+
+def _render(results: Iterable[FactTaskResult]) -> str | None:
+    sections = [_compose_result(result) for result in results]
     answer = "\n\n".join(section for section in sections if section)
     return answer or None
 
@@ -109,12 +125,23 @@ def _coverage_total_answer(result: FactTaskResult) -> str:
 
 
 def _overlap_answer(result: FactTaskResult) -> str:
+    """Name the contracts that share a coverage.
+
+    A row count leaves the reader to guess what the rows are; the amounts and
+    the insurer are what tells them whether the overlap matters.
+    """
+
     overlaps = result.overlaps or []
     if not overlaps:
-        return "현재 자료에서는 같은 담보명이 두 개 이상 확인된 항목이 없어요."
-    lines = ["같은 담보명이 두 개 이상 확인된 항목이에요."]
+        return "현재 자료에서는 여러 계약에 걸쳐 겹치는 담보가 없어요."
+
+    lines = ["여러 계약에서 함께 확인된 담보예요."]
     for item in overlaps:
-        lines.append(f"- {item.담보명}: {len(item.policies)}건")
+        lines.append(f"- {item.담보명}")
+        for entry in item.policies:
+            owner = " · ".join(part for part in (entry.보험사, entry.상품명) if part)
+            amount = entry.가입금액 or "가입금액 미확인"
+            lines.append(f"  - {owner or '보험사 미확인'}: {amount}")
     return "\n".join(lines)
 
 

@@ -94,7 +94,7 @@ describe("portfolio session requests", () => {
     const encoder = new TextEncoder();
     const chunks = [
       'data: {"type":"meta","in_scope":true,',
-      '"rewritten_question":"보험을 알려줘","excluded_note":null,"turns_remaining":9}\r\n\r\n',
+      '"answered_question":"보험을 알려줘","excluded_note":null,"turns_remaining":9}\r\n\r\n',
       'data: {"type":"delta","text":"답변"}\n\n',
       `data: ${JSON.stringify(endEvent())}\n\n`,
     ];
@@ -224,7 +224,7 @@ function metaEvent() {
   return {
     type: "meta" as const,
     in_scope: true,
-    rewritten_question: "보험을 알려줘",
+    answered_question: "보험을 알려줘",
     excluded_note: null,
     turns_remaining: 9,
   };

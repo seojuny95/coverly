@@ -1,7 +1,7 @@
 import asyncio
 import json
 from collections.abc import AsyncGenerator, AsyncIterator
-from typing import cast
+from typing import Any, cast
 
 from app.modules.counsel.answer import build_answer_stream
 from app.modules.counsel.planner import CounselPlan, CounselTask
@@ -10,7 +10,7 @@ from app.modules.portfolio.schemas import PolicyInput
 
 
 async def _fake_agent_stream_runner(
-    _agent: object, _input_text: str, _context: object
+    _agent: Any, _conversation: Any, _context: Any
 ) -> AsyncIterator[str]:
     yield "암진단비가 "
     yield "확인돼요."
@@ -42,7 +42,7 @@ def test_streams_meta_then_agent_deltas_then_end_when_in_scope() -> None:
         {
             "type": "meta",
             "in_scope": True,
-            "rewritten_question": "암진단비 알려줘",
+            "answered_question": "암진단비 알려줘",
             "excluded_note": None,
             "turns_remaining": 9,
         },
@@ -56,7 +56,7 @@ def test_streams_the_refusal_message_without_running_the_agent_when_out_of_scope
     called = False
 
     async def unexpected_runner(
-        _agent: object, _input_text: str, _context: object
+        _agent: Any, _conversation: Any, _context: Any
     ) -> AsyncIterator[str]:
         nonlocal called
         called = True
@@ -90,7 +90,7 @@ def test_streams_fact_answer_without_running_agent_for_fact_only_plan() -> None:
     called = False
 
     async def unexpected_runner(
-        _agent: object, _input_text: str, _context: object
+        _agent: Any, _conversation: Any, _context: Any
     ) -> AsyncIterator[str]:
         nonlocal called
         called = True
@@ -182,7 +182,7 @@ def test_closing_the_stream_early_propagates_into_the_agent_stream_runner() -> N
     cleaned_up = False
 
     async def slow_agent_stream_runner(
-        _agent: object, _input_text: str, _context: object
+        _agent: Any, _conversation: Any, _context: Any
     ) -> AsyncIterator[str]:
         nonlocal cleaned_up
         try:
@@ -349,3 +349,48 @@ def test_clarify_with_nothing_planned_still_asks_something() -> None:
     text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
     assert text.rstrip().endswith("?")
     assert "확인돼요." not in text
+
+
+def test_a_catalog_lookup_reaches_the_agent_without_reaching_the_screen() -> None:
+    async def echo_input(_agent: Any, conversation: Any, _context: Any) -> AsyncIterator[str]:
+        text = " ".join(str(item["content"]) for item in conversation)
+        yield f"[받은 컨텍스트에 긴급출동특약 포함: {'긴급출동특약' in text}]"
+
+    plan = CounselPlan(
+        rewritten_question="대장암에 걸렸는데 어떻게 해야 하나요?",
+        in_scope=True,
+        reason="상황형 질문",
+        response_mode="fact_then_explanation",
+        tasks=[CounselTask(kind="coverage_list")],
+    )
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "테스트보험사", "상품명": "종합보험"},
+                "보장목록": [
+                    {"담보명": "암진단비(유사암제외)", "가입금액": "2,000만원"},
+                    {"담보명": "긴급출동특약", "가입금액": "실손"},
+                ],
+            }
+        ),
+    ]
+
+    events = asyncio.run(
+        _collect(
+            build_answer_stream(
+                question="대장암에 걸렸는데 어떻게 해?",
+                history=[],
+                plan=plan,
+                policies=policies,
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                turns_remaining=9,
+                agent_stream_runner=echo_input,
+            )
+        )
+    )
+
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert "긴급출동특약 포함: True" in text
+    assert "현재 확인된 담보명은" not in text

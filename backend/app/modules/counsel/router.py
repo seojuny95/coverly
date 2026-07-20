@@ -12,6 +12,7 @@ from app.core.responses import EventStreamOpenAPIResponse
 from app.integrations.openai.client import JsonCompleter, structured_completer
 from app.modules.counsel.agent.definition import AgentStreamRunner, run_agent_streamed
 from app.modules.counsel.answer import CounselStreamEvent, build_answer_stream
+from app.modules.counsel.history import recent_turns
 from app.modules.counsel.pii import mask_counsel_pii, masked_history
 from app.modules.counsel.planner import CounselPlan, plan_counsel_turn
 from app.modules.counsel.schemas import CounselRequest
@@ -87,7 +88,9 @@ async def stream_counsel_answer(
     # Mask once, here, so every downstream model call and anything an exporter
     # might carry sees the same masked text.
     question = mask_counsel_pii(request.question)
-    history = masked_history(request.history)
+    history = masked_history(
+        recent_turns(request.history, max_turns=settings.counsel_history_turns)
+    )
 
     plan = await asyncio.to_thread(
         plan_counsel_turn,

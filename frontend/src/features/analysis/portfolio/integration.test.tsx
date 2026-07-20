@@ -233,7 +233,7 @@ describe("portfolio features", () => {
           {
             type: "meta",
             in_scope: true,
-            rewritten_question: "암 진단비는?",
+            answered_question: "암 진단비는?",
             excluded_note: null,
             turns_remaining: 9,
           },

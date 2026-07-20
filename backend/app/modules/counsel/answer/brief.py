@@ -1,6 +1,13 @@
-"""Build the agent's input for one turn, including facts already resolved."""
+"""Build the agent's input for one turn: the conversation plus resolved facts.
+
+Earlier turns are passed as their own messages rather than folded into the
+question. A flattened transcript reads as one long user utterance, which is how
+an old topic ends up competing with the current one.
+"""
 
 from app.core.untrusted import strip_injection_markers_by_line, wrap_untrusted
+from app.integrations.openai import ConversationMessage
+from app.modules.counsel.schemas import CounselMessage
 
 _FACTS_LABEL = "확인된사실"
 _CONFIRMED_HEADER = (
@@ -18,12 +25,31 @@ _HEDGE = (
 def build_agent_input(
     question: str,
     *,
+    history: list[CounselMessage],
+    facts: str | None,
+    facts_shown: bool,
+    needs_hedge: bool,
+) -> list[ConversationMessage]:
+    """Compose the conversation the agent answers, current question last."""
+
+    items: list[ConversationMessage] = [
+        ConversationMessage(role=message.role, content=message.content) for message in history
+    ]
+    items.append(
+        ConversationMessage(
+            role="user",
+            content=_current_turn(question, facts, facts_shown, needs_hedge),
+        )
+    )
+    return items
+
+
+def _current_turn(
+    question: str,
     facts: str | None,
     facts_shown: bool,
     needs_hedge: bool,
 ) -> str:
-    """Compose the agent input so it starts from what has already been resolved."""
-
     if facts is None and not needs_hedge:
         return question
 

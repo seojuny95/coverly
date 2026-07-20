@@ -7,6 +7,7 @@ import pytest
 from agents import Runner
 
 from app.core.config import get_settings
+from app.integrations.openai import ConversationMessage
 from app.modules.counsel.agent.definition import create_agent, run_agent_streamed
 from app.modules.counsel.context import CounselContext
 
@@ -61,7 +62,7 @@ def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
             )
 
     def fake_run_streamed(
-        agent: object, *, input: str, context: object, max_turns: object = None
+        agent: object, *, input: list[Any], context: object, max_turns: object = None
     ) -> object:
         captured["agent"] = agent
         captured["input"] = input
@@ -75,13 +76,14 @@ def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
     context = CounselContext(policies=[])
 
     async def collect() -> list[str]:
-        return [chunk async for chunk in run_agent_streamed(agent, "암진단비 알려줘", context)]
+        conversation = [ConversationMessage(role="user", content="암진단비 알려줘")]
+        return [chunk async for chunk in run_agent_streamed(agent, conversation, context)]
 
     chunks = asyncio.run(collect())
 
     assert chunks == ["안녕", "하세요"]
     assert captured["agent"] is agent
-    assert captured["input"] == "암진단비 알려줘"
+    assert captured["input"] == [{"role": "user", "content": "암진단비 알려줘"}]
     assert captured["context"] is context
     # This turn cap is the server-side defense against runaway agent loops;
     # without this assertion, removing the argument from definition.py would

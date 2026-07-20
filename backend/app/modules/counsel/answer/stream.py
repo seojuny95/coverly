@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from app.modules.counsel.agent.definition import AgentStreamRunner, create_agent
 from app.modules.counsel.answer.brief import build_agent_input
 from app.modules.counsel.answer.clarify import compose_clarify_question
-from app.modules.counsel.answer.composer import compose_fact_answer
+from app.modules.counsel.answer.composer import compose_agent_facts, compose_fact_answer
 from app.modules.counsel.answer.escalation import route_answer
 from app.modules.counsel.answer.events import (
     CounselDeltaEvent,
@@ -41,7 +41,7 @@ async def build_answer_stream(
     yield serialize_event(
         CounselMetaEvent(
             in_scope=plan.in_scope,
-            rewritten_question=plan.rewritten_question,
+            answered_question=plan.question_to_answer,
             excluded_note=plan.excluded_note,
             turns_remaining=turns_remaining,
         )
@@ -53,7 +53,11 @@ async def build_answer_stream(
         return
 
     execution = execute_fact_tasks(plan, policies)
-    composed = compose_fact_answer(execution)
+
+    # What the user should read and what the agent needs to work from differ: a
+    # coverage catalog helps the agent and only clutters the screen.
+    user_facts = compose_fact_answer(execution)
+    agent_facts = compose_agent_facts(execution)
 
     if plan.response_mode == "clarify":
         clarifying_question = compose_clarify_question(execution)
@@ -65,7 +69,7 @@ async def build_answer_stream(
     route = route_answer(
         plan,
         execution,
-        composed,
+        user_facts,
         asked_texts=_texts_the_user_wrote(question, history),
     )
 
@@ -79,8 +83,9 @@ async def build_answer_stream(
 
     context = CounselContext(policies=policies, policy_rag_session_ids=policy_rag_session_ids)
     agent_input = build_agent_input(
-        plan.rewritten_question,
-        facts=composed,
+        plan.question_to_answer,
+        history=history,
+        facts=agent_facts,
         facts_shown=route.shows_facts,
         needs_hedge=route.needs_hedge,
     )

@@ -1,6 +1,7 @@
 """OpenAI completion boundary used by application modules."""
 
 from app.integrations.openai.client import (
+    ConversationMessage,
     JsonCompleter,
     compact_prompt_text,
     configure_agent_sdk_credentials,
@@ -10,6 +11,7 @@ from app.integrations.openai.client import (
 )
 
 __all__ = [
+    "ConversationMessage",
     "JsonCompleter",
     "compact_prompt_text",
     "configure_agent_sdk_credentials",
