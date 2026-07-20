@@ -23,6 +23,7 @@ from typing import Any
 from agents import Agent, Runner
 from fastapi.testclient import TestClient
 
+from app.integrations.openai import ConversationMessage
 from app.integrations.openai.client import structured_completer
 from app.main import create_app
 from app.modules.counsel.context import CounselContext
@@ -92,10 +93,10 @@ class Recorder:
     async def agent_stream_runner(
         self,
         agent: Agent[CounselContext],
-        input_text: str,
+        conversation: list[ConversationMessage],
         context: CounselContext,
     ) -> AsyncIterator[str]:
-        result = Runner.run_streamed(agent, input=input_text, context=context)
+        result = Runner.run_streamed(agent, input=list(conversation), context=context)
         async for event in result.stream_events():
             if event.type == "run_item_stream_event":
                 if event.item.type == "tool_call_item":

@@ -243,3 +243,34 @@ def test_the_planner_never_receives_identifiers_the_user_typed() -> None:
     assert "010-1234-5678" not in prompt
     assert "900101-1234567" not in prompt
     assert "a@b.com" not in prompt
+
+
+def test_the_planner_only_sees_the_most_recent_turns() -> None:
+    seen: list[str] = []
+
+    def recording_completer() -> object:
+        def complete(_system: str, user: str) -> dict[str, object]:
+            seen.append(user)
+            return {"rewritten_question": "확인", "in_scope": True, "reason": "r"}
+
+        return complete
+
+    app = create_app()
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+    app.dependency_overrides[get_plan_completer] = recording_completer
+    app.dependency_overrides[get_agent_stream_runner] = lambda: _fake_agent_stream_runner("네.")
+    client = TestClient(app)
+
+    long_history = [
+        {"role": role, "content": f"{role}-{index}"}
+        for index in range(1, 9)
+        for role in ("user", "assistant")
+    ]
+    client.post(
+        "/counsel/stream",
+        json={"question": "지금 질문", "history": long_history, "session_id": "valid-session"},
+    )
+
+    prompt = "".join(seen)
+    assert "user-8" in prompt
+    assert "user-1" not in prompt

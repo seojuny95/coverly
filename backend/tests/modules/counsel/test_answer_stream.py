@@ -1,7 +1,7 @@
 import asyncio
 import json
 from collections.abc import AsyncGenerator, AsyncIterator
-from typing import cast
+from typing import Any, cast
 
 from app.modules.counsel.answer import build_answer_stream
 from app.modules.counsel.planner import CounselPlan, CounselTask
@@ -10,7 +10,7 @@ from app.modules.portfolio.schemas import PolicyInput
 
 
 async def _fake_agent_stream_runner(
-    _agent: object, _input_text: str, _context: object
+    _agent: Any, _conversation: Any, _context: Any
 ) -> AsyncIterator[str]:
     yield "암진단비가 "
     yield "확인돼요."
@@ -56,7 +56,7 @@ def test_streams_the_refusal_message_without_running_the_agent_when_out_of_scope
     called = False
 
     async def unexpected_runner(
-        _agent: object, _input_text: str, _context: object
+        _agent: Any, _conversation: Any, _context: Any
     ) -> AsyncIterator[str]:
         nonlocal called
         called = True
@@ -90,7 +90,7 @@ def test_streams_fact_answer_without_running_agent_for_fact_only_plan() -> None:
     called = False
 
     async def unexpected_runner(
-        _agent: object, _input_text: str, _context: object
+        _agent: Any, _conversation: Any, _context: Any
     ) -> AsyncIterator[str]:
         nonlocal called
         called = True
@@ -182,7 +182,7 @@ def test_closing_the_stream_early_propagates_into_the_agent_stream_runner() -> N
     cleaned_up = False
 
     async def slow_agent_stream_runner(
-        _agent: object, _input_text: str, _context: object
+        _agent: Any, _conversation: Any, _context: Any
     ) -> AsyncIterator[str]:
         nonlocal cleaned_up
         try:
@@ -352,8 +352,9 @@ def test_clarify_with_nothing_planned_still_asks_something() -> None:
 
 
 def test_a_catalog_lookup_reaches_the_agent_without_reaching_the_screen() -> None:
-    async def echo_input(_agent: object, input_text: str, _context: object) -> AsyncIterator[str]:
-        yield f"[받은 컨텍스트에 긴급출동특약 포함: {'긴급출동특약' in input_text}]"
+    async def echo_input(_agent: Any, conversation: Any, _context: Any) -> AsyncIterator[str]:
+        text = " ".join(str(item["content"]) for item in conversation)
+        yield f"[받은 컨텍스트에 긴급출동특약 포함: {'긴급출동특약' in text}]"
 
     plan = CounselPlan(
         rewritten_question="대장암에 걸렸는데 어떻게 해야 하나요?",

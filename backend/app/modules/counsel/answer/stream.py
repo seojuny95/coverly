@@ -84,6 +84,7 @@ async def build_answer_stream(
     context = CounselContext(policies=policies, policy_rag_session_ids=policy_rag_session_ids)
     agent_input = build_agent_input(
         plan.rewritten_question,
+        history=history,
         facts=agent_facts,
         facts_shown=route.shows_facts,
         needs_hedge=route.needs_hedge,

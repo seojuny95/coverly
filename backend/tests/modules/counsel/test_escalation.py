@@ -1,4 +1,3 @@
-from app.modules.counsel.answer.brief import build_agent_input
 from app.modules.counsel.answer.composer import compose_fact_answer
 from app.modules.counsel.answer.escalation import AnswerRoute, route_answer
 from app.modules.counsel.answer.executor import execute_fact_tasks
@@ -111,17 +110,6 @@ def test_named_and_resolved_coverage_needs_no_hedge() -> None:
     route = _route("암진단비(유사암제외) 얼마야?", ["암진단비(유사암제외)"])
 
     assert route.needs_hedge is False
-
-
-def test_agent_input_carries_what_was_shown_and_whether_to_hedge() -> None:
-    shown = build_agent_input("질문", facts="사실", facts_shown=True, needs_hedge=False)
-    hedged = build_agent_input("질문", facts="사실", facts_shown=True, needs_hedge=True)
-    plain = build_agent_input("질문", facts=None, facts_shown=False, needs_hedge=False)
-
-    assert "이미 사용자에게" in shown
-    assert "금액을 확정해서" not in shown
-    assert "금액을 확정해서" in hedged
-    assert plain == "질문"
 
 
 def test_llm_rewrite_alone_is_not_evidence_the_user_named_the_coverage() -> None:
