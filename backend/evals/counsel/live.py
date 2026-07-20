@@ -36,6 +36,7 @@ _HERE = Path(__file__).parent
 _FIXTURE_PATH = _HERE / "fixture_policies.json"
 _DATASET_PATH = _HERE / "dataset.json"
 _SESSION_ID = "live-fixture-session"
+_UNLIMITED_TURNS = 999
 
 
 def load_fixture_policies() -> tuple[PolicyInput, ...]:
@@ -48,6 +49,11 @@ class FixtureSessions:
 
     def __init__(self, policies: tuple[PolicyInput, ...]) -> None:
         self._policies = policies
+
+    def consume_counsel_turn(self, token: str, **_kwargs: object) -> int:
+        """Evaluation runs are not subject to the per-session question cap."""
+
+        return _UNLIMITED_TURNS
 
     def snapshot(self, token: str, **_kwargs: object) -> PortfolioSessionSnapshot:
         return PortfolioSessionSnapshot(

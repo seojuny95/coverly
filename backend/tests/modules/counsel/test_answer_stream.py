@@ -349,3 +349,47 @@ def test_clarify_with_nothing_planned_still_asks_something() -> None:
     text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
     assert text.rstrip().endswith("?")
     assert "확인돼요." not in text
+
+
+def test_a_catalog_lookup_reaches_the_agent_without_reaching_the_screen() -> None:
+    async def echo_input(_agent: object, input_text: str, _context: object) -> AsyncIterator[str]:
+        yield f"[받은 컨텍스트에 긴급출동특약 포함: {'긴급출동특약' in input_text}]"
+
+    plan = CounselPlan(
+        rewritten_question="대장암에 걸렸는데 어떻게 해야 하나요?",
+        in_scope=True,
+        reason="상황형 질문",
+        response_mode="fact_then_explanation",
+        tasks=[CounselTask(kind="coverage_list")],
+    )
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "테스트보험사", "상품명": "종합보험"},
+                "보장목록": [
+                    {"담보명": "암진단비(유사암제외)", "가입금액": "2,000만원"},
+                    {"담보명": "긴급출동특약", "가입금액": "실손"},
+                ],
+            }
+        ),
+    ]
+
+    events = asyncio.run(
+        _collect(
+            build_answer_stream(
+                question="대장암에 걸렸는데 어떻게 해?",
+                history=[],
+                plan=plan,
+                policies=policies,
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                turns_remaining=9,
+                agent_stream_runner=echo_input,
+            )
+        )
+    )
+
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert "긴급출동특약 포함: True" in text
+    assert "현재 확인된 담보명은" not in text

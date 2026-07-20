@@ -1,4 +1,6 @@
-"""Compose user-facing counsel text from deterministic fact execution."""
+"""Compose counsel text from deterministic fact execution."""
+
+from collections.abc import Iterable
 
 from app.modules.counsel.answer.executor import FactExecution, FactTaskResult
 from app.modules.counsel.facts.coverages import (
@@ -9,14 +11,28 @@ from app.modules.counsel.facts.coverages import (
 from app.modules.counsel.facts.policies import PolicyFact
 from app.modules.reference_data.contracts import ClaimChannelMedicalIndemnity
 
+# coverage_list exists so the agent can find the exact spelling of a coverage.
+# A real portfolio holds around eighty of them, and printing that catalog answers
+# no question the user asked, so it is written for the agent only.
+_AGENT_ONLY_TASKS: frozenset[str] = frozenset({"coverage_list"})
+
 
 def compose_fact_answer(execution: FactExecution) -> str | None:
-    """Render deterministic facts into a user-facing answer."""
+    """Render the facts the user should see."""
 
-    if not execution.results:
-        return None
+    return _render(
+        result for result in execution.results if result.task.kind not in _AGENT_ONLY_TASKS
+    )
 
-    sections = [_compose_result(result) for result in execution.results]
+
+def compose_agent_facts(execution: FactExecution) -> str | None:
+    """Render every resolved fact, including the ones kept off the screen."""
+
+    return _render(execution.results)
+
+
+def _render(results: Iterable[FactTaskResult]) -> str | None:
+    sections = [_compose_result(result) for result in results]
     answer = "\n\n".join(section for section in sections if section)
     return answer or None
 
