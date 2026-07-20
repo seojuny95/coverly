@@ -101,6 +101,9 @@
   --animate-amount-range-fill: amount-range-fill 700ms ease-out both;
 }
 
+/* Screen-specific keyframes and CSS-only rules below (descendant, pseudo-element,
+   and :nth-child selectors that a utility class can't express). */
+
 .analysis-overview-grid {
   background-image:
     linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px),
