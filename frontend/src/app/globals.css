@@ -88,6 +88,17 @@
      these so the rule lives in one place instead of in class strings. */
   --animate-enter: enter 200ms ease-out both;
   --animate-enter-overlay: enter-overlay 300ms ease-out both;
+
+  /* Screen-specific animations. Their keyframes cannot be expressed as
+     utility combinations (step timing, many keyframes), so only the entry
+     point is unified here. */
+  --animate-evidence-scan: evidence-scan 8s ease-in-out infinite;
+  --animate-evidence-signal: evidence-signal 8s linear infinite;
+  --animate-evidence-glow: evidence-glow 8s steps(4, end) infinite;
+  --animate-evidence-result-row: evidence-result-row 8s steps(1, end) infinite;
+  --animate-evidence-complete: evidence-complete 8s steps(1, end) infinite;
+  --animate-pixel-pulse: analysis-pixel-pulse 1.6s steps(2, end) infinite;
+  --animate-amount-range-fill: amount-range-fill 700ms ease-out both;
 }
 
 .analysis-overview-grid {
@@ -117,7 +128,7 @@
 
 .analysis-pixel-loader span {
   background: #d4d4d8;
-  animation: analysis-pixel-pulse 1.6s steps(2, end) infinite;
+  animation: var(--animate-pixel-pulse);
 }
 
 .analysis-pixel-loader span:nth-child(2),
@@ -142,7 +153,6 @@
 
 .amount-range-fill {
   width: var(--amount-range-position);
-  animation: amount-range-fill 700ms ease-out both;
 }
 
 @keyframes amount-range-fill {
@@ -184,7 +194,7 @@
   );
   opacity: 0;
   transform: translateX(-120%);
-  animation: evidence-scan 8s ease-in-out infinite;
+  animation: var(--animate-evidence-scan);
 }
 
 .evidence-source-2::after {
@@ -212,7 +222,7 @@
   stroke-dashoffset: 1.08;
   opacity: 0;
   vector-effect: non-scaling-stroke;
-  animation: evidence-signal 8s linear infinite;
+  animation: var(--animate-evidence-signal);
 }
 
 .evidence-signal-2 {
@@ -236,25 +246,12 @@
 .evidence-glow {
   fill: var(--coverly-mist);
   opacity: 0;
-  animation: evidence-glow 8s steps(4, end) infinite;
+  animation: var(--animate-evidence-glow);
 }
 
 .evidence-result-row {
   background: transparent;
   opacity: 0.48;
-  animation: evidence-result-row 8s steps(1, end) infinite;
-}
-
-.evidence-result-row-2 {
-  animation-delay: 180ms;
-}
-
-.evidence-result-row-3 {
-  animation-delay: 360ms;
-}
-
-.evidence-complete {
-  animation: evidence-complete 8s steps(1, end) infinite;
 }
 
 @keyframes evidence-scan {
@@ -366,19 +363,19 @@
 
 @media (prefers-reduced-motion: reduce) {
   .analysis-pixel-loader span,
-  .amount-range-fill,
+  .animate-amount-range-fill,
   .evidence-source::after,
   .evidence-signal,
   .evidence-glow,
-  .evidence-result-row,
-  .evidence-complete,
+  .animate-evidence-result-row,
+  .animate-evidence-complete,
   .animate-enter,
   .animate-enter-overlay {
     animation: none;
   }
 
   .evidence-result-row,
-  .evidence-complete {
+  .animate-evidence-complete {
     opacity: 1;
   }
 

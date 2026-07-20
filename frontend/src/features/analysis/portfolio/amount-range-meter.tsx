@@ -71,7 +71,7 @@ export function AmountRangeMeter({
           />
           <span
             className={cn(
-              "amount-range-fill absolute inset-y-0 left-0 rounded-full",
+              "amount-range-fill animate-amount-range-fill absolute inset-y-0 left-0 rounded-full",
               tone === "dark" ? "bg-white" : "bg-blue-600",
             )}
             style={currentPositionStyle}

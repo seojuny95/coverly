@@ -10,6 +10,7 @@ const insuranceSources = [
 ];
 
 const resultRows = ["가입 내역 연결", "보장별로 정리", "확인 근거 포함"];
+const resultRowDelays = ["delay-0", "delay-[180ms]", "delay-[360ms]"];
 
 function InsuranceCard({
   company,
@@ -65,7 +66,7 @@ function CoverageMap({ compact = false }: { compact?: boolean }) {
             나의 보장 지도
           </strong>
         </span>
-        <span className="evidence-complete grid size-6 place-items-center rounded-lg bg-blue-600 text-white">
+        <span className="animate-evidence-complete grid size-6 place-items-center rounded-lg bg-blue-600 text-white">
           <svg
             aria-hidden="true"
             className="size-3.5"
@@ -86,7 +87,7 @@ function CoverageMap({ compact = false }: { compact?: boolean }) {
         {resultRows.map((row, index) => (
           <div
             key={row}
-            className={`evidence-result-row evidence-result-row-${index + 1} flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[9px] text-zinc-600 sm:text-[10px]`}
+            className={`evidence-result-row animate-evidence-result-row ${resultRowDelays[index]} flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[9px] text-zinc-600 sm:text-[10px]`}
           >
             <span className="size-1.5 shrink-0 bg-blue-600" />
             {row}
