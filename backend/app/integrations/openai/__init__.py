@@ -3,6 +3,7 @@
 from app.integrations.openai.client import (
     JsonCompleter,
     compact_prompt_text,
+    configure_agent_sdk_credentials,
     dump_prompt_json,
     embed_texts,
     structured_completer,
@@ -11,6 +12,7 @@ from app.integrations.openai.client import (
 __all__ = [
     "JsonCompleter",
     "compact_prompt_text",
+    "configure_agent_sdk_credentials",
     "dump_prompt_json",
     "embed_texts",
     "structured_completer",

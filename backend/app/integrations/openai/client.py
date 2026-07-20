@@ -7,6 +7,7 @@ degrades to 확인필요/부분 instead of breaking the upload).
 """
 
 import json
+import os
 from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, cast
@@ -89,3 +90,21 @@ def dump_prompt_json(payload: object) -> str:
     """Serialize prompt payloads consistently across LLM call sites."""
 
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def configure_agent_sdk_credentials() -> None:
+    """Publish the configured key so SDKs that read the environment can see it.
+
+    pydantic-settings loads .env into Settings, not into os.environ, but the
+    agents SDK builds its own OpenAI client from the environment. Without this
+    the planner answers from .env while the agent fails at request time -- the
+    app boots fine and only half of it works.
+
+    A missing key is left absent rather than written as an empty string: the SDK
+    would then fail as "invalid key" instead of "not configured". Nothing is
+    raised here because every OpenAI call site already raises at use time.
+    """
+
+    api_key = get_settings().openai_api_key
+    if api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
