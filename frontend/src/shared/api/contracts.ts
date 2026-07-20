@@ -31,13 +31,10 @@ export type SourceReliability = ReferenceSource["reliability"];
 export type EssentialCoverageItem = Schemas["EssentialCoverageItem"];
 export type CoverageGroup = Schemas["CoverageGroup"];
 
-export type PortfolioQuestionRequest = Schemas["PortfolioQuestionRequest"];
-export type ChatHistoryItem = Schemas["ConversationMessage"];
-export type QaStreamEvent =
-  | Schemas["QaProgressEvent"]
-  | Schemas["QaMetaEvent"]
-  | Schemas["QaDeltaEvent"]
-  | Schemas["QaEndEvent"];
-export type QaProgressEvent = Schemas["QaProgressEvent"];
-export type QaMetaEvent = Schemas["QaMetaEvent"];
-export type QaEndEvent = Schemas["QaEndEvent"];
+export type CounselRequest = Schemas["CounselRequest"];
+export type ChatHistoryItem = Schemas["CounselMessage"];
+export type CounselStreamEvent =
+  | Schemas["CounselMetaEvent"]
+  | Schemas["CounselDeltaEvent"]
+  | Schemas["CounselEndEvent"];
+export type CounselMetaEvent = Schemas["CounselMetaEvent"];

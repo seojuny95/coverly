@@ -1,23 +1,21 @@
 import type { AnalyzedInsurance } from "../store";
 import { apiResponseError, apiUrl } from "../../../shared/api/client";
 import {
-  QaStreamProtocolError,
-  requireQaStreamEvent,
-} from "../../../shared/api/qa-stream";
+  CounselStreamProtocolError,
+  requireCounselStreamEvent,
+} from "../../../shared/api/counsel-stream";
 import type {
   ClaimChannelBlock,
   ChatHistoryItem,
+  CounselMetaEvent,
+  CounselRequest,
+  CounselStreamEvent,
   CoverageTotal,
   CoverageGroup,
   DeathBenefitGuideInput,
   EssentialCoverageItem,
   PortfolioCoverageSummary,
-  PortfolioQuestionRequest,
   PortfolioSummaryRequest,
-  QaEndEvent,
-  QaMetaEvent,
-  QaProgressEvent,
-  QaStreamEvent,
   ReferenceSource,
   SourceReliability,
   SpecialPolicyAnalysis,
@@ -75,30 +73,25 @@ export function requestPortfolioSummary(
   return postPortfolioSummary(body, signal);
 }
 
-export type QaStreamEnd = QaEndEvent;
-export type QaStreamProgress = QaProgressEvent;
-
-type QaStreamHandlers = {
-  onMeta?: (meta: QaMetaEvent) => void;
-  onProgress?: (progress: QaStreamProgress) => void;
+type CounselStreamHandlers = {
+  onMeta?: (meta: CounselMetaEvent) => void;
   onDelta: (text: string) => void | Promise<void>;
-  onEnd: (end: QaStreamEnd) => void;
+  onEnd: () => void;
 };
 
 export async function streamPortfolioQuestion(
   question: string,
-  insuranceDocuments: AnalyzedInsurance[],
   history: ChatHistoryItem[],
-  handlers: QaStreamHandlers,
+  handlers: CounselStreamHandlers,
   portfolioSessionToken: string,
   signal?: AbortSignal,
 ): Promise<void> {
   const body = {
     question,
-    ...portfolioSelection(insuranceDocuments, portfolioSessionToken),
+    session_id: portfolioSessionToken,
     history,
-  } satisfies PortfolioQuestionRequest;
-  const response = await fetch(apiUrl("/qa/stream"), {
+  } satisfies CounselRequest;
+  const response = await fetch(apiUrl("/counsel/stream"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -108,15 +101,13 @@ export async function streamPortfolioQuestion(
     throw await apiResponseError(response, "상담 요청에 실패했어요.");
   }
   if (!response.headers.get("content-type")?.includes("text/event-stream")) {
-    throw new QaStreamProtocolError();
+    throw new CounselStreamProtocolError();
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  const protocol: { phase: "progress" | "answer" | "end" } = {
-    phase: "progress",
-  };
+  const protocol: { phase: "meta" | "answer" | "end" } = { phase: "meta" };
 
   const dispatch = async (frame: string) => {
     const data = frame
@@ -130,24 +121,21 @@ export async function streamPortfolioQuestion(
     try {
       payload = JSON.parse(data);
     } catch {
-      throw new QaStreamProtocolError();
+      throw new CounselStreamProtocolError();
     }
-    const event: QaStreamEvent = requireQaStreamEvent(payload);
+    const event: CounselStreamEvent = requireCounselStreamEvent(payload);
 
     if (event.type === "meta") {
-      if (protocol.phase !== "progress") throw new QaStreamProtocolError();
+      if (protocol.phase !== "meta") throw new CounselStreamProtocolError();
       protocol.phase = "answer";
       handlers.onMeta?.(event);
-    } else if (event.type === "progress") {
-      if (protocol.phase !== "progress") throw new QaStreamProtocolError();
-      handlers.onProgress?.(event);
     } else if (event.type === "delta") {
-      if (protocol.phase !== "answer") throw new QaStreamProtocolError();
+      if (protocol.phase !== "answer") throw new CounselStreamProtocolError();
       await handlers.onDelta(event.text);
     } else if (event.type === "end") {
-      if (protocol.phase !== "answer") throw new QaStreamProtocolError();
+      if (protocol.phase !== "answer") throw new CounselStreamProtocolError();
       protocol.phase = "end";
-      handlers.onEnd(event);
+      handlers.onEnd();
     }
   };
 
@@ -168,7 +156,7 @@ export async function streamPortfolioQuestion(
   }
   buffer += decoder.decode();
   if (buffer.trim()) await dispatch(buffer);
-  if (protocol.phase !== "end") throw new QaStreamProtocolError();
+  if (protocol.phase !== "end") throw new CounselStreamProtocolError();
 }
 
 function nextSseBoundary(buffer: string): {

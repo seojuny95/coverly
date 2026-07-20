@@ -235,7 +235,6 @@ export function InsuranceAnalysisPage({
         )}
 
         <InsuranceChatbot
-          documents={insuranceDocuments}
           portfolioSessionToken={analysis.portfolioSessionToken}
           sessionExpired={sessionExpired}
           mode={activeTab === "chat" ? "full" : "floating"}

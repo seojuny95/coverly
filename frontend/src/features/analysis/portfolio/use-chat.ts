@@ -1,13 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import type { AnalyzedInsurance } from "../store";
 import type { ChatMessageData } from "./chat-message";
-import {
-  streamPortfolioQuestion,
-  type ChatHistoryItem,
-  type QaStreamEnd,
-} from "./api";
+import { streamPortfolioQuestion, type ChatHistoryItem } from "./api";
 
 const INITIAL_SUGGESTIONS = [
   "내 보험에서 확인된 강점은 뭐예요?",
@@ -16,12 +11,10 @@ const INITIAL_SUGGESTIONS = [
 ];
 
 export function useQaChat({
-  documents,
   portfolioSessionToken,
   sessionExpired,
   isChatVisible,
 }: {
-  documents: AnalyzedInsurance[];
   portfolioSessionToken: string;
   sessionExpired: boolean;
   isChatVisible: boolean;
@@ -64,26 +57,6 @@ export function useQaChat({
     );
   }
 
-  function finalizeAnswer(assistantId: number, end: QaStreamEnd) {
-    const sources = end.citations
-      .map((citation) => ({
-        label: [citation.insurer, citation.product_name, citation.coverage_name]
-          .filter(Boolean)
-          .join(" · "),
-      }))
-      .filter((source) => source.label)
-      .slice(0, 3);
-    updateMessage(assistantId, (message) => ({
-      ...message,
-      sources,
-      limitations: end.limitations,
-      claimChannels: end.claim_channels,
-    }));
-    setSuggestions(
-      end.suggestions?.length ? end.suggestions : INITIAL_SUGGESTIONS,
-    );
-  }
-
   async function sendQuestion(rawQuestion: string) {
     const text = rawQuestion.trim();
     if (!text || streaming || sessionExpired) return;
@@ -104,23 +77,15 @@ export function useQaChat({
     try {
       await streamPortfolioQuestion(
         text,
-        documents,
         history,
         {
-          onProgress: (progress) => {
-            updateMessage(assistantId, (message) => ({
-              ...message,
-              progress: message.text.trim() ? message.progress : progress.text,
-            }));
-          },
           onDelta: (delta) => {
             updateMessage(assistantId, (message) => ({
               ...message,
-              progress: undefined,
               text: message.text + delta,
             }));
           },
-          onEnd: (end) => finalizeAnswer(assistantId, end),
+          onEnd: () => setSuggestions(INITIAL_SUGGESTIONS),
         },
         portfolioSessionToken,
       );

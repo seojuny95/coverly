@@ -1,8 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
-import type { ClaimChannelBlock } from "./api";
 
 function assistant(overrides: Partial<ChatMessageData> = {}): ChatMessageData {
   return { id: 1, role: "assistant", text: "", ...overrides };
@@ -64,65 +62,9 @@ describe("ChatMessage", () => {
     expect(screen.getByText("3,000만원")).toHaveClass("font-semibold");
   });
 
-  it("keeps a safe claim-channel link but downgrades an unsafe one to text", () => {
-    const claimChannels: ClaimChannelBlock = {
-      insurers: [
-        {
-          name: "삼성화재",
-          customer_center: "1588-5114",
-          links: [
-            { label: "홈페이지", url: "https://samsungfire.com" },
-            { label: "위험링크", url: "javascript:alert(1)" },
-          ],
-        },
-      ],
-      medical_indemnity: null,
-    };
-    render(
-      <ChatMessage
-        message={assistant({ text: "청구는 여기서요", claimChannels })}
-      />,
-    );
+  it("shows a waiting indicator until the first token arrives", () => {
+    render(<ChatMessage message={assistant({ text: "" })} />);
 
-    const safeLink = screen.getByRole("link", { name: "홈페이지" });
-    expect(safeLink).toHaveAttribute("href", "https://samsungfire.com");
-    // The javascript: link is not a link at all — just its label text.
-    expect(
-      screen.queryByRole("link", { name: "위험링크" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("위험링크")).toBeInTheDocument();
-  });
-
-  it("renders answer sources in a collapsed disclosure", async () => {
-    const user = userEvent.setup();
-    render(
-      <ChatMessage
-        message={assistant({
-          text: "확인한 답변이에요.",
-          sources: [{ label: "테스트보험 · 암진단비" }],
-        })}
-      />,
-    );
-
-    const disclosure = screen.getByText("확인한 근거").closest("details");
-    expect(disclosure).not.toHaveAttribute("open");
-
-    await user.click(screen.getByText("확인한 근거"));
-
-    expect(disclosure).toHaveAttribute("open");
-  });
-
-  it("keeps answer limitations collapsed until requested", () => {
-    render(
-      <ChatMessage
-        message={assistant({
-          text: "확인한 답변이에요.",
-          limitations: ["약관 원문이 필요한 내용이에요."],
-        })}
-      />,
-    );
-
-    const disclosure = screen.getByText("답변의 확인 범위").closest("details");
-    expect(disclosure).not.toHaveAttribute("open");
+    expect(screen.getByRole("status", { name: "답변 준비 중" })).toBeVisible();
   });
 });

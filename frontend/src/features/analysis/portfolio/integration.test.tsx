@@ -227,19 +227,16 @@ describe("portfolio features", () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
-      if (path.endsWith("/qa/stream")) {
+      if (path.endsWith("/counsel/stream")) {
         const events = [
-          { type: "meta", status: "answered", generation: "llm" },
-          { type: "delta", text: "암 진단비는 1,000만원이에요." },
           {
-            type: "end",
-            status: "answered",
-            generation: "llm",
-            citations: [],
-            limitations: [],
-            suggestions: [],
-            claim_channels: null,
+            type: "meta",
+            in_scope: true,
+            rewritten_question: "암 진단비는?",
+            excluded_note: null,
           },
+          { type: "delta", text: "암 진단비는 1,000만원이에요." },
+          { type: "end" },
         ];
         const body = events
           .map((event) => `data: ${JSON.stringify(event)}\n\n`)
@@ -313,10 +310,10 @@ describe("portfolio features", () => {
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
     >;
-    const qaCall = fetchCalls.find(([input]) =>
-      String(input).endsWith("/qa/stream"),
+    const counselCall = fetchCalls.find(([input]) =>
+      String(input).endsWith("/counsel/stream"),
     );
-    expect(qaCall?.[1]?.body).toContain('"history":[]');
+    expect(counselCall?.[1]?.body).toContain('"history":[]');
 
     await user.click(
       screen.getByRole("button", { name: "AI 보험 상담 탭에서 크게 보기" }),

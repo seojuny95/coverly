@@ -70,21 +70,16 @@ describe("portfolio session requests", () => {
     expect(body).not.toHaveProperty("policies");
   });
 
-  test("does not resend structured policies to QA", async () => {
+  test("asks with the session token and history, never the structured policies", async () => {
     const question = "가".repeat(400);
+    const history = [{ role: "user" as const, content: "이전 질문" }];
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        sseResponse([
-          { type: "meta", status: "answered", generation: "fallback" },
-          endEvent(),
-        ]),
-      );
+      .mockResolvedValue(sseResponse([metaEvent(), endEvent()]));
 
     await streamPortfolioQuestion(
       question,
-      sessionDocuments,
-      [],
+      history,
       { onDelta: vi.fn(), onEnd: vi.fn() },
       "portfolio-token",
     );
@@ -92,20 +87,14 @@ describe("portfolio session requests", () => {
     const body = JSON.parse(
       String(fetchMock.mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>;
-    expect(body).toMatchObject({
-      question,
-      portfolioSessionToken: "portfolio-token",
-      policyIds: ["document-1"],
-    });
-    expect(body).not.toHaveProperty("policies");
-    expect(body).not.toHaveProperty("demographics");
+    expect(body).toEqual({ question, session_id: "portfolio-token", history });
   });
 
   test("validates and dispatches fragmented SSE events through the terminal end", async () => {
     const encoder = new TextEncoder();
     const chunks = [
-      'data: {"type":"progress","stage":"portfolio",',
-      '"text":"확인 중"}\r\n\r\ndata: {"type":"meta","status":"answered","generation":"fallback"}\r\n\r\n',
+      'data: {"type":"meta","in_scope":true,',
+      '"rewritten_question":"보험을 알려줘","excluded_note":null}\r\n\r\n',
       'data: {"type":"delta","text":"답변"}\n\n',
       `data: ${JSON.stringify(endEvent())}\n\n`,
     ];
@@ -121,43 +110,30 @@ describe("portfolio session requests", () => {
         { headers: { "Content-Type": "text/event-stream" } },
       ),
     );
-    const onProgress = vi.fn();
+    const onMeta = vi.fn();
     const onDelta = vi.fn();
     const onEnd = vi.fn();
 
     await streamPortfolioQuestion(
       "보험을 알려줘",
-      sessionDocuments,
       [],
-      { onProgress, onDelta, onEnd },
+      { onMeta, onDelta, onEnd },
       "portfolio-token",
     );
 
-    expect(onProgress).toHaveBeenCalledWith({
-      type: "progress",
-      stage: "portfolio",
-      text: "확인 중",
-    });
+    expect(onMeta).toHaveBeenCalledWith(metaEvent());
     expect(onDelta).toHaveBeenCalledWith("답변");
-    expect(onEnd).toHaveBeenCalledWith(endEvent());
+    expect(onEnd).toHaveBeenCalledOnce();
   });
 
   test("rejects a malformed SSE event instead of trusting its discriminator", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        [
-          `data: ${JSON.stringify({ type: "meta", status: "answered", generation: "fallback" })}`,
-          `data: ${JSON.stringify({ ...endEvent(), suggestions: "not-an-array" })}`,
-          "",
-        ].join("\n\n"),
-        { headers: { "Content-Type": "text/event-stream" } },
-      ),
+      sseResponse([metaEvent(), { type: "delta", text: 42 }]),
     );
 
     await expect(
       streamPortfolioQuestion(
         "보험을 알려줘",
-        sessionDocuments,
         [],
         { onDelta: vi.fn(), onEnd: vi.fn() },
         "portfolio-token",
@@ -165,28 +141,29 @@ describe("portfolio session requests", () => {
     ).rejects.toThrow("상담 응답 형식을 확인할 수 없어요.");
   });
 
-  test("rejects nested SSE data that violates the generated OpenAPI schema", async () => {
+  test("rejects an SSE event that omits a field the generated schema requires", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      sseResponse([
-        { type: "meta", status: "answered", generation: "fallback" },
-        {
-          ...endEvent(),
-          citations: [
-            {
-              policy_id: null,
-              insurer: null,
-              product_name: null,
-              source_page: 0,
-            },
-          ],
-        },
-      ]),
+      sseResponse([{ type: "meta", in_scope: true }, endEvent()]),
     );
 
     await expect(
       streamPortfolioQuestion(
         "보험을 알려줘",
-        sessionDocuments,
+        [],
+        { onDelta: vi.fn(), onEnd: vi.fn() },
+        "portfolio-token",
+      ),
+    ).rejects.toThrow("상담 응답 형식을 확인할 수 없어요.");
+  });
+
+  test("rejects an answer that starts before the meta event", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      sseResponse([{ type: "delta", text: "먼저 온 답변" }, endEvent()]),
+    );
+
+    await expect(
+      streamPortfolioQuestion(
+        "보험을 알려줘",
         [],
         { onDelta: vi.fn(), onEnd: vi.fn() },
         "portfolio-token",
@@ -196,16 +173,12 @@ describe("portfolio session requests", () => {
 
   test("rejects a stream that closes without a terminal end event", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      sseResponse([
-        { type: "meta", status: "answered", generation: "fallback" },
-        { type: "delta", text: "미완성 답변" },
-      ]),
+      sseResponse([metaEvent(), { type: "delta", text: "미완성 답변" }]),
     );
 
     await expect(
       streamPortfolioQuestion(
         "보험을 알려줘",
-        sessionDocuments,
         [],
         { onDelta: vi.fn(), onEnd: vi.fn() },
         "portfolio-token",
@@ -223,7 +196,7 @@ describe("portfolio session requests", () => {
             controller.enqueue(
               encoder.encode(
                 [
-                  `data: ${JSON.stringify({ type: "meta", status: "answered", generation: "fallback" })}`,
+                  `data: ${JSON.stringify(metaEvent())}`,
                   `data: ${JSON.stringify(endEvent())}`,
                   "",
                 ].join("\n\n"),
@@ -238,7 +211,6 @@ describe("portfolio session requests", () => {
 
     await streamPortfolioQuestion(
       "보험을 알려줘",
-      sessionDocuments,
       [],
       { onDelta: vi.fn(), onEnd: vi.fn() },
       "portfolio-token",
@@ -248,16 +220,17 @@ describe("portfolio session requests", () => {
   });
 });
 
-function endEvent() {
+function metaEvent() {
   return {
-    type: "end" as const,
-    status: "answered" as const,
-    generation: "fallback" as const,
-    citations: [],
-    limitations: [],
-    suggestions: [],
-    claim_channels: null,
+    type: "meta" as const,
+    in_scope: true,
+    rewritten_question: "보험을 알려줘",
+    excluded_note: null,
   };
+}
+
+function endEvent() {
+  return { type: "end" as const };
 }
 
 function sseResponse(events: object[]) {

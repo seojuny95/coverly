@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { AnalyzedInsurance } from "../store";
 import { useDialogA11y } from "../use-dialog-a11y";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -9,13 +8,11 @@ import { ChatMessage } from "./chat-message";
 import { useQaChat } from "./use-chat";
 
 export function InsuranceChatbot({
-  documents,
   portfolioSessionToken,
   sessionExpired = false,
   mode = "floating",
   onExpand,
 }: {
-  documents: AnalyzedInsurance[];
   portfolioSessionToken: string;
   sessionExpired?: boolean;
   mode?: "floating" | "full";
@@ -37,7 +34,6 @@ export function InsuranceChatbot({
     submit,
     sendQuestion,
   } = useQaChat({
-    documents,
     portfolioSessionToken,
     sessionExpired,
     isChatVisible,

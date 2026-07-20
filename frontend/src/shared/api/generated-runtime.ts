@@ -6,8 +6,6 @@
 import type { components } from "./generated";
 
 type ApiErrorCode = components["schemas"]["ApiErrorCode"];
-type QaAnswerStatus = components["schemas"]["QaAnswerStatus"];
-type QaGenerationMode = components["schemas"]["QaMetaEvent"]["generation"];
 type PolicyClassification = components["schemas"]["PolicySummary"]["보험분류"];
 
 export const API_ERROR_CODES = [
@@ -25,16 +23,6 @@ export const API_ERROR_CODES = [
   "REQUEST_VALIDATION_ERROR",
   "INVALID_MULTIPART_REQUEST",
 ] as const satisfies readonly ApiErrorCode[];
-export const QA_ANSWER_STATUSES = [
-  "answered",
-  "refused",
-  "no_data",
-  "clarify",
-] as const satisfies readonly QaAnswerStatus[];
-export const QA_GENERATION_MODES = [
-  "llm",
-  "fallback",
-] as const satisfies readonly QaGenerationMode[];
 export const POLICY_CLASSIFICATIONS = [
   "생명보험",
   "제3보험",
@@ -42,151 +30,26 @@ export const POLICY_CLASSIFICATIONS = [
   "미분류",
 ] as const satisfies readonly PolicyClassification[];
 
-export const QA_STREAM_JSON_SCHEMA = {
+export const COUNSEL_STREAM_JSON_SCHEMA = {
   schema: {
     oneOf: [
-      { $ref: "#/components/schemas/QaProgressEvent" },
-      { $ref: "#/components/schemas/QaMetaEvent" },
-      { $ref: "#/components/schemas/QaDeltaEvent" },
-      { $ref: "#/components/schemas/QaEndEvent" },
+      { $ref: "#/components/schemas/CounselMetaEvent" },
+      { $ref: "#/components/schemas/CounselDeltaEvent" },
+      { $ref: "#/components/schemas/CounselEndEvent" },
     ],
-    title: "Response 200 Ask Portfolio Question Stream Qa Stream Post",
+    title: "Response 200 Stream Counsel Answer Counsel Stream Post",
     discriminator: {
       propertyName: "type",
       mapping: {
-        progress: "#/components/schemas/QaProgressEvent",
-        meta: "#/components/schemas/QaMetaEvent",
-        delta: "#/components/schemas/QaDeltaEvent",
-        end: "#/components/schemas/QaEndEvent",
+        meta: "#/components/schemas/CounselMetaEvent",
+        delta: "#/components/schemas/CounselDeltaEvent",
+        end: "#/components/schemas/CounselEndEvent",
       },
     },
   },
   components: {
     schemas: {
-      AnswerCitation: {
-        properties: {
-          evidence_id: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Evidence Id",
-          },
-          policy_id: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Policy Id",
-          },
-          insurer: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Insurer",
-          },
-          product_name: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Product Name",
-          },
-          coverage_name: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Coverage Name",
-          },
-          source_id: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Source Id",
-          },
-          source_title: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Source Title",
-          },
-          source_category: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Source Category",
-          },
-          source_url: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Source Url",
-          },
-          source_page: {
-            anyOf: [{ type: "integer", minimum: 1 }, { type: "null" }],
-            title: "Source Page",
-          },
-          source_version: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Source Version",
-          },
-        },
-        type: "object",
-        required: ["policy_id", "insurer", "product_name"],
-        title: "AnswerCitation",
-      },
-      ClaimChannelBlock: {
-        properties: {
-          insurers: {
-            items: { $ref: "#/components/schemas/ClaimChannelInsurer" },
-            type: "array",
-            title: "Insurers",
-          },
-          medical_indemnity: {
-            anyOf: [
-              { $ref: "#/components/schemas/ClaimChannelMedicalIndemnity" },
-              { type: "null" },
-            ],
-          },
-        },
-        type: "object",
-        title: "ClaimChannelBlock",
-      },
-      ClaimChannelInsurer: {
-        properties: {
-          name: { type: "string", title: "Name" },
-          customer_center: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Customer Center",
-          },
-          note: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Note",
-          },
-          links: {
-            items: { $ref: "#/components/schemas/ClaimChannelLink" },
-            type: "array",
-            title: "Links",
-          },
-        },
-        type: "object",
-        required: ["name"],
-        title: "ClaimChannelInsurer",
-      },
-      ClaimChannelLink: {
-        properties: {
-          label: { type: "string", title: "Label" },
-          url: { type: "string", title: "Url" },
-        },
-        type: "object",
-        required: ["label", "url"],
-        title: "ClaimChannelLink",
-      },
-      ClaimChannelMedicalIndemnity: {
-        properties: {
-          name: { type: "string", title: "Name" },
-          description: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Description",
-          },
-          call_center: {
-            anyOf: [{ type: "string" }, { type: "null" }],
-            title: "Call Center",
-          },
-          links: {
-            items: { $ref: "#/components/schemas/ClaimChannelLink" },
-            type: "array",
-            title: "Links",
-          },
-        },
-        type: "object",
-        required: ["name"],
-        title: "ClaimChannelMedicalIndemnity",
-      },
-      QaAnswerStatus: {
-        type: "string",
-        enum: ["answered", "refused", "no_data", "clarify"],
-      },
-      QaDeltaEvent: {
+      CounselDeltaEvent: {
         properties: {
           type: {
             type: "string",
@@ -197,10 +60,10 @@ export const QA_STREAM_JSON_SCHEMA = {
           text: { type: "string", title: "Text" },
         },
         type: "object",
-        required: ["type", "text"],
-        title: "QaDeltaEvent",
+        required: ["text", "type"],
+        title: "CounselDeltaEvent",
       },
-      QaEndEvent: {
+      CounselEndEvent: {
         properties: {
           type: {
             type: "string",
@@ -208,47 +71,12 @@ export const QA_STREAM_JSON_SCHEMA = {
             description:
               "discriminator enum property added by openapi-typescript",
           },
-          status: { $ref: "#/components/schemas/QaAnswerStatus" },
-          generation: {
-            type: "string",
-            enum: ["llm", "fallback"],
-            title: "Generation",
-          },
-          citations: {
-            items: { $ref: "#/components/schemas/AnswerCitation" },
-            type: "array",
-            title: "Citations",
-          },
-          limitations: {
-            items: { type: "string" },
-            type: "array",
-            title: "Limitations",
-          },
-          suggestions: {
-            items: { type: "string" },
-            type: "array",
-            title: "Suggestions",
-          },
-          claim_channels: {
-            anyOf: [
-              { $ref: "#/components/schemas/ClaimChannelBlock" },
-              { type: "null" },
-            ],
-          },
         },
         type: "object",
-        required: [
-          "type",
-          "status",
-          "generation",
-          "citations",
-          "limitations",
-          "suggestions",
-          "claim_channels",
-        ],
-        title: "QaEndEvent",
+        title: "CounselEndEvent",
+        required: ["type"],
       },
-      QaMetaEvent: {
+      CounselMetaEvent: {
         properties: {
           type: {
             type: "string",
@@ -256,48 +84,23 @@ export const QA_STREAM_JSON_SCHEMA = {
             description:
               "discriminator enum property added by openapi-typescript",
           },
-          status: { $ref: "#/components/schemas/QaAnswerStatus" },
-          generation: {
-            type: "string",
-            enum: ["llm", "fallback"],
-            title: "Generation",
+          in_scope: { type: "boolean", title: "In Scope" },
+          rewritten_question: { type: "string", title: "Rewritten Question" },
+          excluded_note: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            title: "Excluded Note",
           },
         },
         type: "object",
-        required: ["type", "status", "generation"],
-        title: "QaMetaEvent",
-      },
-      QaProgressEvent: {
-        properties: {
-          type: {
-            type: "string",
-            enum: ["progress"],
-            description:
-              "discriminator enum property added by openapi-typescript",
-          },
-          stage: { type: "string", title: "Stage" },
-          text: { type: "string", title: "Text" },
-        },
-        type: "object",
-        required: ["type", "stage", "text"],
-        title: "QaProgressEvent",
+        required: ["in_scope", "rewritten_question", "excluded_note", "type"],
+        title: "CounselMetaEvent",
       },
     },
   },
 } as const;
 
 const apiErrorCodeSet: ReadonlySet<string> = new Set(API_ERROR_CODES);
-const qaAnswerStatusSet: ReadonlySet<string> = new Set(QA_ANSWER_STATUSES);
-const qaGenerationModeSet: ReadonlySet<string> = new Set(QA_GENERATION_MODES);
 
 export function isApiErrorCode(value: unknown): value is ApiErrorCode {
   return typeof value === "string" && apiErrorCodeSet.has(value);
-}
-
-export function isQaAnswerStatus(value: unknown): value is QaAnswerStatus {
-  return typeof value === "string" && qaAnswerStatusSet.has(value);
-}
-
-export function isQaGenerationMode(value: unknown): value is QaGenerationMode {
-  return typeof value === "string" && qaGenerationModeSet.has(value);
 }

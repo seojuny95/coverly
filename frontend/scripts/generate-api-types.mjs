@@ -48,24 +48,16 @@ function enumValues(value, label) {
 
 const schemas = schema.components?.schemas;
 const apiErrorCodes = enumValues(schemas?.ApiErrorCode?.enum, "ApiErrorCode");
-const qaAnswerStatuses = enumValues(
-  schemas?.QaAnswerStatus?.enum,
-  "QaAnswerStatus",
-);
-const qaGenerationModes = enumValues(
-  schemas?.QaMetaEvent?.properties?.generation?.enum,
-  "QaMetaEvent.generation",
-);
 const policyClassifications = enumValues(
   schemas?.PolicySummary?.properties?.["보험분류"]?.enum,
   "PolicySummary.보험분류",
 );
-const qaStreamSchema =
-  schema.paths?.["/qa/stream"]?.post?.responses?.["200"]?.content?.[
+const counselStreamSchema =
+  schema.paths?.["/counsel/stream"]?.post?.responses?.["200"]?.content?.[
     "text/event-stream"
   ]?.schema;
-if (!qaStreamSchema || typeof qaStreamSchema !== "object") {
-  throw new Error("OpenAPI /qa/stream response schema is missing.");
+if (!counselStreamSchema || typeof counselStreamSchema !== "object") {
+  throw new Error("OpenAPI /counsel/stream response schema is missing.");
 }
 
 function referencedComponentSchemas(rootSchema) {
@@ -103,40 +95,27 @@ function referencedComponentSchemas(rootSchema) {
   );
 }
 
-const qaStreamComponentSchemas = referencedComponentSchemas(qaStreamSchema);
+const counselStreamComponentSchemas =
+  referencedComponentSchemas(counselStreamSchema);
 const runtimeGenerated = await format(
   `${COMMENT_HEADER}
 import type { components } from "./generated";
 
 type ApiErrorCode = components["schemas"]["ApiErrorCode"];
-type QaAnswerStatus = components["schemas"]["QaAnswerStatus"];
-type QaGenerationMode = components["schemas"]["QaMetaEvent"]["generation"];
 type PolicyClassification = components["schemas"]["PolicySummary"]["보험분류"];
 
 export const API_ERROR_CODES = ${JSON.stringify(apiErrorCodes)} as const satisfies readonly ApiErrorCode[];
-export const QA_ANSWER_STATUSES = ${JSON.stringify(qaAnswerStatuses)} as const satisfies readonly QaAnswerStatus[];
-export const QA_GENERATION_MODES = ${JSON.stringify(qaGenerationModes)} as const satisfies readonly QaGenerationMode[];
 export const POLICY_CLASSIFICATIONS = ${JSON.stringify(policyClassifications)} as const satisfies readonly PolicyClassification[];
 
-export const QA_STREAM_JSON_SCHEMA = ${JSON.stringify({
-    schema: qaStreamSchema,
-    components: { schemas: qaStreamComponentSchemas },
+export const COUNSEL_STREAM_JSON_SCHEMA = ${JSON.stringify({
+    schema: counselStreamSchema,
+    components: { schemas: counselStreamComponentSchemas },
   })} as const;
 
 const apiErrorCodeSet: ReadonlySet<string> = new Set(API_ERROR_CODES);
-const qaAnswerStatusSet: ReadonlySet<string> = new Set(QA_ANSWER_STATUSES);
-const qaGenerationModeSet: ReadonlySet<string> = new Set(QA_GENERATION_MODES);
 
 export function isApiErrorCode(value: unknown): value is ApiErrorCode {
   return typeof value === "string" && apiErrorCodeSet.has(value);
-}
-
-export function isQaAnswerStatus(value: unknown): value is QaAnswerStatus {
-  return typeof value === "string" && qaAnswerStatusSet.has(value);
-}
-
-export function isQaGenerationMode(value: unknown): value is QaGenerationMode {
-  return typeof value === "string" && qaGenerationModeSet.has(value);
 }
 `,
   { filepath: runtimeOutputPath },

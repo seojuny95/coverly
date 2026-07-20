@@ -126,6 +126,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/counsel/stream": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Stream Counsel Answer
+     * @description Resolve the session, plan the turn, then stream the answer as SSE.
+     */
+    post: operations["stream_counsel_answer_counsel_stream_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/health": {
     parameters: {
       query?: never;
@@ -303,6 +323,57 @@ export interface components {
       role: "user" | "assistant";
       /** Content */
       content: string;
+    };
+    /** CounselDeltaEvent */
+    CounselDeltaEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "delta";
+      /** Text */
+      text: string;
+    };
+    /** CounselEndEvent */
+    CounselEndEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "end";
+    };
+    /** CounselMessage */
+    CounselMessage: {
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: "user" | "assistant";
+      /** Content */
+      content: string;
+    };
+    /** CounselMetaEvent */
+    CounselMetaEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "meta";
+      /** In Scope */
+      in_scope: boolean;
+      /** Rewritten Question */
+      rewritten_question: string;
+      /** Excluded Note */
+      excluded_note: string | null;
+    };
+    /** CounselRequest */
+    CounselRequest: {
+      /** Question */
+      question: string;
+      /** History */
+      history?: components["schemas"]["CounselMessage"][];
+      /** Session Id */
+      session_id: string;
     };
     /**
      * Coverage
@@ -1245,6 +1316,51 @@ export interface operations {
       };
       /** @description Coverly API error */
       503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+    };
+  };
+  stream_counsel_answer_counsel_stream_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CounselRequest"];
+      };
+    };
+    responses: {
+      /** @description Server-Sent Events: meta → delta* → end */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/event-stream":
+            | components["schemas"]["CounselMetaEvent"]
+            | components["schemas"]["CounselDeltaEvent"]
+            | components["schemas"]["CounselEndEvent"];
+        };
+      };
+      /** @description Coverly API error */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      422: {
         headers: {
           [name: string]: unknown;
         };
