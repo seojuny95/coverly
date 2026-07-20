@@ -2,13 +2,35 @@
 
 from agents import RunContextWrapper, function_tool
 
+from app.core.untrusted import strip_injection_markers_by_line
 from app.modules.counsel.context import CounselContext
 from app.modules.counsel.facts import coverages as coverage_facts
 
 CoverageNameInfo = coverage_facts.CoverageNameInfo
+CoverageMatch = coverage_facts.CoverageMatch
 CoverageTotalResult = coverage_facts.CoverageTotalResult
 FindCoveragesResult = coverage_facts.FindCoveragesResult
 OverlappingCoverage = coverage_facts.OverlappingCoverage
+
+
+def _strip_free_text_fields[T: (CoverageNameInfo, CoverageMatch)](item: T) -> T:
+    """Sanitize the only two free-text fields these models carry from PDFs.
+
+    담보명/보험사/상품명/가입금액/지급유형 and every id are identity or matching
+    fields and must pass through unchanged — 담보명 in particular drives
+    canonical coverage matching downstream. Only 보장내용/해설 hold free text
+    lifted from the user's uploaded document (or LLM-generated guidance based
+    on it), so only those two cross the model boundary stripped.
+    """
+
+    updates: dict[str, str] = {}
+    if item.보장내용:
+        updates["보장내용"] = strip_injection_markers_by_line(item.보장내용)
+    if item.해설:
+        updates["해설"] = strip_injection_markers_by_line(item.해설)
+    if not updates:
+        return item
+    return item.model_copy(update=updates)
 
 
 @function_tool
@@ -22,7 +44,8 @@ def list_coverage_names(wrapper: RunContextWrapper[CounselContext]) -> list[Cove
     보장"처럼 카테고리 이름 자체를 담보명으로 넘기지 마세요.
     """
 
-    return coverage_facts.list_coverage_name_facts(wrapper.context.policies)
+    facts = coverage_facts.list_coverage_name_facts(wrapper.context.policies)
+    return [_strip_free_text_fields(fact) for fact in facts]
 
 
 @function_tool
@@ -44,7 +67,11 @@ def find_coverages(
             요청한 낱말을 모두 포함한 후보 이름으로 보고됩니다.
     """
 
-    return coverage_facts.find_coverage_facts(wrapper.context.policies, coverage_names)
+    result = coverage_facts.find_coverage_facts(wrapper.context.policies, coverage_names)
+    return FindCoveragesResult(
+        matches=[_strip_free_text_fields(match) for match in result.matches],
+        unmatched=result.unmatched,
+    )
 
 
 @function_tool
@@ -69,7 +96,13 @@ def calculate_coverage_total(
             list_coverage_names를 호출하세요.
     """
 
-    return coverage_facts.calculate_coverage_total_fact(wrapper.context.policies, coverage_names)
+    result = coverage_facts.calculate_coverage_total_fact(wrapper.context.policies, coverage_names)
+    return CoverageTotalResult(
+        total=result.total,
+        included=[_strip_free_text_fields(match) for match in result.included],
+        excluded=result.excluded,
+        unmatched=result.unmatched,
+    )
 
 
 @function_tool
