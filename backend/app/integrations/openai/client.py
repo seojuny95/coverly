@@ -7,18 +7,16 @@ degrades to 확인필요/부분 instead of breaking the upload).
 """
 
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, cast
 
-from openai import AsyncOpenAI, OpenAI
+from openai import OpenAI
 from pydantic import BaseModel
 
 from app.core.config import get_settings
 
 JsonCompleter = Callable[[str, str], dict[str, object]]
-TextStreamer = Callable[[str, str], Iterator[str]]
-Embedder = Callable[[list[str]], list[list[float]]]
 
 _TIMEOUT_S = 30.0
 _MAX_RETRIES = 2
@@ -60,29 +58,6 @@ def structured_completer(
     return complete
 
 
-def stream_completion(system: str, user: str) -> Iterator[str]:
-    """Stream plain-text deltas from the model for conversational answers."""
-
-    settings = get_settings()
-    if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is not configured")
-
-    stream = _get_client(settings.openai_api_key).chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        temperature=0,
-        stream=True,
-    )
-
-    for chunk in stream:
-        delta = chunk.choices[0].delta.content if chunk.choices else None
-        if delta:
-            yield delta
-
-
 def embed_texts(texts: list[str]) -> list[list[float]]:
     """Embed texts through the configured OpenAI embedding model."""
     if not texts:
@@ -99,29 +74,6 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     )
 
     return [list(item.embedding) for item in response.data]
-
-
-async def search_official_web_async(
-    *,
-    api_key: str,
-    model: str,
-    query: str,
-    allowed_domains: list[str],
-) -> Any:
-    """Run an allowlisted web search that can be cancelled with its request task."""
-
-    async with AsyncOpenAI(api_key=api_key, timeout=60.0, max_retries=0) as client:
-        return await client.responses.create(
-            model=model,
-            input=query,
-            tools=[
-                {
-                    "type": "web_search",
-                    "filters": {"allowed_domains": allowed_domains},
-                }
-            ],
-            include=["web_search_call.action.sources"],
-        )
 
 
 def compact_prompt_text(text: str, max_chars: int) -> str:

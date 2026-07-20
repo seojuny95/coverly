@@ -1,1 +1,1 @@
-"""Grounded insurance counseling use case (replacement for qa)."""
+"""Grounded insurance counseling: the use case behind POST /counsel/stream."""
