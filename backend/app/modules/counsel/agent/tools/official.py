@@ -3,6 +3,7 @@
 from agents import RunContextWrapper, function_tool
 from pydantic import BaseModel
 
+from app.core.untrusted import strip_injection_markers_by_line
 from app.modules.counsel.context import CounselContext
 from app.rag.official.answer import answer_official_question
 
@@ -34,6 +35,6 @@ def retrieve_official_guidance(
         return OfficialGuidanceResult(matched=False, answer="", limitations=[])
     return OfficialGuidanceResult(
         matched=True,
-        answer=result.answer,
+        answer=strip_injection_markers_by_line(result.answer),
         limitations=list(result.limitations),
     )

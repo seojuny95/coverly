@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     policy_rag_session_secret: str = ""
     portfolio_session_max_documents: int = 50
     counsel_max_turns_per_session: int = 10
+    counsel_agent_max_turns: int = 8
     policy_upload_reservation_ttl_seconds: int = 15 * 60
     backend_cors_origins: str = ",".join(DEFAULT_BACKEND_CORS_ORIGINS)
 

@@ -59,10 +59,13 @@ def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
                 data=SimpleNamespace(type="response.output_text.delta", delta="하세요"),
             )
 
-    def fake_run_streamed(agent: object, *, input: str, context: object) -> object:
+    def fake_run_streamed(
+        agent: object, *, input: str, context: object, max_turns: object = None
+    ) -> object:
         captured["agent"] = agent
         captured["input"] = input
         captured["context"] = context
+        captured["max_turns"] = max_turns
         return _FakeStreamingResult()
 
     monkeypatch.setattr(Runner, "run_streamed", cast(Any, fake_run_streamed))
