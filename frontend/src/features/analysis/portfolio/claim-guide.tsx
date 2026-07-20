@@ -39,7 +39,11 @@ export function ClaimGuide({
   hasMedicalIndemnity: boolean;
 }) {
   return (
-    <section aria-labelledby="claim-guide-title">
+    // Continues the panel's enter stagger (0/100/200ms) as the last section in render order.
+    <section
+      aria-labelledby="claim-guide-title"
+      className="animate-enter delay-300"
+    >
       <Card variant="muted" className="rounded-[28px] p-5 sm:p-7">
         <p className="text-xs font-semibold tracking-[0.1em] text-blue-700 uppercase">
           보험금 청구 방법
