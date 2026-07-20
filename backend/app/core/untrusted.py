@@ -78,6 +78,20 @@ def strip_injection_markers(text: str) -> str:
 
 
 def strip_injection_markers_by_line(text: str) -> str:
-    """Line-preserving variant, for composed multi-line blocks."""
+    """Line-preserving variant, for composed multi-line blocks.
 
-    return "\n".join(strip_injection_markers(line) for line in text.split("\n"))
+    Leading whitespace is restored after stripping: composed briefs express
+    "this amount belongs to that coverage" as indentation, so losing it would
+    reparent a sub-bullet onto the wrong coverage.
+    """
+
+    return "\n".join(_strip_injection_markers_keeping_indent(line) for line in text.split("\n"))
+
+
+def _strip_injection_markers_keeping_indent(line: str) -> str:
+    stripped = strip_injection_markers(line)
+    if not stripped:
+        return ""
+
+    indent = line[: len(line) - len(line.lstrip())]
+    return f"{indent}{stripped}"

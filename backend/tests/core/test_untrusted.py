@@ -128,5 +128,13 @@ def test_strip_injection_markers_by_line_keeps_line_structure() -> None:
     assert result.splitlines() == ["- 암진단비: 3000만원", "", "- 뇌졸중: 2000만원"]
 
 
+def test_strip_injection_markers_by_line_keeps_sub_bullet_indentation() -> None:
+    # composer.py emits nested sub-bullets as "  - 설명: ...". Flattening the
+    # indent reparents the explanation as a sibling of the coverage bullets.
+    block = "- 암진단비: 5,000만원\n  - 설명: 암 진단 확정 시 지급합니다.\n- 뇌졸중: 2,000만원"
+
+    assert strip_injection_markers_by_line(block) == block
+
+
 def test_strip_injection_markers_by_line_preserves_blank_lines() -> None:
     assert strip_injection_markers_by_line("가\n\n나") == "가\n\n나"
