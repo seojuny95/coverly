@@ -159,14 +159,16 @@
           "question": "실손의료보험을 두 개 들고 있는 것 같은데 맞아?",
           "expected_in_scope": true,
           "must_include_any": [
-            "실손"
+            "실손의료비",
+            "실손형"
           ],
           "must_not_include": [
             "해지하세요",
             "해지하시는 게 좋습니다"
           ]
         }
-      ]
+      ],
+      "notes": "보험 개수를 세는 질문이 아니라 같은 보장의 중복을 묻는 질문이다. policy_count로 '6건이에요'라고 답하면 질문에 답한 게 아니다."
     },
     {
       "id": "claim_channel",
