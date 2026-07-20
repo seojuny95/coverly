@@ -399,7 +399,7 @@
   }
 
   /* Both start hidden and are only revealed by their animation, so without
-     one they need the drawn end state the loop peaks at. */
+     one they need explicit values — taken from the frame the loop peaks at. */
   .evidence-signal {
     stroke-dashoffset: -0.08;
     opacity: 1;
