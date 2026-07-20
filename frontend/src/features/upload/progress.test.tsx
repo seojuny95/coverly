@@ -97,12 +97,14 @@ describe("AnalysisProgress", () => {
   });
 
   it("shows a finished state when completing", () => {
+    // Milestone is intentionally not already 100 (1 of 2), so reaching 100
+    // here can only come from the isCompleting branch, not the milestone math.
     render(
       <AnalysisProgress
-        progress={{ completed: 2, total: 2 }}
+        progress={{ completed: 1, total: 2 }}
         files={[
           { name: "a.pdf", status: "done" },
-          { name: "b.pdf", status: "done" },
+          { name: "b.pdf", status: "reading" },
         ]}
         surface="page"
         isCompleting

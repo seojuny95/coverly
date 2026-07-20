@@ -18,6 +18,9 @@ export function useCompletionBeat() {
   }, []);
 
   const runAfterBeat = (action: () => void) => {
+    // A second call before the first fires must not orphan the earlier timer
+    // (it would keep running uncancellable after unmount).
+    if (timerRef.current) clearTimeout(timerRef.current);
     setIsCompleting(true);
     timerRef.current = setTimeout(action, COMPLETION_BEAT_MS);
   };

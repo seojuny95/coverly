@@ -366,6 +366,39 @@ describe("InsuranceUploadForm", () => {
     expect(navigateToAnalysis).toHaveBeenCalledOnce();
   });
 
+  test("keeps the completion beat on screen before navigating to analysis", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
+      status: "accepted",
+      documentId: "test-document-id",
+      문자수: 20,
+      기본정보: {
+        보험사: "삼성화재",
+        상품명: "건강보험",
+        계약자: "테스트고객",
+        피보험자: "테스트고객",
+        보험분류: "제3보험",
+        상품태그: ["질병보험"],
+      },
+    });
+    const onAnalysisComplete = vi.fn();
+    const navigateToAnalysis = vi.fn();
+    renderForm({ uploadInsurance, onAnalysisComplete, navigateToAnalysis });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText("다 읽었어요. 결과를 보여드릴게요."),
+    ).toBeVisible();
+    expect(navigateToAnalysis).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(navigateToAnalysis).toHaveBeenCalledOnce();
+    });
+  });
+
   test("requires a name before saving the analysis", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
