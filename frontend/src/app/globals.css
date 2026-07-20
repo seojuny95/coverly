@@ -86,8 +86,8 @@
 
   /* Shared motion tokens. Every enter animation in the app resolves to one of
      these so the rule lives in one place instead of in class strings. */
-  --animate-enter: enter 200ms ease-out both;
-  --animate-enter-overlay: enter-overlay 300ms ease-out both;
+  --animate-enter: coverly-enter 200ms ease-out both;
+  --animate-enter-overlay: coverly-enter-overlay 300ms ease-out both;
 
   /* Screen-specific animations. Their keyframes cannot be expressed as
      utility combinations (step timing, many keyframes), so only the entry
@@ -352,7 +352,9 @@
   }
 }
 
-@keyframes enter {
+/* Prefixed: tw-animate-css ships its own `enter`/`exit` keyframes, and a
+   duplicate name is overwritten wholesale rather than merged. */
+@keyframes coverly-enter {
   from {
     opacity: 0;
     transform: translateY(4px);
@@ -363,7 +365,7 @@
   }
 }
 
-@keyframes enter-overlay {
+@keyframes coverly-enter-overlay {
   from {
     opacity: 0;
   }
