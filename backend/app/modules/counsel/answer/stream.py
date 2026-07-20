@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 
 from app.modules.counsel.agent.definition import AgentStreamRunner, create_agent
 from app.modules.counsel.answer.brief import build_agent_input
+from app.modules.counsel.answer.clarify import compose_clarify_question
 from app.modules.counsel.answer.composer import compose_fact_answer
 from app.modules.counsel.answer.escalation import route_answer
 from app.modules.counsel.answer.events import (
@@ -51,6 +52,14 @@ async def build_answer_stream(
 
     execution = execute_fact_tasks(plan, policies)
     composed = compose_fact_answer(execution)
+
+    if plan.response_mode == "clarify":
+        clarifying_question = compose_clarify_question(execution)
+        if clarifying_question is not None:
+            yield serialize_event(CounselDeltaEvent(text=clarifying_question))
+            yield serialize_event(CounselEndEvent())
+            return
+
     route = route_answer(
         plan,
         execution,

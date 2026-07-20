@@ -286,3 +286,56 @@ def test_a_coverage_the_user_named_in_an_earlier_turn_still_answers_from_facts()
     text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
     assert "4,000만원" in text
     assert "확인돼요." not in text
+
+
+def _clarify_plan(*tasks: CounselTask) -> CounselPlan:
+    return CounselPlan(
+        rewritten_question="질문",
+        in_scope=True,
+        reason="보험 질문",
+        response_mode="clarify",
+        tasks=list(tasks),
+    )
+
+
+def test_clarify_asks_the_user_back_instead_of_handing_off_to_the_agent() -> None:
+    events = asyncio.run(
+        _collect(
+            build_answer_stream(
+                question="암진단비 얼마야?",
+                history=[],
+                plan=_clarify_plan(
+                    CounselTask(kind="coverage_lookup", coverage_names=["암진단비"])
+                ),
+                policies=_cancer_policies(),
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                agent_stream_runner=_fake_agent_stream_runner,
+            )
+        )
+    )
+
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert "암진단비(유사암제외)" in text
+    assert text.rstrip().endswith("?")
+    assert "확인돼요." not in text
+
+
+def test_clarify_with_nothing_planned_still_asks_something() -> None:
+    events = asyncio.run(
+        _collect(
+            build_answer_stream(
+                question="얼마 받을 수 있어?",
+                history=[],
+                plan=_clarify_plan(),
+                policies=_cancer_policies(),
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                agent_stream_runner=_fake_agent_stream_runner,
+            )
+        )
+    )
+
+    text = "".join(str(event["text"]) for event in events if event["type"] == "delta")
+    assert text.rstrip().endswith("?")
+    assert "확인돼요." not in text
