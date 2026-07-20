@@ -213,9 +213,9 @@ export default function Home() {
   return (
     <main className="overflow-hidden bg-white text-zinc-950">
       <section className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center px-6 pt-24 pb-10 text-center sm:pt-28 sm:pb-14 lg:px-8">
-        {/* animate-enter-overlay (fade only): EvidenceWeave already carries its
-            own looping entrance motion, so this covers only the surrounding
-            text to avoid a compounded double fade. */}
+        {/* EvidenceWeave already carries its own looping entrance motion, so
+            this covers only the surrounding text to avoid a compounded
+            double fade. */}
         <div className="animate-enter-overlay flex flex-col items-center">
           <div className="mb-6">
             <SectionLabel>보험을 팔지 않는 AI 보험 분석</SectionLabel>
