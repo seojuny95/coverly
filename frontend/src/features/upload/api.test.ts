@@ -53,6 +53,7 @@ describe("uploadInsurance", () => {
       {
         method: "POST",
         body: expect.any(FormData),
+        signal: expect.any(AbortSignal),
       },
     );
     expect(result.기본정보?.보험사).toBe("삼성화재");
@@ -224,6 +225,48 @@ describe("uploadInsurance", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
+    );
+
+    await expect(
+      uploadInsurance({
+        file: insuranceFile,
+        documentId,
+        portfolioSessionToken: "portfolio-token",
+      }),
+    ).rejects.toMatchObject({
+      code: "UPLOAD_NETWORK_ERROR",
+      userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+    });
+  });
+
+  test("attaches an abort signal to the request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "accepted", 문자수: 32 }), {
+        status: 200,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await uploadInsurance({
+      file: insuranceFile,
+      documentId,
+      portfolioSessionToken: "portfolio-token",
+    });
+
+    const signal = fetchMock.mock.calls[0]?.[1]?.signal as AbortSignal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+
+  test("surfaces the same connection message when the request times out", async () => {
+    // Mirrors what fetch rejects with once AbortSignal.timeout fires on a
+    // stalled connection: a TimeoutError DOMException, not a TypeError.
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException("The operation timed out.", "TimeoutError"),
+        ),
     );
 
     await expect(

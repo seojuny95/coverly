@@ -936,6 +936,66 @@ describe("InsuranceUploadForm", () => {
     expect(screen.queryByText("읽을 수 없는 PDF")).not.toBeInTheDocument();
   });
 
+  test("rolls back an already-succeeded upload when another file in the batch times out, and clears the in-flight state", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi
+      .fn<UploadInsurance>()
+      .mockImplementation(async (input) => {
+        if (input.file === secondInsuranceFile) {
+          // A stalled connection surfaces through api.ts as the same
+          // UPLOAD_NETWORK_ERROR a plain connection failure produces.
+          throw new UploadInsuranceError({
+            code: "UPLOAD_NETWORK_ERROR",
+            userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+          });
+        }
+        return {
+          ...POLICY_PARSE_RESPONSE_DEFAULTS,
+          status: "accepted",
+          documentId: "document-a",
+          문자수: 32,
+          기본정보: {
+            보험사: "삼성화재",
+            상품명: "건강보험",
+            계약자: "테스트고객",
+            피보험자: "테스트고객",
+            보험분류: "제3보험",
+            상품태그: [],
+          },
+        };
+      });
+    const { deleteSessionDocuments } = renderForm({ uploadInsurance });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      secondInsuranceFile,
+    ]);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+
+    // The already-succeeded document must be rolled back, not left orphaned
+    // server-side, exactly like any other unexpected upload failure. Both
+    // pre-assigned document ids are cleaned up, since the batch reserves an
+    // id per file up front.
+    await waitFor(() => {
+      expect(deleteSessionDocuments).toHaveBeenCalledWith(
+        "test-portfolio-token",
+        [expect.any(String), expect.any(String)],
+      );
+    });
+
+    // isAnalyzing must resolve to false so the form (and, in the modal
+    // surface, its close controls) become interactive again.
+    expect(
+      screen.getByRole("button", { name: "내 보험 분석하기" }),
+    ).toBeEnabled();
+  });
+
   test("rejects duplicate policies in the same upload batch", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({

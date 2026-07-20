@@ -6,6 +6,7 @@ import { useState } from "react";
 import { UploadInsuranceModal } from "./upload-modal";
 import type { InsuranceAnalysis } from "./store";
 import type { UploadInsurance } from "../upload/form";
+import { UploadInsuranceError } from "../upload/api";
 import { isPdfPasswordProtected } from "../upload/pdf-password-check";
 import { renderWithProviders } from "../../test/render-with-providers";
 import { POLICY_PARSE_RESPONSE_DEFAULTS } from "../../test/api-fixtures";
@@ -25,6 +26,7 @@ vi.mock("./session-api", async (importOriginal) => ({
     expiresAt: "2030-01-01T00:00:00.000Z",
     counselTurnsRemaining: 10,
   })),
+  deletePortfolioSessionDocuments: vi.fn().mockResolvedValue(undefined),
 }));
 
 const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
@@ -105,5 +107,41 @@ describe("UploadInsuranceModal", () => {
       );
     });
     expect(await screen.findByText("모달이 닫혔어요")).toBeInTheDocument();
+  });
+
+  test("becomes closable again once a stalled upload surfaces as an error", async () => {
+    const user = userEvent.setup();
+    const onAnalysisComplete = vi.fn();
+    // api.ts converts a stalled/timed-out request into the same
+    // UPLOAD_NETWORK_ERROR a plain connection failure produces, so this
+    // stands in for what the modal sees once the upload timeout fires.
+    const uploadInsurance = vi.fn<UploadInsurance>().mockRejectedValue(
+      new UploadInsuranceError({
+        code: "UPLOAD_NETWORK_ERROR",
+        userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+      }),
+    );
+    renderWithProviders(
+      <ModalHost
+        uploadInsurance={uploadInsurance}
+        onAnalysisComplete={onAnalysisComplete}
+      />,
+    );
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "분석에 추가하기" }));
+
+    expect(
+      await screen.findByText(
+        "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+      ),
+    ).toBeInTheDocument();
+
+    const closeButton = screen.getByRole("button", { name: "닫기" });
+    expect(closeButton).toBeEnabled();
+
+    await user.click(closeButton);
+    expect(await screen.findByText("모달이 닫혔어요")).toBeInTheDocument();
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 });
