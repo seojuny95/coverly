@@ -1,12 +1,12 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import { useId, useState } from "react";
 
 import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
+import { CollapseRegion, useDisclosure } from "@/shared/components/disclosure";
 
 import type { ClaimChannelBlock } from "./api";
 import { safeHref } from "./safe-href";
@@ -149,8 +149,7 @@ function InsurerChannelList({
 }: {
   insurers: NonNullable<ClaimChannelBlock["insurers"]>;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const panelId = useId();
+  const { expanded, toggle, panelId } = useDisclosure();
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
@@ -158,7 +157,7 @@ function InsurerChannelList({
         type="button"
         aria-expanded={expanded}
         aria-controls={panelId}
-        onClick={() => setExpanded((current) => !current)}
+        onClick={toggle}
         className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-none"
       >
         <span>
@@ -177,38 +176,26 @@ function InsurerChannelList({
         </Badge>
       </button>
 
-      <div
-        className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
-          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
-      >
-        <div className="overflow-hidden" inert={!expanded}>
-          <ul
-            id={panelId}
-            className="mt-3 divide-y divide-zinc-100 border-t border-zinc-100 text-xs leading-5 text-zinc-600"
-          >
-            {insurers.map((insurer) => (
-              <li key={insurer.name} className="py-3 first:pt-3 last:pb-0">
-                <div className="px-1">
-                  <p className="font-semibold text-zinc-900">{insurer.name}</p>
-                  {insurer.customer_center ? (
-                    <p className="mt-1 text-zinc-500">
-                      고객센터 {insurer.customer_center}
-                    </p>
-                  ) : null}
-                  {insurer.note ? (
-                    <p className="mt-1 text-zinc-500">{insurer.note}</p>
-                  ) : null}
-                  <ChannelLinkList
-                    links={insurer.links ?? []}
-                    className="mt-2"
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      <CollapseRegion expanded={expanded} id={panelId}>
+        <ul className="mt-3 divide-y divide-zinc-100 border-t border-zinc-100 text-xs leading-5 text-zinc-600">
+          {insurers.map((insurer) => (
+            <li key={insurer.name} className="py-3 first:pt-3 last:pb-0">
+              <div className="px-1">
+                <p className="font-semibold text-zinc-900">{insurer.name}</p>
+                {insurer.customer_center ? (
+                  <p className="mt-1 text-zinc-500">
+                    고객센터 {insurer.customer_center}
+                  </p>
+                ) : null}
+                {insurer.note ? (
+                  <p className="mt-1 text-zinc-500">{insurer.note}</p>
+                ) : null}
+                <ChannelLinkList links={insurer.links ?? []} className="mt-2" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CollapseRegion>
     </div>
   );
 }
