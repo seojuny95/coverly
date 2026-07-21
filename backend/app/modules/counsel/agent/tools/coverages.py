@@ -6,10 +6,8 @@ from app.modules.counsel.context import CounselContext
 from app.modules.counsel.facts import coverages as coverage_facts
 
 CoverageNameInfo = coverage_facts.CoverageNameInfo
-CoverageMatch = coverage_facts.CoverageMatch
 CoverageTotalResult = coverage_facts.CoverageTotalResult
 FindCoveragesResult = coverage_facts.FindCoveragesResult
-OverlapEntry = coverage_facts.OverlapEntry
 OverlappingCoverage = coverage_facts.OverlappingCoverage
 
 

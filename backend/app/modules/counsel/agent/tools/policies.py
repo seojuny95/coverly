@@ -7,7 +7,6 @@ from app.modules.counsel.facts import policies as policy_facts
 from app.modules.counsel.facts.policies import list_policy_facts
 
 PolicyListResult = policy_facts.PolicyListResult
-PolicyFact = policy_facts.PolicyFact
 
 
 @function_tool
