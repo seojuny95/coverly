@@ -14,7 +14,6 @@ from typing import Literal
 from agents import RunContextWrapper, function_tool
 from pydantic import BaseModel
 
-from app.core.untrusted import strip_injection_markers_by_line
 from app.modules.counsel.context import CounselContext
 from app.rag.policy.generation import PolicyEvidence, PolicyGenerationResult, generate_policy_answer
 from app.rag.policy.retrieval import retrieve_policy_context_by_session_ids
@@ -78,6 +77,6 @@ def retrieve_policy_terms(
         return PolicyTermsResult(matched=False, answer="", limitations=[])
     return PolicyTermsResult(
         matched=True,
-        answer=strip_injection_markers_by_line(result.answer),
+        answer=result.answer,
         limitations=list(result.limitations),
     )

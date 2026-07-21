@@ -2,7 +2,6 @@
 
 from agents import RunContextWrapper, function_tool
 
-from app.core.untrusted import strip_injection_markers, strip_injection_markers_by_line
 from app.modules.counsel.context import CounselContext
 from app.modules.counsel.facts import coverages as coverage_facts
 
@@ -12,50 +11,6 @@ CoverageTotalResult = coverage_facts.CoverageTotalResult
 FindCoveragesResult = coverage_facts.FindCoveragesResult
 OverlapEntry = coverage_facts.OverlapEntry
 OverlappingCoverage = coverage_facts.OverlappingCoverage
-
-
-def _strip_free_text_fields[T: (CoverageNameInfo, CoverageMatch)](item: T) -> T:
-    """Sanitize the only two free-text fields these models carry from PDFs.
-
-    담보명/보험사/상품명/가입금액/지급유형 and every id are identity or matching
-    fields and must pass through unchanged — 담보명 in particular drives
-    canonical coverage matching downstream. Only 보장내용/해설 hold free text
-    lifted from the user's uploaded document (or LLM-generated guidance based
-    on it), so only those two cross the model boundary stripped.
-    """
-
-    updates: dict[str, str] = {}
-    if item.보장내용:
-        updates["보장내용"] = strip_injection_markers_by_line(item.보장내용)
-    if item.해설:
-        updates["해설"] = strip_injection_markers_by_line(item.해설)
-    if not updates:
-        return item
-
-    stripped = item.model_copy(update=updates)
-    # The grounding label must not outlive the evidence it describes: if
-    # stripping emptied both fields, nothing text-based backs 설명근거 anymore.
-    if not stripped.보장내용 and not stripped.해설:
-        return stripped.model_copy(update={"설명근거": "none"})
-    return stripped
-
-
-def _strip_overlap_entry_free_text_fields(entry: OverlapEntry) -> OverlapEntry:
-    """Sanitize 상품명/가입금액, the only free text an overlap entry carries from a PDF.
-
-    담보명 (on the parent OverlappingCoverage), 보험사, ids, and 가입금액숫자 are
-    identity or matching fields and stay untouched. 가입금액 here is display-only
-    prose — it is never compared or summed downstream, unlike 가입금액숫자.
-    """
-
-    updates: dict[str, str] = {}
-    if entry.상품명:
-        updates["상품명"] = strip_injection_markers(entry.상품명)
-    if entry.가입금액:
-        updates["가입금액"] = strip_injection_markers(entry.가입금액)
-    if not updates:
-        return entry
-    return entry.model_copy(update=updates)
 
 
 @function_tool
@@ -69,8 +24,7 @@ def list_coverage_names(wrapper: RunContextWrapper[CounselContext]) -> list[Cove
     보장"처럼 카테고리 이름 자체를 담보명으로 넘기지 마세요.
     """
 
-    facts = coverage_facts.list_coverage_name_facts(wrapper.context.policies)
-    return [_strip_free_text_fields(fact) for fact in facts]
+    return coverage_facts.list_coverage_name_facts(wrapper.context.policies)
 
 
 @function_tool
@@ -92,10 +46,7 @@ def find_coverages(
             요청한 낱말을 모두 포함한 후보 이름으로 보고됩니다.
     """
 
-    result = coverage_facts.find_coverage_facts(wrapper.context.policies, coverage_names)
-    return result.model_copy(
-        update={"matches": [_strip_free_text_fields(match) for match in result.matches]}
-    )
+    return coverage_facts.find_coverage_facts(wrapper.context.policies, coverage_names)
 
 
 @function_tool
@@ -120,10 +71,7 @@ def calculate_coverage_total(
             list_coverage_names를 호출하세요.
     """
 
-    result = coverage_facts.calculate_coverage_total_fact(wrapper.context.policies, coverage_names)
-    return result.model_copy(
-        update={"included": [_strip_free_text_fields(match) for match in result.included]}
-    )
+    return coverage_facts.calculate_coverage_total_fact(wrapper.context.policies, coverage_names)
 
 
 @function_tool
@@ -135,14 +83,4 @@ def find_overlapping_coverages(
     중복 여부만 사실대로 알려주고, 해지하거나 줄이라고 권유하지 마세요.
     """
 
-    results = coverage_facts.find_overlapping_coverage_facts(wrapper.context.policies)
-    return [
-        overlap.model_copy(
-            update={
-                "policies": [
-                    _strip_overlap_entry_free_text_fields(entry) for entry in overlap.policies
-                ]
-            }
-        )
-        for overlap in results
-    ]
+    return coverage_facts.find_overlapping_coverage_facts(wrapper.context.policies)
