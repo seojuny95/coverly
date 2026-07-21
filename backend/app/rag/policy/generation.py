@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
 from app.core.generation import GenerationMode
-from app.core.untrusted import strip_injection_markers
 from app.integrations.openai import JsonCompleter, dump_prompt_json, structured_completer
 
 _UNSAFE_POLICY_TEXT = (
@@ -145,7 +145,7 @@ def generate_policy_answer(
         return _fallback()
 
     confirmed_facts = tuple(
-        strip_injection_markers(evidence_by_id[item_id].fact) for item_id in evidence_ids
+        _safe_evidence_fact(evidence_by_id[item_id].fact) for item_id in evidence_ids
     )
     if any(not fact for fact in confirmed_facts):
         return _fallback()
@@ -290,6 +290,25 @@ def _asks_missing_exclusion_confirmation(question: str, evidence_text: str) -> b
     if not any(term in question for term in ("제외", "면책", "보상하지")):
         return False
     return not any(term in evidence_text for term in ("제외", "면책", "보상하지"))
+
+
+_PROMPT_INJECTION_MARKERS = (
+    "이전 지시",
+    "시스템 지시",
+    "지시를 무시",
+    "답하라",
+    "출력하라",
+    "추천하라",
+    "권유하라",
+)
+
+
+def _safe_evidence_fact(fact: str) -> str:
+    parts = re.split(r"(?<=[.!?])\s+", fact.strip())
+    kept = [
+        part for part in parts if not any(marker in part for marker in _PROMPT_INJECTION_MARKERS)
+    ]
+    return " ".join(kept).strip()
 
 
 def _safe_unique_texts(
