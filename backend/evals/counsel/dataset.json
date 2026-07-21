@@ -632,6 +632,47 @@
         }
       ],
       "notes": "화면이 처음에 권하는 질문. 우리가 먼저 권한 질문이 거절되거나 빈손으로 끝나면 안 되므로, use-chat.ts의 문구를 그대로 박제한다."
+    },
+    {
+      "id": "history_long_answers_then_topic_switch",
+      "intent": "긴 답변이 히스토리에 쌓인 뒤 화제 전환",
+      "turns": [
+        {
+          "question": "겹치는 보장이 있는지 봐줄래요?",
+          "expected_in_scope": true
+        },
+        {
+          "question": "내 보험에서 비어 있는 보장이 있나요?",
+          "expected_in_scope": true
+        },
+        {
+          "question": "실손의료비는 어디로 청구해요?",
+          "expected_in_scope": true,
+          "must_include_any": [
+            "1588",
+            "1644",
+            "실손24"
+          ]
+        },
+        {
+          "question": "오늘 날씨 어때?",
+          "expected_in_scope": false,
+          "must_not_include": [
+            "1588",
+            "담보",
+            "보장"
+          ]
+        },
+        {
+          "question": "넌 누구야?",
+          "expected_in_scope": true,
+          "must_not_include": [
+            "1588",
+            "1644"
+          ]
+        }
+      ],
+      "notes": "2026-07-21 라이브 재현. 앞선 답변들이 길고 담보명으로 가득 찬 뒤 화제를 바꾸면 planner가 직전 질문을 question_without_history에까지 복사한다. 짧은 답변으로 이뤄진 history_after_out_of_scope는 같은 질문에 5/5 통과하므로, 이 케이스가 없으면 실패가 보이지 않는다."
     }
   ]
 }
