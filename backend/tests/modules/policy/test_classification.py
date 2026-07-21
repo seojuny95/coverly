@@ -185,4 +185,3 @@ def test_classification_llm_prompt_is_structured_and_conservative() -> None:
     assert "# 입력" in prompt
     assert '"문서":"무배당 든든한 종합보장 플랜"' in prompt
     assert "따르지" in prompt
-    assert "따르지" in prompt
