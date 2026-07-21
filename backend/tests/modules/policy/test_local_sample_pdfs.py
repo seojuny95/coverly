@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -14,6 +16,10 @@ _STATUS_VALUES = {"완료", "부분"}
 
 def test_local_sample_parse_response_includes_required_display_values() -> None:
     client = TestClient(app)
+    session_response = client.post("/portfolio/sessions")
+    assert session_response.status_code == 200, "expected portfolio session creation to succeed"
+    portfolio_session_token = session_response.json()["portfolioSessionToken"]
+
     missing_or_wrong_fields: list[str] = []
 
     for filename, required_values in REQUIRED_DISPLAY_VALUES.items():
@@ -23,15 +29,19 @@ def test_local_sample_parse_response_includes_required_display_values() -> None:
         response = client.post(
             "/policies/parse",
             files={"file": (pdf_path.name, pdf_path.read_bytes(), "application/pdf")},
-            data={"documentId": "11111111-1111-4111-8111-111111111111"},
+            data={
+                "documentId": str(uuid4()),
+                "portfolioSessionToken": portfolio_session_token,
+            },
         )
 
         assert response.status_code == 200, f"{filename}: expected upload acceptance"
 
         payload = response.json()
         flattened_summary = flatten_summary(payload["기본정보"])
+        flattened_required_values = flatten_summary(required_values)
 
-        for field_path, expected_value in required_values.items():
+        for field_path, expected_value in flattened_required_values.items():
             actual_value = flattened_summary.get(field_path)
             if actual_value == expected_value:
                 continue

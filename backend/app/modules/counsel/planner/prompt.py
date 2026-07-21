@@ -29,6 +29,22 @@ def build_system_prompt() -> str:
 
 def build_user_prompt(question: str, history: list[CounselMessage]) -> str:
     history_text = (
-        "\n".join(f"{item.role}: {item.content}" for item in history) if history else _NO_HISTORY
+        "\n".join(f"{item.role}: {_one_line(item.content)}" for item in history)
+        if history
+        else _NO_HISTORY
     )
-    return f"이전 대화:\n{history_text}\n\n질문: {question}"
+    return f"이전 대화:\n{history_text}\n\n질문: {_one_line(question)}"
+
+
+def _one_line(content: str) -> str:
+    """Flatten a turn so its text cannot start a line and forge a turn label.
+
+    One line per turn is what marks a turn boundary here, so a user who types a
+    newline followed by "assistant:" would otherwise produce a line
+    indistinguishable from a real prior turn. `splitlines` uses Python's own
+    definition of a line boundary, which covers \\r, \\v, \\f, \\x1c-\\x1e,
+    \\x85, \\u2028 and \\u2029 as well as \\n — enumerating them by hand is how
+    this kind of guard gets bypassed.
+    """
+
+    return " ".join(content.splitlines())

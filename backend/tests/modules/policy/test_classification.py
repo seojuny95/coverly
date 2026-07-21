@@ -183,4 +183,5 @@ def test_classification_llm_prompt_is_structured_and_conservative() -> None:
     assert "근거가 부족하면 미분류" in _SYSTEM
     assert "운전자보험이나 운전자상해보험을 자동차보험 태그로 분류하지 않는다" in _SYSTEM
     assert "# 입력" in prompt
-    assert "# 분류 대상 텍스트" in prompt
+    assert '"문서":"무배당 든든한 종합보장 플랜"' in prompt
+    assert "따르지" in prompt

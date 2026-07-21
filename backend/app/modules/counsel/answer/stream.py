@@ -2,6 +2,8 @@
 
 from collections.abc import AsyncIterator
 
+from agents import MaxTurnsExceeded
+
 from app.modules.counsel.agent.definition import AgentStreamRunner, create_agent
 from app.modules.counsel.answer.brief import build_agent_input
 from app.modules.counsel.answer.clarify import compose_clarify_question
@@ -22,6 +24,10 @@ from app.modules.portfolio.schemas import PolicyInput
 _OUT_OF_SCOPE_ANSWER = (
     "이 질문은 보험 상담 범위 밖이라 답하기 어려워요. 가입 보험, 담보, 약관, "
     "청구처럼 보험과 관련된 내용으로 물어봐 주세요."
+)
+
+_MAX_TURNS_EXCEEDED_ANSWER = (
+    "질문이 복잡해서 이번 답변을 끝까지 완성하지 못했어요. 질문을 조금 나누어 다시 물어봐 주세요."
 )
 
 
@@ -90,8 +96,15 @@ async def build_answer_stream(
         needs_hedge=route.needs_hedge,
     )
 
-    async for chunk in agent_stream_runner(create_agent(model), agent_input, context):
-        yield serialize_event(CounselDeltaEvent(text=chunk))
+    streamed_any = False
+    try:
+        async for chunk in agent_stream_runner(create_agent(model), agent_input, context):
+            streamed_any = True
+            yield serialize_event(CounselDeltaEvent(text=chunk))
+    except MaxTurnsExceeded:
+        # The cap trips mid-sentence, so break the line before apologising.
+        separator = "\n\n" if streamed_any else ""
+        yield serialize_event(CounselDeltaEvent(text=f"{separator}{_MAX_TURNS_EXCEEDED_ANSWER}"))
 
     yield serialize_event(CounselEndEvent())
 
