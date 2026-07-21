@@ -8,13 +8,6 @@ from app.modules.counsel.facts.claims import get_claim_channel_facts
 
 ClaimChannelsResult = claim_facts.ClaimChannelsResult
 
-# Deliberately not stripped: every field this tool returns (customer-center
-# numbers, app names, claim links) comes from Coverly's own verified reference
-# data (app/modules/reference_data), never from an uploaded PDF. Coverage names
-# passed in only steer which insurer's reference data is looked up; they never
-# reach the output. If a future field here starts carrying user-uploaded free
-# text, it needs its own stripping — this exemption does not cover it.
-
 
 @function_tool
 def get_claim_channels(
