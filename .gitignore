@@ -26,6 +26,7 @@ dist/
 
 # Local editor settings
 .vscode/
+.claude/
 
 # Local test inputs with real PII
 sample-insurance-input/
