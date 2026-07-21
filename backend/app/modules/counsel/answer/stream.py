@@ -96,11 +96,15 @@ async def build_answer_stream(
         needs_hedge=route.needs_hedge,
     )
 
+    streamed_any = False
     try:
         async for chunk in agent_stream_runner(create_agent(model), agent_input, context):
+            streamed_any = True
             yield serialize_event(CounselDeltaEvent(text=chunk))
     except MaxTurnsExceeded:
-        yield serialize_event(CounselDeltaEvent(text=_MAX_TURNS_EXCEEDED_ANSWER))
+        # The cap trips mid-sentence, so break the line before apologising.
+        separator = "\n\n" if streamed_any else ""
+        yield serialize_event(CounselDeltaEvent(text=f"{separator}{_MAX_TURNS_EXCEEDED_ANSWER}"))
 
     yield serialize_event(CounselEndEvent())
 
