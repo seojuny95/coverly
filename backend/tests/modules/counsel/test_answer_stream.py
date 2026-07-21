@@ -3,6 +3,8 @@ import json
 from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any, cast
 
+from agents import MaxTurnsExceeded
+
 from app.modules.counsel.answer import build_answer_stream
 from app.modules.counsel.planner import CounselPlan, CounselTask
 from app.modules.counsel.schemas import CounselMessage
@@ -175,6 +177,36 @@ def test_streams_fact_answer_before_agent_for_fact_then_explanation_plan() -> No
     assert "암진단비: 3,000만원" in str(events[1]["text"])
     assert events[2] == {"type": "delta", "text": "암진단비가 "}
     assert events[-1] == {"type": "end"}
+
+
+def test_max_turns_exceeded_mid_stream_still_terminates_with_an_end_event() -> None:
+    async def runner_that_hits_the_turn_cap(
+        _agent: Any, _conversation: Any, _context: Any
+    ) -> AsyncIterator[str]:
+        yield "일부 답변 "
+        raise MaxTurnsExceeded("max turns exceeded")
+
+    check = CounselPlan(rewritten_question="암진단비 알려줘", in_scope=True, reason="보험 질문")
+
+    events = asyncio.run(
+        _collect(
+            build_answer_stream(
+                question=check.rewritten_question,
+                history=[],
+                plan=check,
+                policies=[],
+                policy_rag_session_ids=(),
+                model="gpt-4.1-mini",
+                turns_remaining=9,
+                agent_stream_runner=runner_that_hits_the_turn_cap,
+            )
+        )
+    )
+
+    assert events[1] == {"type": "delta", "text": "일부 답변 "}
+    assert events[-1] == {"type": "end"}
+    texts = [str(event["text"]) for event in events if event["type"] == "delta"]
+    assert any("완성하지 못했어요" in text for text in texts)
 
 
 def test_closing_the_stream_early_propagates_into_the_agent_stream_runner() -> None:
