@@ -379,6 +379,31 @@ def test_find_coverages_reports_unmatched_names_without_guessing() -> None:
     assert result.unmatched[0].candidates == []
 
 
+def _policies_with_same_insurer_tiers() -> list[PolicyInput]:
+    return [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "현대해상", "상품명": "건강보험A"},
+                "보장목록": [
+                    {
+                        "담보명": "암진단비",
+                        "가입금액": "3,000만원",
+                        "가입금액숫자": 30_000_000,
+                        "지급유형": "정액",
+                    },
+                    {
+                        "담보명": "암진단비",
+                        "가입금액": "2,000만원",
+                        "가입금액숫자": 20_000_000,
+                        "지급유형": "정액",
+                    },
+                ],
+            }
+        ),
+    ]
+
+
 def _policies_with_indemnity_and_overlap() -> list[PolicyInput]:
     return [
         PolicyInput.model_validate(
@@ -439,6 +464,21 @@ def test_calculate_coverage_total_reports_unmatched_names() -> None:
     assert result.total == 0
     assert result.included == []
     assert len(result.unmatched) == 1
+
+
+def test_calculate_coverage_total_does_not_blindly_sum_same_insurer_tiers() -> None:
+    # One insurer lists 암진단비 twice -- these can be tiers of a single contract,
+    # so they must not be folded into one confident total; they surface for review.
+    context = CounselContext(policies=_policies_with_same_insurer_tiers())
+
+    result = _invoke_calculate_coverage_total(context, ["암진단비"])
+
+    assert result.total == 0
+    assert result.included == []
+    assert result.excluded == []
+    assert len(result.needs_review) == 1
+    assert result.needs_review[0].담보명 == "암진단비"
+    assert len(result.needs_review[0].rows) == 2
 
 
 def test_find_overlapping_coverages_reports_names_held_in_multiple_policies() -> None:
