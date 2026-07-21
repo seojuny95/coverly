@@ -228,7 +228,7 @@ describe("portfolio features", () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
-      if (path.endsWith("/counsel/stream")) {
+      if (path.endsWith("/qa/stream")) {
         const events = [
           {
             type: "meta",
@@ -313,7 +313,7 @@ describe("portfolio features", () => {
       [RequestInfo | URL, RequestInit]
     >;
     const counselCall = fetchCalls.find(([input]) =>
-      String(input).endsWith("/counsel/stream"),
+      String(input).endsWith("/qa/stream"),
     );
     expect(counselCall?.[1]?.body).toContain('"history":[]');
 
