@@ -72,8 +72,19 @@ class OverlapEntry(BaseModel):
     보장분류: str | None = None
 
 
+CoveragePayoutMode = Literal["각각지급", "비례보상", "확인필요"]
+"""What holding one coverage in two contracts actually pays.
+
+각각지급 -- a 정액 coverage pays its full amount from every contract.
+비례보상 -- a 실손 coverage pays the loss incurred, shared across contracts, so
+the second contract adds no payout.
+확인필요 -- the payout type was not parsed, or the contracts disagree.
+"""
+
+
 class OverlappingCoverage(BaseModel):
     담보명: str
+    보상방식: CoveragePayoutMode
     policies: list[OverlapEntry]
 
 
@@ -163,6 +174,9 @@ def find_overlapping_coverage_facts(
     Names are compared by canonical identity, so a line break inside a PDF name
     ("배상책 임") does not hide a real overlap, while a qualifier that changes
     what pays out, such as (유사암제외), keeps two coverages apart.
+
+    Each result carries how it actually pays, because holding the same coverage
+    twice means opposite things for 정액 and 실손 -- see CoveragePayoutMode.
     """
 
     groups = _group_by_coverage_identity(policies)
@@ -170,8 +184,29 @@ def find_overlapping_coverage_facts(
     overlapping = [group for group in groups.values() if group.spans_two_contracts]
     overlapping.sort(key=lambda group: group.담보명)
     return [
-        OverlappingCoverage(담보명=group.담보명, policies=group.entries) for group in overlapping
+        OverlappingCoverage(
+            담보명=group.담보명,
+            보상방식=_payout_mode(group.entries),
+            policies=group.entries,
+        )
+        for group in overlapping
     ]
+
+
+def _payout_mode(entries: list[OverlapEntry]) -> CoveragePayoutMode:
+    """Read the payout mode off the contracts, or admit it is unknown.
+
+    Contracts that disagree are reported as 확인필요 rather than resolved by a
+    majority: the two modes lead to opposite advice, so guessing the wrong one
+    could push someone to drop cover that is paying out.
+    """
+
+    payout_types = {entry.지급유형 for entry in entries}
+    if payout_types == {"정액"}:
+        return "각각지급"
+    if payout_types == {"실손"}:
+        return "비례보상"
+    return "확인필요"
 
 
 def _group_by_coverage_identity(policies: list[PolicyInput]) -> dict[str, _OverlapGroup]:

@@ -76,9 +76,12 @@ def calculate_coverage_total(
 def find_overlapping_coverages(
     wrapper: RunContextWrapper[CounselContext],
 ) -> list[OverlappingCoverage]:
-    """같은 담보명이 두 개 이상의 증권에 중복 가입된 경우를 모두 나열합니다.
+    """같은 담보가 두 개 이상의 증권에 함께 들어 있는 경우를 모두 나열합니다.
 
-    중복 여부만 사실대로 알려주고, 해지하거나 줄이라고 권유하지 마세요.
+    각 항목의 보상방식을 반드시 함께 전하세요. 정액형(각각지급)은 계약마다 전액
+    지급되므로 중복이나 낭비라고 말하면 안 되고, 실손형(비례보상)만 여러 건이어도
+    실제 부담한 의료비 안에서만 보상됩니다. 보상방식이 확인필요면 어느 쪽인지
+    단정하지 마세요.
     """
 
     return coverage_facts.find_overlapping_coverage_facts(wrapper.context.policies)

@@ -6,6 +6,7 @@ from app.modules.counsel.answer.executor import FactExecution, FactTaskResult
 from app.modules.counsel.facts.coverages import (
     CoverageMatch,
     CoverageNameInfo,
+    CoveragePayoutMode,
     UnmatchedCoverageName,
 )
 from app.modules.counsel.facts.policies import PolicyFact
@@ -124,20 +125,33 @@ def _coverage_total_answer(result: FactTaskResult) -> str:
     return "\n".join(lines)
 
 
+_PAYOUT_NOTES: dict[CoveragePayoutMode, str] = {
+    "각각지급": "정액형이라 계약마다 각각 지급돼요.",
+    "비례보상": "실손형이라 비례보상이에요. 여러 건이어도 실제 부담한 의료비 안에서만 보상돼요.",
+    "확인필요": (
+        "지급 방식이 확인되지 않아, 각각 지급되는지 나눠 보상되는지는 약관을 확인해야 해요."
+    ),
+}
+
+
 def _overlap_answer(result: FactTaskResult) -> str:
-    """Name the contracts that share a coverage.
+    """Name the contracts that share a coverage, and what holding it twice pays.
 
     A row count leaves the reader to guess what the rows are; the amounts and
-    the insurer are what tells them whether the overlap matters.
+    the insurer are what tells them whether it matters.
+
+    The payout mode is not decoration. Calling a 정액 coverage a duplicate reads
+    as "one of these is wasted" and would push someone to drop cover that pays
+    out in full from both contracts.
     """
 
     overlaps = result.overlaps or []
     if not overlaps:
-        return "현재 자료에서는 여러 계약에 걸쳐 겹치는 담보가 없어요."
+        return "현재 자료에서는 여러 계약에 함께 들어 있는 담보가 없어요."
 
-    lines = ["여러 계약에서 함께 확인된 담보예요."]
+    lines = ["여러 계약에 함께 들어 있는 담보예요."]
     for item in overlaps:
-        lines.append(f"- {item.담보명}")
+        lines.append(f"- {item.담보명} — {_PAYOUT_NOTES[item.보상방식]}")
         for entry in item.policies:
             owner = " · ".join(part for part in (entry.보험사, entry.상품명) if part)
             amount = entry.가입금액 or "가입금액 미확인"

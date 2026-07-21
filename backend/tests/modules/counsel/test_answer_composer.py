@@ -120,6 +120,43 @@ def test_overlap_answer_names_the_contracts_instead_of_counting_rows() -> None:
     assert "2건" not in answer
 
 
+def test_overlap_answer_says_an_indemnity_coverage_is_not_paid_twice() -> None:
+    plan = _plan(CounselTask(kind="overlap_check"))
+
+    answer = compose_fact_answer(execute_fact_tasks(plan, _two_contract_policies()))
+
+    assert answer is not None
+    assert "비례" in answer
+
+
+def test_overlap_answer_does_not_call_a_fixed_amount_coverage_a_duplicate() -> None:
+    # 암진단비 in two contracts pays from both. Calling it 중복 would read as
+    # "one of these is wasted" and push the user to drop a paying coverage.
+    policies = [
+        PolicyInput.model_validate(
+            {
+                "id": "p1",
+                "기본정보": {"보험사": "A화재", "상품명": "상품1"},
+                "보장목록": [{"담보명": "암진단비", "가입금액": "2,000만원", "지급유형": "정액"}],
+            }
+        ),
+        PolicyInput.model_validate(
+            {
+                "id": "p2",
+                "기본정보": {"보험사": "B화재", "상품명": "상품2"},
+                "보장목록": [{"담보명": "암진단비", "가입금액": "4,000만원", "지급유형": "정액"}],
+            }
+        ),
+    ]
+    plan = _plan(CounselTask(kind="overlap_check"))
+
+    answer = compose_fact_answer(execute_fact_tasks(plan, policies))
+
+    assert answer is not None
+    assert "각각" in answer
+    assert "중복" not in answer
+
+
 def _policies_with_many_coverages() -> list[PolicyInput]:
     names = ["암진단비(유사암제외)", "뇌혈관질환진단비", "대물배상", "긴급출동특약"]
     return [

@@ -83,6 +83,64 @@ def test_a_meaningful_qualifier_still_separates_two_coverages() -> None:
     assert find_overlapping_coverage_facts(policies) == []
 
 
+def test_a_fixed_amount_coverage_in_two_contracts_pays_from_each() -> None:
+    # 정액 coverages pay their full amount from every contract that carries them,
+    # so calling this a duplicate would push the user to drop cover they are
+    # actually being paid for.
+    policies = [
+        _policy(
+            "p1",
+            "A화재",
+            "상품1",
+            [{"담보명": "암진단비", "가입금액": "2,000만원", "지급유형": "정액"}],
+        ),
+        _policy(
+            "p2",
+            "B화재",
+            "상품2",
+            [{"담보명": "암진단비", "가입금액": "4,000만원", "지급유형": "정액"}],
+        ),
+    ]
+
+    overlaps = find_overlapping_coverage_facts(policies)
+
+    assert [item.보상방식 for item in overlaps] == ["각각지급"]
+
+
+def test_an_indemnity_coverage_in_two_contracts_shares_one_loss() -> None:
+    # 실손 pays the loss actually incurred, split across contracts, so a second
+    # one buys no extra payout.
+    policies = [
+        _policy(
+            "p1",
+            "A화재",
+            "상품1",
+            [{"담보명": "실손의료비", "가입금액": "5,000만원", "지급유형": "실손"}],
+        ),
+        _policy(
+            "p2",
+            "B화재",
+            "상품2",
+            [{"담보명": "실손의료비", "가입금액": "5,000만원", "지급유형": "실손"}],
+        ),
+    ]
+
+    overlaps = find_overlapping_coverage_facts(policies)
+
+    assert [item.보상방식 for item in overlaps] == ["비례보상"]
+
+
+def test_an_unknown_payout_type_is_not_claimed_either_way() -> None:
+    policies = [
+        _policy("p1", "A화재", "상품1", [{"담보명": "질병수술비", "가입금액": "100만원"}]),
+        _policy("p2", "B화재", "상품2", [{"담보명": "질병수술비", "가입금액": "200만원"}]),
+    ]
+
+    overlaps = find_overlapping_coverage_facts(policies)
+
+    assert [item.보상방식 for item in overlaps] == ["확인필요"]
+
+
 def test_a_payout_condition_suffix_does_not_split_a_real_overlap() -> None:
     policies = [
         _policy("p1", "A화재", "상품1", [{"담보명": "뇌혈관질환진단비", "가입금액": "1,000만원"}]),
