@@ -73,7 +73,7 @@ def extract_policy_summary_with_llm(
     text: str,
     complete: JsonCompleter | None = None,
 ) -> LlmPolicySummary | None:
-    if complete is None and not get_settings().openai_api_key:
+    if complete is None and not get_settings().openai_api_key.get_secret_value():
         return None
 
     insurer_candidates = get_insurer_candidates()

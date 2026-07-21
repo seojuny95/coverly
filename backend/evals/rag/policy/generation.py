@@ -142,7 +142,7 @@ def evaluate_generation(
     *,
     complete: JsonCompleter | None = None,
 ) -> PolicyGenerationEvalReport:
-    if complete is None and not get_settings().openai_api_key:
+    if complete is None and not get_settings().openai_api_key.get_secret_value():
         raise RuntimeError("OPENAI_API_KEY is required for live policy generation evaluation")
 
     active_cases = cases if cases is not None else load_practice_eval_cases()

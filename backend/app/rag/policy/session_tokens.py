@@ -118,10 +118,11 @@ def _active_secret(secret: str | None) -> str:
         return secret
 
     settings = get_settings()
-    if settings.policy_rag_session_secret:
-        _validate_configured_secret(settings.policy_rag_session_secret)
-        return settings.policy_rag_session_secret
-    if settings.database_url:
+    configured = settings.policy_rag_session_secret.get_secret_value()
+    if configured:
+        _validate_configured_secret(configured)
+        return configured
+    if settings.database_url.get_secret_value():
         raise RuntimeError("POLICY_RAG_SESSION_SECRET is required when DATABASE_URL is configured")
     return _FALLBACK_SECRET
 

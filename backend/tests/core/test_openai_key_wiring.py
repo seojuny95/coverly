@@ -1,11 +1,12 @@
 import pytest
+from pydantic import SecretStr
 
 from app.core.config import Settings
 from app.integrations.openai import client
 
 
 def _settings(monkeypatch: pytest.MonkeyPatch, key: str) -> None:
-    monkeypatch.setattr(client, "get_settings", lambda: Settings(openai_api_key=key))
+    monkeypatch.setattr(client, "get_settings", lambda: Settings(openai_api_key=SecretStr(key)))
 
 
 def test_agent_sdk_gets_the_key_without_touching_the_environment(

@@ -127,10 +127,11 @@ class PgVectorPolicyStore:
 @lru_cache(maxsize=1)
 def shared_policy_store() -> PgVectorPolicyStore:
     settings = get_settings()
-    if not settings.database_url:
+    database_url = settings.database_url.get_secret_value()
+    if not database_url:
         raise RuntimeError("DATABASE_URL is required for policy RAG")
     return PgVectorPolicyStore(
-        settings.database_url,
+        database_url,
         table_name=POLICY_RAG_TABLE_NAME,
     )
 

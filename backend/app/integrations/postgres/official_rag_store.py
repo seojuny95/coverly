@@ -41,17 +41,18 @@ class PgVectorRagStore:
     @classmethod
     def from_settings(cls) -> PgVectorRagStore:
         settings = get_settings()
-        if not settings.database_url:
+        database_url = settings.database_url.get_secret_value()
+        if not database_url:
             raise RuntimeError("DATABASE_URL is not configured")
 
         return cls(
             _pg_vector_store_from_database_url(
-                settings.database_url,
+                database_url,
                 table_name=settings.rag_pg_table,
                 embed_dim=settings.rag_embedding_dim,
             ),
             embedding_model=settings.openai_embedding_model,
-            database_url=settings.database_url,
+            database_url=database_url,
             table_name=settings.rag_pg_table,
             embed_dim=settings.rag_embedding_dim,
         )

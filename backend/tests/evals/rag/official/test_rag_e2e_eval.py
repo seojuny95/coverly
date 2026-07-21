@@ -2,6 +2,7 @@ import json
 import re
 
 import pytest
+from pydantic import SecretStr
 
 from app.rag.official.models import RagChunk, RetrievalHit
 from evals.rag.official.e2e import (
@@ -238,7 +239,7 @@ def test_official_rag_e2e_requires_openai_key_for_live_generation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _Settings:
-        openai_api_key = ""
+        openai_api_key = SecretStr("")
 
     monkeypatch.setattr("evals.rag.official.e2e.get_settings", lambda: _Settings())
 

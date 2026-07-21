@@ -57,7 +57,8 @@ class LlamaIndexOpenAIEmbedder:
 
 def openai_embedder_from_settings() -> LlamaIndexOpenAIEmbedder:
     settings = get_settings()
-    if not settings.openai_api_key:
+    api_key = settings.openai_api_key.get_secret_value()
+    if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
     if settings.openai_embedding_dimensions != settings.rag_embedding_dim:
         raise RuntimeError(
@@ -67,7 +68,7 @@ def openai_embedder_from_settings() -> LlamaIndexOpenAIEmbedder:
             "what the embedder actually produces."
         )
     return LlamaIndexOpenAIEmbedder(
-        api_key=settings.openai_api_key,
+        api_key=api_key,
         model=settings.openai_embedding_model,
         dimensions=settings.openai_embedding_dimensions,
     )

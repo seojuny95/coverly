@@ -23,9 +23,10 @@ def _database_url() -> str:
     settings = get_settings()
     if not settings.reference_data_database_enabled:
         raise ReferenceDataUnavailableError("Database reference data is disabled")
-    if not settings.database_url:
+    database_url = settings.database_url.get_secret_value()
+    if not database_url:
         raise ReferenceDataUnavailableError("DATABASE_URL is required for database reference data")
-    return settings.database_url
+    return database_url
 
 
 @lru_cache(maxsize=1)

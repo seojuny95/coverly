@@ -3,6 +3,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from pydantic import SecretStr
 
 from app.rag.embeddings import HashingEmbedder, openai_embedder_from_settings
 from app.rag.official.chunkers import build_chunks
@@ -266,7 +267,7 @@ def test_openai_embedder_rejects_mismatched_dimension_settings(
     didn't match the pgvector column width."""
 
     class _StubSettings:
-        openai_api_key = "test-key"
+        openai_api_key = SecretStr("test-key")
         openai_embedding_model = "text-embedding-3-small"
         openai_embedding_dimensions = 512
         rag_embedding_dim = 1536
@@ -342,8 +343,8 @@ def test_production_retrieval_applies_injected_semantic_reranker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _StubSettings:
-        database_url = "postgresql://configured"
-        openai_api_key = ""
+        database_url = SecretStr("postgresql://configured")
+        openai_api_key = SecretStr("")
 
     class _StubEmbedder:
         def embed_query(self, _text: str) -> tuple[float, ...]:

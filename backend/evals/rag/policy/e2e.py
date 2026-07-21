@@ -115,7 +115,11 @@ def evaluate_e2e(
 ) -> PolicyRagE2EReport:
     validate_execution_modes(retrieval_mode, generation_mode)
     settings = get_settings()
-    if generation_mode == "live" and complete is None and not settings.openai_api_key:
+    if (
+        generation_mode == "live"
+        and complete is None
+        and not settings.openai_api_key.get_secret_value()
+    ):
         raise RuntimeError("OPENAI_API_KEY is required for live policy RAG E2E evaluation")
     active_completer = complete
     if generation_mode == "deterministic" and active_completer is None:

@@ -2,6 +2,7 @@ import json
 import re
 
 import pytest
+from pydantic import SecretStr
 
 from app.rag.official.loaders import load_official_chunks
 from app.rag.official.models import RagChunk
@@ -242,7 +243,7 @@ def test_generation_eval_requires_openai_key_for_live_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _Settings:
-        openai_api_key = ""
+        openai_api_key = SecretStr("")
 
     monkeypatch.setattr(
         "evals.rag.official.generation.get_settings",

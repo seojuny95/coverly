@@ -2,6 +2,7 @@ import json
 import re
 
 import pytest
+from pydantic import SecretStr
 
 from app.modules.coverage.contracts import InsuredDemographics
 from evals.rag.policy.contracts import ConsultationEvidence
@@ -175,7 +176,7 @@ def test_policy_generation_eval_offline_lexical_completer_runs_without_openai_ke
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _Settings:
-        openai_api_key = ""
+        openai_api_key = SecretStr("")
 
     monkeypatch.setattr(
         "evals.rag.policy.generation.get_settings",
@@ -305,7 +306,7 @@ def test_policy_generation_eval_requires_openai_key_for_live_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _Settings:
-        openai_api_key = ""
+        openai_api_key = SecretStr("")
 
     monkeypatch.setattr(
         "evals.rag.policy.generation.get_settings",

@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_BACKEND_CORS_ORIGINS = (
@@ -10,11 +11,13 @@ DEFAULT_BACKEND_CORS_ORIGINS = (
 
 
 class Settings(BaseSettings):
-    openai_api_key: str = ""
+    # Secrets are SecretStr so that a repr of Settings -- e.g. a failing
+    # assertion message -- can never dump live credentials into CI logs.
+    openai_api_key: SecretStr = SecretStr("")
     openai_model: str = "gpt-4.1-mini"
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
-    database_url: str = ""
+    database_url: SecretStr = SecretStr("")
     reference_data_database_enabled: bool = True
     rag_pg_table: str = "official_rag_chunks"
     reference_schema: str = "reference"
@@ -23,7 +26,7 @@ class Settings(BaseSettings):
     rag_embedding_dim: int = 1536
     policy_rag_ttl_seconds: int = 15 * 60
     policy_rag_max_ttl_seconds: int = 2 * 60 * 60
-    policy_rag_session_secret: str = ""
+    policy_rag_session_secret: SecretStr = SecretStr("")
     portfolio_session_max_documents: int = 50
     counsel_max_turns_per_session: int = 10
     counsel_agent_max_turns: int = 10

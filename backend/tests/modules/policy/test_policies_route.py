@@ -2,6 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.main import app
 from app.modules.policy.parsing import (
@@ -49,8 +50,8 @@ def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     from app.rag.policy import session_tokens
 
     class _Settings:
-        policy_rag_session_secret = "test-policy-rag-session-secret-32"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("test-policy-rag-session-secret-32")
+        database_url = SecretStr("postgresql://example/test")
 
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 

@@ -45,10 +45,11 @@ def structured_completer(
 
     def complete(system: str, user: str) -> dict[str, object]:
         settings = get_settings()
-        if not settings.openai_api_key:
+        api_key = settings.openai_api_key.get_secret_value()
+        if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not configured")
 
-        response = _get_client(settings.openai_api_key).responses.parse(
+        response = _get_client(api_key).responses.parse(
             model=model or settings.openai_model,
             input=cast(
                 Any,
@@ -73,10 +74,11 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
         return []
 
     settings = get_settings()
-    if not settings.openai_api_key:
+    api_key = settings.openai_api_key.get_secret_value()
+    if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
 
-    response = _get_client(settings.openai_api_key).embeddings.create(
+    response = _get_client(api_key).embeddings.create(
         model=settings.openai_embedding_model,
         input=texts,
         dimensions=settings.openai_embedding_dimensions,
@@ -116,6 +118,6 @@ def configure_agent_sdk_credentials() -> None:
 
     set_tracing_disabled(True)
 
-    api_key = get_settings().openai_api_key
+    api_key = get_settings().openai_api_key.get_secret_value()
     if api_key:
         set_default_openai_key(api_key, use_for_tracing=False)

@@ -161,7 +161,11 @@ def evaluate_e2e(
     active_completer = complete
     if generation_mode == "deterministic" and active_completer is None:
         active_completer = offline_extractive_completer
-    if generation_mode == "live" and active_completer is None and not get_settings().openai_api_key:
+    if (
+        generation_mode == "live"
+        and active_completer is None
+        and not get_settings().openai_api_key.get_secret_value()
+    ):
         raise RuntimeError("OPENAI_API_KEY is required for live official RAG E2E evaluation")
 
     active_cases = cases if cases is not None else load_e2e_eval_cases()
@@ -173,7 +177,7 @@ def evaluate_e2e(
         f"in-memory:{corpus_version}"
         if retrieval_mode == "offline"
         else _production_index_version(
-            database_url=settings.database_url,
+            database_url=settings.database_url.get_secret_value(),
             table_name=settings.rag_pg_table,
         )
     )
@@ -191,7 +195,7 @@ def evaluate_e2e(
 
     if retrieval_mode == "production":
         final_index_version = _production_index_version(
-            database_url=settings.database_url,
+            database_url=settings.database_url.get_secret_value(),
             table_name=settings.rag_pg_table,
         )
         if final_index_version != index_version:

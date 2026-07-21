@@ -135,7 +135,7 @@ def evaluate_generation(
     *,
     complete: JsonCompleter | None = None,
 ) -> GenerationEvalReport:
-    if complete is None and not get_settings().openai_api_key:
+    if complete is None and not get_settings().openai_api_key.get_secret_value():
         raise RuntimeError("OPENAI_API_KEY is required for live generation evaluation")
 
     active_cases = cases if cases is not None else load_generation_eval_cases()

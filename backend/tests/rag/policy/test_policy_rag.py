@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+from pydantic import SecretStr
 
 from app.modules.policy.models import ParsedDocument
 from app.rag.embeddings import HashingEmbedder
@@ -101,8 +102,8 @@ def _policy_session_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.rag.policy import session_tokens
 
     class _Settings:
-        policy_rag_session_secret = "test-policy-rag-session-secret-32"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("test-policy-rag-session-secret-32")
+        database_url = SecretStr("postgresql://example/test")
 
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 
@@ -315,8 +316,8 @@ def test_policy_session_token_requires_configured_secret_when_database_is_enable
     from app.rag.policy import session_tokens
 
     class _Settings:
-        policy_rag_session_secret = ""
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("")
+        database_url = SecretStr("postgresql://example/test")
 
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 
@@ -330,8 +331,8 @@ def test_policy_session_token_rejects_placeholder_configured_secret(
     from app.rag.policy import session_tokens
 
     class _Settings:
-        policy_rag_session_secret = "replace-with-random-secret"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("replace-with-random-secret")
+        database_url = SecretStr("postgresql://example/test")
 
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 
@@ -345,8 +346,8 @@ def test_policy_session_token_rejects_weak_configured_secret(
     from app.rag.policy import session_tokens
 
     class _Settings:
-        policy_rag_session_secret = "short-secret"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("short-secret")
+        database_url = SecretStr("postgresql://example/test")
 
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
 
@@ -360,8 +361,8 @@ def test_policy_index_validates_secret_before_embedding_or_storage(
     from app.rag.policy import session_tokens
 
     class _Settings:
-        policy_rag_session_secret = ""
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("")
+        database_url = SecretStr("postgresql://example/test")
 
     store = _MemoryStore(())
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())

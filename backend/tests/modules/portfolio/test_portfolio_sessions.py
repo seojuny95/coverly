@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from pydantic import SecretStr
 
 from app.modules.policy.pipeline import PipelineResult
 from app.modules.portfolio.schemas import PolicyInput
@@ -248,8 +249,8 @@ def _settings(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Settings:
         policy_rag_ttl_seconds = 900
         policy_rag_max_ttl_seconds = 7200
-        policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("test-portfolio-session-secret-32-bytes")
+        database_url = SecretStr("postgresql://example/test")
         portfolio_session_max_documents = 50
         policy_upload_reservation_ttl_seconds = 300
 
@@ -457,8 +458,8 @@ def test_document_limit_removes_the_unlinked_rag_document(
     class _Settings:
         policy_rag_ttl_seconds = 900
         policy_rag_max_ttl_seconds = 7200
-        policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("test-portfolio-session-secret-32-bytes")
+        database_url = SecretStr("postgresql://example/test")
         portfolio_session_max_documents = 1
         policy_upload_reservation_ttl_seconds = 300
 
@@ -493,8 +494,8 @@ def test_in_progress_upload_counts_toward_document_limit(
     class _Settings:
         policy_rag_ttl_seconds = 900
         policy_rag_max_ttl_seconds = 7200
-        policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("test-portfolio-session-secret-32-bytes")
+        database_url = SecretStr("postgresql://example/test")
         portfolio_session_max_documents = 1
         policy_upload_reservation_ttl_seconds = 300
 
@@ -538,8 +539,8 @@ def test_expired_upload_reservation_releases_its_document_slot(
     class _Settings:
         policy_rag_ttl_seconds = 900
         policy_rag_max_ttl_seconds = 7200
-        policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("test-portfolio-session-secret-32-bytes")
+        database_url = SecretStr("postgresql://example/test")
         portfolio_session_max_documents = 1
         policy_upload_reservation_ttl_seconds = 30
 
@@ -568,8 +569,8 @@ def test_stale_reservation_cannot_release_or_complete_a_new_owner(
     class _Settings:
         policy_rag_ttl_seconds = 900
         policy_rag_max_ttl_seconds = 7200
-        policy_rag_session_secret = "test-portfolio-session-secret-32-bytes"
-        database_url = "postgresql://example/test"
+        policy_rag_session_secret = SecretStr("test-portfolio-session-secret-32-bytes")
+        database_url = SecretStr("postgresql://example/test")
         portfolio_session_max_documents = 1
         policy_upload_reservation_ttl_seconds = 30
 

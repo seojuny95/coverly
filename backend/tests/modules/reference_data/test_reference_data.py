@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from pydantic import SecretStr
 
 from app.modules.reference_data import loader as reference_data
 
@@ -51,7 +52,7 @@ def test_database_reference_data_requires_database_url(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         reference_data,
         "get_settings",
-        lambda: SimpleNamespace(reference_data_database_enabled=True, database_url=""),
+        lambda: SimpleNamespace(reference_data_database_enabled=True, database_url=SecretStr("")),
     )
 
     with pytest.raises(reference_data.ReferenceDataUnavailableError):
@@ -64,7 +65,7 @@ def test_database_reference_data_requires_enabled_database(monkeypatch: pytest.M
         "get_settings",
         lambda: SimpleNamespace(
             reference_data_database_enabled=False,
-            database_url="postgresql://example",
+            database_url=SecretStr("postgresql://example"),
         ),
     )
 

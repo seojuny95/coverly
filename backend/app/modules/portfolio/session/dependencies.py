@@ -13,7 +13,7 @@ from app.modules.portfolio.session.service import (
 
 
 def get_portfolio_session_service() -> PortfolioSessionService:
-    if not get_settings().database_url:
+    if not get_settings().database_url.get_secret_value():
         raise _unavailable_error()
     try:
         return shared_portfolio_session_service()

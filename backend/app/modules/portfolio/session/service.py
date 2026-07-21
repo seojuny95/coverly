@@ -389,9 +389,10 @@ class PortfolioSessionService:
 @lru_cache(maxsize=1)
 def shared_portfolio_session_service() -> PortfolioSessionService:
     settings = get_settings()
-    if not settings.database_url:
+    database_url = settings.database_url.get_secret_value()
+    if not database_url:
         raise RuntimeError("DATABASE_URL is required for portfolio sessions")
     return PortfolioSessionService(
-        PgPortfolioSessionRepository(settings.database_url),
+        PgPortfolioSessionRepository(database_url),
         rag_store=shared_policy_store(),
     )

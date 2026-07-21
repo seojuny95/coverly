@@ -115,7 +115,7 @@ def _retrieve_from_pgvector(
     store: OfficialRagStore | None,
     rerank_complete: JsonCompleter | None,
 ) -> list[RetrievalHit]:
-    if not get_settings().database_url:
+    if not get_settings().database_url.get_secret_value():
         raise RuntimeError("DATABASE_URL is required for RAG retrieval")
 
     query_embedding = openai_embedder_from_settings().embed_query(plan.search_query)
@@ -125,7 +125,7 @@ def _retrieve_from_pgvector(
         top_k=max(candidate_k, final_k),
     )
     ranked = _rerank_with_rrf(plan, hits, top_k=candidate_k)
-    if rerank_complete is None and not get_settings().openai_api_key:
+    if rerank_complete is None and not get_settings().openai_api_key.get_secret_value():
         return ranked[:final_k]
     return semantic_rerank(
         plan.original_query,

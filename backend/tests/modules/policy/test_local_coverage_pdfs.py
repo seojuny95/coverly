@@ -23,7 +23,8 @@ from tests.summary_helpers import SAMPLE_PDF_DIR
 pytestmark = [
     pytest.mark.skipif(not SAMPLE_PDF_DIR.exists(), reason="local sample PDFs are not available"),
     pytest.mark.skipif(
-        not get_settings().openai_api_key, reason="OPENAI_API_KEY is not configured"
+        not get_settings().openai_api_key.get_secret_value(),
+        reason="OPENAI_API_KEY is not configured",
     ),
 ]
 

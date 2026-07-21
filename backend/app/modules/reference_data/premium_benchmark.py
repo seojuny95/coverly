@@ -98,10 +98,11 @@ def _cached_premium_benchmark_for_age(age: int) -> PremiumBenchmark | None:
 @lru_cache(maxsize=1)
 def _repository() -> PremiumBenchmarkRepository:
     settings = get_settings()
-    if not settings.database_url:
+    database_url = settings.database_url.get_secret_value()
+    if not database_url:
         return NullPremiumBenchmarkRepository()
     return PostgresPremiumBenchmarkRepository(
-        settings.database_url,
+        database_url,
         schema=settings.reference_schema,
         benchmark_table=settings.premium_burden_guide_table,
         source_table=settings.reference_source_table,
