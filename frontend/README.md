@@ -12,8 +12,9 @@ pnpm dev
 ## 검증
 
 ```bash
-pnpm lint
+pnpm api:check
 pnpm test
+pnpm lint
 pnpm typecheck
 pnpm format:check
 pnpm build

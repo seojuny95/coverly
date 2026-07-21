@@ -201,7 +201,7 @@ uv run python -m evals.rag.official.generation --show-passing
 ## 최근 기준 결과
 
 2026-07-15부터 2026-07-19까지 Retrieval/Generation/Extraction 데이터셋으로 측정한 결과다.
-2026-07-20에 보험약관 개선 로드맵을 런타임 RAG에서 제외하면서 extraction은 120개, retrieval은 66개 케이스로 조정됐다.
+2026-07-20에 보험약관 개선 로드맵을 런타임 RAG에서 제외하면서 extraction은 120개, retrieval은 66개(positive 48개), generation은 54개 케이스로 조정됐고, 같은 날 운영 index를 재생성해 retrieval/generation을 재측정했다.
 수치는 모델, 공식문서 index, 데이터베이스 상태가 바뀌면 함께 달라질 수 있다.
 
 ### Retrieval
@@ -218,6 +218,7 @@ uv run python -m evals.rag.official.generation --show-passing
 | 운영 pgvector 문서 타입별 chunker 재인덱싱 후 | 48/54 | 0.889 | 0.833 | 0.889 | 0.185 | 0.636 | 0.651 | 0/18 | 1.049초 | Supabase index를 1,326개 chunk로 재생성하고 legacy 테이블을 제거 |
 | 운영 pgvector hybrid 후보 폭/가중치 조정 | 49/54 | 0.907 | 0.852 | 0.907 | 0.189 | 0.662 | 0.673 | 0/18 | 1.338초 | 운영 index는 재생성 없이 retrieval 후보 폭과 BM25 비중만 조정 |
 | 운영 pgvector 의미 기반 context selection | 54/54 | 1.000 | 0.981 | 1.000 | 0.421 | 0.814 | 0.824 | 17/18 | 3.560초 | hybrid/RRF 후보를 LLM이 질문과 직접 비교하고 선택하지 않은 context는 제외한다. 품질은 개선됐지만 LLM 호출로 지연이 늘어남 |
+| 운영 pgvector 보험약관 개선 로드맵 제외 후 재측정 | 48/48 | 1.000 | 0.958 | 1.000 | 0.406 | 0.809 | 0.811 | 17/18 | 4.737초 | 로드맵 정책 시나리오 3개를 제거해 66→48개(positive)로 조정된 index에서 재측정. accepted pass는 유지 |
 
 ### Extraction
 
@@ -244,6 +245,7 @@ Extraction 점수는 회귀 안정성을 뜻한다. 특히 `broad_regression`은
 | citation alias·matcher 1차 개선 | 57/60 (0.950) | 0.983 | 1.000 | 0.983 | 0.950 | 1.000 | 1.000 | 1.000 | citation label을 chunk id로 정규화하고 명확한 동의어를 보강 |
 | matcher 2차 개선 | 59/60 (0.983) | 1.000 | 1.000 | 1.000 | 0.983 | 1.000 | 1.000 | 1.000 | 남은 false negative 표현을 보강 |
 | citation alias 확장 후 | 60/60 (1.000) | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 조문 label·짧은 조문명 alias를 허용해 live 응답 변동성 완화 |
+| 보험약관 개선 로드맵 제외 후 재측정 | 53/54 (0.981) | 1.000 | 1.000 | 1.000 | 0.981 | 1.000 | 1.000 | 1.000 | 로드맵 전용 시나리오 3개를 제거해 54개 케이스로 조정됐다. `must_include` 1건만 미달(표현 폭 부족 가능성, 사람이 함께 검토) |
 
 실패는 답변 내용 오류보다 citation 식별자 형식 차이와 `must_include_groups`의 표현 폭 부족에 집중되어 있었다.
 runtime prompt에 평가 정답을 넣지 않고, 후처리의 근거 ID 정규화와 평가 matcher의 동의어 보강으로 개선했다.

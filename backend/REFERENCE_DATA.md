@@ -23,6 +23,7 @@ LLM 총평은 서버가 근거를 구성한 뒤 생성하고 검증해야 한다
 | `private.portfolio_sessions` | current ephemeral | 서명된 단일 토큰으로 접근하는 포트폴리오 세션. 만료 시각, 데이터 버전, 분석 결과 캐시, 사용한 상담 질문 수를 보관한다. 질문 수는 토큰이 아니라 세션 행에 두어, 옛 토큰 재사용으로 초기화되거나 증권 추가로 늘어나지 않는다. |
 | `private.policy_documents` | current ephemeral | 포트폴리오 세션에 속한 PII 최소화 구조화 증권, 분석 상태, 내부 RAG 참조를 보관한다. 세션 삭제 시 함께 삭제된다. |
 | `private.policy_document_reservations` | current ephemeral | PDF 파싱 전에 문서 슬롯을 원자적으로 확보하는 단기 lease. 세션·문서 ID와 예약 소유자 ID, 만료 시각을 보관하며 완료·실패·취소 또는 만료 정리 시 제거된다. |
+| `private.policy_document_tombstones` | current ephemeral | 취소된 클라이언트 지정 문서 ID를 기록해, 늦게 도착한 업로드 완료 요청이 취소된 문서를 저장하지 못하게 막는다. |
 | `reference.reference_data` | current | `claim_channels`, `death_benefit_guides`, `disclosure_links`, `insurer_catalog`, `essential_coverage_guides` 운영 참조 데이터의 DB 원본 |
 | `reference.sources` | current | 구조화된 참조 테이블이 공유하는 출처 메타데이터 |
 | `reference.premium_burden_guides` | current | 보험료 부담 가이드의 운영 기준. 스키마·기준일을 함께 관리한다. |
