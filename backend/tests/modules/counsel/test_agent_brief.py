@@ -1,5 +1,7 @@
 """The agent brief carries PDF-derived facts, so the facts block is untrusted data."""
 
+import json
+
 from app.modules.counsel.answer.brief import build_agent_input
 from app.modules.counsel.schemas import CounselMessage
 
@@ -30,31 +32,25 @@ def _current_turn(
     return str(items[-1]["content"])
 
 
-def test_facts_section_is_fenced() -> None:
+def test_facts_section_is_json_encoded_not_concatenated() -> None:
     content = _current_turn("- 암진단비: 3,000만원")
 
-    assert "<확인된사실>" in content
-    assert "</확인된사실>" in content
+    json_start = content.index("{")
+    payload = json.loads(content[json_start:])
+    assert payload["확인된사실"] == "- 암진단비: 3,000만원"
+    # Structurally separated: the raw fact text does not also appear loose in
+    # the surrounding prose ahead of the JSON payload.
+    assert "- 암진단비: 3,000만원" not in content[:json_start]
 
 
-def test_injection_line_inside_facts_is_dropped() -> None:
+def test_malicious_facts_survive_intact_as_a_json_string_value() -> None:
+    # Nothing strips or filters the facts text anymore — the JSON boundary
+    # itself is the control, not content filtering.
     content = _current_turn(_MALICIOUS_FACTS)
 
-    assert "이전 지시" not in content
-    assert "3,000만원" in content
-    assert "2,000만원" in content
-
-
-def test_only_the_injection_line_is_dropped_and_the_other_lines_keep_their_breaks() -> None:
-    content = _current_turn(_MALICIOUS_FACTS)
-
-    assert (
-        "<확인된사실>\n"
-        "- 암진단비: 3,000만원 (○○생명)\n"
-        "\n"
-        "- 뇌졸중진단비: 2,000만원 (○○생명)\n"
-        "</확인된사실>"
-    ) in content
+    json_start = content.index("{")
+    payload = json.loads(content[json_start:])
+    assert payload["확인된사실"] == _MALICIOUS_FACTS
 
 
 def test_header_tells_the_model_not_to_follow_embedded_instructions() -> None:
