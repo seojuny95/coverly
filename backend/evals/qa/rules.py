@@ -29,8 +29,6 @@ from typing import Any
 from app.modules.portfolio.schemas import PolicyInput
 
 _PRONOUN_LEAK_RE = re.compile(r"그거|그것|아까|저건|저거|이거|그건")
-_AMOUNT_RE = re.compile(r"\d[\d,]*(?:\.\d+)?\s*(?:원|만원|억원|천원)")
-_BARE_INTEGER_RE = re.compile(r"\d{3,}")
 
 _WON_UNITS = {
     "원": 1,
@@ -40,7 +38,25 @@ _WON_UNITS = {
     "천만원": 10_000_000,
     "억원": 100_000_000,
 }
-_UNIT_SUFFIX_RE = re.compile(r"(억원|천만원|백만원|만원|천원|원)$")
+# Longest unit first so "5천만원" reads as 천만원 rather than failing on 천원.
+# Both regexes share this alternation: an amount the answer states must be
+# detectable by exactly the units _parse_won can convert, or a figure phrased
+# "5천만원" would never even be looked up and would pass as grounded.
+_UNIT_ALTERNATION = "|".join(["억원", "천만원", "백만원", "만원", "천원", "원"])
+_AMOUNT_RE = re.compile(rf"\d[\d,]*(?:\.\d+)?\s*(?:{_UNIT_ALTERNATION})")
+_UNIT_SUFFIX_RE = re.compile(rf"({_UNIT_ALTERNATION})$")
+
+# A tool serializes a computed won amount as a bare int (`total=60000000`),
+# which no unit suffix would find. Only integers sitting in a field that
+# actually holds an amount count: scanning every long digit run would also
+# ground ids, counts and timestamps, letting a fabricated figure pass by
+# coincidence.
+_AMOUNT_FIELD_RE = re.compile(
+    r"(?:total|금액|가입금액숫자|monthly_total|confirmed_amount"
+    r"|reference_min_amount|reference_max_amount"
+    r"|suggested_min_premium|suggested_max_premium)"
+    r"['\"]?\s*[:=]\s*(\d+)"
+)
 
 
 @dataclass
@@ -145,10 +161,7 @@ def _known_won_values(outcome: TurnOutcome) -> set[int]:
             value = _parse_won(text)
             if value is not None:
                 known.add(value)
-        # A tool's own computed total (calculate_coverage_total's `total`,
-        # a premium sum) is serialized as a bare int with no 원 suffix at
-        # all, so it needs its own, more permissive extraction.
-        known.update(int(match) for match in _BARE_INTEGER_RE.findall(tool_output))
+        known.update(int(match) for match in _AMOUNT_FIELD_RE.findall(tool_output))
 
     return known
 

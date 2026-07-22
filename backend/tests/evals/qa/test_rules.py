@@ -162,6 +162,47 @@ def test_computed_total_serialized_as_a_bare_integer_in_tool_output_grounds_it()
     assert result.passed
 
 
+def test_an_amount_written_as_cheonmanwon_is_still_checked() -> None:
+    # "5천만원" is ordinary phrasing. If the amount regex cannot see it, the
+    # figure is never looked up at all and a fabricated number passes.
+    turn: dict[str, object] = {}
+    outcome = _outcome(
+        answer="암진단비는 5천만원이에요.", policies=[_policy("암진단비", "2,000만원")]
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert not result.passed
+    assert any("5천만원" in f for f in result.failures)
+
+
+def test_a_grounded_amount_written_as_cheonmanwon_passes() -> None:
+    turn: dict[str, object] = {}
+    outcome = _outcome(
+        answer="실손의료비는 5천만원이에요.", policies=[_policy("실손의료비", "5,000만원")]
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert result.passed
+
+
+def test_an_unrelated_long_number_in_tool_output_does_not_ground_an_amount() -> None:
+    # Ids, counts and timestamps also contain long digit runs. Grounding on
+    # any of them would let a fabricated figure through by coincidence.
+    turn: dict[str, object] = {}
+    outcome = _outcome(
+        answer="암진단비는 4,000만원이에요.",
+        policies=[_policy("암진단비", "2,000만원")],
+        tool_outputs=["chunk_id='doc-40000000' retrieved_at=20240101 count=3"],
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert not result.passed
+    assert any("4,000만원" in f for f in result.failures)
+
+
 def test_a_value_with_no_grounding_anywhere_is_still_flagged() -> None:
     # The bare-integer extraction from tool output must not become so
     # permissive that it launders a genuinely invented amount.
