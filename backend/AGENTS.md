@@ -6,7 +6,7 @@ FastAPI + uv 백엔드. 전체 프로젝트 가이드: [../AGENTS.md](../AGENTS.
 
 ## 프로젝트 소개
 
-Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 근거 기반 상담을 담당하는 백엔드 앱이다. 분류·상담·답변 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 증권 파싱·세션 추가(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 상담(`POST /counsel/stream`)이다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
+Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 근거 기반 상담을 담당하는 백엔드 앱이다. 분류·상담·답변 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 증권 파싱·세션 추가(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 상담(`POST /qa/stream`)이다. 상담은 도구를 가진 단일 agent가 처리한다. 구 `POST /counsel/stream`(planner→사실 조회→composer→agent 파이프라인)은 비교용으로 잠시 남겨두었고, 확인이 끝나면 제거한다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
 
 ## Development Commands
 
@@ -30,9 +30,13 @@ app/
 │   ├── policy/              # 증권 파싱·분류·요약·담보 해설
 │   ├── portfolio/           # 다건 증권 집계, 총평 생성, 단일 토큰 세션
 │   │   └── session/         # 세션 토큰, 구조화 증권 저장, 분석 캐시
-│   ├── counsel/             # 근거 기반 상담 (POST /counsel/stream)
+│   ├── qa/                  # 근거 기반 상담 (POST /qa/stream) — 단일 agent
+│   │   ├── agent.py         # agent 정의·스트리밍. 지시문은 instructions.md
+│   │   ├── tools/           # 사실 조회·RAG 도구 (counsel/facts를 재사용)
+│   │   └── route.py         # SSE 라우트 (meta → delta* → end)
+│   ├── counsel/             # 구 상담 (POST /counsel/stream) — 비교용, 제거 예정
 │   │   ├── planner/         # 범위 판단·질문 재작성·수행할 fact 작업 계획
-│   │   ├── facts/           # 저장된 증권에 대한 순수 조회 (LLM 없음)
+│   │   ├── facts/           # 저장된 증권에 대한 순수 조회 (LLM 없음, qa도 사용)
 │   │   ├── answer/          # executor → composer → escalation → stream
 │   │   └── agent/           # 설명·해석 담당 agent와 도구
 │   ├── coverage/            # 담보 분류·매칭·설명
@@ -45,7 +49,8 @@ app/
     └── postgres/            # pgvector / 세션 / 참조 데이터 Postgres 구현
 
 backend/evals/
-├── counsel/                 # 실제 /counsel/stream을 태우는 라이브 러너 + 케이스
+├── qa/                      # 실제 /qa/stream을 태우는 라이브 러너 + 규칙·심사 + 케이스
+├── counsel/                 # 구 /counsel/stream 라이브 러너 (비교용, 제거 예정)
 └── rag/
     ├── official/            # official retrieval/generation eval runners + datasets
     └── policy/              # policy retrieval/generation eval runners + datasets
