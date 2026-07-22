@@ -162,6 +162,87 @@ def test_computed_total_serialized_as_a_bare_integer_in_tool_output_grounds_it()
     assert result.passed
 
 
+def test_a_compound_amount_grounds_against_the_full_value() -> None:
+    # "4만 2천원" is 42,000원. An earlier checker read only the digits next
+    # to the final unit (2천원 = 2,000), failing this fully grounded answer.
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "A화재", "상품명": "테스트상품", "보험료": {"금액": 42000}},
+            "보장목록": [],
+        }
+    )
+    turn: dict[str, object] = {}
+    outcome = _outcome(answer="월 보험료는 4만 2천원이에요.", policies=[policy])
+
+    result = check_turn(turn, outcome)
+
+    assert result.passed
+
+
+def test_a_fabricated_compound_amount_is_flagged_as_a_whole() -> None:
+    # "1억 2,000만원" is 120,000,000. Checking only the trailing "2,000만원"
+    # would match a real 2,000만원 coverage and let the invented figure pass.
+    turn: dict[str, object] = {}
+    outcome = _outcome(
+        answer="암진단비는 1억 2,000만원이에요.", policies=[_policy("암진단비", "2,000만원")]
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert not result.passed
+    assert any("근거 없는 금액" in f for f in result.failures)
+
+
+def test_a_space_before_the_won_unit_is_still_detected() -> None:
+    # "3,000만 원" (spaced unit) must be recognized as an amount at all, or a
+    # fabricated figure phrased this way skips the check entirely.
+    turn: dict[str, object] = {}
+    outcome = _outcome(
+        answer="암진단비는 3,000만 원이에요.", policies=[_policy("암진단비", "2,000만원")]
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert not result.passed
+    assert any("근거 없는 금액" in f for f in result.failures)
+
+
+def test_a_generic_product_name_does_not_satisfy_expect_source() -> None:
+    # 삼성화재's product is literally named "실손의료보험" -- the generic term.
+    # "실손의료보험은 비례보상이에요" discusses the product type without citing
+    # which uploaded policy the fact came from.
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "삼성화재", "상품명": "실손의료보험"},
+            "보장목록": [{"담보명": "실손의료비", "가입금액": "5,000만원", "지급유형": "실손"}],
+        }
+    )
+    turn = {"expect_source": True}
+    outcome = _outcome(answer="실손의료보험은 비례보상이에요.", policies=[policy])
+
+    result = check_turn(turn, outcome)
+
+    assert any("expect_source" in f for f in result.failures)
+
+
+def test_a_distinctive_product_name_satisfies_expect_source() -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": "p1",
+            "기본정보": {"보험사": "현대해상", "상품명": "Hicar 다이렉트"},
+            "보장목록": [{"담보명": "대물배상", "가입금액": "10억원", "지급유형": "실손"}],
+        }
+    )
+    turn = {"expect_source": True}
+    outcome = _outcome(answer="대물배상은 Hicar 다이렉트에 들어 있어요.", policies=[policy])
+
+    result = check_turn(turn, outcome)
+
+    assert not any("expect_source" in f for f in result.failures)
+
+
 def test_an_amount_written_as_cheonmanwon_is_still_checked() -> None:
     # "5천만원" is ordinary phrasing. If the amount regex cannot see it, the
     # figure is never looked up at all and a fabricated number passes.
