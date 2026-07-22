@@ -1,5 +1,5 @@
-from app.modules.counsel.facts.coverages import find_overlapping_coverage_facts
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.facts.coverages import find_overlapping_coverage_facts
 
 
 def _policy(

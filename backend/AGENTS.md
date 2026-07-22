@@ -32,13 +32,13 @@ app/
 │   │   └── session/         # 세션 토큰, 구조화 증권 저장, 분석 캐시
 │   ├── qa/                  # 근거 기반 상담 (POST /qa/stream) — 단일 agent
 │   │   ├── agent.py         # agent 정의·스트리밍. 지시문은 instructions.md
-│   │   ├── tools/           # 사실 조회·RAG 도구 (counsel/facts를 재사용)
+│   │   ├── facts/           # 저장된 증권에 대한 순수 조회 (LLM 없음)
+│   │   ├── tools/           # facts·RAG를 agent 도구로 노출
 │   │   └── route.py         # SSE 라우트 (meta → delta* → end)
 │   ├── counsel/             # 구 상담 (POST /counsel/stream) — 비교용, 제거 예정
 │   │   ├── planner/         # 범위 판단·질문 재작성·수행할 fact 작업 계획
-│   │   ├── facts/           # 저장된 증권에 대한 순수 조회 (LLM 없음, qa도 사용)
 │   │   ├── answer/          # executor → composer → escalation → stream
-│   │   └── agent/           # 설명·해석 담당 agent와 도구
+│   │   └── agent/           # 설명·해석 담당 agent와 도구 (qa/facts 사용)
 │   ├── coverage/            # 담보 분류·매칭·설명
 │   └── reference_data/      # 참조 데이터 계약·검증·조회 조정
 ├── rag/                     # 공유 런타임 RAG subsystem

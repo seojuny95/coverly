@@ -9,17 +9,17 @@ from app.modules.counsel.answer.brief import build_agent_input
 from app.modules.counsel.answer.clarify import compose_clarify_question
 from app.modules.counsel.answer.composer import compose_agent_facts, compose_fact_answer
 from app.modules.counsel.answer.escalation import route_answer
-from app.modules.counsel.answer.events import (
+from app.modules.counsel.answer.executor import execute_fact_tasks
+from app.modules.counsel.context import CounselContext
+from app.modules.counsel.planner import CounselPlan
+from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.events import (
     CounselDeltaEvent,
     CounselEndEvent,
     CounselMetaEvent,
     serialize_event,
 )
-from app.modules.counsel.answer.executor import execute_fact_tasks
-from app.modules.counsel.context import CounselContext
-from app.modules.counsel.planner import CounselPlan
-from app.modules.counsel.schemas import CounselMessage
-from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.schemas import CounselMessage
 
 _OUT_OF_SCOPE_ANSWER = (
     "이 질문은 보험 상담 범위 밖이라 답하기 어려워요. 가입 보험, 담보, 약관, "

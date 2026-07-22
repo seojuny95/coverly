@@ -1,5 +1,5 @@
 {
-  "fixture": "evals/counsel/fixture_policies.json",
+  "fixture": "evals/qa/fixture_policies.json",
   "judge_rubrics": {
     "counselor_tone": "상담사처럼 사람에게 말하듯 답했는가. 검색 결과를 나열하거나 보고서처럼 쓰지 않았는가",
     "advice": "사실만 늘어놓지 않고, 그 사실이 사용자에게 무슨 뜻인지 판단하거나 권유했는가",

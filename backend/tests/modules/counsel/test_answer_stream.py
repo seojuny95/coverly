@@ -7,8 +7,8 @@ from agents import MaxTurnsExceeded
 
 from app.modules.counsel.answer import build_answer_stream
 from app.modules.counsel.planner import CounselPlan, CounselTask
-from app.modules.counsel.schemas import CounselMessage
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.schemas import CounselMessage
 
 
 async def _fake_agent_stream_runner(

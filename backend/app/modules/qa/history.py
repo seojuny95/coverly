@@ -5,7 +5,7 @@ arbitrarily long conversation into every model call. Keeping a window also
 limits how far an old topic can reach into the current answer.
 """
 
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.schemas import CounselMessage
 
 
 def recent_turns(history: list[CounselMessage], *, max_turns: int) -> list[CounselMessage]:

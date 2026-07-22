@@ -3,7 +3,7 @@
 import json
 
 from app.modules.counsel.answer.brief import build_agent_input
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.schemas import CounselMessage
 
 _MALICIOUS_FACTS = (
     "- 암진단비: 3,000만원 (○○생명)\n"

@@ -1,5 +1,5 @@
-from app.modules.counsel.pii import mask_counsel_pii, masked_history
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.pii import mask_counsel_pii, masked_history
+from app.modules.qa.schemas import CounselMessage
 
 
 def test_user_typed_identifiers_never_reach_the_model() -> None:

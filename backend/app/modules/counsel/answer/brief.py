@@ -6,7 +6,7 @@ an old topic ends up competing with the current one.
 """
 
 from app.integrations.openai import ConversationMessage, dump_prompt_json
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.schemas import CounselMessage
 
 _FACTS_LABEL = "확인된사실"
 _CONFIRMED_HEADER = (

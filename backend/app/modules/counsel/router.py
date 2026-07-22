@@ -12,15 +12,15 @@ from app.core.responses import EventStreamOpenAPIResponse
 from app.integrations.openai.client import JsonCompleter, structured_completer
 from app.modules.counsel.agent.definition import AgentStreamRunner, run_agent_streamed
 from app.modules.counsel.answer import CounselStreamEvent, build_answer_stream
-from app.modules.counsel.history import recent_turns
-from app.modules.counsel.pii import mask_counsel_pii, masked_history
 from app.modules.counsel.planner import CounselPlan, plan_counsel_turn
-from app.modules.counsel.schemas import CounselRequest
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.service import (
     CounselTurnLimitReached,
     InvalidPortfolioSessionToken,
 )
+from app.modules.qa.history import recent_turns
+from app.modules.qa.pii import mask_counsel_pii, masked_history
+from app.modules.qa.schemas import CounselRequest
 
 router = APIRouter(prefix="/counsel", tags=["counsel"])
 

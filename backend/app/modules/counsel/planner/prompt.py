@@ -7,7 +7,7 @@ and rewrite policy a person needs to read and review, per backend/PROMPTING.md.
 from functools import lru_cache
 from pathlib import Path
 
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.schemas import CounselMessage
 
 _INSTRUCTIONS_PATH = Path(__file__).with_name("instructions.md")
 _NO_HISTORY = "(이전 대화 없음)"

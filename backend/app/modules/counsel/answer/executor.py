@@ -2,8 +2,10 @@
 
 from pydantic import BaseModel
 
-from app.modules.counsel.facts.claims import ClaimChannelsResult, get_claim_channel_facts
-from app.modules.counsel.facts.coverages import (
+from app.modules.counsel.planner import CounselPlan, CounselTask
+from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.facts.claims import ClaimChannelsResult, get_claim_channel_facts
+from app.modules.qa.facts.coverages import (
     CoverageNameInfo,
     CoverageTotalResult,
     FindCoveragesResult,
@@ -14,10 +16,8 @@ from app.modules.counsel.facts.coverages import (
     find_overlapping_coverage_facts,
     list_coverage_name_facts,
 )
-from app.modules.counsel.facts.policies import PolicyListResult, list_policy_facts
-from app.modules.counsel.facts.portfolio import PortfolioFactBundle, build_portfolio_fact_bundle
-from app.modules.counsel.planner import CounselPlan, CounselTask
-from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.facts.policies import PolicyListResult, list_policy_facts
+from app.modules.qa.facts.portfolio import PortfolioFactBundle, build_portfolio_fact_bundle
 
 
 class FactTaskResult(BaseModel):

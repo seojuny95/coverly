@@ -1,12 +1,12 @@
 from pytest import MonkeyPatch
 
-from app.modules.counsel.facts.portfolio import build_portfolio_fact_bundle
 from app.modules.portfolio.schemas import (
     PolicyInput,
     PolicyInsuredDemographicsInput,
     PremiumBenchmark,
     PremiumBenchmarkSource,
 )
+from app.modules.qa.facts.portfolio import build_portfolio_fact_bundle
 from app.modules.reference_data import premium_benchmark as premium_benchmark_module
 
 

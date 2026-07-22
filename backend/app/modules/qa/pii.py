@@ -12,7 +12,7 @@ from app.core.pii import (
     mask_phone_numbers,
     mask_resident_identifiers,
 )
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.schemas import CounselMessage
 
 
 def mask_counsel_pii(text: str) -> str:

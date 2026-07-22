@@ -3,13 +3,13 @@
 from collections.abc import Iterable
 
 from app.modules.counsel.answer.executor import FactExecution, FactTaskResult
-from app.modules.counsel.facts.coverages import (
+from app.modules.qa.facts.coverages import (
     CoverageMatch,
     CoverageNameInfo,
     CoveragePayoutMode,
     UnmatchedCoverageName,
 )
-from app.modules.counsel.facts.policies import PolicyFact
+from app.modules.qa.facts.policies import PolicyFact
 from app.modules.reference_data.contracts import ClaimChannelMedicalIndemnity
 
 # coverage_list exists so the agent can find the exact spelling of a coverage.

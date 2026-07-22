@@ -1,5 +1,5 @@
-from app.modules.counsel.facts.special_policies import build_special_policy_facts
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.facts.special_policies import build_special_policy_facts
 
 
 def test_auto_policy_returns_populated_analysis_with_matched_names() -> None:

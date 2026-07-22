@@ -1,5 +1,5 @@
-from app.modules.counsel.history import recent_turns
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.history import recent_turns
+from app.modules.qa.schemas import CounselMessage
 
 
 def _exchange(index: int) -> list[CounselMessage]:

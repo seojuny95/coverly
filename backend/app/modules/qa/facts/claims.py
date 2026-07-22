@@ -2,9 +2,9 @@
 
 from pydantic import BaseModel
 
-from app.modules.counsel.facts.coverages import UnmatchedCoverageName, match_coverage_names
 from app.modules.coverage.indemnity import is_medical_indemnity_name
 from app.modules.portfolio.schemas import PolicyInput
+from app.modules.qa.facts.coverages import UnmatchedCoverageName, match_coverage_names
 from app.modules.reference_data.claim_channels import claim_channel_block
 from app.modules.reference_data.contracts import ClaimChannelBlock
 

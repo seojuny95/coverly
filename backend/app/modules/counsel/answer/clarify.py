@@ -6,7 +6,7 @@ decision next to the evidence instead of leaving it to the agent.
 """
 
 from app.modules.counsel.answer.executor import FactExecution
-from app.modules.counsel.facts.coverages import UnmatchedCoverageName
+from app.modules.qa.facts.coverages import UnmatchedCoverageName
 
 _NOTHING_TO_NARROW = (
     "담보 이름이나 상황을 알려주시면 가입하신 내용에서 찾아볼게요. 어떤 보장을 확인해 드릴까요?"

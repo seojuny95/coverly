@@ -34,7 +34,9 @@ from app.modules.portfolio.session.dependencies import get_portfolio_session_ser
 from app.modules.portfolio.session.models import PortfolioSessionSnapshot
 
 _HERE = Path(__file__).parent
-_FIXTURE_PATH = _HERE / "fixture_policies.json"
+# The fixture moved to the qa eval, which owns it now; this legacy runner
+# borrows it until the counsel pipeline is deleted.
+_FIXTURE_PATH = _HERE.parent / "qa" / "fixture_policies.json"
 _DATASET_PATH = _HERE / "dataset.json"
 _SESSION_ID = "live-fixture-session"
 _UNLIMITED_TURNS = 999

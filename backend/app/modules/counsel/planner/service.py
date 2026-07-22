@@ -3,7 +3,7 @@
 from app.integrations.openai.client import JsonCompleter
 from app.modules.counsel.planner.contracts import CounselPlan
 from app.modules.counsel.planner.prompt import build_system_prompt, build_user_prompt
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.schemas import CounselMessage
 
 
 def plan_counsel_turn(

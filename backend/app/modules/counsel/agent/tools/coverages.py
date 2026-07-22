@@ -3,7 +3,7 @@
 from agents import RunContextWrapper, function_tool
 
 from app.modules.counsel.context import CounselContext
-from app.modules.counsel.facts import coverages as coverage_facts
+from app.modules.qa.facts import coverages as coverage_facts
 
 CoverageNameInfo = coverage_facts.CoverageNameInfo
 CoverageTotalResult = coverage_facts.CoverageTotalResult

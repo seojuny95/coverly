@@ -1,6 +1,6 @@
 from app.modules.counsel.planner import CounselTask, plan_counsel_turn
 from app.modules.counsel.planner.prompt import build_system_prompt, build_user_prompt
-from app.modules.counsel.schemas import CounselMessage
+from app.modules.qa.schemas import CounselMessage
 
 
 def test_plan_counsel_turn_parses_fact_tasks() -> None:

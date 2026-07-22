@@ -5,14 +5,14 @@ pure fact modules, composer renders them, escalation decides whether they can
 stand as the answer, and stream emits the SSE events.
 """
 
-from app.modules.counsel.answer.events import (
+from app.modules.counsel.answer.stream import build_answer_stream
+from app.modules.qa.events import (
     CounselDeltaEvent,
     CounselEndEvent,
     CounselMetaEvent,
     CounselStreamEvent,
     serialize_event,
 )
-from app.modules.counsel.answer.stream import build_answer_stream
 
 __all__ = [
     "CounselDeltaEvent",

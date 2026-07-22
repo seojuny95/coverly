@@ -26,16 +26,6 @@ from app.core.config import get_settings
 from app.core.errors import ApiError, api_error_responses
 from app.core.responses import EventStreamOpenAPIResponse
 from app.integrations.openai import ConversationMessage
-from app.modules.counsel.answer.events import (
-    CounselDeltaEvent,
-    CounselEndEvent,
-    CounselMetaEvent,
-    CounselStreamEvent,
-    serialize_event,
-)
-from app.modules.counsel.history import recent_turns
-from app.modules.counsel.pii import mask_counsel_pii, masked_history
-from app.modules.counsel.schemas import CounselMessage, CounselRequest
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.service import (
@@ -44,6 +34,16 @@ from app.modules.portfolio.session.service import (
 )
 from app.modules.qa.agent import AgentStreamRunner, create_agent, run_agent_streamed
 from app.modules.qa.context import QaContext
+from app.modules.qa.events import (
+    CounselDeltaEvent,
+    CounselEndEvent,
+    CounselMetaEvent,
+    CounselStreamEvent,
+    serialize_event,
+)
+from app.modules.qa.history import recent_turns
+from app.modules.qa.pii import mask_counsel_pii, masked_history
+from app.modules.qa.schemas import CounselMessage, CounselRequest
 
 router = APIRouter(prefix="/qa", tags=["qa"])
 
