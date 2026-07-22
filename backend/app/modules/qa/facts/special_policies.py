@@ -1,4 +1,4 @@
-"""Deterministic auto/driver/travel/fire policy facts for counsel.
+"""Deterministic auto/driver/travel/fire policy facts for qa.
 
 Thin projection over ``portfolio.special_policies``: it classifies the user's
 uploaded non-life policies and checks each for the coverages that matter when a

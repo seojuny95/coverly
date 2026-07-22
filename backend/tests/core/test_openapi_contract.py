@@ -113,31 +113,17 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
     }
 
 
-def test_openapi_exposes_discriminated_sse_events_and_json_errors() -> None:
-    responses = app.openapi()["paths"]["/counsel/stream"]["post"]["responses"]
-
-    assert set(responses["200"]["content"]) == {"text/event-stream"}
-    stream_schema = responses["200"]["content"]["text/event-stream"]["schema"]
-    assert {item["$ref"] for item in stream_schema["oneOf"]} == {
-        "#/components/schemas/CounselMetaEvent",
-        "#/components/schemas/CounselDeltaEvent",
-        "#/components/schemas/CounselEndEvent",
-    }
-    assert stream_schema["discriminator"]["propertyName"] == "type"
-    assert set(responses["422"]["content"]) == {"application/json"}
-
-
-def test_openapi_exposes_counsel_sse_events_the_client_must_validate() -> None:
+def test_openapi_exposes_qa_sse_events_the_client_must_validate() -> None:
     # The frontend generates its stream validator from this schema, so the event
     # union has to be reachable from the route rather than only from the code.
-    responses = app.openapi()["paths"]["/counsel/stream"]["post"]["responses"]
+    responses = app.openapi()["paths"]["/qa/stream"]["post"]["responses"]
 
     assert set(responses["200"]["content"]) == {"text/event-stream"}
     stream_schema = responses["200"]["content"]["text/event-stream"]["schema"]
     assert {item["$ref"] for item in stream_schema["oneOf"]} == {
-        "#/components/schemas/CounselMetaEvent",
-        "#/components/schemas/CounselDeltaEvent",
-        "#/components/schemas/CounselEndEvent",
+        "#/components/schemas/QaMetaEvent",
+        "#/components/schemas/QaDeltaEvent",
+        "#/components/schemas/QaEndEvent",
     }
     assert stream_schema["discriminator"]["propertyName"] == "type"
     assert set(responses["403"]["content"]) == {"application/json"}
@@ -148,7 +134,7 @@ def test_request_validation_uses_common_error_envelope() -> None:
     app.dependency_overrides[get_portfolio_session_service] = lambda: object()
     try:
         response = TestClient(app).post(
-            "/counsel/stream",
+            "/qa/stream",
             headers={"x-request-id": "validation-request"},
             json={"question": "", "history": [], "session_id": "portfolio-token"},
         )
@@ -188,8 +174,8 @@ def test_openapi_reuses_shared_claim_and_reference_source_contracts() -> None:
     assert "PremiumBenchmarkSource" not in schemas
 
 
-def test_counsel_stream_declares_the_turn_limit_response() -> None:
-    responses = app.openapi()["paths"]["/counsel/stream"]["post"]["responses"]
+def test_qa_stream_declares_the_turn_limit_response() -> None:
+    responses = app.openapi()["paths"]["/qa/stream"]["post"]["responses"]
 
     assert "429" in responses
     assert set(responses["429"]["content"]) == {"application/json"}

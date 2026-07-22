@@ -1,4 +1,4 @@
-"""SSE event contracts for a streamed counsel answer."""
+"""SSE event contracts for a streamed qa answer."""
 
 import json
 from typing import Annotated, Literal
@@ -6,39 +6,38 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 
-class CounselMetaEvent(BaseModel):
+class QaMetaEvent(BaseModel):
     type: Literal["meta"] = "meta"
     in_scope: bool
 
     answered_question: str
-    """The question this turn is answering, as the planner tidied it up.
+    """The question this turn is answering.
 
-    Not always the history-resolved rewrite: a turn that stands on its own is
-    answered as its own sentence, so naming this field after the rewrite would
-    describe a value it often does not carry.
+    See route.py's module docstring for why this and the two fields below carry
+    placeholder values today rather than values from a dedicated scoping step.
     """
 
     excluded_note: str | None
-    """What the planner dropped from the question for being outside insurance."""
+    """What was dropped from the question for being outside insurance, if anything."""
     turns_remaining: int
 
 
-class CounselDeltaEvent(BaseModel):
+class QaDeltaEvent(BaseModel):
     type: Literal["delta"] = "delta"
     text: str
 
 
-class CounselEndEvent(BaseModel):
+class QaEndEvent(BaseModel):
     type: Literal["end"] = "end"
 
 
 # Discriminated so the published schema is a strict oneOf: a client validator can
 # then reject an event that only loosely resembles one of the shapes.
-CounselStreamEvent = Annotated[
-    CounselMetaEvent | CounselDeltaEvent | CounselEndEvent,
+QaStreamEvent = Annotated[
+    QaMetaEvent | QaDeltaEvent | QaEndEvent,
     Field(discriminator="type"),
 ]
 
 
-def serialize_event(event: CounselStreamEvent) -> str:
+def serialize_event(event: QaStreamEvent) -> str:
     return f"data: {json.dumps(event.model_dump(mode='json'), ensure_ascii=False)}\n\n"

@@ -1,13 +1,11 @@
-from app.modules.qa.pii import mask_counsel_pii, masked_history
-from app.modules.qa.schemas import CounselMessage
+from app.modules.qa.pii import mask_qa_pii, masked_history
+from app.modules.qa.schemas import QaMessage
 
 
 def test_user_typed_identifiers_never_reach_the_model() -> None:
     # The question is client text. qa masked it before the model boundary and the
     # rule outlived qa: anything sent to OpenAI is also what tracing would export.
-    masked = mask_counsel_pii(
-        "제 주민번호는 900101-1234567이고 010-1234-5678로 연락주세요. a@b.com"
-    )
+    masked = mask_qa_pii("제 주민번호는 900101-1234567이고 010-1234-5678로 연락주세요. a@b.com")
 
     assert "900101-1234567" not in masked
     assert "010-1234-5678" not in masked
@@ -15,13 +13,13 @@ def test_user_typed_identifiers_never_reach_the_model() -> None:
 
 
 def test_masking_leaves_the_insurance_question_intact() -> None:
-    assert mask_counsel_pii("암진단비(유사암제외) 얼마야?") == "암진단비(유사암제외) 얼마야?"
+    assert mask_qa_pii("암진단비(유사암제외) 얼마야?") == "암진단비(유사암제외) 얼마야?"
 
 
 def test_history_is_masked_turn_by_turn() -> None:
     history = [
-        CounselMessage(role="user", content="010-1234-5678 입니다"),
-        CounselMessage(role="assistant", content="네, 확인했어요"),
+        QaMessage(role="user", content="010-1234-5678 입니다"),
+        QaMessage(role="assistant", content="네, 확인했어요"),
     ]
 
     masked = masked_history(history)

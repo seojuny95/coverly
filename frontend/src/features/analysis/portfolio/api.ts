@@ -1,15 +1,15 @@
 import type { AnalyzedInsurance } from "../store";
 import { apiResponseError, apiUrl } from "../../../shared/api/client";
 import {
-  CounselStreamProtocolError,
-  requireCounselStreamEvent,
-} from "../../../shared/api/counsel-stream";
+  QaStreamProtocolError,
+  requireQaStreamEvent,
+} from "../../../shared/api/qa-stream";
 import type {
   ClaimChannelBlock,
   ChatHistoryItem,
-  CounselMetaEvent,
-  CounselRequest,
-  CounselStreamEvent,
+  QaMetaEvent,
+  QaRequest,
+  QaStreamEvent,
   CoverageTotal,
   CoverageGroup,
   DeathBenefitGuideInput,
@@ -73,8 +73,8 @@ export function requestPortfolioSummary(
   return postPortfolioSummary(body, signal);
 }
 
-type CounselStreamHandlers = {
-  onMeta?: (meta: CounselMetaEvent) => void;
+type QaStreamHandlers = {
+  onMeta?: (meta: QaMetaEvent) => void;
   onDelta: (text: string) => void | Promise<void>;
   onEnd: () => void;
 };
@@ -82,7 +82,7 @@ type CounselStreamHandlers = {
 export async function streamPortfolioQuestion(
   question: string,
   history: ChatHistoryItem[],
-  handlers: CounselStreamHandlers,
+  handlers: QaStreamHandlers,
   portfolioSessionToken: string,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -90,7 +90,7 @@ export async function streamPortfolioQuestion(
     question,
     session_id: portfolioSessionToken,
     history,
-  } satisfies CounselRequest;
+  } satisfies QaRequest;
   const response = await fetch(apiUrl("/qa/stream"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -101,7 +101,7 @@ export async function streamPortfolioQuestion(
     throw await apiResponseError(response, "상담 요청에 실패했어요.");
   }
   if (!response.headers.get("content-type")?.includes("text/event-stream")) {
-    throw new CounselStreamProtocolError();
+    throw new QaStreamProtocolError();
   }
 
   const reader = response.body.getReader();
@@ -121,19 +121,19 @@ export async function streamPortfolioQuestion(
     try {
       payload = JSON.parse(data);
     } catch {
-      throw new CounselStreamProtocolError();
+      throw new QaStreamProtocolError();
     }
-    const event: CounselStreamEvent = requireCounselStreamEvent(payload);
+    const event: QaStreamEvent = requireQaStreamEvent(payload);
 
     if (event.type === "meta") {
-      if (protocol.phase !== "meta") throw new CounselStreamProtocolError();
+      if (protocol.phase !== "meta") throw new QaStreamProtocolError();
       protocol.phase = "answer";
       handlers.onMeta?.(event);
     } else if (event.type === "delta") {
-      if (protocol.phase !== "answer") throw new CounselStreamProtocolError();
+      if (protocol.phase !== "answer") throw new QaStreamProtocolError();
       await handlers.onDelta(event.text);
     } else if (event.type === "end") {
-      if (protocol.phase !== "answer") throw new CounselStreamProtocolError();
+      if (protocol.phase !== "answer") throw new QaStreamProtocolError();
       protocol.phase = "end";
       handlers.onEnd();
     }
@@ -156,7 +156,7 @@ export async function streamPortfolioQuestion(
   }
   buffer += decoder.decode();
   if (buffer.trim()) await dispatch(buffer);
-  if (protocol.phase !== "end") throw new CounselStreamProtocolError();
+  if (protocol.phase !== "end") throw new QaStreamProtocolError();
 }
 
 function nextSseBoundary(buffer: string): {

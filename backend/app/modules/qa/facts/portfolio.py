@@ -1,4 +1,4 @@
-"""Deterministic portfolio-level facts for counsel."""
+"""Deterministic portfolio-level facts for qa."""
 
 from pydantic import BaseModel, Field
 

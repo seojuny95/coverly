@@ -5,10 +5,10 @@ arbitrarily long conversation into every model call. Keeping a window also
 limits how far an old topic can reach into the current answer.
 """
 
-from app.modules.qa.schemas import CounselMessage
+from app.modules.qa.schemas import QaMessage
 
 
-def recent_turns(history: list[CounselMessage], *, max_turns: int) -> list[CounselMessage]:
+def recent_turns(history: list[QaMessage], *, max_turns: int) -> list[QaMessage]:
     """Return the last `max_turns` turns.
 
     A turn is one user message and everything that followed it, so an answer is

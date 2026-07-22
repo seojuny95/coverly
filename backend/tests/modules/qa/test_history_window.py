@@ -1,15 +1,15 @@
 from app.modules.qa.history import recent_turns
-from app.modules.qa.schemas import CounselMessage
+from app.modules.qa.schemas import QaMessage
 
 
-def _exchange(index: int) -> list[CounselMessage]:
+def _exchange(index: int) -> list[QaMessage]:
     return [
-        CounselMessage(role="user", content=f"질문{index}"),
-        CounselMessage(role="assistant", content=f"답변{index}"),
+        QaMessage(role="user", content=f"질문{index}"),
+        QaMessage(role="assistant", content=f"답변{index}"),
     ]
 
 
-def _conversation(count: int) -> list[CounselMessage]:
+def _conversation(count: int) -> list[QaMessage]:
     return [message for index in range(1, count + 1) for message in _exchange(index)]
 
 
@@ -30,9 +30,9 @@ def test_a_turn_keeps_everything_that_followed_the_question() -> None:
     # separated from the question it belongs to.
     history = [
         *_exchange(1),
-        CounselMessage(role="user", content="질문2"),
-        CounselMessage(role="assistant", content="답변2-a"),
-        CounselMessage(role="assistant", content="답변2-b"),
+        QaMessage(role="user", content="질문2"),
+        QaMessage(role="assistant", content="답변2-a"),
+        QaMessage(role="assistant", content="답변2-b"),
     ]
 
     kept = recent_turns(history, max_turns=1)
@@ -42,7 +42,7 @@ def test_a_turn_keeps_everything_that_followed_the_question() -> None:
 
 def test_history_that_starts_mid_turn_does_not_keep_an_orphaned_answer() -> None:
     history = [
-        CounselMessage(role="assistant", content="앞선 답변"),
+        QaMessage(role="assistant", content="앞선 답변"),
         *_exchange(1),
     ]
 

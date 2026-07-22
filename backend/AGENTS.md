@@ -6,7 +6,7 @@ FastAPI + uv 백엔드. 전체 프로젝트 가이드: [../AGENTS.md](../AGENTS.
 
 ## 프로젝트 소개
 
-Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 근거 기반 상담을 담당하는 백엔드 앱이다. 분류·상담·답변 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 증권 파싱·세션 추가(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 상담(`POST /qa/stream`)이다. 상담은 도구를 가진 단일 agent가 처리한다. 구 `POST /counsel/stream`(planner→사실 조회→composer→agent 파이프라인)은 비교용으로 잠시 남겨두었고, 확인이 끝나면 제거한다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
+Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 근거 기반 상담을 담당하는 백엔드 앱이다. 분류·상담·답변 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 증권 파싱·세션 추가(`POST /policies/parse`), 포트폴리오 보장금 요약(`POST /portfolio/summary`), 근거 기반 상담(`POST /qa/stream`)이다. 상담은 도구를 가진 단일 agent가 처리한다. 상담용 총평은 서버가 생성하며 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
 
 ## Development Commands
 
@@ -35,10 +35,6 @@ app/
 │   │   ├── facts/           # 저장된 증권에 대한 순수 조회 (LLM 없음)
 │   │   ├── tools/           # facts·RAG를 agent 도구로 노출
 │   │   └── route.py         # SSE 라우트 (meta → delta* → end)
-│   ├── counsel/             # 구 상담 (POST /counsel/stream) — 비교용, 제거 예정
-│   │   ├── planner/         # 범위 판단·질문 재작성·수행할 fact 작업 계획
-│   │   ├── answer/          # executor → composer → escalation → stream
-│   │   └── agent/           # 설명·해석 담당 agent와 도구 (qa/facts 사용)
 │   ├── coverage/            # 담보 분류·매칭·설명
 │   └── reference_data/      # 참조 데이터 계약·검증·조회 조정
 ├── rag/                     # 공유 런타임 RAG subsystem
@@ -50,14 +46,13 @@ app/
 
 backend/evals/
 ├── qa/                      # 실제 /qa/stream을 태우는 라이브 러너 + 규칙·심사 + 케이스
-├── counsel/                 # 구 /counsel/stream 라이브 러너 (비교용, 제거 예정)
 └── rag/
     ├── official/            # official retrieval/generation eval runners + datasets
     └── policy/              # policy retrieval/generation eval runners + datasets
 
 tests/
 ├── core/                    # 앱 조립, 미들웨어, 공용 규칙 테스트
-├── modules/                 # policy, portfolio, counsel 등 기능별 테스트
+├── modules/                 # policy, portfolio, qa 등 기능별 테스트
 ├── rag/                     # official / policy 런타임 RAG 테스트
 ├── evals/                   # 평가 runner와 metric 테스트
 └── integrations/            # Postgres 등 외부 연동 구현 테스트
@@ -65,7 +60,7 @@ tests/
 
 FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별 엔드포인트 묶음에만 쓰고, `Depends`는 실제로 필요한 경우에만 라우터/핸들러에서 국소적으로 사용한다. 서로 다른 기능을 조합하는 업로드 HTTP 흐름은 `modules/upload`가 소유하며, `modules/policy`는 파싱 도메인에 집중한다. 전역 의존성 주입은 기본 패턴이 아니며, 앱 수명 주기 연결은 최상위 `app/lifespan.py`에서 처리한다. `lifespan`은 공용 캐시 워밍, 초기화, 종료 정리에 사용하고 `create_app()`에서 연결한다.
 
-의존 방향은 대체로 `modules -> core/integrations/rag`, `rag -> integrations/core`, `integrations -> 외부 시스템`이다. `portfolio`와 `counsel`은 서버 응답을 생성하는 계층이고, `coverage`, `reference_data`는 여러 기능이 공유하는 계약·순수 로직·조회 조정을 담는다. `core`는 비즈니스 모듈을 참조하지 않고, 기능 모듈의 import graph는 순환하지 않아야 한다. OpenAI·Postgres 같은 vendor client는 `integrations` 경계를 거치며, 이 규칙들은 `tests/test_architecture.py`로 강제한다. `app`는 평가 코드를 참조하지 않는다.
+의존 방향은 대체로 `modules -> core/integrations/rag`, `rag -> integrations/core`, `integrations -> 외부 시스템`이다. `portfolio`와 `qa`는 서버 응답을 생성하는 계층이고, `coverage`, `reference_data`는 여러 기능이 공유하는 계약·순수 로직·조회 조정을 담는다. `core`는 비즈니스 모듈을 참조하지 않고, 기능 모듈의 import graph는 순환하지 않아야 한다. OpenAI·Postgres 같은 vendor client는 `integrations` 경계를 거치며, 이 규칙들은 `tests/test_architecture.py`로 강제한다. `app`는 평가 코드를 참조하지 않는다.
 
 참조 데이터, 임시 포트폴리오 세션, RAG 테이블 경계와 Supabase migration을 포함한 DB 원본 정의는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다. 분석과 상담은 프론트엔드가 증권 전체를 다시 보내는 방식보다 세션 토큰과 선택 문서 ID로 서버 저장 사실을 조회하는 방식을 우선한다.
 

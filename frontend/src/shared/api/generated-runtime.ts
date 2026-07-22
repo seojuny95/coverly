@@ -31,26 +31,26 @@ export const POLICY_CLASSIFICATIONS = [
   "미분류",
 ] as const satisfies readonly PolicyClassification[];
 
-export const COUNSEL_STREAM_JSON_SCHEMA = {
+export const QA_STREAM_JSON_SCHEMA = {
   schema: {
     oneOf: [
-      { $ref: "#/components/schemas/CounselMetaEvent" },
-      { $ref: "#/components/schemas/CounselDeltaEvent" },
-      { $ref: "#/components/schemas/CounselEndEvent" },
+      { $ref: "#/components/schemas/QaMetaEvent" },
+      { $ref: "#/components/schemas/QaDeltaEvent" },
+      { $ref: "#/components/schemas/QaEndEvent" },
     ],
-    title: "Response 200 Stream Counsel Answer Counsel Stream Post",
+    title: "Response 200 Stream Qa Answer Qa Stream Post",
     discriminator: {
       propertyName: "type",
       mapping: {
-        meta: "#/components/schemas/CounselMetaEvent",
-        delta: "#/components/schemas/CounselDeltaEvent",
-        end: "#/components/schemas/CounselEndEvent",
+        meta: "#/components/schemas/QaMetaEvent",
+        delta: "#/components/schemas/QaDeltaEvent",
+        end: "#/components/schemas/QaEndEvent",
       },
     },
   },
   components: {
     schemas: {
-      CounselDeltaEvent: {
+      QaDeltaEvent: {
         properties: {
           type: {
             type: "string",
@@ -62,9 +62,9 @@ export const COUNSEL_STREAM_JSON_SCHEMA = {
         },
         type: "object",
         required: ["text", "type"],
-        title: "CounselDeltaEvent",
+        title: "QaDeltaEvent",
       },
-      CounselEndEvent: {
+      QaEndEvent: {
         properties: {
           type: {
             type: "string",
@@ -74,10 +74,10 @@ export const COUNSEL_STREAM_JSON_SCHEMA = {
           },
         },
         type: "object",
-        title: "CounselEndEvent",
+        title: "QaEndEvent",
         required: ["type"],
       },
-      CounselMetaEvent: {
+      QaMetaEvent: {
         properties: {
           type: {
             type: "string",
@@ -101,7 +101,7 @@ export const COUNSEL_STREAM_JSON_SCHEMA = {
           "turns_remaining",
           "type",
         ],
-        title: "CounselMetaEvent",
+        title: "QaMetaEvent",
       },
     },
   },

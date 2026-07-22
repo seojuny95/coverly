@@ -1,18 +1,18 @@
-import type { CounselStreamEvent } from "./contracts";
-import { COUNSEL_STREAM_JSON_SCHEMA } from "./generated-runtime";
+import type { QaStreamEvent } from "./contracts";
+import { QA_STREAM_JSON_SCHEMA } from "./generated-runtime";
 
-export class CounselStreamProtocolError extends Error {
+export class QaStreamProtocolError extends Error {
   constructor(message = "상담 응답 형식을 확인할 수 없어요.") {
     super(message);
-    this.name = "CounselStreamProtocolError";
+    this.name = "QaStreamProtocolError";
   }
 }
 
-export function requireCounselStreamEvent(value: unknown): CounselStreamEvent {
-  if (!matchesJsonSchema(value, COUNSEL_STREAM_JSON_SCHEMA.schema)) {
-    throw new CounselStreamProtocolError();
+export function requireQaStreamEvent(value: unknown): QaStreamEvent {
+  if (!matchesJsonSchema(value, QA_STREAM_JSON_SCHEMA.schema)) {
+    throw new QaStreamProtocolError();
   }
-  return value as CounselStreamEvent;
+  return value as QaStreamEvent;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -100,7 +100,7 @@ function matchesJsonSchema(value: unknown, schema: unknown): boolean {
 
 function resolveLocalReference(reference: string): unknown {
   if (!reference.startsWith("#/")) return undefined;
-  let current: unknown = COUNSEL_STREAM_JSON_SCHEMA;
+  let current: unknown = QA_STREAM_JSON_SCHEMA;
   for (const encodedSegment of reference.slice(2).split("/")) {
     if (!isRecord(current)) return undefined;
     const segment = encodedSegment.replaceAll("~1", "/").replaceAll("~0", "~");

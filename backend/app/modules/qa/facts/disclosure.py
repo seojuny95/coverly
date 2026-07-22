@@ -1,4 +1,4 @@
-"""Deterministic official disclosure/terms link facts for counsel."""
+"""Deterministic official disclosure/terms link facts for qa."""
 
 from pydantic import BaseModel, Field
 

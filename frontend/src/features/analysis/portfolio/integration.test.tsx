@@ -312,10 +312,10 @@ describe("portfolio features", () => {
     const fetchCalls = fetchMock.mock.calls as unknown as Array<
       [RequestInfo | URL, RequestInit]
     >;
-    const counselCall = fetchCalls.find(([input]) =>
+    const qaCall = fetchCalls.find(([input]) =>
       String(input).endsWith("/qa/stream"),
     );
-    expect(counselCall?.[1]?.body).toContain('"history":[]');
+    expect(qaCall?.[1]?.body).toContain('"history":[]');
 
     await user.click(
       screen.getByRole("button", { name: "AI 보험 상담 탭에서 크게 보기" }),

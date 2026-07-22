@@ -1,12 +1,12 @@
 """Agent SDK tools for the plain-free-text qa baseline.
 
 No slot registry, no structured output: each tool returns the same
-deterministic facts counsel/facts/ (and, increasingly, portfolio/ and
+deterministic facts qa/facts/ (and, increasingly, portfolio/ and
 reference_data/) already compute, and the agent quotes them directly in its
 own free-text answer. See agent.py's module docstring for why.
 
-Split into one file per domain (mirrors counsel/facts/'s layout) so
-independent tools can be added without one file growing without bound.
+Split into one file per domain (mirrors qa/facts/'s layout) so independent
+tools can be added without one file growing without bound.
 """
 
 from agents import Tool

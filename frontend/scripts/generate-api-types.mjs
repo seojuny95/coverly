@@ -52,12 +52,12 @@ const policyClassifications = enumValues(
   schemas?.PolicySummary?.properties?.["보험분류"]?.enum,
   "PolicySummary.보험분류",
 );
-const counselStreamSchema =
-  schema.paths?.["/counsel/stream"]?.post?.responses?.["200"]?.content?.[
+const qaStreamSchema =
+  schema.paths?.["/qa/stream"]?.post?.responses?.["200"]?.content?.[
     "text/event-stream"
   ]?.schema;
-if (!counselStreamSchema || typeof counselStreamSchema !== "object") {
-  throw new Error("OpenAPI /counsel/stream response schema is missing.");
+if (!qaStreamSchema || typeof qaStreamSchema !== "object") {
+  throw new Error("OpenAPI /qa/stream response schema is missing.");
 }
 
 function referencedComponentSchemas(rootSchema) {
@@ -95,8 +95,7 @@ function referencedComponentSchemas(rootSchema) {
   );
 }
 
-const counselStreamComponentSchemas =
-  referencedComponentSchemas(counselStreamSchema);
+const qaStreamComponentSchemas = referencedComponentSchemas(qaStreamSchema);
 const runtimeGenerated = await format(
   `${COMMENT_HEADER}
 import type { components } from "./generated";
@@ -107,9 +106,9 @@ type PolicyClassification = components["schemas"]["PolicySummary"]["보험분류
 export const API_ERROR_CODES = ${JSON.stringify(apiErrorCodes)} as const satisfies readonly ApiErrorCode[];
 export const POLICY_CLASSIFICATIONS = ${JSON.stringify(policyClassifications)} as const satisfies readonly PolicyClassification[];
 
-export const COUNSEL_STREAM_JSON_SCHEMA = ${JSON.stringify({
-    schema: counselStreamSchema,
-    components: { schemas: counselStreamComponentSchemas },
+export const QA_STREAM_JSON_SCHEMA = ${JSON.stringify({
+    schema: qaStreamSchema,
+    components: { schemas: qaStreamComponentSchemas },
   })} as const;
 
 const apiErrorCodeSet: ReadonlySet<string> = new Set(API_ERROR_CODES);

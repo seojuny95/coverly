@@ -1,4 +1,4 @@
-"""Deterministic claim-channel facts for counsel."""
+"""Deterministic claim-channel facts for qa."""
 
 from pydantic import BaseModel
 

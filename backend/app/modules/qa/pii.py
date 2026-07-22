@@ -1,4 +1,4 @@
-"""Mask user-entered PII before counsel text crosses the model boundary.
+"""Mask user-entered PII before qa text crosses the model boundary.
 
 The question and the conversation history are client text: a user can type a
 resident registration number, a phone number, or an email into the chat. Those
@@ -12,10 +12,10 @@ from app.core.pii import (
     mask_phone_numbers,
     mask_resident_identifiers,
 )
-from app.modules.qa.schemas import CounselMessage
+from app.modules.qa.schemas import QaMessage
 
 
-def mask_counsel_pii(text: str) -> str:
+def mask_qa_pii(text: str) -> str:
     """Mask resident identifiers, phone numbers, and email addresses."""
 
     masked = mask_resident_identifiers(text, replacement=MASKED_RESIDENT_IDENTIFIER)
@@ -23,10 +23,9 @@ def mask_counsel_pii(text: str) -> str:
     return mask_phone_numbers(masked)
 
 
-def masked_history(history: list[CounselMessage]) -> list[CounselMessage]:
-    """Mask every turn, keeping roles so the planner still reads the exchange."""
+def masked_history(history: list[QaMessage]) -> list[QaMessage]:
+    """Mask every turn, keeping roles so the agent still reads the exchange."""
 
     return [
-        message.model_copy(update={"content": mask_counsel_pii(message.content)})
-        for message in history
+        message.model_copy(update={"content": mask_qa_pii(message.content)}) for message in history
     ]

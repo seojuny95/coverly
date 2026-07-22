@@ -1,4 +1,4 @@
-"""Deterministic policy inventory facts for counsel."""
+"""Deterministic policy inventory facts for qa."""
 
 from pydantic import BaseModel
 

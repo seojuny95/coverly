@@ -314,7 +314,7 @@ def main() -> None:
     results: list[TurnResult] = []
     # Entering the client runs the app's lifespan, which is what hands the
     # agents SDK its key. Without it every agent turn dies on a missing
-    # credential (see evals/counsel/live.py, which hit this same trap).
+    # credential.
     with build_client(recorder, policies) as client:
         for run_index in range(1, args.runs + 1):
             for case in cases:

@@ -1,4 +1,4 @@
-"""Deterministic coverage facts for counsel."""
+"""Deterministic coverage facts for qa."""
 
 from typing import Literal
 
