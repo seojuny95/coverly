@@ -2,8 +2,8 @@
 
 from agents import RunContextWrapper, function_tool
 
-from app.modules.counsel.facts import portfolio as portfolio_facts
 from app.modules.qa.context import QaContext
+from app.modules.qa.facts import portfolio as portfolio_facts
 
 
 @function_tool

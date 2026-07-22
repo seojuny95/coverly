@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import type { ChatMessageData } from "./chat-message";
 import { streamPortfolioQuestion, type ChatHistoryItem } from "./api";
 
-// Kept in step with the suggestion_* cases in backend/evals/counsel/dataset.json:
+// Kept in step with the suggestion_* cases in backend/evals/qa/dataset.json:
 // a question the product offers first has to be one it can actually answer.
 const INITIAL_SUGGESTIONS = [
   "겹치는 보장이 있는지 봐줄래요?",

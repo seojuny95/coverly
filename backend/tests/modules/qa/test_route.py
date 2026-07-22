@@ -1,4 +1,4 @@
-"""Route-level smoke test for /qa/stream, with a stubbed agent runner.
+"""Route-level tests for /qa/stream, with a stubbed agent runner.
 
 No real OpenAI call: the agent stream runner is overridden with a canned
 generator so this stays a fast, deterministic unit test, per this project's
@@ -7,6 +7,11 @@ generator so this stays a fast, deterministic unit test, per this project's
 There is no slot registry or structured output anymore (see agent.py's
 module docstring) -- the stub yields plain natural-language text, and the
 route is expected to forward it to the client unmodified.
+
+The safety-boundary tests at the bottom guard what the route owes every
+turn before the agent runs: an invalid session is rejected without the
+question ever reaching the model, the turn limit bites first, identifiers
+are masked, and only the recent history window goes on the wire.
 """
 
 import json
@@ -20,6 +25,10 @@ from app.main import create_app
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.models import PortfolioSessionSnapshot
+from app.modules.portfolio.session.service import (
+    CounselTurnLimitReached,
+    InvalidPortfolioSessionToken,
+)
 from app.modules.qa.agent import AgentStreamRunner
 from app.modules.qa.context import QaContext
 from app.modules.qa.route import get_agent_stream_runner
@@ -38,32 +47,59 @@ def _policy(담보명: str, 가입금액: str, 지급유형: str, 보험사: str
 
 
 class _FixtureSessions:
-    def __init__(self, policies: tuple[PolicyInput, ...]) -> None:
+    """Accepts only _SESSION_ID, so tests can exercise the 403 boundary."""
+
+    def __init__(self, policies: tuple[PolicyInput, ...] = ()) -> None:
         self._policies = policies
 
     def consume_counsel_turn(self, token: str, **_kwargs: object) -> int:
+        if token != _SESSION_ID:
+            raise InvalidPortfolioSessionToken
         return 9
 
     def snapshot(self, token: str, **_kwargs: object) -> PortfolioSessionSnapshot:
+        if token != _SESSION_ID:
+            raise InvalidPortfolioSessionToken
         return PortfolioSessionSnapshot(
             session_id=token, version=1, policies=self._policies, rag_session_ids=()
         )
 
 
-def _stub_runner(chunks: list[str]) -> AgentStreamRunner:
+class _ExhaustedSessions(_FixtureSessions):
+    """A session whose question quota has already run out."""
+
+    def consume_counsel_turn(self, token: str, **_kwargs: object) -> int:
+        raise CounselTurnLimitReached
+
+
+def _stub_runner(
+    chunks: list[str],
+    seen_conversations: list[list[ConversationMessage]] | None = None,
+) -> AgentStreamRunner:
     async def runner(
         agent: Agent[QaContext], conversation: list[ConversationMessage], context: QaContext
     ) -> AsyncIterator[str]:
+        if seen_conversations is not None:
+            seen_conversations.append(list(conversation))
         for chunk in chunks:
             yield chunk
 
     return runner
 
 
-def _client(policies: tuple[PolicyInput, ...], chunks: list[str]) -> TestClient:
+def _client(
+    policies: tuple[PolicyInput, ...],
+    chunks: list[str],
+    *,
+    sessions: _FixtureSessions | None = None,
+    seen_conversations: list[list[ConversationMessage]] | None = None,
+) -> TestClient:
     app = create_app()
-    app.dependency_overrides[get_portfolio_session_service] = lambda: _FixtureSessions(policies)
-    app.dependency_overrides[get_agent_stream_runner] = lambda: _stub_runner(chunks)
+    session_service = sessions if sessions is not None else _FixtureSessions(policies)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: session_service
+    app.dependency_overrides[get_agent_stream_runner] = lambda: _stub_runner(
+        chunks, seen_conversations
+    )
     return TestClient(app)
 
 
@@ -137,3 +173,79 @@ def test_empty_deltas_are_not_forwarded() -> None:
 
     events = _events(response.text)
     assert _delta_texts(events) == ["안녕", "하세요"]
+
+
+def test_an_invalid_session_is_rejected_before_the_agent_runs() -> None:
+    # The session token is an access boundary: an unauthorized request must
+    # never put the question on the wire toward the model.
+    seen: list[list[ConversationMessage]] = []
+    client = _client((), ["네."], seen_conversations=seen)
+
+    response = client.post(
+        "/qa/stream",
+        json={"question": "암진단비 알려줘", "history": [], "session_id": "bad-session"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "INVALID_PORTFOLIO_SESSION"
+    assert seen == []
+
+
+def test_a_session_out_of_turns_is_refused_before_the_agent_runs() -> None:
+    # The quota must bite before the agent spends a model call.
+    seen: list[list[ConversationMessage]] = []
+    client = _client((), ["네."], sessions=_ExhaustedSessions(), seen_conversations=seen)
+
+    response = client.post(
+        "/qa/stream",
+        json={"question": "암진단비 알려줘", "history": [], "session_id": _SESSION_ID},
+    )
+
+    assert response.status_code == 429
+    assert response.json()["error"]["code"] == "COUNSEL_TURN_LIMIT_REACHED"
+    assert seen == []
+
+
+def test_the_agent_never_receives_identifiers_the_user_typed() -> None:
+    seen: list[list[ConversationMessage]] = []
+    client = _client((), ["확인했어요."], seen_conversations=seen)
+
+    client.post(
+        "/qa/stream",
+        json={
+            "question": "제 번호는 010-1234-5678이고 주민번호는 900101-1234567이에요",
+            "history": [{"role": "user", "content": "메일은 a@b.com 이에요"}],
+            "session_id": _SESSION_ID,
+        },
+    )
+
+    conversation_text = "".join(
+        str(message["content"]) for conversation in seen for message in conversation
+    )
+    assert conversation_text
+    assert "010-1234-5678" not in conversation_text
+    assert "900101-1234567" not in conversation_text
+    assert "a@b.com" not in conversation_text
+
+
+def test_the_agent_only_sees_the_most_recent_turns() -> None:
+    # The client sends the history, so without a window a single request
+    # could carry an arbitrarily long conversation into the model call.
+    seen: list[list[ConversationMessage]] = []
+    client = _client((), ["네."], seen_conversations=seen)
+
+    long_history = [
+        {"role": role, "content": f"{role}-{index}"}
+        for index in range(1, 9)
+        for role in ("user", "assistant")
+    ]
+    client.post(
+        "/qa/stream",
+        json={"question": "지금 질문", "history": long_history, "session_id": _SESSION_ID},
+    )
+
+    conversation_text = "".join(
+        str(message["content"]) for conversation in seen for message in conversation
+    )
+    assert "user-8" in conversation_text
+    assert "user-1" not in conversation_text

@@ -31,10 +31,8 @@ export type SourceReliability = ReferenceSource["reliability"];
 export type EssentialCoverageItem = Schemas["EssentialCoverageItem"];
 export type CoverageGroup = Schemas["CoverageGroup"];
 
-export type CounselRequest = Schemas["CounselRequest"];
-export type ChatHistoryItem = Schemas["CounselMessage"];
-export type CounselStreamEvent =
-  | Schemas["CounselMetaEvent"]
-  | Schemas["CounselDeltaEvent"]
-  | Schemas["CounselEndEvent"];
-export type CounselMetaEvent = Schemas["CounselMetaEvent"];
+export type QaRequest = Schemas["QaRequest"];
+export type ChatHistoryItem = Schemas["QaMessage"];
+export type QaStreamEvent =
+  Schemas["QaMetaEvent"] | Schemas["QaDeltaEvent"] | Schemas["QaEndEvent"];
+export type QaMetaEvent = Schemas["QaMetaEvent"];

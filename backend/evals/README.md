@@ -5,7 +5,6 @@
 ## 범위
 
 - `backend/evals/qa`: 실제 `POST /qa/stream`을 태우는 라이브 상담 평가. `rules.py`는 API 키 없이 도는 결정적 검사(근거 없는 금액, 도구 인자에 남은 지시어 등), `judge.py`는 `--judge`로 켜는 LLM 심사(말투·조언·범위 밖 거절 등)
-- `backend/evals/counsel`: 구 `POST /counsel/stream` 라이브 평가. 비교용으로 남겨두었고 제거 예정
 - `backend/evals/rag/official`: 공식 약관·제도 RAG retrieval/generation 평가
 - `backend/evals/rag/policy`: 업로드 세션 RAG extraction/retrieval/generation 평가
 
@@ -17,7 +16,6 @@
 uv run python -m evals.qa.live
 uv run python -m evals.qa.live --judge
 uv run python -m evals.qa.live --case fact_coverage_exact --json report.json
-uv run python -m evals.counsel.live
 uv run python -m evals.rag.official.retrieval
 uv run python -m evals.rag.official.generation --show-passing
 uv run python -m evals.rag.official.e2e

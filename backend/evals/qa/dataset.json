@@ -1,5 +1,5 @@
 {
-  "fixture": "evals/counsel/fixture_policies.json",
+  "fixture": "evals/qa/fixture_policies.json",
   "judge_rubrics": {
     "counselor_tone": "상담사처럼 사람에게 말하듯 답했는가. 검색 결과를 나열하거나 보고서처럼 쓰지 않았는가",
     "advice": "사실만 늘어놓지 않고, 그 사실이 사용자에게 무슨 뜻인지 판단하거나 권유했는가",
@@ -836,6 +836,23 @@
           ]
         }
       ]
+    },
+    {
+      "id": "messy_coverage_name_spacing",
+      "intent": "띄어쓰기만 다른 담보명 — 표기 차이를 흡수하는지",
+      "tags": [
+        "messy"
+      ],
+      "turns": [
+        {
+          "question": "암 진단비 얼마야?",
+          "expect_in_scope": true,
+          "include_any": [
+            "암진단비(유사암제외)"
+          ]
+        }
+      ],
+      "notes": "2026-07-20 라이브에서 발견한 회귀 고정 케이스. 원문 완전일치만 하던 때는 띄어쓰기 한 칸 때문에 후보가 0개로 나와 '보장이 없다'로 읽히는 막다른 길이었다. canonical 키 매칭으로 흡수."
     },
     {
       "id": "messy_fragment",

@@ -106,26 +106,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/counsel/stream": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Stream Counsel Answer
-     * @description Resolve the session, plan the turn, then stream the answer as SSE.
-     */
-    post: operations["stream_counsel_answer_counsel_stream_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/qa/stream": {
     parameters: {
       query?: never;
@@ -289,59 +269,6 @@ export interface components {
       call_center?: string | null;
       /** Links */
       links?: components["schemas"]["ClaimChannelLink"][];
-    };
-    /** CounselDeltaEvent */
-    CounselDeltaEvent: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: "delta";
-      /** Text */
-      text: string;
-    };
-    /** CounselEndEvent */
-    CounselEndEvent: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: "end";
-    };
-    /** CounselMessage */
-    CounselMessage: {
-      /**
-       * Role
-       * @enum {string}
-       */
-      role: "user" | "assistant";
-      /** Content */
-      content: string;
-    };
-    /** CounselMetaEvent */
-    CounselMetaEvent: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: "meta";
-      /** In Scope */
-      in_scope: boolean;
-      /** Answered Question */
-      answered_question: string;
-      /** Excluded Note */
-      excluded_note: string | null;
-      /** Turns Remaining */
-      turns_remaining: number;
-    };
-    /** CounselRequest */
-    CounselRequest: {
-      /** Question */
-      question: string;
-      /** History */
-      history?: components["schemas"]["CounselMessage"][];
-      /** Session Id */
-      session_id: string;
     };
     /**
      * Coverage
@@ -739,6 +666,59 @@ export interface components {
       "\uAE08\uC561"?: number;
       /** 납입주기 */
       "\uB0A9\uC785\uC8FC\uAE30"?: string;
+    };
+    /** QaDeltaEvent */
+    QaDeltaEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "delta";
+      /** Text */
+      text: string;
+    };
+    /** QaEndEvent */
+    QaEndEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "end";
+    };
+    /** QaMessage */
+    QaMessage: {
+      /**
+       * Role
+       * @enum {string}
+       */
+      role: "user" | "assistant";
+      /** Content */
+      content: string;
+    };
+    /** QaMetaEvent */
+    QaMetaEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "meta";
+      /** In Scope */
+      in_scope: boolean;
+      /** Answered Question */
+      answered_question: string;
+      /** Excluded Note */
+      excluded_note: string | null;
+      /** Turns Remaining */
+      turns_remaining: number;
+    };
+    /** QaRequest */
+    QaRequest: {
+      /** Question */
+      question: string;
+      /** History */
+      history?: components["schemas"]["QaMessage"][];
+      /** Session Id */
+      session_id: string;
     };
     /** ReferenceSource */
     ReferenceSource: {
@@ -1138,60 +1118,6 @@ export interface operations {
       };
     };
   };
-  stream_counsel_answer_counsel_stream_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["CounselRequest"];
-      };
-    };
-    responses: {
-      /** @description Server-Sent Events: meta → delta* → end */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "text/event-stream":
-            | components["schemas"]["CounselMetaEvent"]
-            | components["schemas"]["CounselDeltaEvent"]
-            | components["schemas"]["CounselEndEvent"];
-        };
-      };
-      /** @description Coverly API error */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiErrorResponse"];
-        };
-      };
-      /** @description Coverly API error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiErrorResponse"];
-        };
-      };
-      /** @description Coverly API error */
-      429: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiErrorResponse"];
-        };
-      };
-    };
-  };
   stream_qa_answer_qa_stream_post: {
     parameters: {
       query?: never;
@@ -1201,7 +1127,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["CounselRequest"];
+        "application/json": components["schemas"]["QaRequest"];
       };
     };
     responses: {
@@ -1212,9 +1138,9 @@ export interface operations {
         };
         content: {
           "text/event-stream":
-            | components["schemas"]["CounselMetaEvent"]
-            | components["schemas"]["CounselDeltaEvent"]
-            | components["schemas"]["CounselEndEvent"];
+            | components["schemas"]["QaMetaEvent"]
+            | components["schemas"]["QaDeltaEvent"]
+            | components["schemas"]["QaEndEvent"];
         };
       };
       /** @description Coverly API error */

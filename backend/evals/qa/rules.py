@@ -30,21 +30,29 @@ from app.modules.portfolio.schemas import PolicyInput
 
 _PRONOUN_LEAK_RE = re.compile(r"그거|그것|아까|저건|저거|이거|그건")
 
-_WON_UNITS = {
-    "원": 1,
-    "천원": 1_000,
-    "만원": 10_000,
-    "백만원": 1_000_000,
-    "천만원": 10_000_000,
-    "억원": 100_000_000,
+# A won amount in Korean prose is one or more digit+unit segments closed by
+# 원: "42,000원", "2,000만원", "4만 2천원", "1억 2,000만원", "6,000만 원".
+# Every leading segment must carry a unit (a bare "1,000 2,000원" is two
+# amounts, not one), only the final segment may drop it, and spaces may
+# appear anywhere. Capturing only the digits next to the final unit -- what
+# an earlier version did -- read "4만 2천원" as 2,000원 and "1억 2,000만원"
+# as 2,000만원, both misgrounding the figure in opposite directions.
+_UNIT_MULTIPLIERS = {
+    "억": 100_000_000,
+    "천만": 10_000_000,
+    "백만": 1_000_000,
+    "십만": 100_000,
+    "만": 10_000,
+    "천": 1_000,
+    "백": 100,
 }
-# Longest unit first so "5천만원" reads as 천만원 rather than failing on 천원.
-# Both regexes share this alternation: an amount the answer states must be
-# detectable by exactly the units _parse_won can convert, or a figure phrased
-# "5천만원" would never even be looked up and would pass as grounded.
-_UNIT_ALTERNATION = "|".join(["억원", "천만원", "백만원", "만원", "천원", "원"])
-_AMOUNT_RE = re.compile(rf"\d[\d,]*(?:\.\d+)?\s*(?:{_UNIT_ALTERNATION})")
-_UNIT_SUFFIX_RE = re.compile(rf"({_UNIT_ALTERNATION})$")
+# Longest unit first so "천만" is not consumed as 천.
+_UNIT_ALTERNATION = "|".join(sorted(_UNIT_MULTIPLIERS, key=len, reverse=True))
+_NUMBER = r"\d[\d,]*(?:\.\d+)?"
+_AMOUNT_RE = re.compile(
+    rf"(?:{_NUMBER}\s*(?:{_UNIT_ALTERNATION})\s*)*{_NUMBER}\s*(?:{_UNIT_ALTERNATION})?\s*원"
+)
+_AMOUNT_SEGMENT_RE = re.compile(rf"({_NUMBER})\s*({_UNIT_ALTERNATION})?")
 
 # A tool serializes a computed won amount as a bare int (`total=60000000`),
 # which no unit suffix would find. Only integers sitting in a field that
@@ -126,16 +134,43 @@ def check_turn(turn: dict[str, Any], outcome: TurnOutcome) -> CheckResult:
     return result
 
 
-def _any_source_named(outcome: TurnOutcome) -> bool:
-    # A product name ("Hicar 다이렉트") identifies the source just as
-    # unambiguously as the insurer name ("현대해상") -- citing either counts.
-    names = {
-        name
-        for policy in outcome.policies
-        for name in (policy.기본정보.보험사, policy.기본정보.상품명)
-        if name
+# A handful of product names are literally the generic name of an insurance
+# line ("실손의료보험" names a whole category, not one contract). Mentioning
+# such a name reads as talking about the product type, not citing which
+# uploaded policy a fact came from, so it cannot satisfy expect_source on
+# its own. Eval-only vocabulary, same spirit as _PRONOUN_LEAK_RE above.
+_GENERIC_PRODUCT_NAMES = frozenset(
+    {
+        "실손보험",
+        "실손의료보험",
+        "실손의료비보험",
+        "자동차보험",
+        "운전자보험",
+        "여행자보험",
+        "화재보험",
+        "암보험",
+        "건강보험",
+        "종신보험",
+        "정기보험",
+        "치아보험",
+        "어린이보험",
     }
-    return any(name in outcome.answer for name in names)
+)
+
+
+def _any_source_named(outcome: TurnOutcome) -> bool:
+    # A distinctive product name ("Hicar 다이렉트") identifies the source just
+    # as unambiguously as the insurer name ("현대해상") -- citing either
+    # counts. A product whose name is a generic line-of-business term does
+    # not, because "실손의료보험은 비례보상이에요" cites nothing.
+    insurers = {policy.기본정보.보험사 for policy in outcome.policies if policy.기본정보.보험사}
+    products = {
+        product
+        for policy in outcome.policies
+        if (product := policy.기본정보.상품명)
+        and product.replace(" ", "") not in _GENERIC_PRODUCT_NAMES
+    }
+    return any(name in outcome.answer for name in insurers | products)
 
 
 def _fabricated_amounts(outcome: TurnOutcome) -> list[str]:
@@ -174,18 +209,20 @@ def _known_won_values(outcome: TurnOutcome) -> set[int]:
 
 
 def _parse_won(text: str) -> int | None:
-    compact = re.sub(r"\s+", "", text)
-    unit_match = _UNIT_SUFFIX_RE.search(compact)
-    if not unit_match:
-        return None
-    unit = unit_match.group(1)
-    number_text = compact[: unit_match.start()].replace(",", "")
-    try:
-        number = float(number_text)
-    except ValueError:
-        return None
-    value = number * _WON_UNITS[unit]
-    return int(value) if value.is_integer() else None
+    """Convert one amount expression to won, summing its segments.
+
+    "4만 2천원" is 4×10,000 + 2×1,000 = 42,000; a segment without a unit
+    (the "42,000" in "42,000원") contributes its digits as-is.
+    """
+
+    total = 0.0
+    for digits, unit in _AMOUNT_SEGMENT_RE.findall(text):
+        try:
+            number = float(digits.replace(",", ""))
+        except ValueError:
+            return None
+        total += number * _UNIT_MULTIPLIERS.get(unit, 1)
+    return int(total) if total.is_integer() else None
 
 
 def _pronoun_leak(arguments_json: str) -> list[str]:
