@@ -54,10 +54,26 @@ class ExcludedCoverage(BaseModel):
     reason: str
 
 
+class UnsummedCoverageGroup(BaseModel):
+    """Matched rows under one coverage name that were not added to the total.
+
+    One insurer listing a coverage name more than once (or a row whose insurer
+    is unknown) may be a benefit split into tiers of a single contract rather
+    than independent amounts, so folding it into the total would risk
+    overstating the coverage. These rows are surfaced for a closer look instead
+    of being guessed into a confident number.
+    """
+
+    담보명: str
+    rows: list[CoverageMatch]
+    reason: str
+
+
 class CoverageTotalResult(BaseModel):
     total: int
     included: list[CoverageMatch]
     excluded: list[ExcludedCoverage]
+    needs_review: list[UnsummedCoverageGroup] = Field(default_factory=list)
     unmatched: list[UnmatchedCoverageName]
 
 
@@ -120,15 +136,26 @@ def find_coverage_facts(
     return FindCoveragesResult(matches=matches, unmatched=unmatched)
 
 
+_UNSUMMED_SAME_INSURER_REASON = (
+    "같은 담보가 여러 건 확인됐지만, 한 보험사에서 단계별(tier)로 나뉜 보장인지"
+    " 확인되지 않아(합치면 과대 계산될 수 있어) 합산하지 않고 확인이 필요한"
+    " 항목으로 남겨뒀습니다."
+)
+
+
 def calculate_coverage_total_fact(
     policies: list[PolicyInput],
     coverage_names: list[str],
 ) -> CoverageTotalResult:
-    """Calculate the total fixed amount for exact coverage names."""
+    """Calculate the total fixed amount for exact coverage names.
+
+    Different requested names are still combined into one total on purpose, but
+    within a single coverage name rows are only summed when they cannot be
+    tiers of one contract -- see UnsummedCoverageGroup for what is held back.
+    """
 
     matches, unmatched = match_coverage_names(policies, coverage_names)
 
-    included = [item for item in matches if item.가입금액숫자 is not None]
     excluded = [
         ExcludedCoverage(
             policy_id=item.policy_id,
@@ -140,13 +167,59 @@ def calculate_coverage_total_fact(
         for item in matches
         if item.가입금액숫자 is None
     ]
+
+    fixed_matches = [item for item in matches if item.가입금액숫자 is not None]
+    included, needs_review = _split_summable_coverages(fixed_matches)
+
     total = sum(item.가입금액숫자 for item in included if item.가입금액숫자 is not None)
     return CoverageTotalResult(
         total=total,
         included=included,
         excluded=excluded,
+        needs_review=needs_review,
         unmatched=unmatched,
     )
+
+
+def _split_summable_coverages(
+    matches: list[CoverageMatch],
+) -> tuple[list[CoverageMatch], list[UnsummedCoverageGroup]]:
+    """Separate rows safe to add from rows that could be tiers of one contract.
+
+    Rows are grouped by canonical coverage identity. A group is summed only when
+    it holds a single row, or every row names a distinct known insurer; any
+    same-insurer repeat (or an unknown insurer among several rows) leaves the
+    whole group out of the total for a closer look.
+    """
+
+    groups: dict[str, list[CoverageMatch]] = {}
+    for item in matches:
+        groups.setdefault(_canonical_key(item.담보명), []).append(item)
+
+    summable_keys = {key for key, rows in groups.items() if _can_sum_rows(rows)}
+
+    included = [item for item in matches if _canonical_key(item.담보명) in summable_keys]
+    needs_review = [
+        UnsummedCoverageGroup(
+            담보명=rows[0].담보명,
+            rows=rows,
+            reason=_UNSUMMED_SAME_INSURER_REASON,
+        )
+        for key, rows in sorted(groups.items())
+        if key not in summable_keys
+    ]
+    return included, needs_review
+
+
+def _can_sum_rows(rows: list[CoverageMatch]) -> bool:
+    """Return whether rows sharing one coverage name can be added without guessing."""
+
+    if len(rows) == 1:
+        return True
+
+    known_insurers = [row.보험사 for row in rows if row.보험사]
+    all_insurers_known = len(known_insurers) == len(rows)
+    return all_insurers_known and len(known_insurers) == len(set(known_insurers))
 
 
 class _OverlapGroup(BaseModel):

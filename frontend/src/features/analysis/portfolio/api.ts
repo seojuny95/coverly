@@ -91,7 +91,7 @@ export async function streamPortfolioQuestion(
     session_id: portfolioSessionToken,
     history,
   } satisfies CounselRequest;
-  const response = await fetch(apiUrl("/counsel/stream"), {
+  const response = await fetch(apiUrl("/qa/stream"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

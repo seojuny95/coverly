@@ -126,6 +126,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/qa/stream": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Stream Qa Answer
+     * @description Resolve the session, then stream one agent's answer as SSE.
+     */
+    post: operations["stream_qa_answer_qa_stream_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/health": {
     parameters: {
       query?: never;
@@ -1119,6 +1139,60 @@ export interface operations {
     };
   };
   stream_counsel_answer_counsel_stream_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CounselRequest"];
+      };
+    };
+    responses: {
+      /** @description Server-Sent Events: meta → delta* → end */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/event-stream":
+            | components["schemas"]["CounselMetaEvent"]
+            | components["schemas"]["CounselDeltaEvent"]
+            | components["schemas"]["CounselEndEvent"];
+        };
+      };
+      /** @description Coverly API error */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+    };
+  };
+  stream_qa_answer_qa_stream_post: {
     parameters: {
       query?: never;
       header?: never;
