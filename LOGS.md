@@ -1,9 +1,10 @@
 # 작업 로그
 
+- 2026-07-22 — 질문 재작성·범위 판단을 앞단에서 확정하던 counsel planner/composer 파이프라인을 제거하고, 결정적 사실 조회와 두 RAG를 11개 읽기 전용 도구로 제공하는 단일 QA agent로 통합. 외부 상담 API를 `POST /qa/stream` 하나로 정리하고 관련 런타임·평가·테스트·프론트엔드 계약을 `qa` 경계로 이동. 현재 QA 평가셋 70개 대화·89턴의 자동 평가는 61/89가 통과했다. 자동 실패 28턴을 사람이 모두 검수해 21턴을 통과, 7턴을 실패로 판정했으며 검수 반영 기준선은 82/89다(PR #58, #59).
 - 2026-07-19 — 프론트엔드에 공용 UI 프리미티브 레이어(shadcn/ui: Card·Badge·Alert·Skeleton·Dialog·AlertDialog·Input·Label·RadioGroup)를 도입하고 기존 룩에 맞춰 커스터마이즈(리팩터, 화면 그대로). 큰 파일을 분리(`recommendation-cards`·`panel`은 폴더로, `screen`은 `useExpandedRows`/`useTabNavigation` 훅과 `InsuranceListPanel`로)하고, Q&A 로직을 `useQaChat`로, 업로드 오케스트레이션을 `handleSubmit` named-step + `upload-helpers`로 추출. 모달은 radix Dialog/AlertDialog로 전환. react-hooks 규칙을 error로 승격(PR #54).
 - 2026-07-19 — 백엔드 아키텍처와 런타임 경계를 정밀 점검해 업로드 슬롯을 파싱 전에 원자적으로 예약하고 lease·소유자 ID로 동시성/ABA를 방어. QA SSE disconnect를 agent·외부 검색 취소까지 전파하고, 정책 업로드 조합·상담 계약·참조 데이터·Postgres/OpenAI 경계를 분리. 총평은 허용된 중립 문장 선택으로 제한하고 사망 범위 검토와 복수 실손 중복 검토를 구분. 공개 API 계약은 유지했으며 백엔드 569개 테스트, 프론트엔드 177개 테스트와 production build, 독립 runtime·architecture 재리뷰 및 CI를 통과(PR #53).
 - 2026-07-17 — Official RAG generation 평가를 재점검하고 citation label·조문 alias 정규화를 추가. Generation live 평가를 52/60에서 60/60으로 개선하고, false negative를 줄이도록 평가 matcher를 보강.
-- 2026-07-17 — Official RAG retrieval 평가를 positive 근거 검색 품질 중심으로 재정리. `accepted_evidence`로 대체 공식 근거를 인정하고, 한국어 복합어·띄어쓰기 차이를 보강했으며, negative no-hit은 상위 QA router/e2e에서 다룰 진단 지표로 격하.
+- 2026-07-17 — Official RAG retrieval 평가를 positive 근거 검색 품질 중심으로 재정리. `accepted_evidence`로 대체 공식 근거를 인정하고, 한국어 복합어·띄어쓰기 차이를 보강했으며, negative no-hit은 상위 QA 전체 경로와 RAG e2e에서 다룰 진단 지표로 격하.
 - 2026-07-15 — 참조 데이터 소유권·RAG 테이블 현황·migration 정리 경계를 `backend/REFERENCE_DATA.md`에 문서화하고 백엔드 가이드의 핵심 라우트와 서버 총평 생성 정책을 갱신.
 - 2026-07-15 — 보험 분류를 생명보험·제3보험·손해보험·미분류로 정리하고, 화면 태그는 보험 종류로 표시하도록 변경. 보장금 합계는 생명보험/제3보험 중심으로 합산하고 손해보험은 종류별 보장금으로 별도 표시. 자동차보험 표에서 여러 줄 가입금액, 부가 특약, 요율/공지성 문장 제거를 보강.
 - 2026-07-12 — 랜딩·업로드 카피를 "보험을 팔지 않는 내 편 상담사" 톤으로 개편(PR #6). 업로드 로딩을 파일별 상태·트리클 진행률·회전 문구로 바꿔 멈춘 것처럼 보이지 않게 개선.
