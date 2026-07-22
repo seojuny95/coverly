@@ -108,7 +108,7 @@ def check_turn(turn: dict[str, Any], outcome: TurnOutcome) -> CheckResult:
     if forbidden:
         result.failures.append(f"exclude 위반: {forbidden}")
 
-    if turn.get("expect_source") and not _any_insurer_named(outcome):
+    if turn.get("expect_source") and not _any_source_named(outcome):
         result.failures.append("expect_source: 보험사·상품명 언급 없음")
 
     if turn.get("expect_in_scope") is False:
@@ -126,9 +126,16 @@ def check_turn(turn: dict[str, Any], outcome: TurnOutcome) -> CheckResult:
     return result
 
 
-def _any_insurer_named(outcome: TurnOutcome) -> bool:
-    insurers = {policy.기본정보.보험사 for policy in outcome.policies if policy.기본정보.보험사}
-    return any(insurer in outcome.answer for insurer in insurers)
+def _any_source_named(outcome: TurnOutcome) -> bool:
+    # A product name ("Hicar 다이렉트") identifies the source just as
+    # unambiguously as the insurer name ("현대해상") -- citing either counts.
+    names = {
+        name
+        for policy in outcome.policies
+        for name in (policy.기본정보.보험사, policy.기본정보.상품명)
+        if name
+    }
+    return any(name in outcome.answer for name in names)
 
 
 def _fabricated_amounts(outcome: TurnOutcome) -> list[str]:
