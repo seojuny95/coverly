@@ -21,9 +21,19 @@ const summaryWithoutOverview = {
   excluded_coverages: [],
   excluded_auto_policy_count: 0,
 } satisfies api.PortfolioSummary;
+const generatedOverview = {
+  generation: "llm" as const,
+  title: "확인된 보장을 기준으로 총평을 정리했어요",
+  paragraphs: ["확인된 보장 정보만 사용해 총평을 만들었어요."],
+} satisfies api.PortfolioOverview;
 
 describe("usePortfolioSummary", () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(api, "requestPortfolioOverview").mockResolvedValue(
+      generatedOverview,
+    );
+  });
 
   it("returns success state from the query", async () => {
     vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
@@ -50,7 +60,7 @@ describe("usePortfolioSummary", () => {
         overview: {
           generation: "llm",
           title: "첫 총평",
-          paragraphs: [],
+          paragraphs: ["첫 총평 문장"],
         },
       })
       .mockReturnValueOnce(nextRequest);
@@ -89,7 +99,7 @@ describe("usePortfolioSummary", () => {
         overview: {
           generation: "llm",
           title: "첫 총평",
-          paragraphs: [],
+          paragraphs: ["첫 총평 문장"],
         },
       })
       .mockReturnValueOnce(nextRequest);
@@ -156,7 +166,86 @@ describe("usePortfolioSummary", () => {
 
     expect(result.current.state.status).toBe("success");
     expect(result.current.isRetrying).toBe(false);
-    expect(result.current.overviewRetryFailed).toBe(true);
+    expect(result.current.overviewRetryFailed).toBe(false);
+  });
+
+  it("generates a missing overview through a separate request and merges it", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    const requestPortfolioOverview = vi.spyOn(api, "requestPortfolioOverview");
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+    await waitFor(() =>
+      expect(requestPortfolioOverview).toHaveBeenCalledOnce(),
+    );
+
+    expect(result.current.state).toEqual({
+      status: "success",
+      summary: { ...summaryWithoutOverview, overview: generatedOverview },
+    });
+  });
+
+  it("keeps summary content visible when overview generation fails", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    vi.spyOn(api, "requestPortfolioOverview").mockRejectedValue(
+      new Error("offline"),
+    );
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+    await waitFor(() => expect(result.current.overviewRetryFailed).toBe(true));
+
+    expect(result.current.state).toEqual({
+      status: "success",
+      summary: summaryWithoutOverview,
+    });
+  });
+
+  it("keeps previous summary content visible when a refresh fails", async () => {
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockResolvedValueOnce({
+        ...summaryWithoutOverview,
+        overview: generatedOverview,
+      })
+      .mockRejectedValueOnce(new Error("offline"));
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(result.current.state.status).toBe("success");
+    expect(result.current.retryFailed).toBe(false);
   });
 
   it("reports when a manual retry also fails", async () => {

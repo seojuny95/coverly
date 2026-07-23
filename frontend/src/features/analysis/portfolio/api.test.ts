@@ -2,7 +2,11 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { AnalyzedInsurance } from "../store";
 import { POLICY_RESULT_DEFAULTS } from "../../../test/api-fixtures";
 
-import { requestPortfolioSummary, streamPortfolioQuestion } from "./api";
+import {
+  requestPortfolioOverview,
+  requestPortfolioSummary,
+  streamPortfolioQuestion,
+} from "./api";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -63,6 +67,39 @@ describe("portfolio session requests", () => {
     const body = JSON.parse(
       String(fetchMock.mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      portfolioSessionToken: "portfolio-token",
+      policyIds: ["document-1"],
+    });
+    expect(body).not.toHaveProperty("policies");
+  });
+
+  test("sends only the token and selected document ids for overview generation", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          generation: "llm",
+          title: "확인된 보장을 기준으로 총평을 정리했어요",
+          paragraphs: ["확인된 보장 정보만 사용해 총평을 만들었어요."],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await requestPortfolioOverview(
+      sessionDocuments,
+      {
+        has_dependent_family: false,
+        has_minor_children: false,
+        has_major_debt: false,
+      },
+      "portfolio-token",
+    );
+
+    const body = JSON.parse(
+      String(fetchMock.mock.calls[0]?.[1]?.body),
+    ) as Record<string, unknown>;
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/portfolio/overview");
     expect(body).toMatchObject({
       portfolioSessionToken: "portfolio-token",
       policyIds: ["document-1"],

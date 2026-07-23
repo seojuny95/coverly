@@ -225,6 +225,8 @@ export function InsuranceAnalysisPage({
                 onRetry={portfolioSummary.retry}
                 isRetrying={portfolioSummary.isRetrying}
                 retryFailed={portfolioSummary.retryFailed}
+                onRetryOverview={portfolioSummary.retryOverview}
+                isOverviewRetrying={portfolioSummary.isOverviewRetrying}
                 overviewRetryFailed={portfolioSummary.overviewRetryFailed}
               />
             </div>

@@ -14,6 +14,7 @@ import type {
   CoverageGroup,
   DeathBenefitGuideInput,
   EssentialCoverageItem,
+  PortfolioOverview,
   PortfolioCoverageSummary,
   PortfolioSummaryRequest,
   ReferenceSource,
@@ -29,6 +30,7 @@ export type {
   CoverageGroup,
   DeathBenefitGuideInput,
   EssentialCoverageItem,
+  PortfolioOverview,
   ReferenceSource,
   SourceReliability,
   SpecialPolicyAnalysis,
@@ -48,6 +50,22 @@ async function postPortfolioSummary(
     throw await apiResponseError(response, "분석 요청에 실패했어요.");
   }
   return (await response.json()) as PortfolioSummary;
+}
+
+async function postPortfolioOverview(
+  body: PortfolioSummaryRequest,
+  signal?: AbortSignal,
+): Promise<PortfolioOverview> {
+  const response = await fetch(apiUrl("/portfolio/overview"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok) {
+    throw await apiResponseError(response, "총평 생성에 실패했어요.");
+  }
+  return (await response.json()) as PortfolioOverview;
 }
 
 function portfolioSelection(
@@ -71,6 +89,19 @@ export function requestPortfolioSummary(
     death_benefit_context: deathBenefitContext,
   } satisfies PortfolioSummaryRequest;
   return postPortfolioSummary(body, signal);
+}
+
+export function requestPortfolioOverview(
+  insuranceDocuments: AnalyzedInsurance[],
+  deathBenefitContext: DeathBenefitGuideInput,
+  portfolioSessionToken: string,
+  signal?: AbortSignal,
+) {
+  const body = {
+    ...portfolioSelection(insuranceDocuments, portfolioSessionToken),
+    death_benefit_context: deathBenefitContext,
+  } satisfies PortfolioSummaryRequest;
+  return postPortfolioOverview(body, signal);
 }
 
 type QaStreamHandlers = {

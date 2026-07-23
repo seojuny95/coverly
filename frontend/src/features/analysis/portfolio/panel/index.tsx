@@ -15,6 +15,8 @@ export function PortfolioAnalysisPanel({
   onRetry,
   isRetrying = false,
   retryFailed = false,
+  onRetryOverview = onRetry,
+  isOverviewRetrying = isRetrying,
   overviewRetryFailed = false,
 }: {
   status: "loading" | "success" | "error";
@@ -26,6 +28,8 @@ export function PortfolioAnalysisPanel({
   onRetry: () => void;
   isRetrying?: boolean;
   retryFailed?: boolean;
+  onRetryOverview?: () => void;
+  isOverviewRetrying?: boolean;
   overviewRetryFailed?: boolean;
 }) {
   if (status === "loading") return <AnalysisLoading />;
@@ -69,8 +73,8 @@ export function PortfolioAnalysisPanel({
         isDeathBenefitRefreshing={isDeathBenefitRefreshing}
         policyCount={policyCount}
         specialAnalyses={specialAnalyses}
-        onRetry={onRetry}
-        isRetrying={isRetrying}
+        onRetry={onRetryOverview}
+        isRetrying={isOverviewRetrying}
         retryFailed={overviewRetryFailed}
       />
 

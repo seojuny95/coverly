@@ -21,6 +21,7 @@ export type PortfolioSessionDocumentsDeleteRequest =
 export type PortfolioSessionResponse = Schemas["PortfolioSessionResponse"];
 export type CoverageTotal = Schemas["CoverageTotalItem"];
 export type PortfolioCoverageSummary = Schemas["PortfolioCoverageSummary"];
+export type PortfolioOverview = Schemas["PortfolioOverview"];
 export type PortfolioSummaryRequest = Schemas["PortfolioSummaryRequest"];
 export type DeathBenefitGuideInput = Schemas["DeathBenefitGuideInput"];
 
