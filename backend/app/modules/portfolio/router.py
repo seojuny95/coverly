@@ -13,6 +13,7 @@ from app.modules.portfolio.schemas import (
     DeathBenefitGuideInput,
     PolicyInput,
     PortfolioCoverageSummary,
+    PortfolioOverview,
     PortfolioSummaryRequest,
 )
 from app.modules.portfolio.session.analysis import analyze_portfolio_snapshot
@@ -53,18 +54,60 @@ def coverage_summary(
     summarize: PortfolioSummaryServiceDep,
     sessions: PortfolioSessionServiceDep,
 ) -> PortfolioCoverageSummary:
+    summary = _portfolio_coverage_summary(request, summarize, sessions)
+    try:
+        return attach_summary_overview(summary)
+    except SummaryOverviewUnavailableError:
+        return summary.model_copy(update={"overview": None})
+
+
+@router.post(
+    "/overview",
+    response_model=PortfolioOverview,
+    responses=api_error_responses(403, 503),
+)
+def summary_overview(
+    request: PortfolioSummaryRequest,
+    summarize: PortfolioSummaryServiceDep,
+    sessions: PortfolioSessionServiceDep,
+) -> PortfolioOverview:
+    summary = _portfolio_coverage_summary(request, summarize, sessions)
+    try:
+        overview = attach_summary_overview(summary).overview
+    except SummaryOverviewUnavailableError as exc:
+        raise ApiError(
+            status_code=503,
+            code="portfolio_overview_unavailable",
+            message=(
+                "총평을 생성하지 못했어요. 확인된 보장 정보는 그대로 있어요. "
+                "잠시 후 다시 시도해주세요."
+            ),
+        ) from exc
+    if overview is None:
+        raise ApiError(
+            status_code=503,
+            code="portfolio_overview_unavailable",
+            message=(
+                "총평을 생성하지 못했어요. 확인된 보장 정보는 그대로 있어요. "
+                "잠시 후 다시 시도해주세요."
+            ),
+        )
+    return overview
+
+
+def _portfolio_coverage_summary(
+    request: PortfolioSummaryRequest,
+    summarize: PortfolioSummaryService,
+    sessions: PortfolioSessionServiceDep,
+) -> PortfolioCoverageSummary:
     try:
         snapshot = resolve_portfolio_snapshot(sessions, request)
-        summary = analyze_portfolio_snapshot(
+        return analyze_portfolio_snapshot(
             sessions,
             snapshot,
             request,
             summarize,
         )
-        try:
-            return attach_summary_overview(summary)
-        except SummaryOverviewUnavailableError:
-            return summary.model_copy(update={"overview": None})
     except ReferenceDataUnavailableError as exc:
         raise ApiError(
             status_code=503,

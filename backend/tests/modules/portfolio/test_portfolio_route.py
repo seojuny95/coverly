@@ -305,6 +305,53 @@ def test_summary_route_keeps_calculated_coverages_when_llm_overview_fails(
     assert body["totals"]
 
 
+def test_summary_overview_route_returns_only_generated_overview(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policies: list[dict[str, object] | PolicyInput] = [
+        {
+            "id": DOCUMENT_1,
+            "기본정보": {"보험사": "테스트보험사", "보험분류": "건강보험"},
+            "보장목록": [{"담보명": "암진단비", "가입금액": "3천만원", "지급유형": "정액"}],
+        }
+    ]
+    response = _client(monkeypatch, policies).post(
+        "/portfolio/overview",
+        json=_request(),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "generation": "llm",
+        "title": "테스트 총평",
+        "paragraphs": ["확인된 보장 정보를 정리했어요."],
+    }
+
+
+def test_summary_overview_route_returns_retryable_error_when_generation_fails(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> object:
+        raise SummaryOverviewUnavailableError("offline")
+
+    monkeypatch.setattr(portfolio, "attach_summary_overview", fail)
+    policies: list[dict[str, object] | PolicyInput] = [
+        {
+            "id": DOCUMENT_1,
+            "기본정보": {"보험사": "테스트보험사", "보험분류": "건강보험"},
+            "보장목록": [{"담보명": "암진단비", "가입금액": "3천만원", "지급유형": "정액"}],
+        }
+    ]
+    response = _client(monkeypatch, policies, stub_overview=False).post(
+        "/portfolio/overview",
+        json=_request(),
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "portfolio_overview_unavailable"
+    assert response.json()["error"]["message"].startswith("총평을 생성하지 못했어요.")
+
+
 def test_summary_route_returns_retryable_error_when_reference_data_fails(
     monkeypatch: MonkeyPatch,
 ) -> None:
