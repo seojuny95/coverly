@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiResponseError } from "@/shared/api/client";
 import { makeTestQueryClient } from "../../../test/render-with-providers";
 import { POLICY_RESULT_DEFAULTS } from "../../../test/api-fixtures";
 import type { AnalyzedInsurance } from "../store";
@@ -270,6 +271,67 @@ describe("usePortfolioSummary", () => {
 
     expect(result.current.state.status).toBe("error");
     expect(result.current.retryFailed).toBe(true);
+  });
+
+  it("reports an expired session from summary requests", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockRejectedValue(
+      new ApiResponseError({
+        status: 403,
+        code: "INVALID_PORTFOLIO_SESSION",
+        message: "세션이 만료됐어요.",
+      }),
+    );
+    const onSessionExpired = vi.fn();
+    const client = makeTestQueryClient();
+
+    renderHook(
+      () =>
+        usePortfolioSummary(
+          docs,
+          deathBenefitContext,
+          "portfolio-token",
+          onSessionExpired,
+        ),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(onSessionExpired).toHaveBeenCalledOnce());
+  });
+
+  it("reports an expired session from overview requests", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    vi.spyOn(api, "requestPortfolioOverview").mockRejectedValue(
+      new ApiResponseError({
+        status: 403,
+        code: "INVALID_PORTFOLIO_SESSION",
+        message: "세션이 만료됐어요.",
+      }),
+    );
+    const onSessionExpired = vi.fn();
+    const client = makeTestQueryClient();
+
+    renderHook(
+      () =>
+        usePortfolioSummary(
+          docs,
+          deathBenefitContext,
+          "portfolio-token",
+          onSessionExpired,
+        ),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(onSessionExpired).toHaveBeenCalledOnce());
   });
 
   it("ignores the outcome of an older retry after the query key changes", async () => {

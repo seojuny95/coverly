@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiResponseError } from "@/shared/api/client";
 import type { AnalyzedInsurance } from "../store";
 import {
   type DeathBenefitGuideInput,
@@ -45,6 +46,7 @@ export function usePortfolioSummary(
   documents: AnalyzedInsurance[],
   deathBenefitContext: DeathBenefitGuideInput,
   portfolioSessionToken?: string,
+  onSessionExpired?: () => void,
 ) {
   const queryClient = useQueryClient();
   const currentPortfolioKey = portfolioKey(documents);
@@ -73,7 +75,10 @@ export function usePortfolioSummary(
         deathBenefitContext,
         portfolioSessionToken,
         signal,
-      );
+      ).catch((error: unknown) => {
+        if (isExpiredSessionError(error)) onSessionExpired?.();
+        throw error;
+      });
     },
     enabled: documents.length > 0 && Boolean(portfolioSessionToken),
     placeholderData: (previousData, previousQuery) =>
@@ -91,7 +96,10 @@ export function usePortfolioSummary(
         documents,
         deathBenefitContext,
         portfolioSessionToken,
-      );
+      ).catch((error: unknown) => {
+        if (isExpiredSessionError(error)) onSessionExpired?.();
+        throw error;
+      });
     },
   });
 
@@ -171,4 +179,8 @@ export function usePortfolioSummary(
     },
     retryOverview: generateOverview,
   };
+}
+
+function isExpiredSessionError(error: unknown) {
+  return error instanceof ApiResponseError && error.status === 403;
 }

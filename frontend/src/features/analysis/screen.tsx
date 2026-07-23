@@ -94,6 +94,7 @@ export function InsuranceAnalysisPage({
     insuranceDocuments,
     deathBenefitContext,
     analysis?.portfolioSessionToken,
+    expireSession,
   );
 
   const openUploadModal = () => setIsUploadModalOpen(true);

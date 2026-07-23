@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PORTFOLIO_SESSION_REFRESH_FALLBACK_MS,
+  PORTFOLIO_SESSION_REFRESH_RETRY_MS,
   portfolioSessionRefreshDelay,
   usePortfolioSessionRefresh,
 } from "./use-session-refresh";
@@ -88,6 +89,50 @@ describe("usePortfolioSessionRefresh", () => {
     });
 
     expect(onExpired).toHaveBeenCalledOnce();
+  });
+
+  it("retries refresh after a transient failure", async () => {
+    vi.useFakeTimers();
+    vi.mocked(refreshPortfolioSession)
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({
+        portfolioSessionToken: "next-portfolio-token",
+        expiresAt: "2026-07-14T00:15:00+00:00",
+        counselTurnsRemaining: 10,
+      });
+    const onRefreshed = vi.fn();
+
+    renderHook(() =>
+      usePortfolioSessionRefresh({
+        session: {
+          portfolioSessionToken: "current-portfolio-token",
+          expiresAt: "invalid",
+          counselTurnsRemaining: 10,
+        },
+        enabled: true,
+        onRefreshed,
+        onExpired: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(PORTFOLIO_SESSION_REFRESH_FALLBACK_MS);
+      await Promise.resolve();
+    });
+    expect(refreshPortfolioSession).toHaveBeenCalledOnce();
+    expect(onRefreshed).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(PORTFOLIO_SESSION_REFRESH_RETRY_MS);
+      await Promise.resolve();
+    });
+
+    expect(refreshPortfolioSession).toHaveBeenCalledTimes(2);
+    expect(onRefreshed).toHaveBeenCalledWith({
+      portfolioSessionToken: "next-portfolio-token",
+      expiresAt: "2026-07-14T00:15:00+00:00",
+      counselTurnsRemaining: 10,
+    });
   });
 
   it("refreshes one minute before the server expiry", () => {

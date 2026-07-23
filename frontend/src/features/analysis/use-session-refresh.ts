@@ -8,6 +8,7 @@ import {
 } from "./session-api";
 
 export const PORTFOLIO_SESSION_REFRESH_FALLBACK_MS = 3 * 60 * 1000;
+export const PORTFOLIO_SESSION_REFRESH_RETRY_MS = 30 * 1000;
 const REFRESH_SAFETY_WINDOW_MS = 60 * 1000;
 const MIN_REFRESH_DELAY_MS = 1000;
 const MAX_REFRESH_DELAY_MS = 24 * 60 * 60 * 1000;
@@ -46,6 +47,12 @@ export function usePortfolioSessionRefresh({
     if (!enabled || !session) return;
 
     let cancelled = false;
+    let timeout: number | undefined;
+    const scheduleRefresh = (delay: number) => {
+      timeout = window.setTimeout(() => {
+        void refresh();
+      }, delay);
+    };
     const refresh = async () => {
       try {
         const refreshed = await refreshPortfolioSession(
@@ -57,17 +64,19 @@ export function usePortfolioSessionRefresh({
       } catch (error) {
         if (!cancelled && error instanceof PortfolioSessionExpiredError) {
           onExpired();
+          return;
+        }
+        if (!cancelled) {
+          scheduleRefresh(PORTFOLIO_SESSION_REFRESH_RETRY_MS);
         }
       }
     };
 
-    const timeout = window.setTimeout(() => {
-      void refresh();
-    }, portfolioSessionRefreshDelay(session.expiresAt));
+    scheduleRefresh(portfolioSessionRefreshDelay(session.expiresAt));
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timeout);
+      if (timeout !== undefined) window.clearTimeout(timeout);
     };
   }, [enabled, onExpired, onRefreshed, session]);
 }
