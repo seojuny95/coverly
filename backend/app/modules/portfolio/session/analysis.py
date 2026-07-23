@@ -2,7 +2,10 @@
 
 import hashlib
 import json
+import logging
 from collections.abc import Callable
+
+from pydantic import ValidationError
 
 from app.modules.portfolio.schemas import (
     DeathBenefitGuideInput,
@@ -21,7 +24,8 @@ PortfolioSummaryCalculator = Callable[
     PortfolioCoverageSummary,
 ]
 
-PORTFOLIO_ANALYSIS_CACHE_VERSION = 2
+PORTFOLIO_ANALYSIS_CACHE_VERSION = 3
+logger = logging.getLogger(__name__)
 
 
 def analyze_portfolio_snapshot(
@@ -33,7 +37,10 @@ def analyze_portfolio_snapshot(
     context_hash = _analysis_context_hash(request)
     cached = sessions.load_cached_analysis(snapshot, context_hash=context_hash)
     if cached is not None:
-        return PortfolioCoverageSummary.model_validate(cached.result)
+        try:
+            return PortfolioCoverageSummary.model_validate(cached.result)
+        except ValidationError:
+            logger.warning("portfolio_analysis_cache_invalid")
 
     result = calculate(list(snapshot.policies), request.death_benefit_context)
     sessions.save_cached_analysis(
@@ -41,7 +48,7 @@ def analyze_portfolio_snapshot(
         CachedPortfolioAnalysis(
             version=snapshot.version,
             context_hash=context_hash,
-            result=result.model_dump(mode="json", by_alias=True),
+            result=result.model_dump(mode="json"),
         ),
     )
     return result
