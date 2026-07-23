@@ -118,6 +118,24 @@ def test_returns_none_without_an_identifier() -> None:
     assert extract_insured_demographics("피보험자 가나") is None
 
 
+def test_extracts_explicit_insured_age_and_gender_without_identifier() -> None:
+    result = extract_insured_demographics("계약자 샘플고객\n피보험자 샘플고객 · 남성 · 만 32세")
+
+    assert result == {"나이": 32, "성별": "남성", "생애단계": "성인"}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "계약자 샘플고객 · 남성 · 만 32세\n피보험자 샘플고객",
+        "피보험자 샘플고객 · 만 32세",
+        "피보험자 샘플고객 · 남성 · 만 121세",
+    ],
+)
+def test_rejects_incomplete_or_invalid_explicit_demographics(text: str) -> None:
+    assert extract_insured_demographics(text) is None
+
+
 def test_accepts_compact_full_identifier_without_returning_raw_pii() -> None:
     raw_identifier = ADULT_BIRTH + FULL_SUFFIX
 
