@@ -7,17 +7,18 @@ export type ActualLossCoverageGroup = {
   displayName: string;
   domain: string;
   normalizedName: string;
+  majorCategory: string;
+  duplicateAcrossContracts: boolean;
+  originalAmount?: string;
+  explanation: string;
+  explanationBasis: ActualLossCoverage["explanation_basis"];
   items: ActualLossCoverage[];
 };
 
-export function duplicateActualLossCoverageGroups(
-  coverages: ActualLossCoverage[],
-) {
+export function groupActualLossCoverages(coverages: ActualLossCoverage[]) {
   const groups = new Map<string, ActualLossCoverageGroup>();
 
   for (const coverage of coverages) {
-    if (!coverage.duplicate_across_contracts) continue;
-
     const normalizedName = coverage.normalized_name || coverage.coverage_name;
     const domain = coverage.coverage_domain || "unknown";
     const key = `${domain}:${normalizedName}`;
@@ -25,6 +26,8 @@ export function duplicateActualLossCoverageGroups(
 
     if (group) {
       group.items.push(coverage);
+      group.duplicateAcrossContracts =
+        group.duplicateAcrossContracts || coverage.duplicate_across_contracts;
       continue;
     }
 
@@ -32,39 +35,38 @@ export function duplicateActualLossCoverageGroups(
       displayName: coverage.coverage_name,
       domain,
       normalizedName,
+      majorCategory: coverage.major_category || "기타",
+      duplicateAcrossContracts: coverage.duplicate_across_contracts,
+      originalAmount: coverage.original_amount || undefined,
+      explanation: coverage.explanation,
+      explanationBasis: coverage.explanation_basis,
       items: [coverage],
     });
   }
 
-  return [...groups.values()].sort((a, b) =>
-    a.displayName.localeCompare(b.displayName, "ko-KR"),
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      originalAmount: groupedOriginalAmount(group.items),
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "ko-KR"));
+}
+
+export function duplicateActualLossCoverageGroups(
+  coverages: ActualLossCoverage[],
+) {
+  return groupActualLossCoverages(coverages).filter(
+    (group) => group.duplicateAcrossContracts,
   );
 }
 
-export function actualLossCoverageDescription(name: string) {
-  const normalizedName = name.replace(/\s/g, "");
-
-  if (normalizedName.includes("상해")) {
-    return "상해로 병원 치료를 받았을 때 본인이 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.";
-  }
-  if (normalizedName.includes("질병")) {
-    return "질병으로 병원 치료를 받았을 때 본인이 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.";
-  }
-  if (normalizedName.includes("입원")) {
-    return "입원 치료 과정에서 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.";
-  }
-  if (normalizedName.includes("통원") || normalizedName.includes("외래")) {
-    return "통원·외래 진료 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.";
-  }
-  if (normalizedName.includes("처방") || normalizedName.includes("약제")) {
-    return "처방 조제비처럼 실제로 부담한 약제 관련 비용을 약관 한도 안에서 보상하는 담보예요.";
-  }
-  if (normalizedName.includes("벌금")) {
-    return "정액 진단비가 아니라 실제 발생한 벌금 손해를 약관 한도 안에서 보상하는 실손형 담보예요.";
-  }
-  if (normalizedName.includes("배상")) {
-    return "타인에게 배상해야 하는 실제 손해를 약관 한도 안에서 보상하는 실손형 담보예요.";
-  }
-
-  return "정해진 금액을 무조건 더해 받는 담보가 아니라, 실제 발생한 손해를 약관 한도 안에서 보상하는 실손형 담보예요.";
+function groupedOriginalAmount(coverages: ActualLossCoverage[]) {
+  const amounts = new Set(
+    coverages
+      .map((coverage) => coverage.original_amount)
+      .filter((amount): amount is string => Boolean(amount)),
+  );
+  if (amounts.size === 1) return [...amounts][0];
+  if (amounts.size > 1) return "계약별 확인";
+  return undefined;
 }

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from app.modules.coverage.indemnity import (
     IndemnityClassification,
     PaymentBasis,
+    actual_loss_guidance,
     classify_indemnity,
     has_negated_actual_loss_marker,
     is_damage_policy_context,
@@ -387,6 +388,7 @@ def _build_actual_loss_items(
     )
     items: list[ActualLossCoverageItem] = []
     for row in ordered_rows:
+        guidance = actual_loss_guidance(row.coverage, row.classification)
         items.append(
             ActualLossCoverageItem(
                 policy_id=row.policy.id,
@@ -407,6 +409,9 @@ def _build_actual_loss_items(
                     )
                     >= 2
                 ),
+                guidance_key=guidance.key,
+                explanation=guidance.description,
+                explanation_basis="generated_guidance",
                 major_category=major_category(row.coverage.담보명),
             )
         )

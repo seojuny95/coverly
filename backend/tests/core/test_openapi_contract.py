@@ -81,6 +81,14 @@ def test_policy_parse_openapi_schema_matches_public_response() -> None:
         "generated_guidance",
         "none",
     }
+
+    actual_loss_schema = schemas["ActualLossCoverageItem"]
+    assert {
+        "guidance_key",
+        "explanation",
+        "explanation_basis",
+    } <= set(actual_loss_schema["required"])
+    assert actual_loss_schema["properties"]["explanation_basis"]["const"] == "generated_guidance"
     assert set(coverage_schema["properties"]["유형"]["enum"]) == {"담보", "부가"}
     policy_summary_schema = schemas["PolicySummary"]
     assert {"보험분류", "상품태그"} <= set(policy_summary_schema["required"])

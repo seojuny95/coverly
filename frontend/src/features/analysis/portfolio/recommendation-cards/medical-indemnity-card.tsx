@@ -5,7 +5,6 @@ import { Card } from "@/shared/components/ui/card";
 
 import {
   type ActualLossCoverageGroup,
-  actualLossCoverageDescription,
   duplicateActualLossCoverageGroups,
 } from "../actual-loss-coverage-groups";
 import type { EssentialCoverageItem, PortfolioSummary } from "../api";
@@ -119,7 +118,7 @@ function MedicalIndemnityDuplicateItem({
               {group.displayName}
             </span>
             <span className="mt-1 block text-xs leading-5 text-zinc-500">
-              {actualLossCoverageDescription(group.displayName)}
+              {group.explanation}
             </span>
             <span className="mt-2 block text-xs font-medium text-amber-700">
               {group.items.length}개 계약에서 확인됐어요.

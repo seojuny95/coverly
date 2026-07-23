@@ -821,6 +821,10 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
         is_medical_indemnity: false,
         is_damage_policy: true,
         duplicate_across_contracts: true,
+        guidance_key: "auto",
+        explanation:
+          "자동차 사고로 실제 발생한 손해나 비용을 약관에서 정한 범위 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
       },
       {
         policy_id: "driver-2",
@@ -834,6 +838,10 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
         is_medical_indemnity: false,
         is_damage_policy: true,
         duplicate_across_contracts: true,
+        guidance_key: "auto",
+        explanation:
+          "자동차 사고로 실제 발생한 손해나 비용을 약관에서 정한 범위 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
       },
     ],
   };
@@ -860,7 +868,7 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
   ).toBeInTheDocument();
   expect(
     within(actualLossReview!).getByText(
-      "정액 진단비가 아니라 실제 발생한 벌금 손해를 약관 한도 안에서 보상하는 실손형 담보예요.",
+      "자동차 사고로 실제 발생한 손해나 비용을 약관에서 정한 범위 안에서 보상하는 담보예요.",
     ),
   ).toBeInTheDocument();
   expect(
@@ -895,6 +903,10 @@ test("reviews duplicate medical indemnity coverages inside the medical card", as
         is_medical_indemnity: true,
         is_damage_policy: false,
         duplicate_across_contracts: true,
+        guidance_key: "injury_medical_expense",
+        explanation:
+          "상해로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
       },
       {
         policy_id: "medical-2",
@@ -908,6 +920,10 @@ test("reviews duplicate medical indemnity coverages inside the medical card", as
         is_medical_indemnity: true,
         is_damage_policy: false,
         duplicate_across_contracts: true,
+        guidance_key: "injury_medical_expense",
+        explanation:
+          "상해로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
       },
       {
         policy_id: "medical-1",
@@ -921,6 +937,10 @@ test("reviews duplicate medical indemnity coverages inside the medical card", as
         is_medical_indemnity: true,
         is_damage_policy: false,
         duplicate_across_contracts: true,
+        guidance_key: "disease_medical_expense",
+        explanation:
+          "질병으로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
       },
       {
         policy_id: "medical-2",
@@ -934,6 +954,10 @@ test("reviews duplicate medical indemnity coverages inside the medical card", as
         is_medical_indemnity: true,
         is_damage_policy: false,
         duplicate_across_contracts: true,
+        guidance_key: "disease_medical_expense",
+        explanation:
+          "질병으로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
       },
     ],
   };

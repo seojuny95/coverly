@@ -5,7 +5,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.modules.coverage.contracts import CoverageDomain, CoverageType, InsuredGender, LifeStage
+from app.modules.coverage.contracts import (
+    ActualLossGuidanceKey,
+    CoverageDomain,
+    CoverageType,
+    InsuredGender,
+    LifeStage,
+)
 from app.modules.coverage.life_stage import life_stage_for_age
 from app.modules.reference_data.contracts import (
     ClaimChannelBlock,
@@ -157,6 +163,9 @@ class ActualLossCoverageItem(BaseModel):
     is_medical_indemnity: bool
     is_damage_policy: bool
     duplicate_across_contracts: bool
+    guidance_key: ActualLossGuidanceKey
+    explanation: str
+    explanation_basis: Literal["generated_guidance"]
     original_amount: str = ""
     major_category: str = "기타"
 

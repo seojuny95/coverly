@@ -1,10 +1,7 @@
 import { Alert } from "@/shared/components/ui/alert";
 import { Card } from "@/shared/components/ui/card";
 
-import {
-  actualLossCoverageDescription,
-  duplicateActualLossCoverageGroups,
-} from "../actual-loss-coverage-groups";
+import { duplicateActualLossCoverageGroups } from "../actual-loss-coverage-groups";
 import type { PortfolioSummary } from "../api";
 
 // Kept as a native <article> (not <Card>, which renders a div) so the
@@ -52,7 +49,7 @@ export function ActualLossCoverageReview({
                   {group.displayName}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-zinc-500">
-                  {actualLossCoverageDescription(group.displayName)}
+                  {group.explanation}
                 </p>
                 <p className="mt-2 text-xs font-medium text-amber-700">
                   {group.items.length}개 계약에서 확인됐어요.

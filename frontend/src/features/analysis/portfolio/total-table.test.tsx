@@ -143,6 +143,10 @@ describe("CoverageTotalTable", () => {
               is_medical_indemnity: false,
               is_damage_policy: false,
               duplicate_across_contracts: false,
+              guidance_key: "liability",
+              explanation:
+                "타인에게 배상해야 하는 실제 손해를 약관 한도 안에서 보상하는 담보예요.",
+              explanation_basis: "generated_guidance",
             },
           ],
         }}
@@ -173,6 +177,10 @@ describe("CoverageTotalTable", () => {
               is_medical_indemnity: false,
               is_damage_policy: true,
               duplicate_across_contracts: false,
+              guidance_key: "legal_cost",
+              explanation:
+                "벌금이나 변호사 비용처럼 실제로 발생한 법률 비용을 약관 한도 안에서 보상하는 담보예요.",
+              explanation_basis: "generated_guidance",
             },
           ],
         }}

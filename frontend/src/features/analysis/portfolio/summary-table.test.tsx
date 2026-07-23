@@ -37,6 +37,10 @@ const summary: PortfolioSummary = {
       is_medical_indemnity: true,
       is_damage_policy: false,
       duplicate_across_contracts: true,
+      guidance_key: "inpatient_medical_expense",
+      explanation:
+        "입원 치료 과정에서 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+      explanation_basis: "generated_guidance",
     },
   ],
   excluded_coverages: [

@@ -1,4 +1,5 @@
 import type { PortfolioSummary } from "../api";
+import { groupActualLossCoverages } from "../actual-loss-coverage-groups";
 
 export type SummedCoverageRow = {
   kind: "summed";
@@ -75,7 +76,7 @@ export function buildCoverageGroups(
     });
   });
 
-  groupedActualLossCoverages(
+  groupActualLossCoverages(
     summary.actual_loss_coverages.filter(
       (coverage) => !coverage.is_damage_policy,
     ),
@@ -86,7 +87,13 @@ export function buildCoverageGroups(
       displayName: group.displayName,
       originalAmount: group.originalAmount,
       duplicateAcrossContracts: group.duplicateAcrossContracts,
-      sources: group.sources,
+      sources: group.items.map((coverage) => ({
+        policyId: coverage.policy_id,
+        coverageName: coverage.coverage_name,
+        originalAmount: coverage.original_amount,
+        insurer: coverage.insurer ?? undefined,
+        productName: coverage.product_name ?? undefined,
+      })),
     });
   });
 
@@ -108,71 +115,6 @@ export function buildCoverageGroups(
       rows,
     }))
     .sort(compareCoverageGroups);
-}
-
-function groupedActualLossCoverages(
-  coverages: PortfolioSummary["actual_loss_coverages"],
-) {
-  const groups = new Map<
-    string,
-    {
-      displayName: string;
-      domain: string;
-      normalizedName: string;
-      majorCategory: string | undefined;
-      duplicateAcrossContracts: boolean;
-      originalAmounts: Set<string>;
-      sources: ActualLossCoverageSource[];
-    }
-  >();
-
-  for (const coverage of coverages) {
-    const normalizedName = coverage.normalized_name || coverage.coverage_name;
-    const domain = coverage.coverage_domain || "unknown";
-    const key = `${domain}:${normalizedName}`;
-    const group = groups.get(key);
-    const source: ActualLossCoverageSource = {
-      policyId: coverage.policy_id,
-      coverageName: coverage.coverage_name,
-      originalAmount: coverage.original_amount,
-      insurer: coverage.insurer ?? undefined,
-      productName: coverage.product_name ?? undefined,
-    };
-
-    if (group) {
-      group.duplicateAcrossContracts =
-        group.duplicateAcrossContracts || coverage.duplicate_across_contracts;
-      group.sources.push(source);
-      if (coverage.original_amount) {
-        group.originalAmounts.add(coverage.original_amount);
-      }
-      continue;
-    }
-
-    groups.set(key, {
-      displayName: coverage.coverage_name,
-      domain,
-      normalizedName,
-      majorCategory: coverage.major_category,
-      duplicateAcrossContracts: coverage.duplicate_across_contracts,
-      originalAmounts: new Set(
-        coverage.original_amount ? [coverage.original_amount] : [],
-      ),
-      sources: [source],
-    });
-  }
-
-  return [...groups.values()].map((group) => ({
-    ...group,
-    duplicateAcrossContracts:
-      group.duplicateAcrossContracts || group.sources.length > 1,
-    originalAmount:
-      group.originalAmounts.size === 1
-        ? [...group.originalAmounts][0]
-        : group.originalAmounts.size > 1
-          ? "계약별 확인"
-          : undefined,
-  }));
 }
 
 function compareCoverageGroups(a: CoverageGroup, b: CoverageGroup) {

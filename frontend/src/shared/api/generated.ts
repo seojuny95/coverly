@@ -195,6 +195,30 @@ export interface components {
       /** Duplicate Across Contracts */
       duplicate_across_contracts: boolean;
       /**
+       * Guidance Key
+       * @enum {string}
+       */
+      guidance_key:
+        | "injury_medical_expense"
+        | "disease_medical_expense"
+        | "inpatient_medical_expense"
+        | "outpatient_medical_expense"
+        | "prescription_medical_expense"
+        | "medical_expense"
+        | "travel_medical_expense"
+        | "legal_cost"
+        | "property_damage"
+        | "liability"
+        | "auto"
+        | "other";
+      /** Explanation */
+      explanation: string;
+      /**
+       * Explanation Basis
+       * @constant
+       */
+      explanation_basis: "generated_guidance";
+      /**
        * Original Amount
        * @default
        */
