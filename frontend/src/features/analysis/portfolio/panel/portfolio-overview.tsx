@@ -1,4 +1,4 @@
-import { Button } from "@/shared/components/ui/button";
+import { RetryButton } from "@/shared/components/retry-button";
 import { formatWon } from "../money-format";
 import type {
   DeathBenefitGuideInput,
@@ -22,6 +22,8 @@ export function PortfolioOverview({
   policyCount,
   specialAnalyses,
   onRetry,
+  isRetrying,
+  retryFailed,
 }: {
   summary?: PortfolioSummary;
   items: EssentialCoverageItem[];
@@ -31,6 +33,8 @@ export function PortfolioOverview({
   policyCount: number;
   specialAnalyses: SpecialPolicyAnalysis[];
   onRetry: () => void;
+  isRetrying: boolean;
+  retryFailed: boolean;
 }) {
   const diagnosisItems = recommendedDiagnosisItems(items);
   const confirmedDiagnosisCount = diagnosisItems.filter(
@@ -59,12 +63,22 @@ export function PortfolioOverview({
           >
             총평을 생성하지 못했어요
           </h2>
-          <p className="mt-3 text-sm leading-6 text-zinc-300">
-            확인된 보장 정보는 그대로예요. 잠시 후 총평을 다시 생성해주세요.
+          <p
+            role={retryFailed ? "alert" : undefined}
+            className="mt-3 text-sm leading-6 text-zinc-300"
+          >
+            {retryFailed
+              ? "총평을 다시 생성하지 못했어요. 확인된 보장 정보는 그대로 있으니 잠시 후 다시 시도해주세요."
+              : "확인된 보장 정보는 그대로예요. 잠시 후 총평을 다시 생성해주세요."}
           </p>
-          <Button type="button" className="mt-5" onClick={onRetry}>
-            총평 다시 생성하기
-          </Button>
+          <RetryButton
+            type="button"
+            className="mt-5"
+            onClick={onRetry}
+            isPending={isRetrying}
+            label="총평 다시 생성하기"
+            pendingLabel="총평 다시 생성하는 중…"
+          />
         </div>
 
         <RecommendedInsuranceCards

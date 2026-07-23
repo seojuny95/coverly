@@ -1,4 +1,5 @@
 import { Badge } from "@/shared/components/ui/badge";
+import { RetryButton } from "@/shared/components/retry-button";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 
 import { CoverageSummaryTable } from "./summary-table";
@@ -8,9 +9,17 @@ type Props = {
   status: "loading" | "error" | "success";
   summary?: PortfolioSummary;
   onRetry: () => void;
+  isRetrying?: boolean;
+  retryFailed?: boolean;
 };
 
-export function CoverageTotalTable({ status, summary, onRetry }: Props) {
+export function CoverageTotalTable({
+  status,
+  summary,
+  onRetry,
+  isRetrying = false,
+  retryFailed = false,
+}: Props) {
   const hasCoverages = summary
     ? summary.totals.length > 0 ||
       summary.actual_loss_coverages.some(
@@ -50,7 +59,11 @@ export function CoverageTotalTable({ status, summary, onRetry }: Props) {
       {status === "loading" ? (
         <CoverageSummaryLoading />
       ) : status === "error" ? (
-        <CoverageSummaryError onRetry={onRetry} />
+        <CoverageSummaryError
+          onRetry={onRetry}
+          isRetrying={isRetrying}
+          retryFailed={retryFailed}
+        />
       ) : (
         <div className="animate-enter">
           {summary && hasCoverages ? (
@@ -120,17 +133,34 @@ function CoverageSummaryLoading() {
   );
 }
 
-function CoverageSummaryError({ onRetry }: { onRetry: () => void }) {
+function CoverageSummaryError({
+  onRetry,
+  isRetrying,
+  retryFailed,
+}: {
+  onRetry: () => void;
+  isRetrying: boolean;
+  retryFailed: boolean;
+}) {
   return (
     <div className="px-6 py-7">
-      <p className="text-sm text-zinc-600">보장금 합계를 불러오지 못했어요.</p>
-      <button
+      <p
+        role={retryFailed ? "alert" : undefined}
+        className="text-sm text-zinc-600"
+      >
+        {retryFailed
+          ? "보장금 합계를 다시 불러오지 못했어요. 잠시 후 다시 시도해주세요."
+          : "보장금 합계를 불러오지 못했어요."}
+      </p>
+      <RetryButton
         type="button"
         onClick={onRetry}
-        className="mt-3 text-sm font-semibold text-blue-600"
-      >
-        다시 불러오기
-      </button>
+        variant="link"
+        className="mt-3 min-h-0 px-0 py-0 text-sm font-semibold text-blue-600"
+        isPending={isRetrying}
+        label="다시 불러오기"
+        pendingLabel="다시 불러오는 중…"
+      />
     </div>
   );
 }

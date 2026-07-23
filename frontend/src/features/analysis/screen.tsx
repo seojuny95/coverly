@@ -188,6 +188,8 @@ export function InsuranceAnalysisPage({
                   : undefined
               }
               onRetryCoverageTotal={portfolioSummary.retry}
+              isRetryingCoverageTotal={portfolioSummary.isRetrying}
+              coverageTotalRetryFailed={portfolioSummary.retryFailed}
               isExpanded={isExpanded}
               onToggle={toggleInsurance}
               onOpenUploadModal={openUploadModal}
@@ -221,6 +223,9 @@ export function InsuranceAnalysisPage({
                 isDeathBenefitRefreshing={portfolioSummary.isRefreshing}
                 policyCount={insuranceDocuments.length}
                 onRetry={portfolioSummary.retry}
+                isRetrying={portfolioSummary.isRetrying}
+                retryFailed={portfolioSummary.retryFailed}
+                overviewRetryFailed={portfolioSummary.overviewRetryFailed}
               />
             </div>
           ) : (

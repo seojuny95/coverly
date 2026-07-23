@@ -1,4 +1,4 @@
-import { Button } from "@/shared/components/ui/button";
+import { RetryButton } from "@/shared/components/retry-button";
 import { ClaimGuide } from "../claim-guide";
 import type { DeathBenefitGuideInput, PortfolioSummary } from "../api";
 import { SpecialPolicySections } from "../special-policy-sections";
@@ -13,6 +13,9 @@ export function PortfolioAnalysisPanel({
   isDeathBenefitRefreshing = false,
   policyCount,
   onRetry,
+  isRetrying = false,
+  retryFailed = false,
+  overviewRetryFailed = false,
 }: {
   status: "loading" | "success" | "error";
   summary?: PortfolioSummary;
@@ -21,6 +24,9 @@ export function PortfolioAnalysisPanel({
   isDeathBenefitRefreshing?: boolean;
   policyCount: number;
   onRetry: () => void;
+  isRetrying?: boolean;
+  retryFailed?: boolean;
+  overviewRetryFailed?: boolean;
 }) {
   if (status === "loading") return <AnalysisLoading />;
 
@@ -30,12 +36,22 @@ export function PortfolioAnalysisPanel({
         <h2 className="text-xl font-semibold">
           보장 점검 결과를 불러오지 못했어요
         </h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          업로드한 증권은 그대로 있어요. 잠시 후 다시 확인해주세요.
+        <p
+          role={retryFailed ? "alert" : undefined}
+          className="mt-2 text-sm text-zinc-500"
+        >
+          {retryFailed
+            ? "다시 불러오지 못했어요. 업로드한 증권은 그대로 있으니 잠시 후 다시 시도해주세요."
+            : "업로드한 증권은 그대로 있어요. 잠시 후 다시 확인해주세요."}
         </p>
-        <Button type="button" className="mt-5" onClick={onRetry}>
-          다시 확인하기
-        </Button>
+        <RetryButton
+          type="button"
+          className="mt-5"
+          onClick={onRetry}
+          isPending={isRetrying}
+          label="다시 확인하기"
+          pendingLabel="다시 확인하는 중…"
+        />
       </section>
     );
   }
@@ -54,6 +70,8 @@ export function PortfolioAnalysisPanel({
         policyCount={policyCount}
         specialAnalyses={specialAnalyses}
         onRetry={onRetry}
+        isRetrying={isRetrying}
+        retryFailed={overviewRetryFailed}
       />
 
       {specialAnalyses.length > 0 ? (

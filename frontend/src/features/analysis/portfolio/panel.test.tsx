@@ -666,6 +666,36 @@ test("shows an explicit retry state when the LLM overview is missing", async () 
   expect(onRetry).toHaveBeenCalledOnce();
 });
 
+test("shows progress while regenerating a missing overview", () => {
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      summary={{ ...summary, overview: null }}
+      isRetrying
+    />,
+  );
+
+  const retryButton = screen.getByRole("button", {
+    name: "총평 다시 생성하는 중…",
+  });
+  expect(retryButton).toBeDisabled();
+  expect(retryButton).toHaveAttribute("aria-busy", "true");
+});
+
+test("explains when regenerating the overview fails again", () => {
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      summary={{ ...summary, overview: null }}
+      overviewRetryFailed
+    />,
+  );
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "총평을 다시 생성하지 못했어요. 확인된 보장 정보는 그대로 있으니",
+  );
+});
+
 test("shows a multiple-medical-indemnity review directly in the coverage map", () => {
   const reviewSummary: PortfolioSummary = {
     ...summary,
@@ -801,4 +831,24 @@ test("calls onRetry from the error state", async () => {
 
   await user.click(screen.getByRole("button", { name: "다시 확인하기" }));
   expect(onRetry).toHaveBeenCalledTimes(1);
+});
+
+test("disables repeated retries while the analysis is loading again", () => {
+  render(<PortfolioAnalysisPanel {...baseProps()} status="error" isRetrying />);
+
+  const retryButton = screen.getByRole("button", {
+    name: "다시 확인하는 중…",
+  });
+  expect(retryButton).toBeDisabled();
+  expect(retryButton).toHaveAttribute("aria-busy", "true");
+});
+
+test("explains when loading the analysis fails again", () => {
+  render(
+    <PortfolioAnalysisPanel {...baseProps()} status="error" retryFailed />,
+  );
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "다시 불러오지 못했어요. 업로드한 증권은 그대로 있으니",
+  );
 });

@@ -44,6 +44,24 @@ describe("CoverageTotalTable", () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
+  it("shows progress and prevents duplicate clicks while retrying", () => {
+    render(<CoverageTotalTable status="error" onRetry={vi.fn()} isRetrying />);
+
+    const retryButton = screen.getByRole("button", {
+      name: "다시 불러오는 중…",
+    });
+    expect(retryButton).toBeDisabled();
+    expect(retryButton).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("explains when loading the totals fails again", () => {
+    render(<CoverageTotalTable status="error" onRetry={vi.fn()} retryFailed />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "보장금 합계를 다시 불러오지 못했어요. 잠시 후 다시 시도해주세요",
+    );
+  });
+
   it("shows an empty message when success has no coverages", () => {
     render(
       <CoverageTotalTable

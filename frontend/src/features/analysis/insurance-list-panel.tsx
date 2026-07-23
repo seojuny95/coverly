@@ -21,6 +21,8 @@ type InsuranceListPanelProps = {
   coverageTotalStatus: "loading" | "error" | "success";
   coverageTotalSummary?: PortfolioSummary;
   onRetryCoverageTotal: () => void;
+  isRetryingCoverageTotal: boolean;
+  coverageTotalRetryFailed: boolean;
   isExpanded: (id: string) => boolean;
   onToggle: (id: string) => void;
   onOpenUploadModal: () => void;
@@ -33,6 +35,8 @@ export function InsuranceListPanel({
   coverageTotalStatus,
   coverageTotalSummary,
   onRetryCoverageTotal,
+  isRetryingCoverageTotal,
+  coverageTotalRetryFailed,
   isExpanded,
   onToggle,
   onOpenUploadModal,
@@ -109,6 +113,8 @@ export function InsuranceListPanel({
         status={coverageTotalStatus}
         summary={coverageTotalSummary}
         onRetry={onRetryCoverageTotal}
+        isRetrying={isRetryingCoverageTotal}
+        retryFailed={coverageTotalRetryFailed}
       />
 
       <div className="mt-8 space-y-5">

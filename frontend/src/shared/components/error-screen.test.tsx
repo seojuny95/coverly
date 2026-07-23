@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 
@@ -21,5 +21,40 @@ describe("ErrorScreen", () => {
     await user.click(screen.getByRole("button", { name: "다시 시도하기" }));
 
     expect(onRetry).toHaveBeenCalledOnce();
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "화면을 다시 불러오지 못했어요.",
+      ),
+    );
+    expect(
+      screen.getByText(
+        "잠시 후 다시 시도하거나 처음 화면에서 다시 시작해주세요.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("shows progress until an asynchronous retry settles", async () => {
+    const user = userEvent.setup();
+    let resolveRetry: (() => void) | undefined;
+    const onRetry = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRetry = resolve;
+        }),
+    );
+    render(<ErrorScreen onRetry={onRetry} />);
+
+    await user.click(screen.getByRole("button", { name: "다시 시도하기" }));
+
+    expect(
+      screen.getByRole("button", { name: "다시 시도하는 중…" }),
+    ).toBeDisabled();
+    resolveRetry?.();
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "화면을 다시 불러오지 못했어요.",
+      ),
+    );
   });
 });

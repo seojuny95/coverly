@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTestQueryClient } from "../../../test/render-with-providers";
@@ -15,14 +15,20 @@ const deathBenefitContext: api.DeathBenefitGuideInput = {
   has_minor_children: false,
   has_major_debt: false,
 };
+const summaryWithoutOverview = {
+  totals: [],
+  actual_loss_coverages: [],
+  excluded_coverages: [],
+  excluded_auto_policy_count: 0,
+} satisfies api.PortfolioSummary;
 
 describe("usePortfolioSummary", () => {
   beforeEach(() => vi.restoreAllMocks());
 
   it("returns success state from the query", async () => {
-    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue({
-      classifications: [],
-    } as unknown as api.PortfolioSummary);
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
     const client = makeTestQueryClient();
     const { result } = renderHook(
       () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
@@ -40,8 +46,13 @@ describe("usePortfolioSummary", () => {
     const requestPortfolioSummary = vi
       .spyOn(api, "requestPortfolioSummary")
       .mockResolvedValueOnce({
-        classifications: ["first"],
-      } as unknown as api.PortfolioSummary)
+        ...summaryWithoutOverview,
+        overview: {
+          generation: "llm",
+          title: "첫 총평",
+          paragraphs: [],
+        },
+      })
       .mockReturnValueOnce(nextRequest);
     const client = makeTestQueryClient();
     const { result, rerender } = renderHook(
@@ -74,8 +85,13 @@ describe("usePortfolioSummary", () => {
     const nextRequest = new Promise<api.PortfolioSummary>(() => undefined);
     vi.spyOn(api, "requestPortfolioSummary")
       .mockResolvedValueOnce({
-        classifications: ["first"],
-      } as unknown as api.PortfolioSummary)
+        ...summaryWithoutOverview,
+        overview: {
+          generation: "llm",
+          title: "첫 총평",
+          paragraphs: [],
+        },
+      })
       .mockReturnValueOnce(nextRequest);
     const client = makeTestQueryClient();
     const { result, rerender } = renderHook(
@@ -104,5 +120,113 @@ describe("usePortfolioSummary", () => {
 
     expect(result.current.state.status).toBe("loading");
     expect(result.current.isRefreshing).toBe(false);
+  });
+
+  it("exposes a retrying state while an error is requested again", async () => {
+    let resolveRetry: ((summary: api.PortfolioSummary) => void) | undefined;
+    const retryRequest = new Promise<api.PortfolioSummary>((resolve) => {
+      resolveRetry = resolve;
+    });
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockReturnValueOnce(retryRequest);
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    let retryPromise: Promise<void> | undefined;
+    act(() => {
+      retryPromise = result.current.retry();
+    });
+
+    await waitFor(() => expect(result.current.isRetrying).toBe(true));
+
+    resolveRetry?.(summaryWithoutOverview);
+    await act(async () => {
+      await retryPromise;
+    });
+
+    expect(result.current.state.status).toBe("success");
+    expect(result.current.isRetrying).toBe(false);
+    expect(result.current.overviewRetryFailed).toBe(true);
+  });
+
+  it("reports when a manual retry also fails", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockRejectedValue(
+      new Error("offline"),
+    );
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(result.current.state.status).toBe("error");
+    expect(result.current.retryFailed).toBe(true);
+  });
+
+  it("ignores the outcome of an older retry after the query key changes", async () => {
+    let resolveOldRetry: ((summary: api.PortfolioSummary) => void) | undefined;
+    const oldRetryRequest = new Promise<api.PortfolioSummary>((resolve) => {
+      resolveOldRetry = resolve;
+    });
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockReturnValueOnce(oldRetryRequest)
+      .mockRejectedValueOnce(new Error("offline"));
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ context }) => usePortfolioSummary(docs, context, "portfolio-token"),
+      {
+        initialProps: { context: deathBenefitContext },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    let oldRetryPromise: Promise<void> | undefined;
+    act(() => {
+      oldRetryPromise = result.current.retry();
+    });
+    await waitFor(() => expect(result.current.isRetrying).toBe(true));
+
+    rerender({
+      context: {
+        ...deathBenefitContext,
+        has_dependent_family: true,
+      },
+    });
+
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+    expect(result.current.isRetrying).toBe(false);
+
+    resolveOldRetry?.(summaryWithoutOverview);
+    await act(async () => {
+      await oldRetryPromise;
+    });
+
+    expect(result.current.overviewRetryFailed).toBe(false);
+    expect(result.current.retryFailed).toBe(false);
   });
 });
