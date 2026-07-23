@@ -117,7 +117,7 @@ def test_coverage_summary_route_accepts_parse_result_shape(
     assert body["totals"][0]["coverageCount"] == 1
     assert body["totals"][0]["composition"][0]["policy_id"] == "p1"
     assert body["premium"]["monthly_total"] == 0
-    assert body["overview"]["generation"] == "llm"
+    assert body["overview"] is None
 
 
 def test_coverage_summary_loads_structured_policies_from_session(
@@ -280,11 +280,11 @@ def test_coverage_summary_route_includes_monthly_premium_without_inventing_bench
     assert body["premium_benchmark"] is None
 
 
-def test_summary_route_keeps_calculated_coverages_when_llm_overview_fails(
+def test_summary_route_does_not_generate_llm_overview(
     monkeypatch: MonkeyPatch,
 ) -> None:
     def fail(*_args: object, **_kwargs: object) -> object:
-        raise SummaryOverviewUnavailableError("offline")
+        raise AssertionError("summary route must not generate overview")
 
     monkeypatch.setattr(portfolio, "attach_summary_overview", fail)
     policies: list[dict[str, object] | PolicyInput] = [

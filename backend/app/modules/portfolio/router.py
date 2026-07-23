@@ -54,11 +54,9 @@ def coverage_summary(
     summarize: PortfolioSummaryServiceDep,
     sessions: PortfolioSessionServiceDep,
 ) -> PortfolioCoverageSummary:
-    summary = _portfolio_coverage_summary(request, summarize, sessions)
-    try:
-        return attach_summary_overview(summary)
-    except SummaryOverviewUnavailableError:
-        return summary.model_copy(update={"overview": None})
+    return _portfolio_coverage_summary(request, summarize, sessions).model_copy(
+        update={"overview": None}
+    )
 
 
 @router.post(
