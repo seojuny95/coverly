@@ -62,7 +62,11 @@ export function ErrorScreen({
             onClick={() => {
               setRetryStatus("retrying");
               startRetry(async () => {
-                await onRetry();
+                try {
+                  await onRetry();
+                } catch {
+                  setRetryStatus("failed");
+                }
               });
             }}
             className="mt-6"

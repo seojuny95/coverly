@@ -57,4 +57,19 @@ describe("ErrorScreen", () => {
       ),
     );
   });
+
+  test("shows the failed state when an asynchronous retry rejects", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn(() => Promise.reject(new Error("offline")));
+    render(<ErrorScreen onRetry={onRetry} />);
+
+    await user.click(screen.getByRole("button", { name: "다시 시도하기" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "화면을 다시 불러오지 못했어요.",
+      ),
+    );
+    expect(screen.queryByText("offline")).not.toBeInTheDocument();
+  });
 });
