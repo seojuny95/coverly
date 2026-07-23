@@ -6,6 +6,8 @@ from pydantic import SecretStr
 
 from app.main import app
 from app.modules.policy.parsing import (
+    PdfComplexityLimitExceededError,
+    PdfPageLimitExceededError,
     PdfPasswordIncorrectError,
     PdfPasswordRequiredError,
 )
@@ -19,6 +21,11 @@ from app.modules.portfolio.session.service import (
     RegisteredPolicyDocument,
 )
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
+from app.modules.upload.parsing_capacity import (
+    PdfParsingCapacity,
+    PdfParsingQueueFullError,
+    get_pdf_parsing_capacity,
+)
 
 PORTFOLIO_TOKEN = "test-portfolio-token"
 DOCUMENT_ID = "11111111-1111-4111-8111-111111111111"
@@ -140,6 +147,77 @@ def test_parse_rejects_pdf_larger_than_limit() -> None:
     assert response.json()["error"]["request_id"] == response.headers["x-request-id"]
 
 
+@pytest.mark.parametrize(
+    ("error", "code", "message"),
+    [
+        (
+            PdfPageLimitExceededError(),
+            "PDF_PAGE_LIMIT_EXCEEDED",
+            "분석할 수 있는 PDF 페이지 수를 초과했어요. 파일을 나눠서 올려주세요.",
+        ),
+        (
+            PdfComplexityLimitExceededError(),
+            "PDF_COMPLEXITY_LIMIT_EXCEEDED",
+            "PDF의 텍스트나 표가 너무 많아요. 파일을 나눠서 올려주세요.",
+        ),
+    ],
+)
+def test_parse_maps_pdf_resource_limits_to_413(
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+    code: str,
+    message: str,
+) -> None:
+    from app.modules.upload import router as policies
+
+    def _raise(_data: bytes, *, password: str | None = None) -> PipelineResult:
+        raise error
+
+    monkeypatch.setattr(policies, "run_pipeline", _raise)
+
+    response = TestClient(app).post(
+        "/policies/parse",
+        files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+        data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == code
+    assert response.json()["error"]["message"] == message
+    assert response.json()["error"]["request_id"] == response.headers["x-request-id"]
+
+
+def test_parse_returns_retryable_error_when_parser_queue_is_full(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capacity = PdfParsingCapacity(
+        concurrency_limit=1,
+        queue_limit=0,
+        queue_timeout_seconds=1,
+    )
+
+    async def _raise_queue_full(*_args: object, **_kwargs: object) -> None:
+        raise PdfParsingQueueFullError
+
+    monkeypatch.setattr(capacity, "run", _raise_queue_full)
+    app.dependency_overrides[get_pdf_parsing_capacity] = lambda: capacity
+    try:
+        response = TestClient(app).post(
+            "/policies/parse",
+            files={"file": ("policy.pdf", b"%PDF-1.7\n%%EOF", "application/pdf")},
+            data={"portfolioSessionToken": PORTFOLIO_TOKEN, "documentId": DOCUMENT_ID},
+        )
+    finally:
+        app.dependency_overrides.pop(get_pdf_parsing_capacity, None)
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"
+    assert response.json()["error"]["code"] == "PDF_PARSING_BUSY"
+    assert (
+        response.json()["error"]["message"] == "PDF 분석 요청이 많아요. 잠시 후 다시 시도해주세요."
+    )
+
+
 def test_parse_rejects_unreadable_pdf_body() -> None:
     # Real run_pipeline / parse_document: pdfplumber can't read this body, so it
     # degrades to an empty ParsedDocument and the pipeline raises EmptyTextError.
@@ -175,6 +253,7 @@ def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) ->
             }
         ],
         "분석상태": "완료",
+        "policy_terms_status": "unavailable",
         "문자수": 42,
     }
 
@@ -221,6 +300,7 @@ def test_parse_registers_result_under_portfolio_session_without_exposing_rag_tok
         },
         "보장목록": [],
         "분석상태": "완료",
+        "policy_terms_status": "available",
         "문자수": 42,
         "문서세션ID": "internal-rag-token",
     }
@@ -287,6 +367,7 @@ def test_parse_reserves_slot_before_running_pipeline(monkeypatch: pytest.MonkeyP
             "기본정보": {},
             "보장목록": [],
             "분석상태": "완료",
+            "policy_terms_status": "unavailable",
             "문자수": 1,
         }
 
@@ -330,6 +411,7 @@ def test_parse_rejects_duplicate_document_before_running_pipeline(
             "기본정보": {},
             "보장목록": [],
             "분석상태": "완료",
+            "policy_terms_status": "unavailable",
             "문자수": 1,
         }
 
@@ -413,6 +495,7 @@ def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) 
         },
         "보장목록": [],
         "분석상태": "완료",
+        "policy_terms_status": "unavailable",
         "문자수": 42,
     }
 
@@ -498,6 +581,7 @@ def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.Monk
         },
         "보장목록": [{"담보명": "대인배상", "가입금액": "무한", "보장내용": None, "해설": None}],
         "분석상태": "완료",
+        "policy_terms_status": "unavailable",
         "문자수": 10,
     }
 

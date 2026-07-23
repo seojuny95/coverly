@@ -1,8 +1,10 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.core.limits import MAX_PORTFOLIO_DOCUMENTS
 
 DEFAULT_BACKEND_CORS_ORIGINS = (
     "http://localhost:3000",
@@ -27,7 +29,15 @@ class Settings(BaseSettings):
     policy_rag_ttl_seconds: int = 15 * 60
     policy_rag_max_ttl_seconds: int = 2 * 60 * 60
     policy_rag_session_secret: SecretStr = SecretStr("")
-    portfolio_session_max_documents: int = 50
+    portfolio_session_max_documents: int = Field(
+        default=MAX_PORTFOLIO_DOCUMENTS,
+        ge=MAX_PORTFOLIO_DOCUMENTS,
+        le=MAX_PORTFOLIO_DOCUMENTS,
+    )
+    pdf_parsing_max_concurrency: int = Field(default=2, ge=1, le=32)
+    pdf_parsing_max_queue_size: int = Field(default=8, ge=0, le=128)
+    pdf_parsing_queue_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
+    pdf_parsing_retry_after_seconds: int = Field(default=5, ge=1, le=300)
     counsel_max_turns_per_session: int = 10
     counsel_agent_max_turns: int = 10
     counsel_history_turns: int = 5

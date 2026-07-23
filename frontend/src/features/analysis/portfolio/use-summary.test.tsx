@@ -52,6 +52,38 @@ describe("usePortfolioSummary", () => {
     await waitFor(() => expect(result.current.state.status).toBe("success"));
   });
 
+  it("does not request summary or overview after the session is expired", async () => {
+    const requestPortfolioSummary = vi.spyOn(api, "requestPortfolioSummary");
+    const requestPortfolioOverview = vi.spyOn(api, "requestPortfolioOverview");
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () =>
+        usePortfolioSummary(
+          docs,
+          deathBenefitContext,
+          "portfolio-token",
+          vi.fn(),
+          true,
+        ),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await act(async () => {
+      await result.current.retry();
+      await result.current.retryOverview();
+    });
+
+    expect(result.current.state.status).toBe("loading");
+    expect(requestPortfolioSummary).not.toHaveBeenCalled();
+    expect(requestPortfolioOverview).not.toHaveBeenCalled();
+    expect(result.current.isRetrying).toBe(false);
+    expect(result.current.isOverviewRetrying).toBe(false);
+  });
+
   it("keeps the previous summary while death benefit context refreshes", async () => {
     const nextRequest = new Promise<api.PortfolioSummary>(() => undefined);
     const requestPortfolioSummary = vi
@@ -194,6 +226,79 @@ describe("usePortfolioSummary", () => {
       status: "success",
       summary: { ...summaryWithoutOverview, overview: generatedOverview },
     });
+  });
+
+  it("aborts an in-flight overview when the screen unmounts", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    let requestSignal: AbortSignal | undefined;
+    vi.spyOn(api, "requestPortfolioOverview").mockImplementation(
+      (_documents, _context, _token, signal) => {
+        requestSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    );
+    const client = makeTestQueryClient();
+    const { unmount } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(requestSignal).toBeDefined());
+    expect(requestSignal?.aborted).toBe(false);
+
+    unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("aborts an older overview request before retrying", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    const requestSignals: AbortSignal[] = [];
+    vi.spyOn(api, "requestPortfolioOverview").mockImplementation(
+      (_documents, _context, _token, signal) => {
+        if (signal) requestSignals.push(signal);
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    );
+    const client = makeTestQueryClient();
+    const { result, unmount } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(requestSignals).toHaveLength(1));
+    act(() => {
+      void result.current.retryOverview();
+    });
+    await waitFor(() => expect(requestSignals).toHaveLength(2));
+
+    expect(requestSignals[0]?.aborted).toBe(true);
+    expect(requestSignals[1]?.aborted).toBe(false);
+    unmount();
   });
 
   it("keeps summary content visible when overview generation fails", async () => {

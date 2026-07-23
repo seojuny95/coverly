@@ -12,6 +12,7 @@ from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
     PortfolioSessionSnapshot,
 )
+from app.modules.portfolio.session.service import PortfolioSessionUnavailable
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
 
 DOCUMENT_1 = "00000000-0000-0000-0000-000000000001"
@@ -188,6 +189,51 @@ def test_coverage_summary_loads_structured_policies_from_session(
     assert response.json()["totals"][0]["totalAmount"] == 10_000_000
     assert saved[0].version == 1
     assert saved[0].result["overview"] is None
+
+
+def test_coverage_summary_maps_cache_store_outage_to_api_error(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    policy = PolicyInput.model_validate(
+        {
+            "id": DOCUMENT_1,
+            "기본정보": {"보험사": "보험사A", "보험분류": "건강보험"},
+            "보장목록": [],
+        }
+    )
+
+    class _Sessions:
+        def snapshot(
+            self,
+            token: str,
+            *,
+            policy_ids: list[str] | None = None,
+        ) -> PortfolioSessionSnapshot:
+            return PortfolioSessionSnapshot(
+                session_id="portfolio-1",
+                version=1,
+                policies=(policy,),
+                rag_session_ids=(),
+            )
+
+        def load_cached_analysis(
+            self,
+            snapshot: PortfolioSessionSnapshot,
+            *,
+            context_hash: str,
+        ) -> None:
+            raise PortfolioSessionUnavailable
+
+    monkeypatch.setattr(portfolio, "attach_summary_overview", _attach_test_overview)
+    app = FastAPI()
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.include_router(portfolio.router)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
+
+    response = TestClient(app).post("/portfolio/summary", json=_request())
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "portfolio_session_unavailable"
 
 
 def test_coverage_summary_rejects_non_uuid_policy_ids(

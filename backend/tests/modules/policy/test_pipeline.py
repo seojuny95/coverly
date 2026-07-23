@@ -72,8 +72,37 @@ def test_result_shape(monkeypatch: pytest.MonkeyPatch) -> None:
         extract=fake_extract,
         index=lambda _doc: "session-1",
     )
-    assert set(result) == {"기본정보", "보장목록", "분석상태", "문자수", "문서세션ID"}
+    assert set(result) == {
+        "기본정보",
+        "보장목록",
+        "분석상태",
+        "policy_terms_status",
+        "문자수",
+        "문서세션ID",
+    }
     assert result["문서세션ID"] == "session-1"
+    assert result["policy_terms_status"] == "available"
+
+
+def test_indexing_failure_keeps_analysis_and_exposes_degraded_capability(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def fail_index(_doc: ParsedDocument) -> str:
+        raise RuntimeError("storage payload must stay private")
+
+    result = run_pipeline(
+        b"%PDF-x",
+        parse=_fake_parse("일반 증권"),
+        summarize=lambda _text: {"보험분류": "제3보험", "상품태그": []},
+        extract=lambda _doc: ([], "완료"),
+        index=fail_index,
+    )
+
+    assert result["분석상태"] == "완료"
+    assert result["policy_terms_status"] == "unavailable"
+    assert "문서세션ID" not in result
+    assert "policy_rag_indexing_failed" in caplog.text
+    assert "storage payload must stay private" not in caplog.text
 
 
 def test_missing_insurer_stays_missing_without_external_fallback() -> None:

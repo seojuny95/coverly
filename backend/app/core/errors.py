@@ -1,9 +1,9 @@
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 
 from fastapi import Request
-from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 type ApiErrorCode = Literal[
     "PDF_TOO_LARGE",
+    "PDF_PAGE_LIMIT_EXCEEDED",
+    "PDF_COMPLEXITY_LIMIT_EXCEEDED",
+    "PDF_PARSING_BUSY",
     "INVALID_PDF",
     "PDF_PASSWORD_REQUIRED",
     "PDF_PASSWORD_INCORRECT",
@@ -29,6 +32,8 @@ type ApiErrorCode = Literal[
     "INVALID_POLICY_SELECTION",
     "REQUEST_VALIDATION_ERROR",
     "INVALID_MULTIPART_REQUEST",
+    "HTTP_ERROR",
+    "INTERNAL_SERVER_ERROR",
 ]
 
 
@@ -48,7 +53,7 @@ def api_error_responses(
 ) -> dict[int | str, dict[str, Any]]:
     """Describe every route error with the shared public envelope."""
 
-    described_status_codes = dict.fromkeys((*status_codes, 422))
+    described_status_codes = dict.fromkeys((*status_codes, 404, 405, 422, 500))
 
     if response_media_type is not None:
         return {
@@ -73,11 +78,52 @@ def api_error_responses(
 
 
 class ApiError(Exception):
-    def __init__(self, *, status_code: int, code: ApiErrorCode, message: str) -> None:
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        code: ApiErrorCode,
+        message: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = dict(headers or {})
         super().__init__(message)
+
+
+async def unexpected_error_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Return the shared public envelope for unhandled application failures."""
+
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        request_id = getattr(request.state, REQUEST_ID_STATE_KEY, str(uuid.uuid4()))
+        logger.error(
+            "unexpected_server_error",
+            extra={
+                "code": "INTERNAL_SERVER_ERROR",
+                "error_type": type(exc).__name__,
+                "request_id": request_id,
+                "status_code": 500,
+                "path": request.url.path,
+            },
+        )
+        return JSONResponse(
+            status_code=500,
+            headers={"x-request-id": request_id},
+            content={
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": "예기치 않은 오류가 발생했어요. 잠시 후 다시 시도해주세요.",
+                    "request_id": request_id,
+                },
+            },
+        )
 
 
 async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -96,7 +142,7 @@ async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
     )
     return JSONResponse(
         status_code=exc.status_code,
-        headers={"x-request-id": request_id},
+        headers={"x-request-id": request_id, **exc.headers},
         content={
             "error": {
                 "code": exc.code,
@@ -141,10 +187,30 @@ async def request_validation_error_handler(
 async def http_error_handler(request: Request, exc: Exception) -> Response:
     if not isinstance(exc, StarletteHTTPException):
         raise exc
-    if exc.status_code != 400 or request.url.path != "/policies/parse":
-        return await http_exception_handler(request, exc)
 
     request_id = getattr(request.state, REQUEST_ID_STATE_KEY, str(uuid.uuid4()))
+    if exc.status_code != 400 or request.url.path != "/policies/parse":
+        logger.info(
+            "http_error",
+            extra={
+                "code": "HTTP_ERROR",
+                "request_id": request_id,
+                "status_code": exc.status_code,
+                "path": request.url.path,
+            },
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            headers={"x-request-id": request_id, **(exc.headers or {})},
+            content={
+                "error": {
+                    "code": "HTTP_ERROR",
+                    "message": _http_error_message(exc.status_code),
+                    "request_id": request_id,
+                },
+            },
+        )
+
     logger.info(
         "invalid_multipart_request",
         extra={
@@ -165,3 +231,11 @@ async def http_error_handler(request: Request, exc: Exception) -> Response:
             },
         },
     )
+
+
+def _http_error_message(status_code: int) -> str:
+    if status_code == 404:
+        return "요청한 내용을 찾을 수 없어요."
+    if status_code == 405:
+        return "지원하지 않는 요청 방식이에요."
+    return "요청을 처리할 수 없어요. 입력 내용을 확인해주세요."

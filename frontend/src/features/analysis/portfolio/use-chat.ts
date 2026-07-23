@@ -1,9 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { ApiResponseError } from "@/shared/api/client";
 import type { ChatMessageData } from "./chat-message";
 import { streamPortfolioQuestion, type ChatHistoryItem } from "./api";
+import { isExpiredSessionError } from "./session-errors";
 
 // Kept in step with the suggestion_* cases in backend/evals/qa/dataset.json:
 // a question the product offers first has to be one it can actually answer.
@@ -164,13 +164,6 @@ function isTurnLimitError(error: unknown): boolean {
     error !== null &&
     "code" in error &&
     (error as { code?: unknown }).code === "COUNSEL_TURN_LIMIT_REACHED"
-  );
-}
-
-function isExpiredSessionError(error: unknown): boolean {
-  return (
-    error instanceof ApiResponseError &&
-    (error.status === 403 || error.code === "INVALID_PORTFOLIO_SESSION")
   );
 }
 

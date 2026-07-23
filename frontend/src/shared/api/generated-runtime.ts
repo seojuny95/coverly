@@ -10,6 +10,9 @@ type PolicyClassification = components["schemas"]["PolicySummary"]["보험분류
 
 export const API_ERROR_CODES = [
   "PDF_TOO_LARGE",
+  "PDF_PAGE_LIMIT_EXCEEDED",
+  "PDF_COMPLEXITY_LIMIT_EXCEEDED",
+  "PDF_PARSING_BUSY",
   "INVALID_PDF",
   "PDF_PASSWORD_REQUIRED",
   "PDF_PASSWORD_INCORRECT",
@@ -24,6 +27,8 @@ export const API_ERROR_CODES = [
   "INVALID_POLICY_SELECTION",
   "REQUEST_VALIDATION_ERROR",
   "INVALID_MULTIPART_REQUEST",
+  "HTTP_ERROR",
+  "INTERNAL_SERVER_ERROR",
 ] as const satisfies readonly ApiErrorCode[];
 export const POLICY_CLASSIFICATIONS = [
   "생명보험",
@@ -31,6 +36,7 @@ export const POLICY_CLASSIFICATIONS = [
   "손해보험",
   "미분류",
 ] as const satisfies readonly PolicyClassification[];
+export const PORTFOLIO_MAX_DOCUMENTS = 5 as const;
 
 export const QA_STREAM_JSON_SCHEMA = {
   schema: {

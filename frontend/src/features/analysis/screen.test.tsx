@@ -17,6 +17,7 @@ import { InsuranceAnalysisPage } from "./screen";
 import type { InsuranceAnalysis } from "./store";
 import { PORTFOLIO_SESSION_REFRESH_FALLBACK_MS } from "./use-session-refresh";
 import type { UploadInsurance } from "../upload/form";
+import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 
 // The upload modal renders InsuranceUploadForm, which calls useRouter even
 // when onAnalysisComplete is provided (it also prefetches the destination).
@@ -113,6 +114,10 @@ describe("InsuranceAnalysisPage", () => {
     expect(
       screen.getByRole("button", { name: "보험증권 더 올리기" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      "insurance-tab",
+    );
 
     const damageCard = screen.getAllByText("손해보험")[0].closest("div");
     const healthCard = screen.getAllByText("제3보험")[0].closest("div");
@@ -128,6 +133,52 @@ describe("InsuranceAnalysisPage", () => {
     expect(screen.getByText("자동차보험")).toBeInTheDocument();
   });
 
+  test("disables additional uploads with an explanation at the document limit", async () => {
+    const user = userEvent.setup();
+    const initialAnalysis: InsuranceAnalysis = {
+      generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
+      insuranceDocuments: Array.from(
+        { length: PORTFOLIO_MAX_DOCUMENTS },
+        (_, index) => ({
+          id: `insurance-${index}`,
+          fileName: `insurance-${index}.pdf`,
+          result: {
+            ...POLICY_RESULT_DEFAULTS,
+            기본정보: {
+              보험사: `보험사 ${index}`,
+              상품명: `보험상품 ${index}`,
+              피보험자: "테스트고객",
+              보험분류: "제3보험" as const,
+              상품태그: ["질병보험"],
+            },
+          },
+        }),
+      ),
+    };
+
+    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
+
+    const addButton = await screen.findByRole("button", {
+      name: "보험증권 더 올리기",
+    });
+    expect(addButton).toBeDisabled();
+    expect(addButton).toHaveAttribute(
+      "aria-describedby",
+      "portfolio-upload-limit-notice",
+    );
+    expect(
+      screen.getByText(
+        "보험증권은 최대 5개까지 분석할 수 있어요. 현재 분석에는 보험증권을 더 추가할 수 없어요.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(addButton);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   test("expands a insurance row to show detail fields", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
@@ -141,6 +192,7 @@ describe("InsuranceAnalysisPage", () => {
           result: {
             ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
+            policy_terms_status: "unavailable",
             문자수: 100,
             기본정보: {
               보험사: "삼성화재",
@@ -181,6 +233,11 @@ describe("InsuranceAnalysisPage", () => {
     expect(screen.getByText("POLICY-TEST-001")).toBeInTheDocument();
     expect(screen.getByText("2026-01-01 - 2046-01-01")).toBeInTheDocument();
     expect(screen.getByText("월납 120,000원")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "약관 질문에 필요한 자료를 준비하지 못했어요. 이 증권의 보장 분석은 그대로 확인할 수 있어요.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText("상품명")).not.toBeInTheDocument();
     expect(screen.queryByText("상품태그")).not.toBeInTheDocument();
   });

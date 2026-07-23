@@ -1,3 +1,5 @@
+import { isExpiredPortfolioSessionApiError } from "@/shared/api/client";
+
 import { UploadInsuranceError, type UploadErrorCode } from "./api";
 
 export type ApiErrorCodeOrLocalUiCode = Exclude<
@@ -19,8 +21,9 @@ export function isFileSpecificUploadError(err: unknown) {
 
 export function isExpiredUploadSessionError(err: unknown) {
   return (
-    err instanceof UploadInsuranceError &&
-    (err.status === 403 || err.code === "INVALID_PORTFOLIO_SESSION")
+    (err instanceof UploadInsuranceError &&
+      (err.status === 403 || err.code === "INVALID_PORTFOLIO_SESSION")) ||
+    isExpiredPortfolioSessionApiError(err)
   );
 }
 

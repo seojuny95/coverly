@@ -7,6 +7,7 @@ from app.modules.portfolio.session.repository import PortfolioPolicySelectionNot
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
     PortfolioSessionService,
+    PortfolioSessionUnavailable,
 )
 
 
@@ -21,6 +22,8 @@ def resolve_portfolio_snapshot(
         )
     except InvalidPortfolioSessionToken:
         raise expired_portfolio_session_error() from None
+    except PortfolioSessionUnavailable:
+        raise portfolio_session_unavailable_error() from None
     except PortfolioPolicySelectionNotFound:
         raise ApiError(
             status_code=422,
@@ -34,4 +37,12 @@ def expired_portfolio_session_error() -> ApiError:
         status_code=403,
         code="INVALID_PORTFOLIO_SESSION",
         message="분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
+    )
+
+
+def portfolio_session_unavailable_error() -> ApiError:
+    return ApiError(
+        status_code=503,
+        code="portfolio_session_unavailable",
+        message="분석 세션을 준비하지 못했어요. 잠시 후 다시 시도해주세요.",
     )

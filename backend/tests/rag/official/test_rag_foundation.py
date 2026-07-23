@@ -3,12 +3,19 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from defusedxml.common import DefusedXmlException
 from pydantic import SecretStr
 
 from app.rag.embeddings import HashingEmbedder, openai_embedder_from_settings
 from app.rag.official.chunkers import build_chunks
+from app.rag.official.chunkers.law import build_law_xml_chunks
 from app.rag.official.indexing import build_vector_records
-from app.rag.official.loaders import _load_law_xml_chunks, load_official_chunks
+from app.rag.official.loaders import (
+    MAX_OFFICIAL_XML_BYTES,
+    OfficialXmlSizeLimitExceededError,
+    _load_law_xml_chunks,
+    load_official_chunks,
+)
 from app.rag.official.models import RagChunk, RetrievalHit, VectorRecord
 from app.rag.official.retrieval import retrieve, transform_query
 from app.rag.official.sources import (
@@ -777,6 +784,43 @@ def test_law_xml_branch_articles_get_distinct_ids_and_labels(tmp_path: Path) -> 
         "제11조의2(보험회사의 부수업무)",
     ]
     assert len({chunk.id for chunk in chunks}) == 2
+
+
+def test_law_xml_rejects_dtd_and_entity_expansion() -> None:
+    source = OfficialSource(
+        id="untrusted_law",
+        title="비정상 법률",
+        category="law",
+        document_type="law",
+        publisher="테스트",
+        status="downloaded",
+        rag_enabled=True,
+    )
+    xml = """<?xml version="1.0"?>
+<!DOCTYPE 법령 [<!ENTITY repeated "반복되는 외부 입력">]>
+<법령><조문단위><조문내용>&repeated;</조문내용></조문단위></법령>
+"""
+
+    with pytest.raises(DefusedXmlException):
+        build_law_xml_chunks(source, xml)
+
+
+def test_law_xml_rejects_files_above_the_size_limit(tmp_path: Path) -> None:
+    xml_path = tmp_path / "oversized-law.xml"
+    xml_path.write_bytes(b"x" * (MAX_OFFICIAL_XML_BYTES + 1))
+    source = OfficialSource(
+        id="oversized_law",
+        title="대용량 법률",
+        category="law",
+        document_type="law",
+        publisher="테스트",
+        status="downloaded",
+        rag_enabled=True,
+        local_path=str(xml_path),
+    )
+
+    with pytest.raises(OfficialXmlSizeLimitExceededError):
+        _load_law_xml_chunks(source)
 
 
 def test_evaluate_retrieval_production_flag_skips_in_memory_chunks(

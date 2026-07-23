@@ -195,6 +195,30 @@ export interface components {
       /** Duplicate Across Contracts */
       duplicate_across_contracts: boolean;
       /**
+       * Guidance Key
+       * @enum {string}
+       */
+      guidance_key:
+        | "injury_medical_expense"
+        | "disease_medical_expense"
+        | "inpatient_medical_expense"
+        | "outpatient_medical_expense"
+        | "prescription_medical_expense"
+        | "medical_expense"
+        | "travel_medical_expense"
+        | "legal_cost"
+        | "property_damage"
+        | "liability"
+        | "auto"
+        | "other";
+      /** Explanation */
+      explanation: string;
+      /**
+       * Explanation Basis
+       * @constant
+       */
+      explanation_basis: "generated_guidance";
+      /**
        * Original Amount
        * @default
        */
@@ -208,6 +232,9 @@ export interface components {
     /** @enum {string} */
     ApiErrorCode:
       | "PDF_TOO_LARGE"
+      | "PDF_PAGE_LIMIT_EXCEEDED"
+      | "PDF_COMPLEXITY_LIMIT_EXCEEDED"
+      | "PDF_PARSING_BUSY"
       | "INVALID_PDF"
       | "PDF_PASSWORD_REQUIRED"
       | "PDF_PASSWORD_INCORRECT"
@@ -221,7 +248,9 @@ export interface components {
       | "portfolio_session_unavailable"
       | "INVALID_POLICY_SELECTION"
       | "REQUEST_VALIDATION_ERROR"
-      | "INVALID_MULTIPART_REQUEST";
+      | "INVALID_MULTIPART_REQUEST"
+      | "HTTP_ERROR"
+      | "INTERNAL_SERVER_ERROR";
     /** ApiErrorDetail */
     ApiErrorDetail: {
       code: components["schemas"]["ApiErrorCode"];
@@ -239,7 +268,7 @@ export interface components {
       /**
        * File
        * Format: binary
-       * @description PDF document only. The server verifies the %PDF signature and accepts at most 10 MiB.
+       * @description PDF document only. The server verifies the %PDF signature and accepts at most 10 MiB and 100 pages.
        */
       file: string;
       /**
@@ -529,6 +558,12 @@ export interface components {
        * @enum {string}
        */
       "\uBD84\uC11D\uC0C1\uD0DC": "완료" | "부분";
+      /**
+       * Policy Terms Status
+       * @default unavailable
+       * @enum {string}
+       */
+      policy_terms_status: "available" | "unavailable";
     };
     /**
      * PolicySummary
@@ -857,6 +892,24 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       409: {
         headers: {
           [name: string]: unknown;
@@ -876,6 +929,15 @@ export interface operations {
       };
       /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -913,7 +975,34 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -964,7 +1053,34 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1015,7 +1131,34 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1066,7 +1209,34 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1117,7 +1287,34 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1168,7 +1365,34 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1222,6 +1446,24 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
@@ -1232,6 +1474,15 @@ export interface operations {
       };
       /** @description Coverly API error */
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1259,6 +1510,42 @@ export interface operations {
           "application/json": {
             [key: string]: string;
           };
+        };
+      };
+      /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
     };

@@ -117,6 +117,107 @@ describe("InsuranceUploadForm", () => {
     });
   });
 
+  test("shows the five-document limit before file selection", () => {
+    renderForm();
+
+    expect(screen.getByText("PDF · 최대 5개")).toBeInTheDocument();
+  });
+
+  test("shows the remaining document allowance for additional uploads", () => {
+    const existingDocuments = Array.from({ length: 4 }, (_, index) => ({
+      id: `existing-${index}`,
+      fileName: `existing-${index}.pdf`,
+      result: POLICY_RESULT_DEFAULTS,
+    }));
+
+    renderForm({ existingDocuments });
+
+    expect(
+      screen.getByText("PDF · 추가 가능 1개 · 전체 최대 5개"),
+    ).toBeInTheDocument();
+  });
+
+  test("accepts five policy PDFs and rejects a sixth", async () => {
+    const user = userEvent.setup();
+    let activeUploads = 0;
+    let maxActiveUploads = 0;
+    const uploadInsurance = vi.fn<UploadInsurance>(async ({ documentId }) => {
+      activeUploads += 1;
+      maxActiveUploads = Math.max(maxActiveUploads, activeUploads);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      activeUploads -= 1;
+      return {
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        documentId,
+      };
+    });
+    renderForm({ uploadInsurance });
+    const files = Array.from(
+      { length: 6 },
+      (_, index) =>
+        new File([`%PDF-1.7 file ${index}`], `policy-${index}.pdf`, {
+          type: "application/pdf",
+        }),
+    );
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), files);
+
+    expect(
+      screen.getByText(
+        "보험증권은 최대 5개까지 분석할 수 있어요. 지금은 5개까지 추가할 수 있어요.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("선택된 PDF가 없어요.")).toBeInTheDocument();
+    expect(uploadInsurance).not.toHaveBeenCalled();
+
+    await user.upload(
+      screen.getByLabelText("PDF 파일 선택"),
+      files.slice(0, 5),
+    );
+
+    expect(
+      screen.queryByText(
+        "보험증권은 최대 5개까지 분석할 수 있어요. 지금은 5개까지 추가할 수 있어요.",
+      ),
+    ).not.toBeInTheDocument();
+    for (const file of files.slice(0, 5)) {
+      expect(screen.getByText(file.name)).toBeInTheDocument();
+    }
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "내 보험 분석하기" }),
+      ).toBeEnabled();
+    });
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    await waitFor(() => {
+      expect(uploadInsurance).toHaveBeenCalledTimes(5);
+    });
+    expect(maxActiveUploads).toBe(5);
+  });
+
+  test("counts existing policies toward the five-document limit", async () => {
+    const user = userEvent.setup();
+    const existingDocuments = Array.from({ length: 4 }, (_, index) => ({
+      id: `existing-${index}`,
+      fileName: `existing-${index}.pdf`,
+      result: POLICY_RESULT_DEFAULTS,
+    }));
+    renderForm({ existingDocuments });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), [
+      insuranceFile,
+      secondInsuranceFile,
+    ]);
+
+    expect(
+      screen.getByText(
+        "보험증권은 최대 5개까지 분석할 수 있어요. 지금은 1개까지 추가할 수 있어요.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   test("disables upload until a file is selected", () => {
     renderForm();
 

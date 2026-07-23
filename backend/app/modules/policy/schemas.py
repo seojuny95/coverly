@@ -14,6 +14,7 @@ from app.modules.policy.models import (
     InsuredDemographics,
     PolicyAnalysisStatus,
     PolicyClassificationName,
+    PolicyTermsStatus,
     PremiumSummary,
     VehicleInfo,
 )
@@ -83,3 +84,4 @@ class PolicyParseResponse(BaseModel):
     기본정보: PolicySummary
     보장목록: list[Coverage]
     분석상태: PolicyAnalysisStatus
+    policy_terms_status: PolicyTermsStatus = "unavailable"

@@ -25,6 +25,10 @@ class PortfolioPolicySelectionNotFound(Exception):
     """One or more requested policy documents do not belong to the session."""
 
 
+class PortfolioSessionRepositoryUnavailable(Exception):
+    """The session store is temporarily unavailable."""
+
+
 class PortfolioSessionRepository(Protocol):
     def create(self, session: NewPortfolioSession) -> None: ...
 

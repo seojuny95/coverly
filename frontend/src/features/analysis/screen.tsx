@@ -22,6 +22,7 @@ import type { UploadInsurance } from "../upload/form";
 import { PortfolioAnalysisPanel } from "./portfolio/panel";
 import { usePortfolioSummary } from "./portfolio/use-summary";
 import type { DeathBenefitGuideInput } from "./portfolio/api";
+import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 
 // Lazy-load the chatbot (and its react-markdown dependency) so they stay out of
 // the initial /analysis bundle — it only mounts after the user opens it.
@@ -83,6 +84,8 @@ export function InsuranceAnalysisPage({
     () => groupInsuranceDocuments(insuranceDocuments),
     [insuranceDocuments],
   );
+  const uploadLimitReached =
+    insuranceDocuments.length >= PORTFOLIO_MAX_DOCUMENTS;
 
   usePortfolioSessionRefresh({
     session: portfolioSession,
@@ -95,9 +98,12 @@ export function InsuranceAnalysisPage({
     deathBenefitContext,
     analysis?.portfolioSessionToken,
     expireSession,
+    sessionExpired,
   );
 
-  const openUploadModal = () => setIsUploadModalOpen(true);
+  const openUploadModal = () => {
+    if (!uploadLimitReached) setIsUploadModalOpen(true);
+  };
   const closeUploadModal = () => setIsUploadModalOpen(false);
 
   const handleAdditionalAnalysisComplete = (
@@ -194,6 +200,7 @@ export function InsuranceAnalysisPage({
               isExpanded={isExpanded}
               onToggle={toggleInsurance}
               onOpenUploadModal={openUploadModal}
+              uploadLimitReached={uploadLimitReached}
             />
           ) : activeTab === "analysis" ? (
             <div

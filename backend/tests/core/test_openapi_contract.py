@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.core.limits import MAX_PORTFOLIO_DOCUMENTS
 from app.main import app
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 
@@ -17,16 +18,35 @@ def test_openapi_exposes_typed_json_api_contracts() -> None:
     }
     unprocessable_schema = parse_responses["422"]["content"]["application/json"]["schema"]
     assert unprocessable_schema == {"$ref": "#/components/schemas/ApiErrorResponse"}
+    assert parse_responses["500"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ApiErrorResponse"
+    }
 
     session_responses = paths["/portfolio/sessions"]["post"]["responses"]
     assert session_responses["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/PortfolioSessionResponse"
     }
+    session_schema = schema["components"]["schemas"]["PortfolioSessionResponse"]
+    assert session_schema["x-maxDocuments"] == MAX_PORTFOLIO_DOCUMENTS
 
     summary_responses = paths["/portfolio/summary"]["post"]["responses"]
     assert summary_responses["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/PortfolioCoverageSummary"
     }
+
+
+def test_every_json_api_route_documents_the_unexpected_error_envelope() -> None:
+    for path, operations in app.openapi()["paths"].items():
+        for method, operation in operations.items():
+            if method not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            success_content = operation["responses"].get("200", {}).get("content", {})
+            if "application/json" not in success_content:
+                continue
+
+            assert operation["responses"]["500"]["content"]["application/json"]["schema"] == {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+            }, f"{method.upper()} {path} must document the shared 500 response"
 
 
 def test_policy_parse_openapi_schema_matches_public_response() -> None:
@@ -44,6 +64,10 @@ def test_policy_parse_openapi_schema_matches_public_response() -> None:
     assert parse_schema["properties"]["status"]["const"] == "accepted"
     assert parse_schema["properties"]["documentId"]["format"] == "uuid"
     assert set(parse_schema["properties"]["분석상태"]["enum"]) == {"완료", "부분"}
+    assert set(parse_schema["properties"]["policy_terms_status"]["enum"]) == {
+        "available",
+        "unavailable",
+    }
     assert "문서세션ID" not in parse_schema["properties"]
 
     upload_body_ref = app.openapi()["paths"]["/policies/parse"]["post"]["requestBody"]["content"][
@@ -58,9 +82,11 @@ def test_policy_parse_openapi_schema_matches_public_response() -> None:
         "contentMediaType": "application/pdf",
         "title": "File",
         "description": (
-            "PDF document only. The server verifies the %PDF signature and accepts at most 10 MiB."
+            "PDF document only. The server verifies the %PDF signature and accepts at most "
+            "10 MiB and 100 pages."
         ),
         "x-maxBytes": 10 * 1024 * 1024,
+        "x-maxPages": 100,
     }
 
     coverage_schema = schemas["Coverage"]
@@ -75,6 +101,14 @@ def test_policy_parse_openapi_schema_matches_public_response() -> None:
         "generated_guidance",
         "none",
     }
+
+    actual_loss_schema = schemas["ActualLossCoverageItem"]
+    assert {
+        "guidance_key",
+        "explanation",
+        "explanation_basis",
+    } <= set(actual_loss_schema["required"])
+    assert actual_loss_schema["properties"]["explanation_basis"]["const"] == "generated_guidance"
     assert set(coverage_schema["properties"]["유형"]["enum"]) == {"담보", "부가"}
     policy_summary_schema = schemas["PolicySummary"]
     assert {"보험분류", "상품태그"} <= set(policy_summary_schema["required"])
@@ -97,6 +131,9 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
     }
     assert set(schemas["ApiErrorCode"]["enum"]) == {
         "PDF_TOO_LARGE",
+        "PDF_PAGE_LIMIT_EXCEEDED",
+        "PDF_COMPLEXITY_LIMIT_EXCEEDED",
+        "PDF_PARSING_BUSY",
         "INVALID_PDF",
         "PDF_PASSWORD_REQUIRED",
         "PDF_PASSWORD_INCORRECT",
@@ -111,6 +148,8 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
         "INVALID_POLICY_SELECTION",
         "REQUEST_VALIDATION_ERROR",
         "INVALID_MULTIPART_REQUEST",
+        "HTTP_ERROR",
+        "INTERNAL_SERVER_ERROR",
     }
 
 

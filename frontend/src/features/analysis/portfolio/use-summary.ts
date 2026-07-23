@@ -38,10 +38,13 @@ export function usePortfolioSummary(
   deathBenefitContext: DeathBenefitGuideInput,
   portfolioSessionToken?: string,
   onSessionExpired?: () => void,
+  sessionExpired = false,
 ) {
   const currentPortfolioKey = portfolioKey(documents);
   const queryKey = portfolioSummaryQueryKey(documents, deathBenefitContext);
   const retryKey = JSON.stringify(queryKey);
+  const queryEnabled =
+    documents.length > 0 && Boolean(portfolioSessionToken) && !sessionExpired;
   const retryAttemptId = useRef(0);
   const [retryState, setRetryState] = useState<RetryState>({
     attemptId: 0,
@@ -64,7 +67,7 @@ export function usePortfolioSummary(
         throw error;
       });
     },
-    enabled: documents.length > 0 && Boolean(portfolioSessionToken),
+    enabled: queryEnabled,
     placeholderData: (previousData, previousQuery) =>
       previousQuery?.queryKey[1] === currentPortfolioKey
         ? previousData
@@ -78,6 +81,7 @@ export function usePortfolioSummary(
     retryKey,
     summary: query.data,
     onSessionExpired,
+    enabled: queryEnabled,
   });
 
   const state: SummaryState = query.data
@@ -99,6 +103,8 @@ export function usePortfolioSummary(
     retryFailed: isCurrentRetry && retryState.status === "request_failed",
     overviewRetryFailed: overview.overviewRetryFailed,
     retry: async () => {
+      if (!queryEnabled) return;
+
       const attemptId = ++retryAttemptId.current;
       setRetryState({ attemptId, key: retryKey, status: "pending" });
 

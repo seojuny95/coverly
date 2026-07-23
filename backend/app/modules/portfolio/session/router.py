@@ -5,7 +5,10 @@ from fastapi import APIRouter
 from app.core.config import get_settings
 from app.core.errors import api_error_responses
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
-from app.modules.portfolio.session.http import expired_portfolio_session_error
+from app.modules.portfolio.session.http import (
+    expired_portfolio_session_error,
+    portfolio_session_unavailable_error,
+)
 from app.modules.portfolio.session.schemas import (
     PortfolioSessionDeleteResponse,
     PortfolioSessionDocumentsDeleteRequest,
@@ -14,6 +17,7 @@ from app.modules.portfolio.session.schemas import (
 )
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
+    PortfolioSessionUnavailable,
 )
 
 router = APIRouter(prefix="/portfolio/sessions", tags=["portfolio-sessions"])
@@ -27,7 +31,10 @@ router = APIRouter(prefix="/portfolio/sessions", tags=["portfolio-sessions"])
 def create_portfolio_session(
     sessions: PortfolioSessionServiceDep,
 ) -> PortfolioSessionResponse:
-    access = sessions.create()
+    try:
+        access = sessions.create()
+    except PortfolioSessionUnavailable:
+        raise portfolio_session_unavailable_error() from None
     return PortfolioSessionResponse(
         portfolio_session_token=access.token,
         expires_at=access.expires_at.isoformat(),
@@ -44,18 +51,21 @@ def refresh_portfolio_session(
     request: PortfolioSessionRequest,
     sessions: PortfolioSessionServiceDep,
 ) -> PortfolioSessionResponse:
+    max_turns = get_settings().counsel_max_turns_per_session
     try:
         access = sessions.refresh(request.portfolio_session_token)
+        counsel_turns_remaining = sessions.counsel_turns_remaining(
+            access.token,
+            max_turns=max_turns,
+        )
     except InvalidPortfolioSessionToken:
         raise expired_portfolio_session_error() from None
-    max_turns = get_settings().counsel_max_turns_per_session
+    except PortfolioSessionUnavailable:
+        raise portfolio_session_unavailable_error() from None
     return PortfolioSessionResponse(
         portfolio_session_token=access.token,
         expires_at=access.expires_at.isoformat(),
-        counsel_turns_remaining=sessions.counsel_turns_remaining(
-            access.token,
-            max_turns=max_turns,
-        ),
+        counsel_turns_remaining=counsel_turns_remaining,
     )
 
 
@@ -72,6 +82,8 @@ def delete_portfolio_session(
         sessions.delete(request.portfolio_session_token)
     except InvalidPortfolioSessionToken:
         raise expired_portfolio_session_error() from None
+    except PortfolioSessionUnavailable:
+        raise portfolio_session_unavailable_error() from None
     return PortfolioSessionDeleteResponse(status="deleted")
 
 
@@ -91,4 +103,6 @@ def delete_portfolio_session_documents(
         )
     except InvalidPortfolioSessionToken:
         raise expired_portfolio_session_error() from None
+    except PortfolioSessionUnavailable:
+        raise portfolio_session_unavailable_error() from None
     return PortfolioSessionDeleteResponse(status="deleted")

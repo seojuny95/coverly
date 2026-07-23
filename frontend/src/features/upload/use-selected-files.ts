@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 import { isPdfPasswordProtected } from "./pdf-password-check";
 import type { SelectedUploadFile } from "./types";
 import {
@@ -15,9 +16,11 @@ import {
 // uploads these files lives in use-orchestration.ts.
 export function useSelectedFiles({
   isLocked,
+  maxSelectableFiles,
   onSelectionReset,
 }: {
   isLocked: boolean;
+  maxSelectableFiles: number;
   onSelectionReset: () => void;
 }) {
   const [selectedUploadFiles, setSelectedUploadFiles] = useState<
@@ -36,6 +39,15 @@ export function useSelectedFiles({
     if (incomingFiles.length === 0) {
       setSelectedUploadFiles([]);
       setError("올릴 파일을 찾지 못했어요. PDF를 다시 선택해주세요.");
+      return;
+    }
+    if (incomingFiles.length > maxSelectableFiles) {
+      setSelectedUploadFiles([]);
+      setError(
+        maxSelectableFiles > 0
+          ? `보험증권은 최대 ${PORTFOLIO_MAX_DOCUMENTS}개까지 분석할 수 있어요. 지금은 ${maxSelectableFiles}개까지 추가할 수 있어요.`
+          : `보험증권은 최대 ${PORTFOLIO_MAX_DOCUMENTS}개까지 분석할 수 있어요.`,
+      );
       return;
     }
 

@@ -25,6 +25,7 @@ export function usePortfolioOverviewGeneration({
   retryKey,
   summary,
   onSessionExpired,
+  enabled,
 }: {
   documents: AnalyzedInsurance[];
   deathBenefitContext: DeathBenefitGuideInput;
@@ -33,17 +34,24 @@ export function usePortfolioOverviewGeneration({
   retryKey: string;
   summary?: PortfolioSummary;
   onSessionExpired?: () => void;
+  enabled: boolean;
 }) {
   const queryClient = useQueryClient();
   const overviewAttemptId = useRef(0);
+  const overviewRequest = useRef<AbortController | null>(null);
+  const enabledRef = useRef(enabled);
   const [overviewState, setOverviewState] = useState<OverviewState>({
     attemptId: 0,
     key: null,
     status: "idle",
   });
 
+  useEffect(() => {
+    enabledRef.current = enabled;
+  }, [enabled]);
+
   const overviewMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (signal: AbortSignal) => {
       if (!portfolioSessionToken) {
         throw new Error("Portfolio session is unavailable");
       }
@@ -51,25 +59,38 @@ export function usePortfolioOverviewGeneration({
         documents,
         deathBenefitContext,
         portfolioSessionToken,
+        signal,
       ).catch((error: unknown) => {
-        if (isExpiredSessionError(error)) onSessionExpired?.();
+        if (!signal.aborted && isExpiredSessionError(error)) {
+          onSessionExpired?.();
+        }
         throw error;
       });
     },
   });
 
   const generateOverview = useCallback(async () => {
+    if (!enabledRef.current) return;
+
+    overviewRequest.current?.abort();
+    const controller = new AbortController();
+    overviewRequest.current = controller;
     const attemptId = ++overviewAttemptId.current;
     setOverviewState({ attemptId, key: retryKey, status: "pending" });
 
     let status: OverviewState["status"] = "idle";
     try {
-      const overview = await overviewMutation.mutateAsync();
+      const overview = await overviewMutation.mutateAsync(controller.signal);
+      if (!enabledRef.current || controller.signal.aborted) return;
       queryClient.setQueryData<PortfolioSummary>(queryKey, (current) =>
         current ? { ...current, overview } : current,
       );
     } catch {
-      status = "failed";
+      if (!controller.signal.aborted) status = "failed";
+    } finally {
+      if (overviewRequest.current === controller) {
+        overviewRequest.current = null;
+      }
     }
 
     setOverviewState((current) =>
@@ -79,8 +100,17 @@ export function usePortfolioOverviewGeneration({
     );
   }, [overviewMutation, queryClient, queryKey, retryKey]);
 
+  useEffect(
+    () => () => {
+      overviewRequest.current?.abort();
+      overviewRequest.current = null;
+    },
+    [retryKey],
+  );
+
   useEffect(() => {
-    if (!summary || summary.overview || !portfolioSessionToken) return;
+    if (!enabled || !summary || summary.overview || !portfolioSessionToken)
+      return;
     if (overviewState.key === retryKey && overviewState.status !== "idle") {
       return;
     }
@@ -88,6 +118,7 @@ export function usePortfolioOverviewGeneration({
     void generateOverview();
   }, [
     generateOverview,
+    enabled,
     overviewState.key,
     overviewState.status,
     portfolioSessionToken,
@@ -98,8 +129,10 @@ export function usePortfolioOverviewGeneration({
   const isCurrentOverview = overviewState.key === retryKey;
 
   return {
-    isOverviewRetrying: isCurrentOverview && overviewState.status === "pending",
-    overviewRetryFailed: isCurrentOverview && overviewState.status === "failed",
+    isOverviewRetrying:
+      enabled && isCurrentOverview && overviewState.status === "pending",
+    overviewRetryFailed:
+      enabled && isCurrentOverview && overviewState.status === "failed",
     retryOverview: generateOverview,
   };
 }

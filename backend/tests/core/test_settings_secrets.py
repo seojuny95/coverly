@@ -1,6 +1,8 @@
-from pydantic import SecretStr
+import pytest
+from pydantic import SecretStr, ValidationError
 
 from app.core.config import Settings
+from app.core.limits import MAX_PORTFOLIO_DOCUMENTS
 
 _OPENAI_API_KEY = "sk-test-should-never-be-printed"
 _DATABASE_URL = "postgresql://user:hunter2@example/test"
@@ -32,3 +34,17 @@ def test_secret_values_stay_readable() -> None:
     assert settings.openai_api_key.get_secret_value() == _OPENAI_API_KEY
     assert settings.database_url.get_secret_value() == _DATABASE_URL
     assert settings.policy_rag_session_secret.get_secret_value() == _SESSION_SECRET
+
+
+def test_portfolio_document_limit_is_a_fixed_product_contract() -> None:
+    assert _settings().portfolio_session_max_documents == MAX_PORTFOLIO_DOCUMENTS
+
+    with pytest.raises(ValidationError):
+        Settings(portfolio_session_max_documents=MAX_PORTFOLIO_DOCUMENTS + 1)
+
+
+def test_pdf_parser_capacity_is_independent_from_the_product_document_limit() -> None:
+    settings = Settings(pdf_parsing_max_concurrency=3)
+
+    assert settings.portfolio_session_max_documents == MAX_PORTFOLIO_DOCUMENTS
+    assert settings.pdf_parsing_max_concurrency == 3

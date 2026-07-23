@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { Alert } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Card } from "@/shared/components/ui/card";
 import type {
@@ -63,6 +64,17 @@ export function InsuranceDetail({
         isExpanded ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"
       }`}
     >
+      {insuranceDocument.result.policy_terms_status === "unavailable" ? (
+        <Alert
+          variant="warning"
+          role="note"
+          className="mb-5 px-4 py-3 text-sm leading-6"
+        >
+          약관 질문에 필요한 자료를 준비하지 못했어요. 이 증권의 보장 분석은
+          그대로 확인할 수 있어요.
+        </Alert>
+      ) : null}
+
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {detailItems.map(([label, value]) => (
           <div key={label}>

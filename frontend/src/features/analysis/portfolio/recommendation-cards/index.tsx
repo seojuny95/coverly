@@ -1,7 +1,11 @@
 import { cardVariants } from "@/shared/components/ui/card";
 import { cn } from "@/shared/lib/utils";
 
-import type { DeathBenefitGuideInput, EssentialCoverageItem } from "../api";
+import type {
+  DeathBenefitGuideInput,
+  EssentialCoverageItem,
+  PortfolioSummary,
+} from "../api";
 import { RecommendedDeathBenefitCard } from "./death-benefit-card";
 import {
   RecommendedDiagnosisCard,
@@ -12,11 +16,13 @@ import { RecommendedMedicalIndemnityCard } from "./medical-indemnity-card";
 export { recommendedDiagnosisItems };
 
 export function RecommendedInsuranceCards({
+  actualLossCoverages,
   items,
   deathBenefitContext,
   onDeathBenefitContextChange,
   isDeathBenefitRefreshing,
 }: {
+  actualLossCoverages: PortfolioSummary["actual_loss_coverages"];
   items: EssentialCoverageItem[];
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
@@ -54,7 +60,10 @@ export function RecommendedInsuranceCards({
           confirmedCount={diagnosisConfirmedCount}
         />
 
-        <RecommendedMedicalIndemnityCard item={medicalIndemnity} />
+        <RecommendedMedicalIndemnityCard
+          actualLossCoverages={actualLossCoverages}
+          item={medicalIndemnity}
+        />
       </div>
     </article>
   );

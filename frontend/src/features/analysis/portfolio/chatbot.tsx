@@ -52,6 +52,7 @@ export function InsuranceChatbot({
     open: isFloating && open,
     onClose: closeChatbot,
     autoFocus: false,
+    trapFocus: false,
   });
 
   if (isFloating && !open)

@@ -359,12 +359,6 @@ test("shows all-policy core, special-policy, and claim checks", async () => {
   ).toBeInTheDocument();
   expect(screen.getByText("핵심 보장 확인")).toBeInTheDocument();
   expect(screen.getByText("실손형 보장 중복 확인")).toBeInTheDocument();
-  expect(screen.getByText("여러 계약에 겹쳐 있는 보장")).toBeInTheDocument();
-  expect(
-    screen.getByText(
-      "실제로 발생한 손해만큼 보상하는 담보가 여러 계약에 함께 있는지 확인해요.",
-    ),
-  ).toBeInTheDocument();
   expect(screen.getAllByText("사망 보장").length).toBeGreaterThan(0);
   expect(screen.getByText("진단 보장")).toBeInTheDocument();
   expect(screen.getByText("실손의료보험")).toBeInTheDocument();
@@ -645,13 +639,50 @@ test("shows the death coverage detail only when no coverage was found", () => {
   ).toBeInTheDocument();
 });
 
-test("shows an explicit retry state when the LLM overview is missing", async () => {
+test("shows overview copy generation separately from confirmed analysis data", () => {
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      summary={{ ...summary, overview: null }}
+    />,
+  );
+
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "총평을 정리하고 있어요",
+  );
+  expect(
+    screen.getByText(
+      "확인된 보장과 보험료 정보는 먼저 볼 수 있어요. 총평 문장만 이어서 준비하고 있어요.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "총평 다시 생성하기" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("group", {
+      name: "현재 98,000원, 권장 193,000원 ~ 386,000원",
+    }),
+  ).toBeInTheDocument();
+});
+
+test("animates the generated overview copy into the existing card", () => {
+  render(<PortfolioAnalysisPanel {...baseProps()} />);
+
+  expect(
+    screen.getByRole("heading", {
+      name: "진단비 구성에서 더 확인할 부분이 있어요",
+    }).parentElement,
+  ).toHaveClass("animate-enter");
+});
+
+test("shows an explicit retry state when overview generation fails", async () => {
   const onRetry = vi.fn();
   render(
     <PortfolioAnalysisPanel
       {...baseProps()}
       summary={{ ...summary, overview: null }}
       onRetry={onRetry}
+      overviewRetryFailed
     />,
   );
 
@@ -666,20 +697,44 @@ test("shows an explicit retry state when the LLM overview is missing", async () 
   expect(onRetry).toHaveBeenCalledOnce();
 });
 
-test("shows progress while regenerating a missing overview", () => {
+test("keeps the premium comparison visible while regenerating a missing overview", () => {
   render(
     <PortfolioAnalysisPanel
       {...baseProps()}
       summary={{ ...summary, overview: null }}
-      isRetrying
+      isOverviewRetrying
     />,
   );
 
-  const retryButton = screen.getByRole("button", {
-    name: "총평 다시 생성하는 중…",
-  });
-  expect(retryButton).toBeDisabled();
-  expect(retryButton).toHaveAttribute("aria-busy", "true");
+  expect(screen.getByText("총평을 정리하고 있어요")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "총평 다시 생성하는 중…" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("group", {
+      name: "현재 98,000원, 권장 193,000원 ~ 386,000원",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("progressbar", { name: "총평 다시 생성 진행" }),
+  ).not.toBeInTheDocument();
+});
+
+test("keeps the current monthly premium visible without an age benchmark", () => {
+  render(
+    <PortfolioAnalysisPanel
+      {...baseProps()}
+      summary={{ ...summary, premium_benchmark: null }}
+    />,
+  );
+
+  expect(screen.getAllByText("현재 월 보험료").length).toBeGreaterThan(0);
+  expect(screen.getByText("연령 정보 확인 필요")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      "보험증권에서 나이를 확인하지 못해 권장금액은 계산하지 않았어요.",
+    ),
+  ).toBeInTheDocument();
 });
 
 test("explains when regenerating the overview fails again", () => {
@@ -692,7 +747,7 @@ test("explains when regenerating the overview fails again", () => {
   );
 
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "총평을 다시 생성하지 못했어요. 확인된 보장 정보는 그대로 있으니",
+    "총평 문장만 생성하지 못했어요. 확인된 보장과 보험료 정보는 그대로",
   );
 });
 
@@ -766,6 +821,10 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
         is_medical_indemnity: false,
         is_damage_policy: true,
         duplicate_across_contracts: true,
+        guidance_key: "auto",
+        explanation:
+          "자동차 사고로 실제 발생한 손해나 비용을 약관에서 정한 범위 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
       },
       {
         policy_id: "driver-2",
@@ -779,6 +838,10 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
         is_medical_indemnity: false,
         is_damage_policy: true,
         duplicate_across_contracts: true,
+        guidance_key: "auto",
+        explanation:
+          "자동차 사고로 실제 발생한 손해나 비용을 약관에서 정한 범위 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
       },
     ],
   };
@@ -786,7 +849,7 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
   render(<PortfolioAnalysisPanel {...baseProps()} summary={reviewSummary} />);
 
   const actualLossReview = screen
-    .getByRole("heading", { name: "여러 계약에 겹쳐 있는 보장" })
+    .getByRole("heading", { name: "실손의료보험 외에 겹쳐 있는 보장" })
     .closest("article");
   const medicalIndemnityCard = screen
     .getByRole("heading", { name: "실손의료보험" })
@@ -795,17 +858,152 @@ test("reviews duplicate actual-loss coverages beyond medical indemnity", () => {
   expect(actualLossReview).not.toBeNull();
   expect(medicalIndemnityCard).not.toBeNull();
   expect(
+    within(actualLossReview!).getByText("실손형 보장 중복 확인"),
+  ).toBeInTheDocument();
+  expect(
+    within(actualLossReview!).getByText("중복 확인된 비의료 실손형 담보 1건"),
+  ).toBeInTheDocument();
+  expect(
+    within(actualLossReview!).getByText("자동차사고벌금(실손)"),
+  ).toBeInTheDocument();
+  expect(
     within(actualLossReview!).getByText(
-      /여러 계약에 표시된 담보: 자동차사고벌금/,
+      "자동차 사고로 실제 발생한 손해나 비용을 약관에서 정한 범위 안에서 보상하는 담보예요.",
     ),
   ).toBeInTheDocument();
   expect(
-    within(actualLossReview!).queryByText(
-      /실손형 지급 방식|중복 보상 제한|실제 발생한 손해/,
+    within(actualLossReview!).getByText(
+      "보험사A · 운전자보험 A · 자동차사고벌금(실손)",
     ),
-  ).not.toBeInTheDocument();
+  ).toBeInTheDocument();
+  expect(
+    within(actualLossReview!).getByText(
+      "보험사A · 운전자보험 B · 자동차사고벌금(실손)",
+    ),
+  ).toBeInTheDocument();
   expect(
     within(medicalIndemnityCard!).queryByText(/자동차사고벌금/),
+  ).not.toBeInTheDocument();
+});
+
+test("reviews duplicate medical indemnity coverages inside the medical card", async () => {
+  const user = userEvent.setup();
+  const reviewSummary: PortfolioSummary = {
+    ...summary,
+    actual_loss_coverages: [
+      {
+        policy_id: "medical-1",
+        insurer: "보험사A",
+        product_name: "실손보험 A",
+        coverage_name: "상해실손의료비",
+        normalized_name: "상해실손의료비",
+        original_amount: "5,000만원",
+        major_category: "치료",
+        coverage_domain: "medical_expense",
+        is_medical_indemnity: true,
+        is_damage_policy: false,
+        duplicate_across_contracts: true,
+        guidance_key: "injury_medical_expense",
+        explanation:
+          "상해로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
+      },
+      {
+        policy_id: "medical-2",
+        insurer: "보험사B",
+        product_name: "실손보험 B",
+        coverage_name: "상해실손의료비",
+        normalized_name: "상해실손의료비",
+        original_amount: "5,000만원",
+        major_category: "치료",
+        coverage_domain: "medical_expense",
+        is_medical_indemnity: true,
+        is_damage_policy: false,
+        duplicate_across_contracts: true,
+        guidance_key: "injury_medical_expense",
+        explanation:
+          "상해로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
+      },
+      {
+        policy_id: "medical-1",
+        insurer: "보험사A",
+        product_name: "실손보험 A",
+        coverage_name: "질병실손의료비",
+        normalized_name: "질병실손의료비",
+        original_amount: "5,000만원",
+        major_category: "치료",
+        coverage_domain: "medical_expense",
+        is_medical_indemnity: true,
+        is_damage_policy: false,
+        duplicate_across_contracts: true,
+        guidance_key: "disease_medical_expense",
+        explanation:
+          "질병으로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
+      },
+      {
+        policy_id: "medical-2",
+        insurer: "보험사B",
+        product_name: "실손보험 B",
+        coverage_name: "질병실손의료비",
+        normalized_name: "질병실손의료비",
+        original_amount: "5,000만원",
+        major_category: "치료",
+        coverage_domain: "medical_expense",
+        is_medical_indemnity: true,
+        is_damage_policy: false,
+        duplicate_across_contracts: true,
+        guidance_key: "disease_medical_expense",
+        explanation:
+          "질병으로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요.",
+        explanation_basis: "generated_guidance",
+      },
+    ],
+  };
+
+  render(<PortfolioAnalysisPanel {...baseProps()} summary={reviewSummary} />);
+
+  const medicalIndemnityCard = screen
+    .getByRole("heading", { name: "실손의료보험" })
+    .closest("section");
+  const actualLossReview = screen
+    .getByRole("heading", { name: "실손의료보험 외에 겹쳐 있는 보장" })
+    .closest("article");
+
+  expect(medicalIndemnityCard).not.toBeNull();
+  expect(actualLossReview).not.toBeNull();
+  expect(
+    within(medicalIndemnityCard!).getByText(
+      "중복된 실손의료비 2종 · 담보 내역 4건",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(medicalIndemnityCard!).queryByText("실손의료보험 중복 확인"),
+  ).not.toBeInTheDocument();
+  expect(
+    within(medicalIndemnityCard!).getAllByText("2개 계약에서 확인됐어요."),
+  ).toHaveLength(2);
+
+  const injuryDisclosure = within(medicalIndemnityCard!).getByRole("button", {
+    name: /상해실손의료비/,
+  });
+  expect(injuryDisclosure).toHaveAttribute("aria-expanded", "false");
+
+  await user.click(injuryDisclosure);
+  expect(injuryDisclosure).toHaveAttribute("aria-expanded", "true");
+  expect(
+    within(medicalIndemnityCard!).getByText(
+      "보험사A · 실손보험 A · 상해실손의료비",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(medicalIndemnityCard!).getByText(
+      "보험사B · 실손보험 B · 상해실손의료비",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(actualLossReview!).queryByText(/상해실손의료비/),
   ).not.toBeInTheDocument();
 });
 

@@ -16,6 +16,20 @@ CoverageDomain = Literal[
     "auto",
     "other",
 ]
+ActualLossGuidanceKey = Literal[
+    "injury_medical_expense",
+    "disease_medical_expense",
+    "inpatient_medical_expense",
+    "outpatient_medical_expense",
+    "prescription_medical_expense",
+    "medical_expense",
+    "travel_medical_expense",
+    "legal_cost",
+    "property_damage",
+    "liability",
+    "auto",
+    "other",
+]
 
 Gender = Literal["남성", "여성", "기타", "미상"]
 DemographicSource = Literal["policy", "user", "unknown"]

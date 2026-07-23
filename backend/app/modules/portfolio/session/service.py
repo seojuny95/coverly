@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
@@ -23,7 +25,10 @@ from app.modules.portfolio.session.policy_projection import (
     policy_for_storage,
     rag_session_id_from_result,
 )
-from app.modules.portfolio.session.repository import PortfolioSessionRepository
+from app.modules.portfolio.session.repository import (
+    PortfolioSessionRepository,
+    PortfolioSessionRepositoryUnavailable,
+)
 from app.rag.policy.session_tokens import (
     InvalidPolicySessionToken,
     PolicySessionClaims,
@@ -54,6 +59,10 @@ class PortfolioSessionDocumentCancelled(Exception):
 
 class PortfolioSessionDocumentConflict(Exception):
     """The document id is already stored or has an upload in progress."""
+
+
+class PortfolioSessionUnavailable(Exception):
+    """The portfolio session store is temporarily unavailable."""
 
 
 @dataclass(frozen=True)
@@ -91,14 +100,15 @@ class PortfolioSessionService:
         expires_at = created_at + timedelta(seconds=settings.policy_rag_ttl_seconds)
         max_expires_at = created_at + timedelta(seconds=settings.policy_rag_max_ttl_seconds)
         session_id = uuid.uuid4().hex
-        self._repository.create(
-            NewPortfolioSession(
-                id=session_id,
-                created_at=created_at,
-                expires_at=expires_at,
-                max_expires_at=max_expires_at,
+        with self._translate_repository_errors():
+            self._repository.create(
+                NewPortfolioSession(
+                    id=session_id,
+                    created_at=created_at,
+                    expires_at=expires_at,
+                    max_expires_at=max_expires_at,
+                )
             )
-        )
         return PortfolioSessionAccess(
             token=sign_policy_session_id(
                 session_id,
@@ -142,17 +152,18 @@ class PortfolioSessionService:
         settings = get_settings()
         resolved_document_id = document_id or uuid.uuid4().hex
         reservation_id = uuid.uuid4().hex
-        reserved = self._repository.reserve_document(
-            claims.session_id,
-            resolved_document_id,
-            reservation_id,
-            now=current,
-            expires_at=min(
-                claims.expires_at,
-                current + timedelta(seconds=settings.policy_upload_reservation_ttl_seconds),
-            ),
-            max_documents=settings.portfolio_session_max_documents,
-        )
+        with self._translate_repository_errors():
+            reserved = self._repository.reserve_document(
+                claims.session_id,
+                resolved_document_id,
+                reservation_id,
+                now=current,
+                expires_at=min(
+                    claims.expires_at,
+                    current + timedelta(seconds=settings.policy_upload_reservation_ttl_seconds),
+                ),
+                max_documents=settings.portfolio_session_max_documents,
+            )
         if reserved == "limit_exceeded":
             raise PortfolioSessionDocumentLimitExceeded
         if reserved == "cancelled":
@@ -178,15 +189,16 @@ class PortfolioSessionService:
         rag_session_id = rag_session_id_from_result(result, now=current)
         try:
             policy = policy_for_storage(result, document_id=reservation.document_id)
-            stored = self._repository.complete_document(
-                reservation,
-                StoredPolicyDocument(
-                    id=reservation.document_id,
-                    policy=policy,
-                    rag_session_id=rag_session_id,
-                ),
-                now=current,
-            )
+            with self._translate_repository_errors():
+                stored = self._repository.complete_document(
+                    reservation,
+                    StoredPolicyDocument(
+                        id=reservation.document_id,
+                        policy=policy,
+                        rag_session_id=rag_session_id,
+                    ),
+                    now=current,
+                )
         except Exception:
             self._discard_upload(reservation, rag_session_id=rag_session_id)
             raise
@@ -199,7 +211,13 @@ class PortfolioSessionService:
 
     def release_upload(self, reservation: PolicyDocumentReservation) -> None:
         try:
-            self._repository.release_document(reservation)
+            with self._translate_repository_errors():
+                self._repository.release_document(reservation)
+        except PortfolioSessionUnavailable as exc:
+            logger.warning(
+                "Portfolio document reservation release failed with %s",
+                type(exc).__name__,
+            )
         except Exception as exc:
             logger.warning(
                 "Portfolio document reservation release failed with %s",
@@ -221,11 +239,12 @@ class PortfolioSessionService:
 
         current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
-        remaining = self._repository.consume_counsel_turn(
-            claims.session_id,
-            now=current,
-            max_turns=max_turns,
-        )
+        with self._translate_repository_errors():
+            remaining = self._repository.consume_counsel_turn(
+                claims.session_id,
+                now=current,
+                max_turns=max_turns,
+            )
         if remaining is None:
             raise CounselTurnLimitReached
         return remaining
@@ -240,7 +259,8 @@ class PortfolioSessionService:
 
         current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
-        self._repository.refund_counsel_turn(claims.session_id, now=current)
+        with self._translate_repository_errors():
+            self._repository.refund_counsel_turn(claims.session_id, now=current)
 
     def counsel_turns_remaining(
         self,
@@ -253,11 +273,12 @@ class PortfolioSessionService:
 
         current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
-        remaining = self._repository.counsel_turns_remaining(
-            claims.session_id,
-            now=current,
-            max_turns=max_turns,
-        )
+        with self._translate_repository_errors():
+            remaining = self._repository.counsel_turns_remaining(
+                claims.session_id,
+                now=current,
+                max_turns=max_turns,
+            )
         if remaining is None:
             raise InvalidPortfolioSessionToken
         return remaining
@@ -272,11 +293,12 @@ class PortfolioSessionService:
         current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
         selected_ids = tuple(dict.fromkeys(policy_ids)) if policy_ids else None
-        snapshot = self._repository.snapshot(
-            claims.session_id,
-            policy_ids=selected_ids,
-            now=current,
-        )
+        with self._translate_repository_errors():
+            snapshot = self._repository.snapshot(
+                claims.session_id,
+                policy_ids=selected_ids,
+                now=current,
+            )
         if snapshot is None:
             raise InvalidPortfolioSessionToken
         return snapshot
@@ -296,11 +318,12 @@ class PortfolioSessionService:
         )
         if next_expires_at <= current:
             raise InvalidPortfolioSessionToken
-        rag_session_ids = self._repository.extend(
-            claims.session_id,
-            next_expires_at,
-            now=current,
-        )
+        with self._translate_repository_errors():
+            rag_session_ids = self._repository.extend(
+                claims.session_id,
+                next_expires_at,
+                now=current,
+            )
         if rag_session_ids is None:
             raise InvalidPortfolioSessionToken
         for rag_session_id in rag_session_ids:
@@ -322,7 +345,8 @@ class PortfolioSessionService:
 
     def delete(self, token: str, *, now: datetime | None = None) -> None:
         claims = self._verify(token, now=now or datetime.now(UTC))
-        rag_session_ids = self._repository.delete(claims.session_id)
+        with self._translate_repository_errors():
+            rag_session_ids = self._repository.delete(claims.session_id)
         if rag_session_ids is None:
             raise InvalidPortfolioSessionToken
         for rag_session_id in rag_session_ids:
@@ -338,11 +362,12 @@ class PortfolioSessionService:
         current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
         selected_ids = tuple(dict.fromkeys(document_ids))
-        rag_session_ids = self._repository.delete_documents(
-            claims.session_id,
-            selected_ids,
-            now=current,
-        )
+        with self._translate_repository_errors():
+            rag_session_ids = self._repository.delete_documents(
+                claims.session_id,
+                selected_ids,
+                now=current,
+            )
         if rag_session_ids is None:
             raise InvalidPortfolioSessionToken
         for rag_session_id in rag_session_ids:
@@ -358,18 +383,20 @@ class PortfolioSessionService:
         *,
         context_hash: str,
     ) -> CachedPortfolioAnalysis | None:
-        return self._repository.load_cached_analysis(
-            snapshot.session_id,
-            version=snapshot.version,
-            context_hash=context_hash,
-        )
+        with self._translate_repository_errors():
+            return self._repository.load_cached_analysis(
+                snapshot.session_id,
+                version=snapshot.version,
+                context_hash=context_hash,
+            )
 
     def save_cached_analysis(
         self,
         snapshot: PortfolioSessionSnapshot,
         analysis: CachedPortfolioAnalysis,
     ) -> None:
-        self._repository.save_cached_analysis(snapshot.session_id, analysis)
+        with self._translate_repository_errors():
+            self._repository.save_cached_analysis(snapshot.session_id, analysis)
 
     @staticmethod
     def _verify(token: str, *, now: datetime) -> PolicySessionClaims:
@@ -386,6 +413,13 @@ class PortfolioSessionService:
                 "Portfolio RAG session deletion failed with %s",
                 type(exc).__name__,
             )
+
+    @contextmanager
+    def _translate_repository_errors(self) -> Iterator[None]:
+        try:
+            yield
+        except PortfolioSessionRepositoryUnavailable as exc:
+            raise PortfolioSessionUnavailable from exc
 
     def _discard_upload(
         self,

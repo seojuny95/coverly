@@ -12,6 +12,7 @@ export const POLICY_RESULT_DEFAULTS = {
   },
   보장목록: [],
   분석상태: "완료",
+  policy_terms_status: "available",
 } satisfies InsurancePolicyResult;
 
 export const POLICY_PARSE_RESPONSE_DEFAULTS = {

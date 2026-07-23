@@ -74,6 +74,36 @@ describe("portfolio session requests", () => {
     expect(body).not.toHaveProperty("policies");
   });
 
+  test("composes the caller cancellation signal for summary requests", async () => {
+    const caller = new AbortController();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          totals: [],
+          actual_loss_coverages: [],
+          excluded_coverages: [],
+          excluded_auto_policy_count: 0,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await requestPortfolioSummary(
+      sessionDocuments,
+      {
+        has_dependent_family: false,
+        has_minor_children: false,
+        has_major_debt: false,
+      },
+      "portfolio-token",
+      caller.signal,
+    );
+
+    const signal = fetchMock.mock.calls[0]?.[1]?.signal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal).not.toBe(caller.signal);
+  });
+
   test("sends only the token and selected document ids for overview generation", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(

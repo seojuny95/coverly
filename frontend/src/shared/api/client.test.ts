@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { apiResponseError, apiUrl, readApiErrorPayload } from "./client";
+import {
+  ApiResponseError,
+  apiResponseError,
+  apiUrl,
+  hasApiErrorCode,
+  isExpiredPortfolioSessionApiError,
+  readApiErrorPayload,
+} from "./client";
 
 describe("shared API client", () => {
   it("builds only paths declared by the generated contract", () => {
@@ -62,5 +69,17 @@ describe("shared API client", () => {
     );
 
     expect(result).toEqual({ detail: null, isJson: true });
+  });
+
+  it("identifies typed API error codes without duplicating status checks", () => {
+    const error = new ApiResponseError({
+      code: "INVALID_PORTFOLIO_SESSION",
+      message: "expired",
+      status: 403,
+    });
+
+    expect(hasApiErrorCode(error, "INVALID_PORTFOLIO_SESSION")).toBe(true);
+    expect(hasApiErrorCode(error, "PDF_TOO_LARGE")).toBe(false);
+    expect(isExpiredPortfolioSessionApiError(error)).toBe(true);
   });
 });

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 
-from psycopg import Connection
+from psycopg import Connection, InterfaceError, OperationalError
 from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.models import (
@@ -21,6 +23,7 @@ from app.modules.portfolio.session.models import (
 from app.modules.portfolio.session.repository import (
     CompleteDocumentResult,
     PortfolioPolicySelectionNotFound,
+    PortfolioSessionRepositoryUnavailable,
     ReserveDocumentResult,
 )
 
@@ -38,8 +41,16 @@ class PgPortfolioSessionRepository:
     def close(self) -> None:
         self._pool.close()
 
+    @contextmanager
+    def _connection(self) -> Iterator[Connection[dict[str, Any]]]:
+        try:
+            with self._pool.connection() as connection:
+                yield connection
+        except (OperationalError, InterfaceError, PoolTimeout) as exc:
+            raise PortfolioSessionRepositoryUnavailable from exc
+
     def create(self, session: NewPortfolioSession) -> None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             connection.execute(
                 "DELETE FROM private.portfolio_sessions WHERE max_expires_at <= now()"
             )
@@ -68,7 +79,7 @@ class PgPortfolioSessionRepository:
         take the last turn the way a separate read-then-write could.
         """
 
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 """UPDATE private.portfolio_sessions
                       SET counsel_turns_used = counsel_turns_used + 1
@@ -89,7 +100,7 @@ class PgPortfolioSessionRepository:
         now: datetime,
         max_turns: int,
     ) -> int | None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 """SELECT counsel_turns_used FROM private.portfolio_sessions
                     WHERE id = %s AND expires_at > %s""",
@@ -100,7 +111,7 @@ class PgPortfolioSessionRepository:
         return max(0, max_turns - int(row["counsel_turns_used"]))
 
     def refund_counsel_turn(self, session_id: str, *, now: datetime) -> bool:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 """UPDATE private.portfolio_sessions
                       SET counsel_turns_used = counsel_turns_used - 1
@@ -122,7 +133,7 @@ class PgPortfolioSessionRepository:
         expires_at: datetime,
         max_documents: int,
     ) -> ReserveDocumentResult:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             session = connection.execute(
                 """SELECT id FROM private.portfolio_sessions
                    WHERE id = %s AND expires_at > %s
@@ -185,7 +196,7 @@ class PgPortfolioSessionRepository:
         now: datetime,
     ) -> CompleteDocumentResult:
         payload = document.policy.model_dump(mode="json", exclude_none=True)
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             session = connection.execute(
                 """SELECT id FROM private.portfolio_sessions
                    WHERE id = %s AND expires_at > %s
@@ -243,7 +254,7 @@ class PgPortfolioSessionRepository:
         return "stored"
 
     def release_document(self, reservation: PolicyDocumentReservation) -> None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """DELETE FROM private.policy_document_reservations
                    WHERE portfolio_session_id = %s AND document_id = %s
@@ -262,7 +273,7 @@ class PgPortfolioSessionRepository:
         policy_ids: tuple[str, ...] | None,
         now: datetime,
     ) -> PortfolioSessionSnapshot | None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             session = connection.execute(
                 """SELECT version FROM private.portfolio_sessions
                    WHERE id = %s AND expires_at > %s""",
@@ -304,7 +315,7 @@ class PgPortfolioSessionRepository:
         *,
         now: datetime,
     ) -> tuple[str, ...] | None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             updated = connection.execute(
                 """UPDATE private.portfolio_sessions
                    SET expires_at = %s
@@ -322,7 +333,7 @@ class PgPortfolioSessionRepository:
         return tuple(str(row["rag_session_id"]) for row in rows)
 
     def delete(self, session_id: str) -> tuple[str, ...] | None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             session = connection.execute(
                 """SELECT id FROM private.portfolio_sessions
                    WHERE id = %s
@@ -351,7 +362,7 @@ class PgPortfolioSessionRepository:
         *,
         now: datetime,
     ) -> tuple[str, ...] | None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             session = connection.execute(
                 """SELECT id FROM private.portfolio_sessions
                    WHERE id = %s AND expires_at > %s
@@ -401,7 +412,7 @@ class PgPortfolioSessionRepository:
         version: int,
         context_hash: str,
     ) -> CachedPortfolioAnalysis | None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 """SELECT analysis_version, analysis_context_hash, analysis_result
                    FROM private.portfolio_sessions
@@ -422,7 +433,7 @@ class PgPortfolioSessionRepository:
         session_id: str,
         analysis: CachedPortfolioAnalysis,
     ) -> None:
-        with self._pool.connection() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """UPDATE private.portfolio_sessions
                    SET analysis_version = %s,

@@ -1,4 +1,9 @@
 import { apiResponseError, apiUrl } from "../../shared/api/client";
+import {
+  ApiRequestTimeoutError,
+  PORTFOLIO_SESSION_REQUEST_TIMEOUT_MS,
+  requestWithDeadline,
+} from "../../shared/api/request";
 import type {
   PortfolioSessionDocumentsDeleteRequest,
   PortfolioSessionRequest,
@@ -23,38 +28,58 @@ export class PortfolioSessionExpiredError extends Error {
   }
 }
 
-export async function createPortfolioSession(): Promise<PortfolioSessionResult> {
-  return requestSession("/portfolio/sessions");
+export async function createPortfolioSession(
+  signal?: AbortSignal,
+): Promise<PortfolioSessionResult> {
+  return requestSession("/portfolio/sessions", undefined, signal);
 }
 
 export async function refreshPortfolioSession(
   portfolioSessionToken: string,
+  signal?: AbortSignal,
 ): Promise<PortfolioSessionResult> {
-  return requestSession("/portfolio/sessions/refresh", portfolioSessionToken);
+  return requestSession(
+    "/portfolio/sessions/refresh",
+    portfolioSessionToken,
+    signal,
+  );
 }
 
 export async function deletePortfolioSession(
   portfolioSessionToken: string,
+  signal?: AbortSignal,
 ): Promise<void> {
-  await request("/portfolio/sessions/delete", portfolioSessionToken);
+  await request(
+    "/portfolio/sessions/delete",
+    portfolioSessionToken,
+    undefined,
+    signal,
+  );
 }
 
 export async function deletePortfolioSessionDocuments(
   portfolioSessionToken: string,
   documentIds: string[],
+  signal?: AbortSignal,
 ): Promise<void> {
   if (documentIds.length === 0) return;
-  await request("/portfolio/sessions/documents/delete", undefined, {
-    portfolioSessionToken,
-    documentIds,
-  } satisfies PortfolioSessionDocumentsDeleteRequest);
+  await request(
+    "/portfolio/sessions/documents/delete",
+    undefined,
+    {
+      portfolioSessionToken,
+      documentIds,
+    } satisfies PortfolioSessionDocumentsDeleteRequest,
+    signal,
+  );
 }
 
 async function requestSession(
   path: SessionPath,
   token?: string,
+  signal?: AbortSignal,
 ): Promise<PortfolioSessionResult> {
-  const response = await request(path, token);
+  const response = await request(path, token, undefined, signal);
   return (await response.json()) as PortfolioSessionResult;
 }
 
@@ -62,6 +87,7 @@ async function request(
   path: SessionPath,
   token?: string,
   explicitBody?: SessionRequestBody,
+  signal?: AbortSignal,
 ): Promise<Response> {
   let response: Response;
   try {
@@ -70,12 +96,22 @@ async function request(
       (token
         ? ({ portfolioSessionToken: token } satisfies PortfolioSessionRequest)
         : undefined);
-    response = await fetch(apiUrl(path), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch {
+    response = await requestWithDeadline(
+      apiUrl(path),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      },
+      {
+        signal,
+        timeoutMs: PORTFOLIO_SESSION_REQUEST_TIMEOUT_MS,
+        timeoutMessage: "Portfolio session request timed out",
+      },
+    );
+  } catch (error) {
+    if (error instanceof ApiRequestTimeoutError) throw error;
+    if (error instanceof Error && error.name === "AbortError") throw error;
     throw new Error("Portfolio session request failed");
   }
 

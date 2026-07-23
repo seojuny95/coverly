@@ -2,15 +2,33 @@
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+from typing import Protocol, cast
+
+from defusedxml.ElementTree import fromstring
 
 from app.rag.official.models import RagChunk
 from app.rag.official.sources import OfficialSource
 from app.rag.text import split_within_char_limit
 
 
+class _XmlElement(Protocol):
+    text: str | None
+
+    def findall(self, path: str) -> list[_XmlElement]: ...
+
+    def findtext(self, path: str) -> str | None: ...
+
+
 def build_law_xml_chunks(source: OfficialSource, xml_text: str) -> list[RagChunk]:
-    root = ET.fromstring(xml_text)
+    root = cast(
+        _XmlElement,
+        fromstring(
+            xml_text,
+            forbid_dtd=True,
+            forbid_entities=True,
+            forbid_external=True,
+        ),
+    )
     chunks: list[RagChunk] = []
     for index, article in enumerate(root.findall(".//조문단위"), start=1):
         if article.findtext("조문여부") != "조문":
@@ -49,7 +67,7 @@ def build_law_xml_chunks(source: OfficialSource, xml_text: str) -> list[RagChunk
     return chunks
 
 
-def _law_article_text(article: ET.Element) -> str:
+def _law_article_text(article: _XmlElement) -> str:
     values: list[str] = []
     for tag in ("조문내용", "조문참고자료"):
         text = article.findtext(tag)

@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from app.modules.coverage.contracts import CoverageDomain
+from app.modules.coverage.contracts import ActualLossGuidanceKey, CoverageDomain
 
 PaymentBasis = Literal["fixed", "indemnity", "unknown"]
 MedicalIndemnityStatus = Literal["confirmed", "excluded", "unknown"]
@@ -52,6 +52,12 @@ class IndemnityClassification:
     payment_basis: PaymentBasis
     coverage_domain: CoverageDomain
     medical_indemnity_status: MedicalIndemnityStatus
+
+
+@dataclass(frozen=True)
+class ActualLossGuidance:
+    key: ActualLossGuidanceKey
+    description: str
 
 
 def _normalize(value: str) -> str:
@@ -188,6 +194,102 @@ def classify_indemnity(
         payment_basis=payment_basis,
         coverage_domain=domain,
         medical_indemnity_status=medical_status,
+    )
+
+
+def actual_loss_guidance(
+    coverage: CoverageContext,
+    classification: IndemnityClassification,
+) -> ActualLossGuidance:
+    """Explain the classified actual-loss domain without making payout claims."""
+
+    domain = classification.coverage_domain
+    if domain == "medical_expense":
+        return _medical_expense_guidance(_coverage_text(coverage))
+
+    guidance_by_domain: dict[CoverageDomain, ActualLossGuidance] = {
+        "travel_medical_expense": ActualLossGuidance(
+            key="travel_medical_expense",
+            description=(
+                "여행 중 실제로 부담한 의료비를 약관에서 정한 지역과 한도 안에서 보상하는 담보예요."
+            ),
+        ),
+        "legal_cost": ActualLossGuidance(
+            key="legal_cost",
+            description=(
+                "벌금이나 변호사 비용처럼 실제로 발생한 법률 비용을 약관 한도 안에서 "
+                "보상하는 담보예요."
+            ),
+        ),
+        "property_damage": ActualLossGuidance(
+            key="property_damage",
+            description=(
+                "재산에 실제로 발생한 손해를 약관에서 정한 대상과 한도 안에서 보상하는 담보예요."
+            ),
+        ),
+        "liability": ActualLossGuidance(
+            key="liability",
+            description=("타인에게 배상해야 하는 실제 손해를 약관 한도 안에서 보상하는 담보예요."),
+        ),
+        "auto": ActualLossGuidance(
+            key="auto",
+            description=(
+                "자동차 사고로 실제 발생한 손해나 비용을 약관에서 정한 범위 안에서 "
+                "보상하는 담보예요."
+            ),
+        ),
+        "other": ActualLossGuidance(
+            key="other",
+            description=(
+                "정해진 금액을 더해 받는 방식이 아니라 실제 발생한 손해를 약관 "
+                "한도 안에서 보상하는 담보예요."
+            ),
+        ),
+    }
+    return guidance_by_domain[domain]
+
+
+def _medical_expense_guidance(text: str) -> ActualLossGuidance:
+    if "상해" in text and "질병" not in text:
+        return ActualLossGuidance(
+            key="injury_medical_expense",
+            description=(
+                "상해로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요."
+            ),
+        )
+    if "질병" in text and "상해" not in text:
+        return ActualLossGuidance(
+            key="disease_medical_expense",
+            description=(
+                "질병으로 치료받았을 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요."
+            ),
+        )
+    if "입원" in text:
+        return ActualLossGuidance(
+            key="inpatient_medical_expense",
+            description=(
+                "입원 치료 과정에서 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요."
+            ),
+        )
+    if "통원" in text or "외래" in text:
+        return ActualLossGuidance(
+            key="outpatient_medical_expense",
+            description=(
+                "통원이나 외래 진료 때 실제로 부담한 의료비를 약관 한도 안에서 보상하는 담보예요."
+            ),
+        )
+    if "처방" in text or "약제" in text:
+        return ActualLossGuidance(
+            key="prescription_medical_expense",
+            description=(
+                "처방 조제비처럼 실제로 부담한 약제 비용을 약관 한도 안에서 보상하는 담보예요."
+            ),
+        )
+    return ActualLossGuidance(
+        key="medical_expense",
+        description=(
+            "실제로 부담한 의료비를 자기부담금과 약관 한도 등을 적용해 보상하는 담보예요."
+        ),
     )
 
 

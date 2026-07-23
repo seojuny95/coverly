@@ -30,6 +30,7 @@ from app.modules.portfolio.session.service import (
     CounselTurnLimitReached,
     InvalidPortfolioSessionToken,
     PortfolioSessionService,
+    PortfolioSessionUnavailable,
 )
 from app.modules.qa.agent import AgentStreamRunner, create_agent, run_agent_streamed
 from app.modules.qa.context import QaContext
@@ -86,6 +87,12 @@ async def stream_qa_answer(
             code="INVALID_PORTFOLIO_SESSION",
             message="분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
         ) from None
+    except PortfolioSessionUnavailable:
+        raise ApiError(
+            status_code=503,
+            code="portfolio_session_unavailable",
+            message="분석 세션을 준비하지 못했어요. 잠시 후 다시 시도해주세요.",
+        ) from None
 
     try:
         turns_remaining = await asyncio.to_thread(
@@ -101,6 +108,12 @@ async def stream_qa_answer(
                 f"이 분석에서는 질문을 {settings.counsel_max_turns_per_session}번까지 할 수 "
                 "있어요. 새 증권을 올려 분석을 다시 시작하면 질문을 이어갈 수 있어요."
             ),
+        ) from None
+    except PortfolioSessionUnavailable:
+        raise ApiError(
+            status_code=503,
+            code="portfolio_session_unavailable",
+            message="분석 세션을 준비하지 못했어요. 잠시 후 다시 시도해주세요.",
         ) from None
 
     question = mask_qa_pii(request.question)
@@ -155,11 +168,24 @@ async def _build_event_stream(
             if delta:
                 yield serialize_event(QaDeltaEvent(text=delta))
     except asyncio.CancelledError:
-        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+        await _refund_counsel_turn_best_effort(sessions, session_id)
         raise
     except Exception as exc:
         logger.warning("qa_stream_failed", extra={"error_type": type(exc).__name__})
-        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+        await _refund_counsel_turn_best_effort(sessions, session_id)
         yield serialize_event(QaDeltaEvent(text=_QA_STREAM_FAILURE_MESSAGE))
 
     yield serialize_event(QaEndEvent())
+
+
+async def _refund_counsel_turn_best_effort(
+    sessions: PortfolioSessionService,
+    session_id: str,
+) -> None:
+    try:
+        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+    except Exception as exc:
+        logger.warning(
+            "qa_turn_refund_failed",
+            extra={"error_type": type(exc).__name__},
+        )

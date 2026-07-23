@@ -16,6 +16,12 @@ from app.rag.official.chunkers.law import build_law_xml_chunks
 from app.rag.official.models import RagChunk
 from app.rag.official.sources import OfficialSource, rag_sources
 
+MAX_OFFICIAL_XML_BYTES = 5 * 1024 * 1024
+
+
+class OfficialXmlSizeLimitExceededError(ValueError):
+    """An official XML source is too large to parse safely."""
+
 
 @lru_cache(maxsize=1)
 def load_official_chunks() -> tuple[RagChunk, ...]:
@@ -37,12 +43,18 @@ def _iter_official_chunks() -> Iterable[RagChunk]:
 
 
 def _load_pdf_chunks(source: OfficialSource) -> list[RagChunk]:
-    assert source.absolute_path is not None
-    with pdfplumber.open(str(source.absolute_path)) as pdf:
+    path = source.absolute_path
+    if path is None:
+        raise ValueError(f"{source.id}: official PDF path is required")
+    with pdfplumber.open(str(path)) as pdf:
         pages = [(page.extract_text() or "") for page in pdf.pages]
     return build_chunks(source, pages)
 
 
 def _load_law_xml_chunks(source: OfficialSource) -> list[RagChunk]:
-    assert source.absolute_path is not None
-    return build_law_xml_chunks(source, source.absolute_path.read_text(encoding="utf-8"))
+    path = source.absolute_path
+    if path is None:
+        raise ValueError(f"{source.id}: official XML path is required")
+    if path.stat().st_size > MAX_OFFICIAL_XML_BYTES:
+        raise OfficialXmlSizeLimitExceededError(f"{source.id}: official XML exceeds the size limit")
+    return build_law_xml_chunks(source, path.read_text(encoding="utf-8"))

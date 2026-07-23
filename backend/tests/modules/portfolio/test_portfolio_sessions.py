@@ -294,6 +294,7 @@ def test_session_stores_only_qa_safe_policy_facts_and_selects_documents() -> Non
             }
         ],
         "분석상태": "완료",
+        "policy_terms_status": "available",
         "문자수": 100,
         "문서세션ID": rag_token,
     }
@@ -611,6 +612,7 @@ def _empty_pipeline_result() -> PipelineResult:
         "기본정보": {"보험사": "보험사A"},
         "보장목록": [],
         "분석상태": "완료",
+        "policy_terms_status": "unavailable",
         "문자수": 1,
     }
 

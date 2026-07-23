@@ -450,6 +450,35 @@ def test_non_medical_actual_loss_is_kept_out_of_individual_review_rows() -> None
     assert result.actual_loss_coverages[0].is_damage_policy is False
 
 
+@pytest.mark.parametrize(
+    ("coverage_name", "guidance_key", "expected_phrase"),
+    [
+        ("상해실손의료비", "injury_medical_expense", "상해로 치료받았을 때"),
+        ("질병실손의료비", "disease_medical_expense", "질병으로 치료받았을 때"),
+        ("일상생활배상책임(실손)", "liability", "타인에게 배상해야 하는 실제 손해"),
+        ("가족화재벌금(실손)", "legal_cost", "실제로 발생한 법률 비용"),
+    ],
+)
+def test_actual_loss_guidance_comes_from_server_classification(
+    coverage_name: str,
+    guidance_key: str,
+    expected_phrase: str,
+) -> None:
+    policy = _policy(
+        "p1",
+        "건강보험",
+        "보험사A",
+        [{"담보명": coverage_name, "지급유형": "실손"}],
+    )
+
+    item = summarize_portfolio_coverages([policy]).actual_loss_coverages[0]
+
+    assert item.guidance_key == guidance_key
+    assert expected_phrase in item.explanation
+    assert item.explanation_basis == "generated_guidance"
+    assert "보장돼요" not in item.explanation
+
+
 def test_medical_expense_without_payment_type_is_kept_for_display() -> None:
     policy = _policy(
         "p1",
