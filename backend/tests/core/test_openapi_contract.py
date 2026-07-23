@@ -58,9 +58,11 @@ def test_policy_parse_openapi_schema_matches_public_response() -> None:
         "contentMediaType": "application/pdf",
         "title": "File",
         "description": (
-            "PDF document only. The server verifies the %PDF signature and accepts at most 10 MiB."
+            "PDF document only. The server verifies the %PDF signature and accepts at most "
+            "10 MiB and 100 pages."
         ),
         "x-maxBytes": 10 * 1024 * 1024,
+        "x-maxPages": 100,
     }
 
     coverage_schema = schemas["Coverage"]
@@ -97,6 +99,9 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
     }
     assert set(schemas["ApiErrorCode"]["enum"]) == {
         "PDF_TOO_LARGE",
+        "PDF_PAGE_LIMIT_EXCEEDED",
+        "PDF_COMPLEXITY_LIMIT_EXCEEDED",
+        "PDF_PARSING_BUSY",
         "INVALID_PDF",
         "PDF_PASSWORD_REQUIRED",
         "PDF_PASSWORD_INCORRECT",

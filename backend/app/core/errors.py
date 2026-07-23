@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 
 type ApiErrorCode = Literal[
     "PDF_TOO_LARGE",
+    "PDF_PAGE_LIMIT_EXCEEDED",
+    "PDF_COMPLEXITY_LIMIT_EXCEEDED",
+    "PDF_PARSING_BUSY",
     "INVALID_PDF",
     "PDF_PASSWORD_REQUIRED",
     "PDF_PASSWORD_INCORRECT",

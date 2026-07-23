@@ -4,6 +4,8 @@ from typing import Protocol
 
 from app.core.errors import ApiError
 from app.modules.policy.parsing import (
+    PdfComplexityLimitExceededError,
+    PdfPageLimitExceededError,
     PdfPasswordIncorrectError,
     PdfPasswordRequiredError,
 )
@@ -107,6 +109,18 @@ class PolicyUploadService:
                 status_code=422,
                 code="PDF_TEXT_EXTRACTION_FAILED",
                 message="PDF에서 텍스트를 추출할 수 없습니다.",
+            ) from None
+        except PdfPageLimitExceededError:
+            raise ApiError(
+                status_code=413,
+                code="PDF_PAGE_LIMIT_EXCEEDED",
+                message="분석할 수 있는 PDF 페이지 수를 초과했어요. 파일을 나눠서 올려주세요.",
+            ) from None
+        except PdfComplexityLimitExceededError:
+            raise ApiError(
+                status_code=413,
+                code="PDF_COMPLEXITY_LIMIT_EXCEEDED",
+                message="PDF의 텍스트나 표가 너무 많아요. 파일을 나눠서 올려주세요.",
             ) from None
         except ReferenceDataUnavailableError as exc:
             raise ApiError(
