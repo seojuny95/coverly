@@ -3,7 +3,11 @@ from threading import Event
 
 import pytest
 
-from app.modules.upload.parsing_capacity import PdfParsingBusyError, PdfParsingCapacity
+from app.modules.upload.parsing_capacity import (
+    PdfBufferCapacity,
+    PdfParsingBusyError,
+    PdfParsingCapacity,
+)
 
 
 def test_parsing_capacity_rejects_work_instead_of_queueing() -> None:
@@ -59,5 +63,32 @@ def test_parsing_capacity_keeps_slot_until_cancelled_call_finishes() -> None:
                 break
         else:
             raise AssertionError("parsing slot was not released after worker completion")
+
+    asyncio.run(run_scenario())
+
+
+def test_buffer_capacity_bounds_live_pdf_byte_owners() -> None:
+    async def run_scenario() -> None:
+        capacity = PdfBufferCapacity(limit=1)
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def hold_buffer() -> None:
+            async with capacity.reserve():
+                entered.set()
+                await release.wait()
+
+        owner = asyncio.create_task(hold_buffer())
+        await entered.wait()
+
+        with pytest.raises(PdfParsingBusyError):
+            async with capacity.reserve():
+                raise AssertionError("busy capacity must not yield")
+
+        release.set()
+        await owner
+
+        async with capacity.reserve():
+            pass
 
     asyncio.run(run_scenario())

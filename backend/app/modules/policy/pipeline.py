@@ -14,6 +14,7 @@ from collections.abc import Callable
 from typing import NotRequired, TypedDict
 
 from app.modules.policy.coverage.service import extract_coverages
+from app.modules.policy.isolated_parsing import parse_document_isolated
 from app.modules.policy.models import (
     Coverage,
     ParsedDocument,
@@ -55,7 +56,7 @@ def run_pipeline(
     index: Callable[[ParsedDocument], str | None] = index_policy_document,
 ) -> PipelineResult:
     if parse is parse_document:
-        doc = parse_document(pdf_bytes, password=password)
+        doc = parse_document_isolated(pdf_bytes, password=password)
     else:
         doc = parse(pdf_bytes)
     if not doc.text:

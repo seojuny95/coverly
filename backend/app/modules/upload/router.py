@@ -11,8 +11,10 @@ from app.modules.policy.pipeline import run_pipeline
 from app.modules.policy.schemas import PolicyParseResponse
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.upload.parsing_capacity import (
+    PdfBufferCapacity,
     PdfParsingBusyError,
     PdfParsingCapacity,
+    get_pdf_buffer_capacity,
     get_pdf_parsing_capacity,
 )
 from app.modules.upload.service import PolicyPipeline, PolicyUploadService
@@ -33,6 +35,7 @@ def get_policy_pipeline() -> PolicyPipeline:
 
 PolicyPipelineDep = Annotated[PolicyPipeline, Depends(get_policy_pipeline)]
 PdfParsingCapacityDep = Annotated[PdfParsingCapacity, Depends(get_pdf_parsing_capacity)]
+PdfBufferCapacityDep = Annotated[PdfBufferCapacity, Depends(get_pdf_buffer_capacity)]
 
 
 async def _read_pdf(file: UploadFile) -> bytes:
@@ -80,6 +83,7 @@ async def parse_policy(
     pipeline: PolicyPipelineDep,
     sessions: PortfolioSessionServiceDep,
     parsing_capacity: PdfParsingCapacityDep,
+    buffer_capacity: PdfBufferCapacityDep,
     document_id: Annotated[UUID, Form(alias="documentId")],
     password: str | None = Form(default=None),
     portfolio_session_token: str = Form(
@@ -88,16 +92,17 @@ async def parse_policy(
         max_length=512,
     ),
 ) -> PolicyParseResponse:
-    data = await _read_pdf(file)
-    service = PolicyUploadService(pipeline=pipeline, sessions=sessions)
     try:
-        return await parsing_capacity.run(
-            service.parse_policy,
-            pdf_bytes=data,
-            document_id=document_id.hex,
-            password=password if password else None,
-            portfolio_session_token=portfolio_session_token,
-        )
+        async with buffer_capacity.reserve():
+            data = await _read_pdf(file)
+            service = PolicyUploadService(pipeline=pipeline, sessions=sessions)
+            return await parsing_capacity.run(
+                service.parse_policy,
+                pdf_bytes=data,
+                document_id=document_id.hex,
+                password=password if password else None,
+                portfolio_session_token=portfolio_session_token,
+            )
     except PdfParsingBusyError:
         raise ApiError(
             status_code=503,

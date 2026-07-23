@@ -1,12 +1,14 @@
 """Admission control for CPU-heavy policy PDF parsing."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from threading import BoundedSemaphore
 from typing import ParamSpec, TypeVar
 
 MAX_CONCURRENT_PDF_PARSING = 2
+MAX_CONCURRENT_PDF_BUFFERS = 2
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -14,6 +16,24 @@ _R = TypeVar("_R")
 
 class PdfParsingBusyError(Exception):
     """All policy parsing workers are currently occupied."""
+
+
+class PdfBufferCapacity:
+    """Bound requests that retain a complete PDF byte buffer."""
+
+    def __init__(self, limit: int) -> None:
+        if limit < 1:
+            raise ValueError("PDF buffer capacity must be positive")
+        self._slots = BoundedSemaphore(limit)
+
+    @asynccontextmanager
+    async def reserve(self) -> AsyncIterator[None]:
+        if not self._slots.acquire(blocking=False):
+            raise PdfParsingBusyError
+        try:
+            yield
+        finally:
+            self._slots.release()
 
 
 class PdfParsingCapacity:
@@ -50,3 +70,8 @@ class PdfParsingCapacity:
 @lru_cache
 def get_pdf_parsing_capacity() -> PdfParsingCapacity:
     return PdfParsingCapacity(MAX_CONCURRENT_PDF_PARSING)
+
+
+@lru_cache
+def get_pdf_buffer_capacity() -> PdfBufferCapacity:
+    return PdfBufferCapacity(MAX_CONCURRENT_PDF_BUFFERS)
