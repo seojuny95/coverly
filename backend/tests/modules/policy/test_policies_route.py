@@ -249,6 +249,7 @@ def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) ->
             }
         ],
         "분석상태": "완료",
+        "policy_terms_status": "unavailable",
         "문자수": 42,
     }
 
@@ -295,6 +296,7 @@ def test_parse_registers_result_under_portfolio_session_without_exposing_rag_tok
         },
         "보장목록": [],
         "분석상태": "완료",
+        "policy_terms_status": "available",
         "문자수": 42,
         "문서세션ID": "internal-rag-token",
     }
@@ -361,6 +363,7 @@ def test_parse_reserves_slot_before_running_pipeline(monkeypatch: pytest.MonkeyP
             "기본정보": {},
             "보장목록": [],
             "분석상태": "완료",
+            "policy_terms_status": "unavailable",
             "문자수": 1,
         }
 
@@ -404,6 +407,7 @@ def test_parse_rejects_duplicate_document_before_running_pipeline(
             "기본정보": {},
             "보장목록": [],
             "분석상태": "완료",
+            "policy_terms_status": "unavailable",
             "문자수": 1,
         }
 
@@ -487,6 +491,7 @@ def test_parse_passes_pdf_password_to_pipeline(monkeypatch: pytest.MonkeyPatch) 
         },
         "보장목록": [],
         "분석상태": "완료",
+        "policy_terms_status": "unavailable",
         "문자수": 42,
     }
 
@@ -572,6 +577,7 @@ def test_parse_runs_coverage_extraction_for_auto_policy(monkeypatch: pytest.Monk
         },
         "보장목록": [{"담보명": "대인배상", "가입금액": "무한", "보장내용": None, "해설": None}],
         "분석상태": "완료",
+        "policy_terms_status": "unavailable",
         "문자수": 10,
     }
 
