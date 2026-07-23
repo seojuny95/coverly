@@ -79,6 +79,7 @@ export function PortfolioOverview({
             label="총평 다시 생성하기"
             pendingLabel="총평 다시 생성하는 중…"
           />
+          {isRetrying ? <OverviewRetryProgress /> : null}
         </div>
 
         <RecommendedInsuranceCards
@@ -154,5 +155,18 @@ export function PortfolioOverview({
         coverages={summary?.actual_loss_coverages ?? []}
       />
     </section>
+  );
+}
+
+function OverviewRetryProgress() {
+  return (
+    <div
+      role="progressbar"
+      aria-label="총평 다시 생성 진행"
+      aria-valuetext="총평을 다시 생성하고 있어요"
+      className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/10"
+    >
+      <div className="h-full w-1/2 animate-pulse rounded-full bg-blue-300" />
+    </div>
   );
 }

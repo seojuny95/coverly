@@ -680,6 +680,9 @@ test("shows progress while regenerating a missing overview", () => {
   });
   expect(retryButton).toBeDisabled();
   expect(retryButton).toHaveAttribute("aria-busy", "true");
+  expect(
+    screen.getByRole("progressbar", { name: "총평 다시 생성 진행" }),
+  ).toHaveAttribute("aria-valuetext", "총평을 다시 생성하고 있어요");
 });
 
 test("explains when regenerating the overview fails again", () => {
