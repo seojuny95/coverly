@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { ApiResponseError } from "@/shared/api/client";
 import type { ChatMessageData } from "./chat-message";
 import { streamPortfolioQuestion, type ChatHistoryItem } from "./api";
 
@@ -17,11 +18,13 @@ export function useInsuranceChat({
   sessionExpired,
   isChatVisible,
   initialTurnsRemaining,
+  onSessionExpired,
 }: {
   portfolioSessionToken: string;
   sessionExpired: boolean;
   isChatVisible: boolean;
   initialTurnsRemaining: number;
+  onSessionExpired?: () => void;
 }) {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessageData[]>([
@@ -37,6 +40,7 @@ export function useInsuranceChat({
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const nextMessageId = useRef(1);
+  const activeRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (isChatVisible) inputRef.current?.focus();
@@ -47,6 +51,17 @@ export function useInsuranceChat({
       endRef.current.scrollIntoView({ block: "nearest" });
     }
   }, [streaming, messages]);
+
+  useEffect(() => {
+    if (!isChatVisible) activeRequest.current?.abort();
+  }, [isChatVisible]);
+
+  useEffect(
+    () => () => {
+      activeRequest.current?.abort();
+    },
+    [],
+  );
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -78,6 +93,9 @@ export function useInsuranceChat({
       { id: userId, role: "user", text },
       { id: assistantId, role: "assistant", text: "" },
     ]);
+    activeRequest.current?.abort();
+    const request = new AbortController();
+    activeRequest.current = request;
     setStreaming(true);
     try {
       await streamPortfolioQuestion(
@@ -94,19 +112,34 @@ export function useInsuranceChat({
           onEnd: () => setSuggestions(INITIAL_SUGGESTIONS),
         },
         portfolioSessionToken,
+        request.signal,
       );
     } catch (error) {
+      if (request.signal.aborted) {
+        updateMessage(assistantId, (message) => ({
+          ...message,
+          text: "질문을 중단했어요.",
+        }));
+        setSuggestions(INITIAL_SUGGESTIONS);
+        return;
+      }
       // Another tab may have spent the last turn, so trust the server over local state.
       const outOfTurns = isTurnLimitError(error);
+      const expiredSession = isExpiredSessionError(error);
       if (outOfTurns) setTurnsRemaining(0);
+      if (expiredSession) onSessionExpired?.();
       updateMessage(assistantId, (message) => ({
         ...message,
-        text: outOfTurns
-          ? "이 분석에서 할 수 있는 질문을 모두 사용했어요."
-          : "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
+        text: chatErrorMessage({
+          outOfTurns,
+          expiredSession,
+        }),
       }));
       setSuggestions(INITIAL_SUGGESTIONS);
     } finally {
+      if (activeRequest.current === request) {
+        activeRequest.current = null;
+      }
       setStreaming(false);
     }
   }
@@ -132,4 +165,25 @@ function isTurnLimitError(error: unknown): boolean {
     "code" in error &&
     (error as { code?: unknown }).code === "COUNSEL_TURN_LIMIT_REACHED"
   );
+}
+
+function isExpiredSessionError(error: unknown): boolean {
+  return (
+    error instanceof ApiResponseError &&
+    (error.status === 403 || error.code === "INVALID_PORTFOLIO_SESSION")
+  );
+}
+
+function chatErrorMessage({
+  outOfTurns,
+  expiredSession,
+}: {
+  outOfTurns: boolean;
+  expiredSession: boolean;
+}) {
+  if (expiredSession) {
+    return "분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.";
+  }
+  if (outOfTurns) return "이 분석에서 할 수 있는 질문을 모두 사용했어요.";
+  return "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.";
 }
