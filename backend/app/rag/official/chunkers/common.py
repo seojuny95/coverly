@@ -22,7 +22,7 @@ def make_chunk(
     citation_label: str,
 ) -> RagChunk:
     key = f"{source.id}|{page_start}|{page_end}|{order}|{text}"
-    digest = hashlib.sha1(key.encode()).hexdigest()
+    digest = hashlib.sha1(key.encode(), usedforsecurity=False).hexdigest()
     return RagChunk(
         id=digest[:20],
         source_id=source.id,

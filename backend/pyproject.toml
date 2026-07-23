@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Coverly backend API"
 requires-python = ">=3.12"
 dependencies = [
+    "defusedxml>=0.7.1",
     "fastapi>=0.139.0",
     "llama-index-core>=0.14.23",
     "llama-index-embeddings-openai>=0.6.0",
@@ -24,6 +25,7 @@ dev = [
     "pypdf>=6.14.2",
     "pytest>=9.1.1",
     "ruff>=0.15.20",
+    "types-defusedxml>=0.7.0.20250822",
 ]
 
 [tool.ruff]
