@@ -1,4 +1,4 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -198,6 +198,28 @@ describe("InsuranceChatbot", () => {
     );
 
     expect(onExpand).toHaveBeenCalledOnce();
+  });
+
+  it("lets focus leave the non-modal floating chat", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <InsuranceChatbot
+          portfolioSessionToken="portfolio-token"
+          turnsRemaining={10}
+        />
+        <button type="button">채팅 밖 작업</button>
+      </>,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "내 보험 질문" });
+    within(dialog).getByRole("button", { name: "질문하기" }).focus();
+    await user.tab();
+
+    expect(screen.getByRole("button", { name: "채팅 밖 작업" })).toHaveFocus();
   });
 });
 

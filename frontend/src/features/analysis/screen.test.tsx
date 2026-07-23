@@ -113,6 +113,10 @@ describe("InsuranceAnalysisPage", () => {
     expect(
       screen.getByRole("button", { name: "보험증권 더 올리기" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      "insurance-tab",
+    );
 
     const damageCard = screen.getAllByText("손해보험")[0].closest("div");
     const healthCard = screen.getAllByText("제3보험")[0].closest("div");
