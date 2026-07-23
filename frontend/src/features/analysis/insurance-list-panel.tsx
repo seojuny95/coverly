@@ -6,7 +6,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
-import { POLICY_CLASSIFICATIONS } from "../../shared/api/generated-runtime";
+import {
+  POLICY_CLASSIFICATIONS,
+  PORTFOLIO_MAX_DOCUMENTS,
+} from "@/shared/api/generated-runtime";
 import { CircleHelp } from "lucide-react";
 
 import { InsurerLogo, InsuranceDetail, TagBadge } from "./policy-detail";
@@ -26,6 +29,7 @@ type InsuranceListPanelProps = {
   isExpanded: (id: string) => boolean;
   onToggle: (id: string) => void;
   onOpenUploadModal: () => void;
+  uploadLimitReached: boolean;
 };
 
 export function InsuranceListPanel({
@@ -40,6 +44,7 @@ export function InsuranceListPanel({
   isExpanded,
   onToggle,
   onOpenUploadModal,
+  uploadLimitReached,
 }: InsuranceListPanelProps) {
   const classificationTypeCount = POLICY_CLASSIFICATIONS.length;
 
@@ -65,9 +70,26 @@ export function InsuranceListPanel({
           </p>
         </div>
         <div className="flex flex-col items-start gap-3 sm:items-end">
-          <Button type="button" onClick={onOpenUploadModal}>
+          <Button
+            type="button"
+            onClick={onOpenUploadModal}
+            disabled={uploadLimitReached}
+            aria-describedby={
+              uploadLimitReached ? "portfolio-upload-limit-notice" : undefined
+            }
+          >
             보험증권 더 올리기
           </Button>
+          {uploadLimitReached ? (
+            <p
+              id="portfolio-upload-limit-notice"
+              role="status"
+              className="max-w-xs text-xs leading-5 text-zinc-500 sm:text-right"
+            >
+              보험증권은 최대 {PORTFOLIO_MAX_DOCUMENTS}개까지 분석할 수 있어요.
+              현재 분석에는 보험증권을 더 추가할 수 없어요.
+            </p>
+          ) : null}
           <p className="font-mono text-[10px] tracking-[0.04em] text-zinc-400">
             정리한 시각 {formatDateTime(generatedAt)}
           </p>

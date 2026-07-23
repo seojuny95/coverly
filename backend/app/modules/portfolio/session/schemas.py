@@ -3,7 +3,9 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.limits import MAX_PORTFOLIO_DOCUMENTS
 
 
 class PortfolioSessionRequest(BaseModel):
@@ -15,6 +17,8 @@ class PortfolioSessionRequest(BaseModel):
 
 
 class PortfolioSessionResponse(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"x-maxDocuments": MAX_PORTFOLIO_DOCUMENTS})
+
     portfolio_session_token: str = Field(serialization_alias="portfolioSessionToken")
     expires_at: str = Field(serialization_alias="expiresAt")
     counsel_turns_remaining: int = Field(serialization_alias="counselTurnsRemaining")

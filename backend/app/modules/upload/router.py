@@ -1,20 +1,20 @@
 """HTTP boundary that composes policy parsing with portfolio sessions."""
 
+import asyncio
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
+from app.core.config import get_settings
 from app.core.errors import ApiError, api_error_responses
 from app.modules.policy.parsing import MAX_PDF_PAGES
 from app.modules.policy.pipeline import run_pipeline
 from app.modules.policy.schemas import PolicyParseResponse
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.upload.parsing_capacity import (
-    PdfBufferCapacity,
-    PdfParsingBusyError,
     PdfParsingCapacity,
-    get_pdf_buffer_capacity,
+    PdfParsingUnavailableError,
     get_pdf_parsing_capacity,
 )
 from app.modules.upload.service import PolicyPipeline, PolicyUploadService
@@ -35,7 +35,6 @@ def get_policy_pipeline() -> PolicyPipeline:
 
 PolicyPipelineDep = Annotated[PolicyPipeline, Depends(get_policy_pipeline)]
 PdfParsingCapacityDep = Annotated[PdfParsingCapacity, Depends(get_pdf_parsing_capacity)]
-PdfBufferCapacityDep = Annotated[PdfBufferCapacity, Depends(get_pdf_buffer_capacity)]
 
 
 async def _read_pdf(file: UploadFile) -> bytes:
@@ -83,7 +82,6 @@ async def parse_policy(
     pipeline: PolicyPipelineDep,
     sessions: PortfolioSessionServiceDep,
     parsing_capacity: PdfParsingCapacityDep,
-    buffer_capacity: PdfBufferCapacityDep,
     document_id: Annotated[UUID, Form(alias="documentId")],
     password: str | None = Form(default=None),
     portfolio_session_token: str = Form(
@@ -92,20 +90,24 @@ async def parse_policy(
         max_length=512,
     ),
 ) -> PolicyParseResponse:
+    async def parse() -> PolicyParseResponse:
+        data = await _read_pdf(file)
+        service = PolicyUploadService(pipeline=pipeline, sessions=sessions)
+        return await asyncio.to_thread(
+            service.parse_policy,
+            pdf_bytes=data,
+            document_id=document_id.hex,
+            password=password if password else None,
+            portfolio_session_token=portfolio_session_token,
+        )
+
     try:
-        async with buffer_capacity.reserve():
-            data = await _read_pdf(file)
-            service = PolicyUploadService(pipeline=pipeline, sessions=sessions)
-            return await parsing_capacity.run(
-                service.parse_policy,
-                pdf_bytes=data,
-                document_id=document_id.hex,
-                password=password if password else None,
-                portfolio_session_token=portfolio_session_token,
-            )
-    except PdfParsingBusyError:
+        return await parsing_capacity.run(parse)
+    except PdfParsingUnavailableError:
+        retry_after = get_settings().pdf_parsing_retry_after_seconds
         raise ApiError(
             status_code=503,
             code="PDF_PARSING_BUSY",
             message="PDF 분석 요청이 많아요. 잠시 후 다시 시도해주세요.",
+            headers={"Retry-After": str(retry_after)},
         ) from None

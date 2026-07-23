@@ -22,8 +22,8 @@ from app.modules.portfolio.session.service import (
 )
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
 from app.modules.upload.parsing_capacity import (
-    PdfParsingBusyError,
     PdfParsingCapacity,
+    PdfParsingQueueFullError,
     get_pdf_parsing_capacity,
 )
 
@@ -187,16 +187,20 @@ def test_parse_maps_pdf_resource_limits_to_413(
     assert response.json()["error"]["request_id"] == response.headers["x-request-id"]
 
 
-def test_parse_rejects_when_parsing_capacity_is_saturated(
+def test_parse_returns_retryable_error_when_parser_queue_is_full(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    parsing_capacity = PdfParsingCapacity(limit=1)
+    capacity = PdfParsingCapacity(
+        concurrency_limit=1,
+        queue_limit=0,
+        queue_timeout_seconds=1,
+    )
 
-    async def _raise_busy(*_args: object, **_kwargs: object) -> None:
-        raise PdfParsingBusyError
+    async def _raise_queue_full(*_args: object, **_kwargs: object) -> None:
+        raise PdfParsingQueueFullError
 
-    monkeypatch.setattr(parsing_capacity, "run", _raise_busy)
-    app.dependency_overrides[get_pdf_parsing_capacity] = lambda: parsing_capacity
+    monkeypatch.setattr(capacity, "run", _raise_queue_full)
+    app.dependency_overrides[get_pdf_parsing_capacity] = lambda: capacity
     try:
         response = TestClient(app).post(
             "/policies/parse",
@@ -207,11 +211,11 @@ def test_parse_rejects_when_parsing_capacity_is_saturated(
         app.dependency_overrides.pop(get_pdf_parsing_capacity, None)
 
     assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"
     assert response.json()["error"]["code"] == "PDF_PARSING_BUSY"
     assert (
         response.json()["error"]["message"] == "PDF 분석 요청이 많아요. 잠시 후 다시 시도해주세요."
     )
-    assert response.json()["error"]["request_id"] == response.headers["x-request-id"]
 
 
 def test_parse_rejects_unreadable_pdf_body() -> None:

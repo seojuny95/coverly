@@ -17,6 +17,7 @@ import { InsuranceAnalysisPage } from "./screen";
 import type { InsuranceAnalysis } from "./store";
 import { PORTFOLIO_SESSION_REFRESH_FALLBACK_MS } from "./use-session-refresh";
 import type { UploadInsurance } from "../upload/form";
+import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 
 // The upload modal renders InsuranceUploadForm, which calls useRouter even
 // when onAnalysisComplete is provided (it also prefetches the destination).
@@ -130,6 +131,52 @@ describe("InsuranceAnalysisPage", () => {
       within(healthCard as HTMLElement).getByText("1"),
     ).toBeInTheDocument();
     expect(screen.getByText("자동차보험")).toBeInTheDocument();
+  });
+
+  test("disables additional uploads with an explanation at the document limit", async () => {
+    const user = userEvent.setup();
+    const initialAnalysis: InsuranceAnalysis = {
+      generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioSessionToken: "test-portfolio-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
+      insuranceDocuments: Array.from(
+        { length: PORTFOLIO_MAX_DOCUMENTS },
+        (_, index) => ({
+          id: `insurance-${index}`,
+          fileName: `insurance-${index}.pdf`,
+          result: {
+            ...POLICY_RESULT_DEFAULTS,
+            기본정보: {
+              보험사: `보험사 ${index}`,
+              상품명: `보험상품 ${index}`,
+              피보험자: "테스트고객",
+              보험분류: "제3보험" as const,
+              상품태그: ["질병보험"],
+            },
+          },
+        }),
+      ),
+    };
+
+    renderWithProviders(<InsuranceAnalysisPage />, { initialAnalysis });
+
+    const addButton = await screen.findByRole("button", {
+      name: "보험증권 더 올리기",
+    });
+    expect(addButton).toBeDisabled();
+    expect(addButton).toHaveAttribute(
+      "aria-describedby",
+      "portfolio-upload-limit-notice",
+    );
+    expect(
+      screen.getByText(
+        "보험증권은 최대 5개까지 분석할 수 있어요. 현재 분석에는 보험증권을 더 추가할 수 없어요.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(addButton);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   test("expands a insurance row to show detail fields", async () => {

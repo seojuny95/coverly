@@ -78,10 +78,18 @@ def api_error_responses(
 
 
 class ApiError(Exception):
-    def __init__(self, *, status_code: int, code: ApiErrorCode, message: str) -> None:
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        code: ApiErrorCode,
+        message: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = dict(headers or {})
         super().__init__(message)
 
 
@@ -134,7 +142,7 @@ async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
     )
     return JSONResponse(
         status_code=exc.status_code,
-        headers={"x-request-id": request_id},
+        headers={"x-request-id": request_id, **exc.headers},
         content={
             "error": {
                 "code": exc.code,

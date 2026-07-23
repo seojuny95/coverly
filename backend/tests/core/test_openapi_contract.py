@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.core.limits import MAX_PORTFOLIO_DOCUMENTS
 from app.main import app
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 
@@ -25,6 +26,8 @@ def test_openapi_exposes_typed_json_api_contracts() -> None:
     assert session_responses["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/PortfolioSessionResponse"
     }
+    session_schema = schema["components"]["schemas"]["PortfolioSessionResponse"]
+    assert session_schema["x-maxDocuments"] == MAX_PORTFOLIO_DOCUMENTS
 
     summary_responses = paths["/portfolio/summary"]["post"]["responses"]
     assert summary_responses["200"]["content"]["application/json"]["schema"] == {

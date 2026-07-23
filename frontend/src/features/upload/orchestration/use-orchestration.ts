@@ -13,6 +13,7 @@ import {
   deletePortfolioSessionDocuments,
   type PortfolioSessionResult,
 } from "../../analysis/session-api";
+import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 import type { UploadInsurance } from "../types";
 import { useCompletionBeat } from "../use-completion-beat";
 import { useSelectedFiles } from "../use-selected-files";
@@ -101,6 +102,10 @@ export function useUploadOrchestration({
     fingerprintSelectedFiles,
   } = useSelectedFiles({
     isLocked: workflow.phase === "name-selection" || isAnalyzing,
+    maxSelectableFiles: Math.max(
+      0,
+      PORTFOLIO_MAX_DOCUMENTS - existingDocuments.length,
+    ),
     onSelectionReset: () => dispatch({ type: "reset" }),
   });
 

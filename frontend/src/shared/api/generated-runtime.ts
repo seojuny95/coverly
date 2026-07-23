@@ -36,6 +36,7 @@ export const POLICY_CLASSIFICATIONS = [
   "손해보험",
   "미분류",
 ] as const satisfies readonly PolicyClassification[];
+export const PORTFOLIO_MAX_DOCUMENTS = 5 as const;
 
 export const QA_STREAM_JSON_SCHEMA = {
   schema: {

@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { AnalysisProgress } from "./progress";
 import { PolicyDocumentGuide } from "./document-guide";
 import { SelectedFileList } from "./file-list";
+import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 import type { UploadInsurance } from "./types";
 import {
   getInsuranceNameOptions,
@@ -99,10 +100,18 @@ export function InsuranceUploadForm({
     (selectedFile) => selectedFile.file,
   );
   const selectedBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+  const remainingDocumentCount = Math.max(
+    0,
+    PORTFOLIO_MAX_DOCUMENTS - existingDocuments.length,
+  );
+  const uploadLimitLabel =
+    existingDocuments.length > 0
+      ? `추가 가능 ${remainingDocumentCount}개 · 전체 최대 ${PORTFOLIO_MAX_DOCUMENTS}개`
+      : `최대 ${PORTFOLIO_MAX_DOCUMENTS}개`;
   const fileSizeLabel =
     selectedFiles.length > 0
-      ? `${selectedFiles.length}개 · ${(selectedBytes / 1024 / 1024).toFixed(2)} MB`
-      : "PDF";
+      ? `${selectedFiles.length}개 · ${(selectedBytes / 1024 / 1024).toFixed(2)} MB · ${uploadLimitLabel}`
+      : `PDF · ${uploadLimitLabel}`;
   const isModal = surface === "modal";
   const passwordRetryFiles = selectedUploadFiles.filter((selectedFile) =>
     isPasswordRetryFile(selectedFile.errorCode),
@@ -185,13 +194,11 @@ export function InsuranceUploadForm({
                 {dropzoneDescription}
               </p>
             ) : null}
-            <p
-              className={`relative mt-1 text-xs text-zinc-400 ${
-                isModal ? "" : "hidden"
-              }`}
-            >
-              {fileSizeLabel}
-            </p>
+            {isModal ? (
+              <p className="relative mt-1 text-xs text-zinc-400">
+                {fileSizeLabel}
+              </p>
+            ) : null}
 
             <input
               ref={inputRef}

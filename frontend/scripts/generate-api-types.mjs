@@ -52,6 +52,17 @@ const policyClassifications = enumValues(
   schemas?.PolicySummary?.properties?.["보험분류"]?.enum,
   "PolicySummary.보험분류",
 );
+const portfolioMaxDocuments =
+  schemas?.PortfolioSessionResponse?.["x-maxDocuments"];
+if (
+  typeof portfolioMaxDocuments !== "number" ||
+  !Number.isInteger(portfolioMaxDocuments) ||
+  portfolioMaxDocuments < 1
+) {
+  throw new Error(
+    "OpenAPI PortfolioSessionResponse.x-maxDocuments must be a positive integer.",
+  );
+}
 const qaStreamSchema =
   schema.paths?.["/qa/stream"]?.post?.responses?.["200"]?.content?.[
     "text/event-stream"
@@ -105,6 +116,7 @@ type PolicyClassification = components["schemas"]["PolicySummary"]["보험분류
 
 export const API_ERROR_CODES = ${JSON.stringify(apiErrorCodes)} as const satisfies readonly ApiErrorCode[];
 export const POLICY_CLASSIFICATIONS = ${JSON.stringify(policyClassifications)} as const satisfies readonly PolicyClassification[];
+export const PORTFOLIO_MAX_DOCUMENTS = ${portfolioMaxDocuments} as const;
 
 export const QA_STREAM_JSON_SCHEMA = ${JSON.stringify({
     schema: qaStreamSchema,

@@ -3,6 +3,7 @@
 from typing import Protocol
 
 from app.core.errors import ApiError
+from app.core.limits import MAX_PORTFOLIO_DOCUMENTS
 from app.modules.policy.parsing import (
     PdfComplexityLimitExceededError,
     PdfPageLimitExceededError,
@@ -158,7 +159,7 @@ def _portfolio_session_error(error: PortfolioUploadSessionError) -> ApiError:
         return ApiError(
             status_code=422,
             code="PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
-            message="한 번에 분석할 수 있는 보험증권 수를 초과했어요.",
+            message=f"보험증권은 최대 {MAX_PORTFOLIO_DOCUMENTS}개까지 분석할 수 있어요.",
         )
     if isinstance(error, PortfolioSessionDocumentConflict):
         return ApiError(
