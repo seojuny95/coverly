@@ -157,8 +157,8 @@ async def _build_event_stream(
     except asyncio.CancelledError:
         await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
         raise
-    except Exception:
-        logger.exception("qa_stream_failed")
+    except Exception as exc:
+        logger.warning("qa_stream_failed", extra={"error_type": type(exc).__name__})
         await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
         yield serialize_event(QaDeltaEvent(text=_QA_STREAM_FAILURE_MESSAGE))
 
