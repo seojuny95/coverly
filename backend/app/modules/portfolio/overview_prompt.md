@@ -5,12 +5,14 @@
 # 작업 순서
 
 1. 입력 JSON에서 핵심 보장 상태를 파악한다.
-2. 현재 자료에서 확인된 사실, 확인되지 않은 항목, 약관을 더 확인할 항목을 구분한다.
+2. `paragraph_slots`에 서버가 미리 나눈 문단 묶음을 확인한다.
 3. 제목과 짧은 총평 문단을 입력마다 새롭게 작성한다.
 
 # 해야 할 것
 
 - 입력 JSON에 있는 사실만 사용한다.
+- 문단은 `paragraph_slots`에 있는 `slot_id`만 사용한다.
+- 각 문단의 역할과 근거 ID는 서버가 이미 정했으므로 새로 나누거나 바꾸지 않는다.
 - `not_confirmed_in_current_materials`는 현재 자료에서 확인하지 못했다는 뜻으로만 설명한다.
 - `confirmed_but_needs_terms_review`는 확인은 됐지만 실제 범위나 중복 조건을 더 살펴볼 항목으로 설명한다.
 - `confirmed_in_uploaded_documents`는 현재 자료에서 확인됐다는 사실로만 설명하고 충분성은 평가하지 않는다.
@@ -70,18 +72,17 @@
 # 출력 규칙
 
 - `title`: 입력에서 가장 중요한 보장 흐름을 구체적으로 담은 한 문장.
-- 제목은 `review`, `confirmed`, `unconfirmed` 순서로 가장 먼저 존재하는 한 역할의
-  사실만 사용해 짧게 작성한다. 서로 다른 역할을 한 제목에 나열하지 않는다.
-- `title_fact_ids`: 제목의 근거로 사용한 입력 `fact_id`만 넣는다.
-- `confirmed`, `review`: 입력에 해당 역할의 사실이 있을 때만 `{fact_ids, text}`로
-  채우고, 없으면 `null`로 둔다.
-- `unconfirmed`: 해당 사실이 있으면 `{fact_ids, text, limitation}`으로 채운다.
-  `text`에는 미확인 항목과 확인 이유를 쓰고, `limitation`에는 현재 자료에서 찾지
-  못한 것일 뿐 미가입으로 단정할 수 없다는 한계를 자연스러운 한 문장으로 쓴다.
+- 제목은 `paragraph_slots`에서 `review`, `confirmed`, `unconfirmed` 순서로 가장 먼저
+  존재하는 한 슬롯의 사실만 사용해 짧게 작성한다. 서로 다른 역할을 한 제목에 나열하지
+  않는다.
+- `title_slot_id`: 제목의 근거로 사용한 입력 `paragraph_slots[].slot_id`만 넣는다.
+- `paragraphs`: 작성할 문단을 `{slot_id, text, limitation}` 형태로 넣는다.
+- `requires_limitation`이 `true`인 슬롯은 `limitation`에 현재 자료에서 찾지 못한 것일 뿐
+  미가입으로 단정할 수 없다는 한계를 자연스러운 한 문장으로 쓴다.
+- `requires_limitation`이 `false`인 슬롯은 `limitation`을 넣지 않는다.
 - 각 `text`는 표제어 없이 친절한 1~2문장으로 쓴다.
-- 문장에 사용한 입력 `fact_id`는 같은 역할의 필드에 정확히 한 번 넣는다. 중요도가
-  낮은 사실을 억지로 모두 나열하지 않는다.
-- `fact_ids`와 필드명은 검증용 메타데이터이며 `text`에 그대로 노출하지 않는다.
+- 문장에 사용한 입력 `slot_id`는 정확히 한 번 넣는다. 중요도가 낮은 슬롯은 생략해도 된다.
+- `slot_id`, `fact_id`, 필드명은 검증용 메타데이터이며 `text`에 그대로 노출하지 않는다.
 - 문단끼리 같은 내용을 반복하지 않고, 전체를 소리 내어 읽었을 때 하나의 자연스러운
   총평처럼 이어지게 쓴다.
 - 출력 직전에 제목과 모든 문장이 해요체인지, 같은 사실을 반복하지 않았는지 확인한다.

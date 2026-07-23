@@ -34,23 +34,28 @@ type _OverviewTitle = Annotated[
 type _FactId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 
 
-class _LlmParagraphDraft(BaseModel):
+class _OverviewParagraphSlot(BaseModel):
+    slot_id: _FactId
+    role: _OverviewRole
     fact_ids: list[_FactId] = Field(min_length=1)
+    requires_limitation: bool = False
+
+
+class _LlmParagraphDraft(BaseModel):
+    slot_id: _FactId
     text: _OverviewText
-
-
-class _LlmUnconfirmedParagraphDraft(_LlmParagraphDraft):
-    limitation: _OverviewText
+    limitation: _OverviewText | None = None
 
 
 class _LlmOverviewDraft(BaseModel):
     title: _OverviewTitle = Field(
         description="입력의 구체적인 보장 흐름을 담고 ~해요 형태로 끝나는 제목"
     )
-    title_fact_ids: list[_FactId] = Field(min_length=1)
-    confirmed: _LlmParagraphDraft | None = None
-    review: _LlmParagraphDraft | None = None
-    unconfirmed: _LlmUnconfirmedParagraphDraft | None = None
+    title_slot_id: _FactId
+    paragraphs: list[_LlmParagraphDraft] = Field(
+        min_length=1,
+        max_length=3,
+    )
 
 
 def attach_summary_overview(
@@ -81,14 +86,14 @@ def generate_summary_overview(
         logger.exception("portfolio_overview_generation_failed")
         return None
 
-    if not _draft_uses_grounded_facts(draft, facts):
+    if not _draft_uses_grounded_slots(draft, facts):
         try:
             raw = completer(_system_prompt(), _correction_user_prompt(facts, raw))
             draft = _LlmOverviewDraft.model_validate(raw)
         except Exception:
             logger.exception("portfolio_overview_correction_failed")
             return None
-        if not _draft_uses_grounded_facts(draft, facts):
+        if not _draft_uses_grounded_slots(draft, facts):
             logger.warning("portfolio_overview_grounding_failed")
             return None
 
@@ -103,10 +108,12 @@ def _overview_prompt_facts(summary: PortfolioCoverageSummary) -> dict[str, objec
     """Expose structured facts without prewritten user-facing conclusions."""
 
     coverage_facts = _coverage_facts(summary.essential_coverage_check.items)
+    duplicate_facts = _duplicate_actual_loss_facts(summary)
+    facts = [*coverage_facts, *duplicate_facts]
     return {
-        "facts": [
-            *coverage_facts,
-            *_duplicate_actual_loss_facts(summary),
+        "facts": facts,
+        "paragraph_slots": [
+            slot.model_dump(mode="json") for slot in _overview_paragraph_slots(facts)
         ],
         "limitations": [
             "업로드한 자료에서 확인한 내용만 사용",
@@ -186,46 +193,73 @@ def _coverage_observation(item: EssentialCoverageItem) -> str:
     return "confirmed_in_uploaded_documents"
 
 
-def _draft_uses_grounded_facts(
+def _overview_paragraph_slots(
+    facts: list[dict[str, object]],
+) -> list[_OverviewParagraphSlot]:
+    slots: list[_OverviewParagraphSlot] = []
+    for role in ("confirmed", "review", "unconfirmed"):
+        fact_ids = [
+            fact["fact_id"]
+            for fact in facts
+            if fact.get("role") == role and isinstance(fact.get("fact_id"), str)
+        ]
+        if fact_ids:
+            slots.append(
+                _OverviewParagraphSlot(
+                    slot_id=f"{role}:summary",
+                    role=role,
+                    fact_ids=fact_ids,
+                    requires_limitation=role == "unconfirmed",
+                )
+            )
+    return slots
+
+
+def _draft_uses_grounded_slots(
     draft: _LlmOverviewDraft,
     prompt_facts: dict[str, object],
 ) -> bool:
-    raw_facts = prompt_facts.get("facts")
-    if not isinstance(raw_facts, list):
+    slots_by_id = _slots_by_id(prompt_facts)
+    if not slots_by_id or draft.title_slot_id not in slots_by_id:
         return False
 
-    roles_by_id: dict[str, _OverviewRole] = {}
-    for fact in raw_facts:
-        if not isinstance(fact, dict):
+    paragraph_slot_ids: list[str] = []
+    for paragraph in draft.paragraphs:
+        slot = slots_by_id.get(paragraph.slot_id)
+        if slot is None:
             return False
-        fact_id = fact.get("fact_id")
-        role = fact.get("role")
-        if not isinstance(fact_id, str) or role not in {"confirmed", "review", "unconfirmed"}:
+        if slot.requires_limitation and paragraph.limitation is None:
             return False
-        roles_by_id[fact_id] = role
-
-    if not roles_by_id or not set(draft.title_fact_ids) <= roles_by_id.keys():
-        return False
-
-    referenced_ids: list[str] = []
-    for role in ("confirmed", "review", "unconfirmed"):
-        paragraph = getattr(draft, role)
-        if paragraph is None:
-            continue
-        if any(roles_by_id.get(fact_id) != role for fact_id in paragraph.fact_ids):
+        if not slot.requires_limitation and paragraph.limitation is not None:
             return False
-        referenced_ids.extend(paragraph.fact_ids)
+        paragraph_slot_ids.append(paragraph.slot_id)
 
-    return bool(referenced_ids) and len(referenced_ids) == len(set(referenced_ids))
+    return len(paragraph_slot_ids) == len(set(paragraph_slot_ids))
 
 
 def _public_paragraphs(draft: _LlmOverviewDraft) -> list[str]:
-    paragraphs = [
-        paragraph.text for paragraph in (draft.confirmed, draft.review) if paragraph is not None
-    ]
-    if draft.unconfirmed is not None:
-        paragraphs.append(f"{draft.unconfirmed.text} {draft.unconfirmed.limitation}")
+    paragraphs: list[str] = []
+    for paragraph in draft.paragraphs:
+        if paragraph.limitation is not None:
+            paragraphs.append(f"{paragraph.text} {paragraph.limitation}")
+        else:
+            paragraphs.append(paragraph.text)
     return paragraphs
+
+
+def _slots_by_id(prompt_facts: dict[str, object]) -> dict[str, _OverviewParagraphSlot]:
+    raw_slots = prompt_facts.get("paragraph_slots")
+    if not isinstance(raw_slots, list):
+        return {}
+
+    slots: dict[str, _OverviewParagraphSlot] = {}
+    for raw_slot in raw_slots:
+        try:
+            slot = _OverviewParagraphSlot.model_validate(raw_slot)
+        except Exception:
+            return {}
+        slots[slot.slot_id] = slot
+    return slots
 
 
 def _system_prompt() -> str:
@@ -248,9 +282,9 @@ def _correction_user_prompt(
     return dump_prompt_json(
         {
             "task": (
-                "이전 총평은 근거 ID 또는 역할 배치가 입력 사실과 맞지 않았습니다. "
-                "실제 입력 fact_id만 같은 role 필드에 중복 없이 사용해 다시 작성하세요. "
-                "중요도가 낮은 사실은 생략해도 됩니다."
+                "이전 총평은 문단 슬롯 배치가 입력 사실과 맞지 않았습니다. "
+                "실제 입력 paragraph_slots의 slot_id만 중복 없이 사용해 다시 작성하세요. "
+                "중요도가 낮은 슬롯은 생략해도 됩니다."
             ),
             "facts": facts,
             "previous_draft": previous_draft,
