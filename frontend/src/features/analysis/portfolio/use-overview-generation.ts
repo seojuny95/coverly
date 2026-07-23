@@ -25,6 +25,7 @@ export function usePortfolioOverviewGeneration({
   retryKey,
   summary,
   onSessionExpired,
+  enabled,
 }: {
   documents: AnalyzedInsurance[];
   deathBenefitContext: DeathBenefitGuideInput;
@@ -33,14 +34,20 @@ export function usePortfolioOverviewGeneration({
   retryKey: string;
   summary?: PortfolioSummary;
   onSessionExpired?: () => void;
+  enabled: boolean;
 }) {
   const queryClient = useQueryClient();
   const overviewAttemptId = useRef(0);
+  const enabledRef = useRef(enabled);
   const [overviewState, setOverviewState] = useState<OverviewState>({
     attemptId: 0,
     key: null,
     status: "idle",
   });
+
+  useEffect(() => {
+    enabledRef.current = enabled;
+  }, [enabled]);
 
   const overviewMutation = useMutation({
     mutationFn: () => {
@@ -59,12 +66,15 @@ export function usePortfolioOverviewGeneration({
   });
 
   const generateOverview = useCallback(async () => {
+    if (!enabledRef.current) return;
+
     const attemptId = ++overviewAttemptId.current;
     setOverviewState({ attemptId, key: retryKey, status: "pending" });
 
     let status: OverviewState["status"] = "idle";
     try {
       const overview = await overviewMutation.mutateAsync();
+      if (!enabledRef.current) return;
       queryClient.setQueryData<PortfolioSummary>(queryKey, (current) =>
         current ? { ...current, overview } : current,
       );
@@ -80,7 +90,8 @@ export function usePortfolioOverviewGeneration({
   }, [overviewMutation, queryClient, queryKey, retryKey]);
 
   useEffect(() => {
-    if (!summary || summary.overview || !portfolioSessionToken) return;
+    if (!enabled || !summary || summary.overview || !portfolioSessionToken)
+      return;
     if (overviewState.key === retryKey && overviewState.status !== "idle") {
       return;
     }
@@ -88,6 +99,7 @@ export function usePortfolioOverviewGeneration({
     void generateOverview();
   }, [
     generateOverview,
+    enabled,
     overviewState.key,
     overviewState.status,
     portfolioSessionToken,
@@ -98,8 +110,10 @@ export function usePortfolioOverviewGeneration({
   const isCurrentOverview = overviewState.key === retryKey;
 
   return {
-    isOverviewRetrying: isCurrentOverview && overviewState.status === "pending",
-    overviewRetryFailed: isCurrentOverview && overviewState.status === "failed",
+    isOverviewRetrying:
+      enabled && isCurrentOverview && overviewState.status === "pending",
+    overviewRetryFailed:
+      enabled && isCurrentOverview && overviewState.status === "failed",
     retryOverview: generateOverview,
   };
 }

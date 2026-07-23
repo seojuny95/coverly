@@ -52,6 +52,38 @@ describe("usePortfolioSummary", () => {
     await waitFor(() => expect(result.current.state.status).toBe("success"));
   });
 
+  it("does not request summary or overview after the session is expired", async () => {
+    const requestPortfolioSummary = vi.spyOn(api, "requestPortfolioSummary");
+    const requestPortfolioOverview = vi.spyOn(api, "requestPortfolioOverview");
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () =>
+        usePortfolioSummary(
+          docs,
+          deathBenefitContext,
+          "portfolio-token",
+          vi.fn(),
+          true,
+        ),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await act(async () => {
+      await result.current.retry();
+      await result.current.retryOverview();
+    });
+
+    expect(result.current.state.status).toBe("loading");
+    expect(requestPortfolioSummary).not.toHaveBeenCalled();
+    expect(requestPortfolioOverview).not.toHaveBeenCalled();
+    expect(result.current.isRetrying).toBe(false);
+    expect(result.current.isOverviewRetrying).toBe(false);
+  });
+
   it("keeps the previous summary while death benefit context refreshes", async () => {
     const nextRequest = new Promise<api.PortfolioSummary>(() => undefined);
     const requestPortfolioSummary = vi

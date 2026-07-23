@@ -49,7 +49,8 @@ export function isExpiredPortfolioSessionApiError(
 ): error is ApiResponseError {
   return (
     error instanceof ApiResponseError &&
-    (error.status === 403 || error.code === "INVALID_PORTFOLIO_SESSION")
+    (error.status === 403 ||
+      hasApiErrorCode(error, "INVALID_PORTFOLIO_SESSION"))
   );
 }
 
