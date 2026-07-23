@@ -42,8 +42,8 @@ describe("actual-loss coverage groups", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({
       duplicateAcrossContracts: true,
+      contractCount: 2,
       explanation: "서버에서 분류한 상해 실손 안내예요.",
-      explanationBasis: "generated_guidance",
     });
     expect(groups[0].items).toHaveLength(2);
   });
@@ -55,6 +55,42 @@ describe("actual-loss coverage groups", () => {
     ]);
 
     expect(duplicates).toEqual([]);
+  });
+
+  it("counts distinct contracts instead of repeated coverage rows", () => {
+    const [group] = groupActualLossCoverages([
+      actualLossCoverage({ duplicate_across_contracts: true }),
+      actualLossCoverage({
+        coverage_name: "상해 실손의료비",
+        duplicate_across_contracts: true,
+      }),
+      actualLossCoverage({
+        policy_id: "policy-2",
+        insurer: "보험사B",
+        duplicate_across_contracts: true,
+      }),
+    ]);
+
+    expect(group.contractCount).toBe(2);
+    expect(group.items).toHaveLength(3);
+  });
+
+  it("keeps differing grounded explanations attached to their source rows", () => {
+    const [group] = groupActualLossCoverages([
+      actualLossCoverage({ duplicate_across_contracts: true }),
+      actualLossCoverage({
+        policy_id: "policy-2",
+        duplicate_across_contracts: true,
+        guidance_key: "medical_expense",
+        explanation: "서버에서 분류한 일반 실손 안내예요.",
+      }),
+    ]);
+
+    expect(group.explanation).toBeUndefined();
+    expect(group.items.map((item) => item.explanation)).toEqual([
+      "서버에서 분류한 상해 실손 안내예요.",
+      "서버에서 분류한 일반 실손 안내예요.",
+    ]);
   });
 
   it("keeps the same normalized name separate across coverage domains", () => {

@@ -117,11 +117,13 @@ function MedicalIndemnityDuplicateItem({
             <span className="block text-sm font-semibold text-zinc-900">
               {group.displayName}
             </span>
-            <span className="mt-1 block text-xs leading-5 text-zinc-500">
-              {group.explanation}
-            </span>
+            {group.explanation ? (
+              <span className="mt-1 block text-xs leading-5 text-zinc-500">
+                {group.explanation}
+              </span>
+            ) : null}
             <span className="mt-2 block text-xs font-medium text-amber-700">
-              {group.items.length}개 계약에서 확인됐어요.
+              {group.contractCount}개 계약에서 확인됐어요.
             </span>
           </span>
           <span
@@ -142,6 +144,11 @@ function MedicalIndemnityDuplicateItem({
               >
                 {coverage.insurer} · {coverage.product_name} ·{" "}
                 {coverage.coverage_name}
+                {!group.explanation ? (
+                  <span className="mt-0.5 block text-zinc-500">
+                    {coverage.explanation}
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>

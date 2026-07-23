@@ -48,11 +48,13 @@ export function ActualLossCoverageReview({
                 <p className="text-sm font-semibold text-zinc-900">
                   {group.displayName}
                 </p>
-                <p className="mt-1 text-xs leading-5 text-zinc-500">
-                  {group.explanation}
-                </p>
+                {group.explanation ? (
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    {group.explanation}
+                  </p>
+                ) : null}
                 <p className="mt-2 text-xs font-medium text-amber-700">
-                  {group.items.length}개 계약에서 확인됐어요.
+                  {group.contractCount}개 계약에서 확인됐어요.
                 </p>
                 <ul className="mt-2 space-y-1 text-xs leading-5 text-zinc-600">
                   {group.items.map((coverage) => (
@@ -61,6 +63,11 @@ export function ActualLossCoverageReview({
                     >
                       {coverage.insurer} · {coverage.product_name} ·{" "}
                       {coverage.coverage_name}
+                      {!group.explanation ? (
+                        <span className="mt-0.5 block text-zinc-500">
+                          {coverage.explanation}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

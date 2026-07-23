@@ -38,6 +38,7 @@ export function usePortfolioOverviewGeneration({
 }) {
   const queryClient = useQueryClient();
   const overviewAttemptId = useRef(0);
+  const overviewRequest = useRef<AbortController | null>(null);
   const enabledRef = useRef(enabled);
   const [overviewState, setOverviewState] = useState<OverviewState>({
     attemptId: 0,
@@ -50,7 +51,7 @@ export function usePortfolioOverviewGeneration({
   }, [enabled]);
 
   const overviewMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (signal: AbortSignal) => {
       if (!portfolioSessionToken) {
         throw new Error("Portfolio session is unavailable");
       }
@@ -58,8 +59,11 @@ export function usePortfolioOverviewGeneration({
         documents,
         deathBenefitContext,
         portfolioSessionToken,
+        signal,
       ).catch((error: unknown) => {
-        if (isExpiredSessionError(error)) onSessionExpired?.();
+        if (!signal.aborted && isExpiredSessionError(error)) {
+          onSessionExpired?.();
+        }
         throw error;
       });
     },
@@ -68,18 +72,25 @@ export function usePortfolioOverviewGeneration({
   const generateOverview = useCallback(async () => {
     if (!enabledRef.current) return;
 
+    overviewRequest.current?.abort();
+    const controller = new AbortController();
+    overviewRequest.current = controller;
     const attemptId = ++overviewAttemptId.current;
     setOverviewState({ attemptId, key: retryKey, status: "pending" });
 
     let status: OverviewState["status"] = "idle";
     try {
-      const overview = await overviewMutation.mutateAsync();
-      if (!enabledRef.current) return;
+      const overview = await overviewMutation.mutateAsync(controller.signal);
+      if (!enabledRef.current || controller.signal.aborted) return;
       queryClient.setQueryData<PortfolioSummary>(queryKey, (current) =>
         current ? { ...current, overview } : current,
       );
     } catch {
-      status = "failed";
+      if (!controller.signal.aborted) status = "failed";
+    } finally {
+      if (overviewRequest.current === controller) {
+        overviewRequest.current = null;
+      }
     }
 
     setOverviewState((current) =>
@@ -88,6 +99,14 @@ export function usePortfolioOverviewGeneration({
         : current,
     );
   }, [overviewMutation, queryClient, queryKey, retryKey]);
+
+  useEffect(
+    () => () => {
+      overviewRequest.current?.abort();
+      overviewRequest.current = null;
+    },
+    [retryKey],
+  );
 
   useEffect(() => {
     if (!enabled || !summary || summary.overview || !portfolioSessionToken)

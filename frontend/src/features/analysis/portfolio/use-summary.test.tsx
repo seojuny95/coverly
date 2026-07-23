@@ -228,6 +228,79 @@ describe("usePortfolioSummary", () => {
     });
   });
 
+  it("aborts an in-flight overview when the screen unmounts", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    let requestSignal: AbortSignal | undefined;
+    vi.spyOn(api, "requestPortfolioOverview").mockImplementation(
+      (_documents, _context, _token, signal) => {
+        requestSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    );
+    const client = makeTestQueryClient();
+    const { unmount } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(requestSignal).toBeDefined());
+    expect(requestSignal?.aborted).toBe(false);
+
+    unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("aborts an older overview request before retrying", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    const requestSignals: AbortSignal[] = [];
+    vi.spyOn(api, "requestPortfolioOverview").mockImplementation(
+      (_documents, _context, _token, signal) => {
+        if (signal) requestSignals.push(signal);
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    );
+    const client = makeTestQueryClient();
+    const { result, unmount } = renderHook(
+      () => usePortfolioSummary(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(requestSignals).toHaveLength(1));
+    act(() => {
+      void result.current.retryOverview();
+    });
+    await waitFor(() => expect(requestSignals).toHaveLength(2));
+
+    expect(requestSignals[0]?.aborted).toBe(true);
+    expect(requestSignals[1]?.aborted).toBe(false);
+    unmount();
+  });
+
   it("keeps summary content visible when overview generation fails", async () => {
     vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
       summaryWithoutOverview,
