@@ -44,18 +44,19 @@ def refresh_portfolio_session(
     request: PortfolioSessionRequest,
     sessions: PortfolioSessionServiceDep,
 ) -> PortfolioSessionResponse:
+    max_turns = get_settings().counsel_max_turns_per_session
     try:
         access = sessions.refresh(request.portfolio_session_token)
+        counsel_turns_remaining = sessions.counsel_turns_remaining(
+            access.token,
+            max_turns=max_turns,
+        )
     except InvalidPortfolioSessionToken:
         raise expired_portfolio_session_error() from None
-    max_turns = get_settings().counsel_max_turns_per_session
     return PortfolioSessionResponse(
         portfolio_session_token=access.token,
         expires_at=access.expires_at.isoformat(),
-        counsel_turns_remaining=sessions.counsel_turns_remaining(
-            access.token,
-            max_turns=max_turns,
-        ),
+        counsel_turns_remaining=counsel_turns_remaining,
     )
 
 

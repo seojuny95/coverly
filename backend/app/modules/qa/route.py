@@ -155,11 +155,24 @@ async def _build_event_stream(
             if delta:
                 yield serialize_event(QaDeltaEvent(text=delta))
     except asyncio.CancelledError:
-        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+        await _refund_counsel_turn_best_effort(sessions, session_id)
         raise
     except Exception as exc:
         logger.warning("qa_stream_failed", extra={"error_type": type(exc).__name__})
-        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+        await _refund_counsel_turn_best_effort(sessions, session_id)
         yield serialize_event(QaDeltaEvent(text=_QA_STREAM_FAILURE_MESSAGE))
 
     yield serialize_event(QaEndEvent())
+
+
+async def _refund_counsel_turn_best_effort(
+    sessions: PortfolioSessionService,
+    session_id: str,
+) -> None:
+    try:
+        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+    except Exception as exc:
+        logger.warning(
+            "qa_turn_refund_failed",
+            extra={"error_type": type(exc).__name__},
+        )

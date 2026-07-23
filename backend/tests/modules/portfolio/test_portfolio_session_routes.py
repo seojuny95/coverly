@@ -3,9 +3,13 @@ from datetime import UTC, datetime
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.core.errors import ApiError, api_error_handler
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.router import router
-from app.modules.portfolio.session.service import PortfolioSessionAccess
+from app.modules.portfolio.session.service import (
+    InvalidPortfolioSessionToken,
+    PortfolioSessionAccess,
+)
 
 
 class _Sessions:
@@ -31,11 +35,14 @@ class _Sessions:
         self.deleted_documents.append((token, document_ids))
 
 
+class _RefreshRaceSessions(_Sessions):
+    def counsel_turns_remaining(self, token: str, **_kwargs: object) -> int:
+        raise InvalidPortfolioSessionToken
+
+
 def test_portfolio_session_lifecycle_uses_one_token_contract() -> None:
     sessions = _Sessions()
-    app = FastAPI()
-    app.include_router(router)
-    app.dependency_overrides[get_portfolio_session_service] = lambda: sessions
+    app = _app_with_sessions(sessions)
     client = TestClient(app)
 
     created = client.post("/portfolio/sessions")
@@ -63,6 +70,26 @@ def test_portfolio_session_lifecycle_uses_one_token_contract() -> None:
     assert sessions.deleted == ["refreshed-token"]
     assert documents_deleted.json() == {"status": "deleted"}
     assert sessions.deleted_documents == [("refreshed-token", ["00000000000000000000000000000001"])]
+
+
+def test_refresh_maps_turn_lookup_race_to_expired_session() -> None:
+    client = TestClient(_app_with_sessions(_RefreshRaceSessions()))
+
+    response = client.post(
+        "/portfolio/sessions/refresh",
+        json={"portfolioSessionToken": "created-token"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "INVALID_PORTFOLIO_SESSION"
+
+
+def _app_with_sessions(sessions: _Sessions) -> FastAPI:
+    app = FastAPI()
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.include_router(router)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: sessions
+    return app
 
 
 def _access(token: str) -> PortfolioSessionAccess:

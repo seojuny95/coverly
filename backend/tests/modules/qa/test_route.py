@@ -81,6 +81,14 @@ class _ExhaustedSessions(_FixtureSessions):
         raise CounselTurnLimitReached
 
 
+class _RefundFailingSessions(_FixtureSessions):
+    """A session store that accepts the turn but cannot refund it later."""
+
+    def refund_counsel_turn(self, token: str, **_kwargs: object) -> None:
+        self.refund_calls += 1
+        raise RuntimeError("store unavailable")
+
+
 def _stub_runner(
     chunks: list[str],
     seen_conversations: list[list[ConversationMessage]] | None = None,
@@ -220,6 +228,28 @@ def test_agent_failure_refunds_the_turn_and_finishes_the_stream() -> None:
     assert "답을 가져오지 못했어요" in "".join(_delta_texts(events))
     assert sessions.refund_calls == 1
     assert sessions.turns_used == 0
+
+
+def test_agent_failure_finishes_the_stream_when_refund_fails() -> None:
+    sessions = _RefundFailingSessions((_policy("암진단비", "2,000만원", "정액"),))
+    client = _client(
+        (),
+        [],
+        sessions=sessions,
+        runner=_failing_runner(),
+    )
+
+    response = client.post(
+        "/qa/stream",
+        json={"question": "질문", "history": [], "session_id": _SESSION_ID},
+    )
+
+    events = _events(response.text)
+    assert response.status_code == 200
+    assert events[0]["type"] == "meta"
+    assert events[-1]["type"] == "end"
+    assert "답을 가져오지 못했어요" in "".join(_delta_texts(events))
+    assert sessions.refund_calls == 1
 
 
 def test_an_invalid_session_is_rejected_before_the_agent_runs() -> None:
