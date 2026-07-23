@@ -13,6 +13,7 @@ decline" must read the answer text, not this field.
 """
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from typing import Annotated
 
@@ -28,6 +29,7 @@ from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDe
 from app.modules.portfolio.session.service import (
     CounselTurnLimitReached,
     InvalidPortfolioSessionToken,
+    PortfolioSessionService,
 )
 from app.modules.qa.agent import AgentStreamRunner, create_agent, run_agent_streamed
 from app.modules.qa.context import QaContext
@@ -43,6 +45,10 @@ from app.modules.qa.pii import mask_qa_pii, masked_history
 from app.modules.qa.schemas import QaMessage, QaRequest
 
 router = APIRouter(prefix="/qa", tags=["qa"])
+logger = logging.getLogger(__name__)
+_QA_STREAM_FAILURE_MESSAGE = (
+    "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요."
+)
 
 
 def get_agent_stream_runner() -> AgentStreamRunner:
@@ -103,6 +109,8 @@ async def stream_qa_answer(
     )
 
     events = _build_event_stream(
+        session_id=request.session_id,
+        sessions=sessions,
         turns_remaining=turns_remaining,
         question=question,
         history=history,
@@ -116,6 +124,8 @@ async def stream_qa_answer(
 
 async def _build_event_stream(
     *,
+    session_id: str,
+    sessions: PortfolioSessionService,
     turns_remaining: int,
     question: str,
     history: list[QaMessage],
@@ -140,8 +150,16 @@ async def _build_event_stream(
     ]
     conversation.append(ConversationMessage(role="user", content=question))
 
-    async for delta in agent_stream_runner(agent, conversation, context):
-        if delta:
-            yield serialize_event(QaDeltaEvent(text=delta))
+    try:
+        async for delta in agent_stream_runner(agent, conversation, context):
+            if delta:
+                yield serialize_event(QaDeltaEvent(text=delta))
+    except asyncio.CancelledError:
+        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+        raise
+    except Exception:
+        logger.exception("qa_stream_failed")
+        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+        yield serialize_event(QaDeltaEvent(text=_QA_STREAM_FAILURE_MESSAGE))
 
     yield serialize_event(QaEndEvent())

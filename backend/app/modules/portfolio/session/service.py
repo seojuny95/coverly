@@ -230,6 +230,18 @@ class PortfolioSessionService:
             raise CounselTurnLimitReached
         return remaining
 
+    def refund_counsel_turn(
+        self,
+        token: str,
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        """Return a counsel turn after a failed answer attempt."""
+
+        current = now or datetime.now(UTC)
+        claims = self._verify(token, now=current)
+        self._repository.refund_counsel_turn(claims.session_id, now=current)
+
     def counsel_turns_remaining(
         self,
         token: str,

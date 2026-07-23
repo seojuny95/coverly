@@ -43,6 +43,10 @@ class PortfolioSessionRepository(Protocol):
         """
         ...
 
+    def refund_counsel_turn(self, session_id: str, *, now: datetime) -> bool:
+        """Return one consumed counsel turn, if the live session still has one."""
+        ...
+
     def reserve_document(
         self,
         session_id: str,
