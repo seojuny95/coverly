@@ -195,18 +195,17 @@ describe("portfolio features", () => {
     const otherGroup = screen.getByRole("rowgroup", { name: "기타" });
     expect(within(treatmentGroup).getByText("암치료비")).toBeInTheDocument();
     expect(
-      within(treatmentGroup).getByText(/질병실손의료비/),
+      within(treatmentGroup).getByText("질병실손의료비"),
     ).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("특정치료비")).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("합산")).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("실손 보장")).toBeInTheDocument();
     expect(within(treatmentGroup).getByText("개별 확인")).toBeInTheDocument();
     for (const coverageName of ["암치료비", "질병실손의료비", "특정치료비"]) {
-      const disclosure = within(treatmentGroup)
-        .getByText(coverageName)
-        .closest("details");
-      expect(disclosure).toBeInTheDocument();
-      expect(disclosure).not.toHaveAttribute("open");
+      const disclosure = within(treatmentGroup).getByRole("button", {
+        name: new RegExp(coverageName),
+      });
+      expect(disclosure).toHaveAttribute("aria-expanded", "false");
     }
     expect(within(otherGroup).getByText("생활보장")).toBeInTheDocument();
     expect(

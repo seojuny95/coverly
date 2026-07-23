@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { CoverageSummaryTable } from "./summary-table";
 import type { PortfolioSummary } from "./api";
@@ -64,6 +65,57 @@ describe("CoverageSummaryTable", () => {
     expect(screen.getByText("실손입원")).toBeInTheDocument();
     expect(screen.getByText("실손 보장")).toBeInTheDocument();
     expect(screen.getByText("중복 확인")).toBeInTheDocument();
+  });
+
+  it("groups duplicated actual-loss coverages by normalized name", () => {
+    render(
+      <CoverageSummaryTable
+        summary={{
+          ...summary,
+          actual_loss_coverages: [
+            {
+              ...summary.actual_loss_coverages[0],
+              policy_id: "injury-1",
+              coverage_name: "상해실손의료비",
+              normalized_name: "상해실손의료비",
+              insurer: "보험사A",
+              product_name: "실손보험 A",
+              duplicate_across_contracts: true,
+            },
+            {
+              ...summary.actual_loss_coverages[0],
+              policy_id: "injury-2",
+              coverage_name: "상해실손의료비",
+              normalized_name: "상해실손의료비",
+              insurer: "보험사B",
+              product_name: "실손보험 B",
+              duplicate_across_contracts: true,
+            },
+            {
+              ...summary.actual_loss_coverages[0],
+              policy_id: "illness-1",
+              coverage_name: "질병실손의료비",
+              normalized_name: "질병실손의료비",
+              insurer: "보험사A",
+              product_name: "실손보험 A",
+              duplicate_across_contracts: false,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText("상해실손의료비")).toHaveLength(1);
+    expect(screen.getByText("질병실손의료비")).toBeInTheDocument();
+    expect(
+      screen.getByText("같은 실손형 담보가 여러 계약에서 확인됐어요."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("보험사A · 실손보험 A · 상해실손의료비 · 5,000만원"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("보험사B · 실손보험 B · 상해실손의료비 · 5,000만원"),
+    ).toBeInTheDocument();
   });
 
   it("includes non-medical actual-loss coverage under the same basis", () => {
@@ -160,10 +212,27 @@ describe("CoverageSummaryTable", () => {
     expect(screen.getByText("2개 합산").closest("td")).toHaveClass("align-top");
   });
 
-  it("animates coverage details when a row is expanded", () => {
+  it("animates coverage details when a row is expanded and collapsed", async () => {
+    const user = userEvent.setup();
     render(<CoverageSummaryTable summary={summary} />);
 
-    const details = screen.getAllByText("암진단비")[0].closest("details");
-    expect(details?.querySelector("div")).toHaveClass("animate-enter");
+    const trigger = screen.getByRole("button", { name: "암진단비" });
+    const panel = document.getElementById(
+      trigger.getAttribute("aria-controls") ?? "",
+    );
+    const collapseRegion = panel?.parentElement?.parentElement;
+
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(collapseRegion).toHaveClass("grid-rows-[0fr]");
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(collapseRegion).toHaveClass("grid-rows-[1fr]");
+    expect(panel?.firstElementChild).toHaveClass("opacity-100");
+
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(collapseRegion).toHaveClass("grid-rows-[0fr]");
+    expect(panel?.firstElementChild).toHaveClass("opacity-0");
   });
 });

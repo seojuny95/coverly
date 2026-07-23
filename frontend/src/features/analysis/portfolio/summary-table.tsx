@@ -1,5 +1,8 @@
+"use client";
+
 import type { ReactNode } from "react";
 
+import { CollapseRegion, useDisclosure } from "@/shared/components/disclosure";
 import { Badge } from "@/shared/components/ui/badge";
 
 import type { PortfolioSummary } from "./api";
@@ -19,9 +22,16 @@ type ActualLossCoverageRow = {
   key: string;
   displayName: string;
   originalAmount?: string;
+  duplicateAcrossContracts: boolean;
+  sources: ActualLossCoverageSource[];
+};
+
+type ActualLossCoverageSource = {
+  policyId?: string | null;
+  coverageName: string;
+  originalAmount?: string;
   insurer?: string;
   productName?: string;
-  duplicateAcrossContracts: boolean;
 };
 
 type IndividualCoverageRow = {
@@ -158,15 +168,23 @@ function ActualLossCoverage({ row }: { row: ActualLossCoverageRow }) {
           label={row.displayName}
           badge={row.duplicateAcrossContracts ? <DuplicateBadge /> : null}
         >
-          <p className="mt-3 text-xs font-normal break-words text-zinc-500">
-            {coverageSourceLabel({
-              insurer: row.insurer,
-              product_name: row.productName,
-            })}
-          </p>
+          <ul className="mt-3 space-y-1.5 text-xs font-normal break-words text-zinc-500">
+            {row.sources.map((source, index) => (
+              <li
+                key={`${source.policyId ?? "policy"}-${source.coverageName}-${index}`}
+              >
+                {coverageSourceLabel({
+                  insurer: source.insurer,
+                  product_name: source.productName,
+                })}{" "}
+                · {source.coverageName}
+                {source.originalAmount ? ` · ${source.originalAmount}` : ""}
+              </li>
+            ))}
+          </ul>
           {row.duplicateAcrossContracts ? (
             <p className="mt-1 text-xs font-normal text-amber-700">
-              여러 계약에서 같은 담보가 확인됐어요.
+              같은 실손형 담보가 여러 계약에서 확인됐어요.
             </p>
           ) : null}
         </CoverageDisclosure>
@@ -216,12 +234,22 @@ function CoverageDisclosure({
   label: string;
   badge?: ReactNode;
 }) {
+  const { expanded, toggle, panelId } = useDisclosure();
+
   return (
-    <details className="group">
-      <summary className="flex cursor-pointer list-none items-start gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
+    <div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={toggle}
+        className="group flex w-full cursor-pointer items-start gap-2 text-left focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+      >
         <span
           aria-hidden="true"
-          className="mt-0.5 w-3 shrink-0 text-zinc-400 transition-transform duration-150 group-open:rotate-90"
+          className={`mt-0.5 w-3 shrink-0 text-zinc-400 transition-transform duration-200 ease-out motion-reduce:transition-none ${
+            expanded ? "rotate-90" : ""
+          }`}
         >
           ›
         </span>
@@ -229,9 +257,19 @@ function CoverageDisclosure({
           {label}
           {badge}
         </span>
-      </summary>
-      <div className="animate-enter">{children}</div>
-    </details>
+      </button>
+      <CollapseRegion expanded={expanded} id={panelId}>
+        <div
+          className={`transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
+            expanded
+              ? "translate-y-0 opacity-100 delay-75"
+              : "-translate-y-1 opacity-0"
+          }`}
+        >
+          {children}
+        </div>
+      </CollapseRegion>
+    </div>
   );
 }
 
@@ -289,19 +327,20 @@ function buildCoverageGroups(summary: PortfolioSummary): CoverageGroup[] {
     });
   });
 
-  summary.actual_loss_coverages
-    .filter((coverage) => !coverage.is_damage_policy)
-    .forEach((coverage, index) => {
-      addRow(coverage.major_category, {
-        kind: "actual-loss",
-        key: `actual-loss-${coverage.policy_id ?? "policy"}-${coverage.coverage_name}-${index}`,
-        displayName: coverage.coverage_name,
-        originalAmount: coverage.original_amount,
-        insurer: coverage.insurer ?? undefined,
-        productName: coverage.product_name ?? undefined,
-        duplicateAcrossContracts: coverage.duplicate_across_contracts,
-      });
+  groupedActualLossCoverages(
+    summary.actual_loss_coverages.filter(
+      (coverage) => !coverage.is_damage_policy,
+    ),
+  ).forEach((group) => {
+    addRow(group.majorCategory, {
+      kind: "actual-loss",
+      key: `actual-loss-${group.domain}-${group.normalizedName}`,
+      displayName: group.displayName,
+      originalAmount: group.originalAmount,
+      duplicateAcrossContracts: group.duplicateAcrossContracts,
+      sources: group.sources,
     });
+  });
 
   summary.excluded_coverages.forEach((coverage, index) => {
     addRow(coverage.major_category, {
@@ -321,6 +360,71 @@ function buildCoverageGroups(summary: PortfolioSummary): CoverageGroup[] {
       rows,
     }))
     .sort(compareCoverageGroups);
+}
+
+function groupedActualLossCoverages(
+  coverages: PortfolioSummary["actual_loss_coverages"],
+) {
+  const groups = new Map<
+    string,
+    {
+      displayName: string;
+      domain: string;
+      normalizedName: string;
+      majorCategory: string | undefined;
+      duplicateAcrossContracts: boolean;
+      originalAmounts: Set<string>;
+      sources: ActualLossCoverageSource[];
+    }
+  >();
+
+  for (const coverage of coverages) {
+    const normalizedName = coverage.normalized_name || coverage.coverage_name;
+    const domain = coverage.coverage_domain || "unknown";
+    const key = `${domain}:${normalizedName}`;
+    const group = groups.get(key);
+    const source: ActualLossCoverageSource = {
+      policyId: coverage.policy_id,
+      coverageName: coverage.coverage_name,
+      originalAmount: coverage.original_amount,
+      insurer: coverage.insurer ?? undefined,
+      productName: coverage.product_name ?? undefined,
+    };
+
+    if (group) {
+      group.duplicateAcrossContracts =
+        group.duplicateAcrossContracts || coverage.duplicate_across_contracts;
+      group.sources.push(source);
+      if (coverage.original_amount) {
+        group.originalAmounts.add(coverage.original_amount);
+      }
+      continue;
+    }
+
+    groups.set(key, {
+      displayName: coverage.coverage_name,
+      domain,
+      normalizedName,
+      majorCategory: coverage.major_category,
+      duplicateAcrossContracts: coverage.duplicate_across_contracts,
+      originalAmounts: new Set(
+        coverage.original_amount ? [coverage.original_amount] : [],
+      ),
+      sources: [source],
+    });
+  }
+
+  return [...groups.values()].map((group) => ({
+    ...group,
+    duplicateAcrossContracts:
+      group.duplicateAcrossContracts || group.sources.length > 1,
+    originalAmount:
+      group.originalAmounts.size === 1
+        ? [...group.originalAmounts][0]
+        : group.originalAmounts.size > 1
+          ? "계약별 확인"
+          : undefined,
+  }));
 }
 
 function compareCoverageGroups(a: CoverageGroup, b: CoverageGroup) {

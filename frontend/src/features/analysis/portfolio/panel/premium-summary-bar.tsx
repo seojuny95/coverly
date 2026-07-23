@@ -14,11 +14,36 @@ export function PremiumSummaryBar({
 }) {
   if (
     !premium ||
-    !benchmark ||
     typeof premium.monthly_total !== "number" ||
     premium.monthly_policy_count < 1
   ) {
     return null;
+  }
+
+  if (!benchmark) {
+    return (
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold text-blue-200">
+              현재 월 보험료
+            </p>
+            <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">
+              {formatWon(premium.monthly_total)}
+            </p>
+          </div>
+          <div className="sm:text-right">
+            <p className="text-xs text-zinc-400">권장금액</p>
+            <p className="mt-1 text-sm font-medium text-zinc-200">
+              연령 정보 확인 필요
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-zinc-300">
+          보험증권에서 나이를 확인하지 못해 권장금액은 계산하지 않았어요.
+        </p>
+      </div>
+    );
   }
 
   const sourceLabels = [
