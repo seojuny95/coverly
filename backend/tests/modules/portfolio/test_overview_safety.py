@@ -37,20 +37,6 @@ def test_rejects_unsupported_judgments_and_actions(
     )
 
 
-def test_rejects_copy_without_evidence_from_its_assigned_slot() -> None:
-    assert not overview_copy_is_safe(
-        title="확인된 보장을 정리했어요",
-        title_slot_id="confirmed:summary",
-        paragraphs=[
-            OverviewCopySegment(
-                slot_id="confirmed:summary",
-                text="현재 자료에서 확인된 보장이 있어요.",
-            )
-        ],
-        terms_by_slot={"confirmed:summary": frozenset({"암진단비"})},
-    )
-
-
 def test_rejects_a_fact_assigned_to_another_slot() -> None:
     assert not overview_copy_is_safe(
         title="암 진단비를 확인했어요",

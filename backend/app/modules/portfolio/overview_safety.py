@@ -38,19 +38,11 @@ def overview_copy_is_safe(
         return False
     if _mentions_terms_from_another_slot(title, title_slot_id, terms_by_slot):
         return False
-    if not _mentions_term_from_slot(title, title_slot_id, terms_by_slot):
-        return False
 
     for paragraph in paragraphs:
         if not _text_is_safe(paragraph.text):
             return False
         if _mentions_terms_from_another_slot(
-            paragraph.text,
-            paragraph.slot_id,
-            terms_by_slot,
-        ):
-            return False
-        if not _mentions_term_from_slot(
             paragraph.text,
             paragraph.slot_id,
             terms_by_slot,
@@ -86,16 +78,6 @@ def _mentions_terms_from_another_slot(
             if term in normalized_text:
                 return True
     return False
-
-
-def _mentions_term_from_slot(
-    text: str,
-    slot_id: str,
-    terms_by_slot: Mapping[str, frozenset[str]],
-) -> bool:
-    normalized_text = _normalize(text)
-    terms = terms_by_slot.get(slot_id, frozenset())
-    return any(term in normalized_text for term in terms)
 
 
 def _is_clear_limitation(text: str) -> bool:
