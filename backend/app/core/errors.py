@@ -53,7 +53,7 @@ def api_error_responses(
 ) -> dict[int | str, dict[str, Any]]:
     """Describe every route error with the shared public envelope."""
 
-    described_status_codes = dict.fromkeys((*status_codes, 422))
+    described_status_codes = dict.fromkeys((*status_codes, 422, 500))
 
     if response_media_type is not None:
         return {

@@ -15,6 +15,9 @@ from app.modules.portfolio.summary import summarize_portfolio_coverages
         ("암 진단비가 충분하게 준비됐어요", "현재 보장으로 충분해요."),
         ("암 진단비를 삼천만원으로 늘려야 해요", "보험금을 더 받으려면 증액해야 해요."),
         ("암 진단비 가입을 권해요", "지금 가입해야 해요."),
+        ("암 진단비 가입을 추천해요", "암 진단비 가입을 추천해요."),
+        ("암 진단비가 완벽하게 준비됐어요", "암 진단비가 든든하게 준비됐어요."),
+        ("암 진단비가 확인됐어요", "암 진단비는 삼천만원으로 확인됐어요."),
     ],
 )
 def test_rejects_unsupported_judgments_and_actions(
@@ -28,6 +31,20 @@ def test_rejects_unsupported_judgments_and_actions(
             OverviewCopySegment(
                 slot_id="confirmed:summary",
                 text=paragraph,
+            )
+        ],
+        terms_by_slot={"confirmed:summary": frozenset({"암진단비"})},
+    )
+
+
+def test_rejects_copy_without_evidence_from_its_assigned_slot() -> None:
+    assert not overview_copy_is_safe(
+        title="확인된 보장을 정리했어요",
+        title_slot_id="confirmed:summary",
+        paragraphs=[
+            OverviewCopySegment(
+                slot_id="confirmed:summary",
+                text="현재 자료에서 확인된 보장이 있어요.",
             )
         ],
         terms_by_slot={"confirmed:summary": frozenset({"암진단비"})},

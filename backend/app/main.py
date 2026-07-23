@@ -7,6 +7,7 @@ from app.core.config import get_settings
 from app.core.errors import (
     ApiError,
     api_error_handler,
+    api_error_responses,
     http_error_handler,
     request_validation_error_handler,
     unexpected_error_middleware,
@@ -41,7 +42,12 @@ def create_app() -> FastAPI:
     app.include_router(portfolio_sessions_router)
     app.include_router(portfolio_router)
     app.include_router(qa_router)
-    app.add_api_route("/health", health, methods=["GET"])
+    app.add_api_route(
+        "/health",
+        health,
+        methods=["GET"],
+        responses=api_error_responses(),
+    )
     return app
 
 

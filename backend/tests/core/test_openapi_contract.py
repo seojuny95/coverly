@@ -17,6 +17,9 @@ def test_openapi_exposes_typed_json_api_contracts() -> None:
     }
     unprocessable_schema = parse_responses["422"]["content"]["application/json"]["schema"]
     assert unprocessable_schema == {"$ref": "#/components/schemas/ApiErrorResponse"}
+    assert parse_responses["500"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ApiErrorResponse"
+    }
 
     session_responses = paths["/portfolio/sessions"]["post"]["responses"]
     assert session_responses["200"]["content"]["application/json"]["schema"] == {
@@ -27,6 +30,20 @@ def test_openapi_exposes_typed_json_api_contracts() -> None:
     assert summary_responses["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/PortfolioCoverageSummary"
     }
+
+
+def test_every_json_api_route_documents_the_unexpected_error_envelope() -> None:
+    for path, operations in app.openapi()["paths"].items():
+        for method, operation in operations.items():
+            if method not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            success_content = operation["responses"].get("200", {}).get("content", {})
+            if "application/json" not in success_content:
+                continue
+
+            assert operation["responses"]["500"]["content"]["application/json"]["schema"] == {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+            }, f"{method.upper()} {path} must document the shared 500 response"
 
 
 def test_policy_parse_openapi_schema_matches_public_response() -> None:

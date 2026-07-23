@@ -918,6 +918,15 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       503: {
         headers: {
           [name: string]: unknown;
@@ -948,6 +957,15 @@ export interface operations {
       };
       /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1007,6 +1025,15 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       503: {
         headers: {
           [name: string]: unknown;
@@ -1050,6 +1077,15 @@ export interface operations {
       };
       /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1109,6 +1145,15 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       503: {
         headers: {
           [name: string]: unknown;
@@ -1160,6 +1205,15 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       503: {
         headers: {
           [name: string]: unknown;
@@ -1203,6 +1257,15 @@ export interface operations {
       };
       /** @description Coverly API error */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -1273,6 +1336,15 @@ export interface operations {
           "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
+      /** @description Coverly API error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
     };
   };
   health_health_get: {
@@ -1293,6 +1365,24 @@ export interface operations {
           "application/json": {
             [key: string]: string;
           };
+        };
+      };
+      /** @description Coverly API error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
     };

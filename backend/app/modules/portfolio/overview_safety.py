@@ -5,10 +5,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 _NUMBER_PATTERN = re.compile(r"\d")
+_KOREAN_AMOUNT_PATTERN = re.compile(r"[영일이삼사오육칠팔구십백천만억]+(?:원|만원|억원)")
 _PROHIBITED_PATTERNS = (
-    re.compile(r"(?:가입|해지|유지).{0,8}(?:해야|하세요|권해|필요)"),
+    re.compile(r"(?:가입|해지|유지).{0,8}(?:해야|하세요|권해|권장|추천|필요)"),
     re.compile(r"(?:증액|감액|늘려야|줄여야)"),
-    re.compile(r"(?:충분|부족|적정|과도)(?:해요|돼요|합니다|하다고|해보여요)"),
+    re.compile(
+        r"(?:충분|부족|적정|과도|완벽|든든)"
+        r"(?:하게|히)?.{0,4}(?:해요|돼요|합니다|하다고|해보여요|준비됐어요)"
+    ),
     re.compile(r"보험금.{0,12}(?:받을 수|지급돼|나와|나옵니다)"),
     re.compile(r"(?:혜택|손해를 봐|큰일)"),
 )
@@ -34,11 +38,19 @@ def overview_copy_is_safe(
         return False
     if _mentions_terms_from_another_slot(title, title_slot_id, terms_by_slot):
         return False
+    if not _mentions_term_from_slot(title, title_slot_id, terms_by_slot):
+        return False
 
     for paragraph in paragraphs:
         if not _text_is_safe(paragraph.text):
             return False
         if _mentions_terms_from_another_slot(
+            paragraph.text,
+            paragraph.slot_id,
+            terms_by_slot,
+        ):
+            return False
+        if not _mentions_term_from_slot(
             paragraph.text,
             paragraph.slot_id,
             terms_by_slot,
@@ -55,7 +67,7 @@ def overview_copy_is_safe(
 
 
 def _text_is_safe(text: str) -> bool:
-    if _NUMBER_PATTERN.search(text):
+    if _NUMBER_PATTERN.search(text) or _KOREAN_AMOUNT_PATTERN.search(text):
         return False
     return not any(pattern.search(text) for pattern in _PROHIBITED_PATTERNS)
 
@@ -74,6 +86,16 @@ def _mentions_terms_from_another_slot(
             if term in normalized_text:
                 return True
     return False
+
+
+def _mentions_term_from_slot(
+    text: str,
+    slot_id: str,
+    terms_by_slot: Mapping[str, frozenset[str]],
+) -> bool:
+    normalized_text = _normalize(text)
+    terms = terms_by_slot.get(slot_id, frozenset())
+    return any(term in normalized_text for term in terms)
 
 
 def _is_clear_limitation(text: str) -> bool:
