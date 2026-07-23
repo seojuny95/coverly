@@ -17,6 +17,7 @@ are masked, and only the recent history window goes on the wire.
 import json
 from collections.abc import AsyncIterator
 
+import pytest
 from agents import Agent
 from fastapi.testclient import TestClient
 
@@ -162,6 +163,34 @@ def test_stream_emits_meta_delta_end_in_order() -> None:
     assert all(event["type"] == "delta" for event in events[1:-1])
     texts = _delta_texts(events)
     assert "".join(texts) == "대장암은 암진단비(유사암제외)로 2,000만원이 나와요."
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"question": "질문" * 1_001, "history": [], "session_id": _SESSION_ID},
+        {
+            "question": "질문",
+            "history": [{"role": "user", "content": "가" * 4_001}],
+            "session_id": _SESSION_ID,
+        },
+        {
+            "question": "질문",
+            "history": [{"role": "user", "content": "질문"}] * 41,
+            "session_id": _SESSION_ID,
+        },
+        {"question": "질문", "history": [], "session_id": "s" * 513},
+    ],
+)
+def test_qa_request_rejects_unbounded_client_input(
+    payload: dict[str, object],
+) -> None:
+    client = _client((), [])
+
+    response = client.post("/qa/stream", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "REQUEST_VALIDATION_ERROR"
 
 
 def test_meta_carries_real_turns_remaining() -> None:
