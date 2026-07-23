@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from app.core.prompts import load_prompt
 from app.integrations.openai.client import JsonCompleter, dump_prompt_json, structured_completer
+from app.modules.portfolio.overview_safety import (
+    OverviewCopySegment,
+    overview_copy_is_safe,
+)
 from app.modules.portfolio.schemas import (
     EssentialCoverageItem,
     PortfolioCoverageSummary,
@@ -86,14 +90,14 @@ def generate_summary_overview(
         logger.exception("portfolio_overview_generation_failed")
         return None
 
-    if not _draft_uses_grounded_slots(draft, facts):
+    if not _draft_is_safe(draft, facts):
         try:
             raw = completer(_system_prompt(), _correction_user_prompt(facts, raw))
             draft = _LlmOverviewDraft.model_validate(raw)
         except Exception:
             logger.exception("portfolio_overview_correction_failed")
             return None
-        if not _draft_uses_grounded_slots(draft, facts):
+        if not _draft_is_safe(draft, facts):
             logger.warning("portfolio_overview_grounding_failed")
             return None
 
@@ -237,6 +241,27 @@ def _draft_uses_grounded_slots(
     return len(paragraph_slot_ids) == len(set(paragraph_slot_ids))
 
 
+def _draft_is_safe(
+    draft: _LlmOverviewDraft,
+    prompt_facts: dict[str, object],
+) -> bool:
+    if not _draft_uses_grounded_slots(draft, prompt_facts):
+        return False
+    return overview_copy_is_safe(
+        title=draft.title,
+        title_slot_id=draft.title_slot_id,
+        paragraphs=[
+            OverviewCopySegment(
+                slot_id=paragraph.slot_id,
+                text=paragraph.text,
+                limitation=paragraph.limitation,
+            )
+            for paragraph in draft.paragraphs
+        ],
+        terms_by_slot=_terms_by_slot(prompt_facts),
+    )
+
+
 def _public_paragraphs(draft: _LlmOverviewDraft) -> list[str]:
     paragraphs: list[str] = []
     for paragraph in draft.paragraphs:
@@ -262,6 +287,64 @@ def _slots_by_id(prompt_facts: dict[str, object]) -> dict[str, _OverviewParagrap
     return slots
 
 
+def _terms_by_slot(prompt_facts: dict[str, object]) -> dict[str, frozenset[str]]:
+    facts_by_id = _facts_by_id(prompt_facts)
+    terms_by_slot: dict[str, frozenset[str]] = {}
+    for slot_id, slot in _slots_by_id(prompt_facts).items():
+        terms: set[str] = set()
+        for fact_id in slot.fact_ids:
+            fact = facts_by_id.get(fact_id)
+            if fact is not None:
+                terms.update(_fact_terms(fact))
+        terms_by_slot[slot_id] = frozenset(terms)
+    return terms_by_slot
+
+
+def _facts_by_id(prompt_facts: dict[str, object]) -> dict[str, dict[str, object]]:
+    raw_facts = prompt_facts.get("facts")
+    if not isinstance(raw_facts, list):
+        return {}
+
+    facts: dict[str, dict[str, object]] = {}
+    for fact in raw_facts:
+        if not isinstance(fact, dict):
+            continue
+        fact_id = fact.get("fact_id")
+        if isinstance(fact_id, str):
+            facts[fact_id] = fact
+    return facts
+
+
+def _fact_terms(fact: dict[str, object]) -> set[str]:
+    terms: set[str] = set()
+    for key in ("label", "coverage_name"):
+        _collect_term(terms, fact.get(key))
+    for key in ("matched_coverage_names",):
+        values = fact.get(key)
+        if isinstance(values, list):
+            for value in values:
+                _collect_term(terms, value)
+    groups = fact.get("review_groups")
+    if isinstance(groups, list):
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            _collect_term(terms, group.get("label"))
+            names = group.get("coverage_names")
+            if isinstance(names, list):
+                for name in names:
+                    _collect_term(terms, name)
+    return terms
+
+
+def _collect_term(terms: set[str], value: object) -> None:
+    if not isinstance(value, str):
+        return
+    normalized = "".join(character for character in value.casefold() if character.isalnum())
+    if len(normalized) >= 2:
+        terms.add(normalized)
+
+
 def _system_prompt() -> str:
     return load_prompt(_PROMPT_PATH)
 
@@ -282,8 +365,9 @@ def _correction_user_prompt(
     return dump_prompt_json(
         {
             "task": (
-                "이전 총평은 문단 슬롯 배치가 입력 사실과 맞지 않았습니다. "
-                "실제 입력 paragraph_slots의 slot_id만 중복 없이 사용해 다시 작성하세요. "
+                "이전 총평은 문단 슬롯 배치나 안전 규칙이 입력 사실과 맞지 않았습니다. "
+                "실제 입력 paragraph_slots의 slot_id만 중복 없이 사용하고, "
+                "근거 없는 판단이나 숫자 없이 다시 작성하세요. "
                 "중요도가 낮은 슬롯은 생략해도 됩니다."
             ),
             "facts": facts,
