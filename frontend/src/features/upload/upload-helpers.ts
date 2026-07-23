@@ -11,9 +11,17 @@ export function toFiles(files: FileList | File[]): File[] {
 
 export function isFileSpecificUploadError(err: unknown) {
   if (!(err instanceof UploadInsuranceError)) return false;
+  if (isExpiredUploadSessionError(err)) return false;
   if (err.code === "UPLOAD_NETWORK_ERROR") return false;
   if (err.status && err.status >= 500) return false;
   return true;
+}
+
+export function isExpiredUploadSessionError(err: unknown) {
+  return (
+    err instanceof UploadInsuranceError &&
+    (err.status === 403 || err.code === "INVALID_PORTFOLIO_SESSION")
+  );
 }
 
 function isPasswordUploadError(code: UploadErrorCode) {
