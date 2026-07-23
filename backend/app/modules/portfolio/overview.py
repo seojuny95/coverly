@@ -198,11 +198,11 @@ def _overview_paragraph_slots(
 ) -> list[_OverviewParagraphSlot]:
     slots: list[_OverviewParagraphSlot] = []
     for role in ("confirmed", "review", "unconfirmed"):
-        fact_ids = [
-            fact["fact_id"]
-            for fact in facts
-            if fact.get("role") == role and isinstance(fact.get("fact_id"), str)
-        ]
+        fact_ids: list[str] = []
+        for fact in facts:
+            fact_id = fact.get("fact_id")
+            if fact.get("role") == role and isinstance(fact_id, str):
+                fact_ids.append(fact_id)
         if fact_ids:
             slots.append(
                 _OverviewParagraphSlot(

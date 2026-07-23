@@ -15,6 +15,7 @@ export const API_ERROR_CODES = [
   "PDF_PASSWORD_INCORRECT",
   "PDF_TEXT_EXTRACTION_FAILED",
   "reference_data_unavailable",
+  "portfolio_overview_unavailable",
   "INVALID_PORTFOLIO_SESSION",
   "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
   "COUNSEL_TURN_LIMIT_REACHED",
