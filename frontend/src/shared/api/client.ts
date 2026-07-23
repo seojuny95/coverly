@@ -37,6 +37,22 @@ export class ApiResponseError extends Error {
   }
 }
 
+export function hasApiErrorCode(
+  error: unknown,
+  code: ApiErrorCode,
+): error is ApiResponseError {
+  return error instanceof ApiResponseError && error.code === code;
+}
+
+export function isExpiredPortfolioSessionApiError(
+  error: unknown,
+): error is ApiResponseError {
+  return (
+    error instanceof ApiResponseError &&
+    (error.status === 403 || error.code === "INVALID_PORTFOLIO_SESSION")
+  );
+}
+
 export async function apiResponseError(
   response: Response,
   fallbackMessage: string,
