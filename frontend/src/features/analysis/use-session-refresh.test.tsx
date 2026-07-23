@@ -135,6 +135,48 @@ describe("usePortfolioSessionRefresh", () => {
     });
   });
 
+  it("expires the session instead of retrying forever after the server expiry passes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-18T00:13:59.000Z"));
+    vi.mocked(refreshPortfolioSession).mockRejectedValue(new Error("offline"));
+    const onExpired = vi.fn();
+
+    renderHook(() =>
+      usePortfolioSessionRefresh({
+        session: {
+          portfolioSessionToken: "current-portfolio-token",
+          expiresAt: "2026-07-18T00:15:00.000Z",
+          counselTurnsRemaining: 10,
+        },
+        enabled: true,
+        onRefreshed: vi.fn(),
+        onExpired,
+      }),
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(refreshPortfolioSession).toHaveBeenCalledOnce();
+    expect(onExpired).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(PORTFOLIO_SESSION_REFRESH_RETRY_MS);
+      await Promise.resolve();
+    });
+    expect(refreshPortfolioSession).toHaveBeenCalledTimes(2);
+    expect(onExpired).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(PORTFOLIO_SESSION_REFRESH_RETRY_MS);
+      await Promise.resolve();
+    });
+
+    expect(refreshPortfolioSession).toHaveBeenCalledTimes(3);
+    expect(onExpired).toHaveBeenCalledOnce();
+  });
+
   it("refreshes one minute before the server expiry", () => {
     expect(
       portfolioSessionRefreshDelay(
