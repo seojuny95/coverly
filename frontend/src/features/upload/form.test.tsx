@@ -16,13 +16,16 @@ import {
 // Probe consumer: reads the in-memory context so tests can assert what the
 // form wrote via the default onAnalysisComplete (setAnalysis).
 function InsuranceDataProbe() {
-  const { analysis } = useInsuranceData();
+  const { analysis, sessionExpired } = useInsuranceData();
   return (
-    <div data-testid="probe">
-      {(analysis?.insuranceDocuments ?? [])
-        .map((document) => document.fileName)
-        .join(",")}
-    </div>
+    <>
+      <div data-testid="probe">
+        {(analysis?.insuranceDocuments ?? [])
+          .map((document) => document.fileName)
+          .join(",")}
+      </div>
+      <div data-testid="session-expired">{sessionExpired ? "yes" : "no"}</div>
+    </>
   );
 }
 
@@ -64,6 +67,7 @@ function renderForm({
   navigateToAnalysis = vi.fn(),
   existingDocuments = [],
   deleteSessionDocuments = vi.fn().mockResolvedValue(undefined),
+  initialAnalysis = null,
 }: {
   uploadInsurance?: UploadInsurance;
   onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
@@ -73,16 +77,21 @@ function renderForm({
     portfolioSessionToken: string,
     documentIds: string[],
   ) => Promise<void>;
+  initialAnalysis?: InsuranceAnalysis | null;
 } = {}) {
   renderWithProviders(
-    <InsuranceUploadForm
-      uploadInsurance={uploadInsurance}
-      onAnalysisComplete={onAnalysisComplete}
-      navigateToAnalysis={navigateToAnalysis}
-      existingDocuments={existingDocuments}
-      createSession={createSession}
-      deleteSessionDocuments={deleteSessionDocuments}
-    />,
+    <>
+      <InsuranceUploadForm
+        uploadInsurance={uploadInsurance}
+        onAnalysisComplete={onAnalysisComplete}
+        navigateToAnalysis={navigateToAnalysis}
+        existingDocuments={existingDocuments}
+        createSession={createSession}
+        deleteSessionDocuments={deleteSessionDocuments}
+      />
+      <InsuranceDataProbe />
+    </>,
+    { initialAnalysis },
   );
   return {
     uploadInsurance,
@@ -784,7 +793,7 @@ describe("InsuranceUploadForm", () => {
     expect(onAnalysisComplete).not.toHaveBeenCalled();
     expect(deleteSessionDocuments).toHaveBeenCalledWith(
       "test-portfolio-token",
-      [expect.any(String), expect.any(String)],
+      [expect.any(String)],
     );
 
     await user.click(
@@ -962,6 +971,56 @@ describe("InsuranceUploadForm", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("읽을 수 없는 PDF")).not.toBeInTheDocument();
+  });
+
+  test("marks the analysis session expired when an additional upload is rejected by the session boundary", async () => {
+    const user = userEvent.setup();
+    const uploadInsurance = vi.fn<UploadInsurance>().mockRejectedValue(
+      new UploadInsuranceError({
+        code: "INVALID_PORTFOLIO_SESSION",
+        status: 403,
+        userMessage: "분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
+      }),
+    );
+    const deleteSessionDocuments = vi.fn().mockResolvedValue(undefined);
+
+    renderForm({
+      uploadInsurance,
+      deleteSessionDocuments,
+      initialAnalysis: {
+        generatedAt: "2026-07-23T00:00:00.000Z",
+        selectedName: "테스트고객",
+        portfolioSessionToken: "expired-portfolio-token",
+        portfolioSessionExpiresAt: "2026-07-23T00:00:00.000Z",
+        counselTurnsRemaining: 10,
+        insuranceDocuments: [
+          {
+            id: "existing-document",
+            fileName: "existing.pdf",
+            result: {
+              ...POLICY_RESULT_DEFAULTS,
+              기본정보: {
+                피보험자: "테스트고객",
+                보험분류: "제3보험",
+                상품태그: [],
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("session-expired")).toHaveTextContent("yes");
+    expect(deleteSessionDocuments).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
   });
 
   test("rolls back an already-succeeded upload when another file in the batch times out, and clears the in-flight state", async () => {

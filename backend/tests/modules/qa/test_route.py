@@ -51,11 +51,20 @@ class _FixtureSessions:
 
     def __init__(self, policies: tuple[PolicyInput, ...] = ()) -> None:
         self._policies = policies
+        self.turns_used = 0
+        self.refund_calls = 0
 
     def consume_counsel_turn(self, token: str, **_kwargs: object) -> int:
         if token != _SESSION_ID:
             raise InvalidPortfolioSessionToken
+        self.turns_used += 1
         return 9
+
+    def refund_counsel_turn(self, token: str, **_kwargs: object) -> None:
+        if token != _SESSION_ID:
+            raise InvalidPortfolioSessionToken
+        self.refund_calls += 1
+        self.turns_used = max(0, self.turns_used - 1)
 
     def snapshot(self, token: str, **_kwargs: object) -> PortfolioSessionSnapshot:
         if token != _SESSION_ID:
@@ -87,18 +96,33 @@ def _stub_runner(
     return runner
 
 
+def _failing_runner(
+    seen_conversations: list[list[ConversationMessage]] | None = None,
+) -> AgentStreamRunner:
+    async def runner(
+        agent: Agent[QaContext], conversation: list[ConversationMessage], context: QaContext
+    ) -> AsyncIterator[str]:
+        if seen_conversations is not None:
+            seen_conversations.append(list(conversation))
+        yield "확인 중이에요."
+        raise RuntimeError("agent failed")
+
+    return runner
+
+
 def _client(
     policies: tuple[PolicyInput, ...],
     chunks: list[str],
     *,
     sessions: _FixtureSessions | None = None,
     seen_conversations: list[list[ConversationMessage]] | None = None,
+    runner: AgentStreamRunner | None = None,
 ) -> TestClient:
     app = create_app()
     session_service = sessions if sessions is not None else _FixtureSessions(policies)
     app.dependency_overrides[get_portfolio_session_service] = lambda: session_service
-    app.dependency_overrides[get_agent_stream_runner] = lambda: _stub_runner(
-        chunks, seen_conversations
+    app.dependency_overrides[get_agent_stream_runner] = lambda: (
+        runner or _stub_runner(chunks, seen_conversations)
     )
     return TestClient(app)
 
@@ -173,6 +197,29 @@ def test_empty_deltas_are_not_forwarded() -> None:
 
     events = _events(response.text)
     assert _delta_texts(events) == ["안녕", "하세요"]
+
+
+def test_agent_failure_refunds_the_turn_and_finishes_the_stream() -> None:
+    sessions = _FixtureSessions((_policy("암진단비", "2,000만원", "정액"),))
+    client = _client(
+        (),
+        [],
+        sessions=sessions,
+        runner=_failing_runner(),
+    )
+
+    response = client.post(
+        "/qa/stream",
+        json={"question": "질문", "history": [], "session_id": _SESSION_ID},
+    )
+
+    events = _events(response.text)
+    assert response.status_code == 200
+    assert events[0]["type"] == "meta"
+    assert events[-1]["type"] == "end"
+    assert "답을 가져오지 못했어요" in "".join(_delta_texts(events))
+    assert sessions.refund_calls == 1
+    assert sessions.turns_used == 0
 
 
 def test_an_invalid_session_is_rejected_before_the_agent_runs() -> None:

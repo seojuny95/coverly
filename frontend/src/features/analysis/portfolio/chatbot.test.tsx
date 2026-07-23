@@ -5,15 +5,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../../../test/render-with-providers";
 import { InsuranceChatbot } from "./chatbot";
 import * as api from "./api";
+import { ApiResponseError } from "@/shared/api/client";
 
 type StreamHandlers = Parameters<typeof api.streamPortfolioQuestion>[2];
 
-async function openChat() {
+async function openChat(
+  props: Partial<Parameters<typeof InsuranceChatbot>[0]> = {},
+) {
   const user = userEvent.setup();
   renderWithProviders(
     <InsuranceChatbot
       portfolioSessionToken="portfolio-token"
       turnsRemaining={10}
+      {...props}
     />,
   );
   await user.click(
@@ -109,6 +113,70 @@ describe("InsuranceChatbot", () => {
         "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("reports an expired session when the qa request is rejected by the session boundary", async () => {
+    const onSessionExpired = vi.fn();
+    vi.spyOn(api, "streamPortfolioQuestion").mockRejectedValue(
+      new ApiResponseError({
+        code: "INVALID_PORTFOLIO_SESSION",
+        message: "분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
+        status: 403,
+      }),
+    );
+    const user = await openChat({ onSessionExpired });
+
+    await user.type(screen.getByLabelText("보험 질문"), "암 진단비는?");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+
+    expect(
+      await screen.findByText(
+        "분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(onSessionExpired).toHaveBeenCalledOnce();
+  });
+
+  it("passes an abort signal to the qa stream request", async () => {
+    let signal: AbortSignal | undefined;
+    vi.spyOn(api, "streamPortfolioQuestion").mockImplementation(
+      (_question, _history, _handlers, _token, requestSignal) => {
+        signal = requestSignal;
+        return new Promise<void>(() => undefined);
+      },
+    );
+    const user = await openChat();
+
+    await user.type(screen.getByLabelText("보험 질문"), "암 진단비는?");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
+  });
+
+  it("does not leave an empty loading answer when the floating chat is closed during a request", async () => {
+    let rejectStream: ((error: unknown) => void) | undefined;
+    vi.spyOn(api, "streamPortfolioQuestion").mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectStream = reject;
+        }),
+    );
+    const user = await openChat();
+
+    await user.type(screen.getByLabelText("보험 질문"), "암 진단비는?");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+    await user.click(screen.getByRole("button", { name: "닫기" }));
+
+    await act(async () => {
+      rejectStream?.(new DOMException("Aborted", "AbortError"));
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
+    );
+    expect(await screen.findByText("질문을 중단했어요.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("답변 준비 중")).not.toBeInTheDocument();
   });
 
   it("opens the full 상담 tab from the floating chat", async () => {

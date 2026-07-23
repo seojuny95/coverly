@@ -159,4 +159,11 @@ describe("CoverageSummaryTable", () => {
     );
     expect(screen.getByText("2개 합산").closest("td")).toHaveClass("align-top");
   });
+
+  it("animates coverage details when a row is expanded", () => {
+    render(<CoverageSummaryTable summary={summary} />);
+
+    const details = screen.getAllByText("암진단비")[0].closest("details");
+    expect(details?.querySelector("div")).toHaveClass("animate-enter");
+  });
 });

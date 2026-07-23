@@ -13,12 +13,14 @@ export function InsuranceChatbot({
   turnsRemaining: initialTurnsRemaining,
   mode = "floating",
   onExpand,
+  onSessionExpired,
 }: {
   portfolioSessionToken: string;
   sessionExpired?: boolean;
   turnsRemaining: number;
   mode?: "floating" | "full";
   onExpand?: () => void;
+  onSessionExpired?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const closeChatbot = useCallback(() => setOpen(false), []);
@@ -41,6 +43,7 @@ export function InsuranceChatbot({
     sessionExpired,
     isChatVisible,
     initialTurnsRemaining,
+    onSessionExpired,
   });
 
   // autoFocus: false — this dialog already focuses the question input itself

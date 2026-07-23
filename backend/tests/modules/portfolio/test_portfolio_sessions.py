@@ -66,6 +66,14 @@ class _Repository:
         self.counsel_turns_used += 1
         return max_turns - self.counsel_turns_used
 
+    def refund_counsel_turn(self, session_id: str, *, now: datetime) -> bool:
+        if self.session is None or self.session.id != session_id:
+            return False
+        if self.counsel_turns_used <= 0:
+            return False
+        self.counsel_turns_used -= 1
+        return True
+
     def create(self, session: NewPortfolioSession) -> None:
         self.session = session
 
@@ -620,6 +628,19 @@ def test_counsel_turns_run_out_after_the_configured_limit() -> None:
     assert remaining == [2, 1, 0]
     with pytest.raises(CounselTurnLimitReached):
         sessions.consume_counsel_turn(access.token, max_turns=3, now=now)
+
+
+def test_refunding_a_failed_counsel_turn_restores_the_session_allowance() -> None:
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+
+    assert sessions.consume_counsel_turn(access.token, max_turns=2, now=now) == 1
+
+    sessions.refund_counsel_turn(access.token, now=now)
+
+    assert sessions.consume_counsel_turn(access.token, max_turns=2, now=now) == 1
 
 
 def test_adding_a_policy_document_does_not_restore_counsel_turns() -> None:

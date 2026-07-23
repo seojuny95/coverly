@@ -99,6 +99,19 @@ class PgPortfolioSessionRepository:
             return None
         return max(0, max_turns - int(row["counsel_turns_used"]))
 
+    def refund_counsel_turn(self, session_id: str, *, now: datetime) -> bool:
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                """UPDATE private.portfolio_sessions
+                      SET counsel_turns_used = counsel_turns_used - 1
+                    WHERE id = %s
+                      AND expires_at > %s
+                      AND counsel_turns_used > 0
+                RETURNING counsel_turns_used""",
+                (session_id, now),
+            ).fetchone()
+        return row is not None
+
     def reserve_document(
         self,
         session_id: str,

@@ -24,6 +24,7 @@ import { useSelectedFiles } from "./use-selected-files";
 import {
   ROLLBACK_ERROR_MESSAGE,
   UploadRollbackError,
+  isExpiredUploadSessionError,
   isFileSpecificUploadError,
   messageForFailedUploads,
   messageForSubmitFailure,
@@ -68,7 +69,11 @@ export function useUploadOrchestration({
     documentIds: string[],
   ) => Promise<void>;
 }) {
-  const { analysis: currentAnalysis, setAnalysis } = useInsuranceData();
+  const {
+    analysis: currentAnalysis,
+    setAnalysis,
+    expireSession,
+  } = useInsuranceData();
   const router = useRouter();
   const uploadMutation = useMutation({ mutationFn: uploadInsurance });
   const sessionMutation = useMutation({
@@ -134,8 +139,7 @@ export function useUploadOrchestration({
     setError(null);
     try {
       await deleteSessionDocuments(
-        currentAnalysis?.portfolioSessionToken ??
-          pendingCleanup.portfolioSessionToken,
+        pendingCleanup.portfolioSessionToken,
         pendingCleanup.documentIds,
       );
       pendingCleanupRef.current = null;
@@ -173,24 +177,26 @@ export function useUploadOrchestration({
         crypto.randomUUID(),
       ]),
     );
-    let successfulDocumentIds = [...assignedDocumentIds.values()];
-    const rollbackSuccessfulDocuments = async () => {
-      if (!portfolioSessionToken || successfulDocumentIds.length === 0) return;
+    let successfulDocumentIds: string[] = [];
+    const rollbackDocuments = async (documentIds: string[]) => {
+      if (!portfolioSessionToken || documentIds.length === 0) return;
+      const uniqueDocumentIds = [...new Set(documentIds)];
       try {
-        await deleteSessionDocuments(
-          portfolioSessionToken,
-          successfulDocumentIds,
-        );
+        await deleteSessionDocuments(portfolioSessionToken, uniqueDocumentIds);
         pendingCleanupRef.current = null;
-        successfulDocumentIds = [];
+        successfulDocumentIds = successfulDocumentIds.filter(
+          (documentId) => !uniqueDocumentIds.includes(documentId),
+        );
       } catch {
         pendingCleanupRef.current = {
           portfolioSessionToken,
-          documentIds: [...successfulDocumentIds],
+          documentIds: uniqueDocumentIds,
         };
         throw new UploadRollbackError();
       }
     };
+    const rollbackSuccessfulDocuments = () =>
+      rollbackDocuments(successfulDocumentIds);
     try {
       const portfolioSession = currentAnalysis
         ? {
@@ -215,6 +221,10 @@ export function useUploadOrchestration({
             portfolioSessionToken: portfolioSession.portfolioSessionToken,
           };
           const result = await uploadMutation.mutateAsync(uploadInput);
+          successfulDocumentIds = [
+            ...successfulDocumentIds,
+            uploadInput.documentId,
+          ];
           const { documentId: _documentId, ...policyResult } = result;
           void _documentId;
           setAnalysisProgress((current) => ({
@@ -274,11 +284,29 @@ export function useUploadOrchestration({
         (result) => result.status === "rejected",
       );
       if (failedUploads.length > 0) {
-        await rollbackSuccessfulDocuments();
+        const expiredSessionFailure = failedUploads.find((result) =>
+          isExpiredUploadSessionError(result.error),
+        );
+        if (expiredSessionFailure) {
+          expireSession();
+          throw expiredSessionFailure.error;
+        }
         const unexpectedFailure = failedUploads.find(
           (result) => !result.uploadError,
         );
-        if (unexpectedFailure) throw unexpectedFailure.error;
+        if (unexpectedFailure) {
+          const rejectedDocumentIds = uploadResults.flatMap((result, index) =>
+            result.status === "rejected"
+              ? [assignedDocumentIds.get(selectedUploadFiles[index].id)!]
+              : [],
+          );
+          await rollbackDocuments([
+            ...successfulDocumentIds,
+            ...rejectedDocumentIds,
+          ]);
+          throw unexpectedFailure.error;
+        }
+        await rollbackSuccessfulDocuments();
         const uploadErrors = failedUploads.flatMap((result) =>
           result.uploadError ? [result.uploadError] : [],
         );
@@ -337,7 +365,12 @@ export function useUploadOrchestration({
         rollbackSuccessfulDocuments,
       );
     } catch (err) {
+      const expiredSessionError = isExpiredUploadSessionError(err);
+      if (expiredSessionError) {
+        expireSession();
+      }
       if (
+        !expiredSessionError &&
         !(err instanceof UploadRollbackError) &&
         successfulDocumentIds.length > 0
       ) {

@@ -14,7 +14,6 @@ export default function GlobalError({
   useEffect(() => {
     console.error("global_render_error", {
       digest: error.digest,
-      message: error.message,
       name: error.name,
     });
   }, [error]);

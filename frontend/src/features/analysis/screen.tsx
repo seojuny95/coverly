@@ -253,6 +253,7 @@ export function InsuranceAnalysisPage({
           turnsRemaining={analysis.counselTurnsRemaining}
           mode={activeTab === "chat" ? "full" : "floating"}
           onExpand={() => setActiveTab("chat")}
+          onSessionExpired={expireSession}
         />
       </section>
 

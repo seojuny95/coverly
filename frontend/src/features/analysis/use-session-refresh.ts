@@ -37,6 +37,11 @@ export function portfolioSessionRefreshDelay(
   );
 }
 
+function portfolioSessionHasExpired(expiresAt: string, now = Date.now()) {
+  const expiresAtMs = Date.parse(expiresAt);
+  return Number.isFinite(expiresAtMs) && expiresAtMs <= now;
+}
+
 export function usePortfolioSessionRefresh({
   session,
   enabled,
@@ -62,7 +67,11 @@ export function usePortfolioSessionRefresh({
           onRefreshed(refreshed);
         }
       } catch (error) {
-        if (!cancelled && error instanceof PortfolioSessionExpiredError) {
+        if (
+          !cancelled &&
+          (error instanceof PortfolioSessionExpiredError ||
+            portfolioSessionHasExpired(session.expiresAt))
+        ) {
           onExpired();
           return;
         }

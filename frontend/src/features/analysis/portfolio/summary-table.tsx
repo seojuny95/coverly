@@ -217,9 +217,12 @@ function CoverageDisclosure({
   badge?: ReactNode;
 }) {
   return (
-    <details>
+    <details className="group">
       <summary className="flex cursor-pointer list-none items-start gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
-        <span aria-hidden="true" className="mt-0.5 w-3 shrink-0 text-zinc-400">
+        <span
+          aria-hidden="true"
+          className="mt-0.5 w-3 shrink-0 text-zinc-400 transition-transform duration-150 group-open:rotate-90"
+        >
           ›
         </span>
         <span className="inline-flex min-w-0 flex-wrap items-center gap-2 break-words">
@@ -227,7 +230,7 @@ function CoverageDisclosure({
           {badge}
         </span>
       </summary>
-      {children}
+      <div className="animate-enter">{children}</div>
     </details>
   );
 }
