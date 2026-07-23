@@ -59,3 +59,31 @@ def test_configured_frontend_origin_can_preflight_policy_upload(
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "https://allowed-origin.test"
     get_settings.cache_clear()
+
+
+def test_unexpected_error_keeps_cors_and_uses_safe_common_envelope() -> None:
+    test_app = create_app()
+
+    @test_app.get("/_test/unexpected-error")
+    def raise_unexpected_error() -> None:
+        raise RuntimeError("sensitive implementation detail")
+
+    response = TestClient(test_app).get(
+        "/_test/unexpected-error",
+        headers={
+            "Origin": "http://localhost:3000",
+            "X-Request-ID": "unexpected-error-request",
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert response.headers["x-request-id"] == "unexpected-error-request"
+    assert response.json() == {
+        "error": {
+            "code": "INTERNAL_SERVER_ERROR",
+            "message": "예기치 않은 오류가 발생했어요. 잠시 후 다시 시도해주세요.",
+            "request_id": "unexpected-error-request",
+        }
+    }
+    assert "sensitive implementation detail" not in response.text

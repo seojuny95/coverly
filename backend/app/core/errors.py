@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 
 from fastapi import Request
@@ -29,6 +30,7 @@ type ApiErrorCode = Literal[
     "INVALID_POLICY_SELECTION",
     "REQUEST_VALIDATION_ERROR",
     "INVALID_MULTIPART_REQUEST",
+    "INTERNAL_SERVER_ERROR",
 ]
 
 
@@ -78,6 +80,39 @@ class ApiError(Exception):
         self.code = code
         self.message = message
         super().__init__(message)
+
+
+async def unexpected_error_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Return the shared public envelope for unhandled application failures."""
+
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        request_id = getattr(request.state, REQUEST_ID_STATE_KEY, str(uuid.uuid4()))
+        logger.error(
+            "unexpected_server_error",
+            extra={
+                "code": "INTERNAL_SERVER_ERROR",
+                "error_type": type(exc).__name__,
+                "request_id": request_id,
+                "status_code": 500,
+                "path": request.url.path,
+            },
+        )
+        return JSONResponse(
+            status_code=500,
+            headers={"x-request-id": request_id},
+            content={
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": "예기치 않은 오류가 발생했어요. 잠시 후 다시 시도해주세요.",
+                    "request_id": request_id,
+                },
+            },
+        )
 
 
 async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
