@@ -141,6 +141,7 @@ describe("InsuranceAnalysisPage", () => {
           result: {
             ...POLICY_RESULT_DEFAULTS,
             status: "accepted",
+            policy_terms_status: "unavailable",
             문자수: 100,
             기본정보: {
               보험사: "삼성화재",
@@ -181,6 +182,11 @@ describe("InsuranceAnalysisPage", () => {
     expect(screen.getByText("POLICY-TEST-001")).toBeInTheDocument();
     expect(screen.getByText("2026-01-01 - 2046-01-01")).toBeInTheDocument();
     expect(screen.getByText("월납 120,000원")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "약관 질문에 필요한 자료를 준비하지 못했어요. 이 증권의 보장 분석은 그대로 확인할 수 있어요.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText("상품명")).not.toBeInTheDocument();
     expect(screen.queryByText("상품태그")).not.toBeInTheDocument();
   });

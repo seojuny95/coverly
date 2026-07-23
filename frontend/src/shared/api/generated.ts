@@ -208,6 +208,9 @@ export interface components {
     /** @enum {string} */
     ApiErrorCode:
       | "PDF_TOO_LARGE"
+      | "PDF_PAGE_LIMIT_EXCEEDED"
+      | "PDF_COMPLEXITY_LIMIT_EXCEEDED"
+      | "PDF_PARSING_BUSY"
       | "INVALID_PDF"
       | "PDF_PASSWORD_REQUIRED"
       | "PDF_PASSWORD_INCORRECT"
@@ -221,7 +224,8 @@ export interface components {
       | "portfolio_session_unavailable"
       | "INVALID_POLICY_SELECTION"
       | "REQUEST_VALIDATION_ERROR"
-      | "INVALID_MULTIPART_REQUEST";
+      | "INVALID_MULTIPART_REQUEST"
+      | "INTERNAL_SERVER_ERROR";
     /** ApiErrorDetail */
     ApiErrorDetail: {
       code: components["schemas"]["ApiErrorCode"];
@@ -239,7 +243,7 @@ export interface components {
       /**
        * File
        * Format: binary
-       * @description PDF document only. The server verifies the %PDF signature and accepts at most 10 MiB.
+       * @description PDF document only. The server verifies the %PDF signature and accepts at most 10 MiB and 100 pages.
        */
       file: string;
       /**
@@ -529,6 +533,12 @@ export interface components {
        * @enum {string}
        */
       "\uBD84\uC11D\uC0C1\uD0DC": "완료" | "부분";
+      /**
+       * Policy Terms Status
+       * @default unavailable
+       * @enum {string}
+       */
+      policy_terms_status: "available" | "unavailable";
     };
     /**
      * PolicySummary

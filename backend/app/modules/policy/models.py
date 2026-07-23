@@ -70,6 +70,7 @@ class PremiumSummary(TypedDict, total=False):
 
 
 PolicyAnalysisStatus = Literal["완료", "부분"]
+PolicyTermsStatus = Literal["available", "unavailable"]
 
 
 class InsuredDemographics(TypedDict):

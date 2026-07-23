@@ -9,6 +9,7 @@ Raises EmptyTextError when the PDF has no extractable text (the only hard-fail);
 coverage failures degrade to 부분 inside extract_coverages.
 """
 
+import logging
 from collections.abc import Callable
 from typing import NotRequired, TypedDict
 
@@ -18,6 +19,7 @@ from app.modules.policy.models import (
     ParsedDocument,
     PolicyAnalysisStatus,
     PolicySummary,
+    PolicyTermsStatus,
 )
 from app.modules.policy.parsing import parse_document
 from app.modules.policy.summary.service import extract_policy_summary
@@ -28,12 +30,16 @@ class PipelineResult(TypedDict):
     기본정보: PolicySummary
     보장목록: list[Coverage]
     분석상태: PolicyAnalysisStatus
+    policy_terms_status: PolicyTermsStatus
     문자수: int
     문서세션ID: NotRequired[str]
 
 
 class EmptyTextError(Exception):
     """The PDF yielded no extractable text; the route maps this to HTTP 422."""
+
+
+logger = logging.getLogger(__name__)
 
 
 def run_pipeline(
@@ -60,6 +66,7 @@ def run_pipeline(
         "기본정보": summary,
         "보장목록": coverages,
         "분석상태": status,
+        "policy_terms_status": "unavailable",
         "문자수": len(doc.text),
     }
     try:
@@ -68,10 +75,15 @@ def run_pipeline(
             if index is index_policy_document
             else index(doc)
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "policy_rag_indexing_failed",
+            extra={"error_type": type(exc).__name__},
+        )
         session_id = None
     if session_id:
         result["문서세션ID"] = session_id
+        result["policy_terms_status"] = "available"
     return result
 
 

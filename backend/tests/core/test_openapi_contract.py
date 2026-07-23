@@ -44,6 +44,10 @@ def test_policy_parse_openapi_schema_matches_public_response() -> None:
     assert parse_schema["properties"]["status"]["const"] == "accepted"
     assert parse_schema["properties"]["documentId"]["format"] == "uuid"
     assert set(parse_schema["properties"]["분석상태"]["enum"]) == {"완료", "부분"}
+    assert set(parse_schema["properties"]["policy_terms_status"]["enum"]) == {
+        "available",
+        "unavailable",
+    }
     assert "문서세션ID" not in parse_schema["properties"]
 
     upload_body_ref = app.openapi()["paths"]["/policies/parse"]["post"]["requestBody"]["content"][
