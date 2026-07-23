@@ -9,6 +9,7 @@ from app.modules.portfolio.session.router import router
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
     PortfolioSessionAccess,
+    PortfolioSessionUnavailable,
 )
 
 
@@ -38,6 +39,11 @@ class _Sessions:
 class _RefreshRaceSessions(_Sessions):
     def counsel_turns_remaining(self, token: str, **_kwargs: object) -> int:
         raise InvalidPortfolioSessionToken
+
+
+class _UnavailableSessions(_Sessions):
+    def create(self) -> PortfolioSessionAccess:
+        raise PortfolioSessionUnavailable
 
 
 def test_portfolio_session_lifecycle_uses_one_token_contract() -> None:
@@ -82,6 +88,15 @@ def test_refresh_maps_turn_lookup_race_to_expired_session() -> None:
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "INVALID_PORTFOLIO_SESSION"
+
+
+def test_create_maps_session_store_unavailable_to_api_error() -> None:
+    client = TestClient(_app_with_sessions(_UnavailableSessions()))
+
+    response = client.post("/portfolio/sessions")
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "portfolio_session_unavailable"
 
 
 def _app_with_sessions(sessions: _Sessions) -> FastAPI:

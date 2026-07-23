@@ -16,6 +16,7 @@ from app.modules.portfolio.session.service import (
     PortfolioSessionDocumentConflict,
     PortfolioSessionDocumentLimitExceeded,
     PortfolioSessionService,
+    PortfolioSessionUnavailable,
     RegisteredPolicyDocument,
 )
 from app.modules.reference_data.loader import ReferenceDataUnavailableError
@@ -78,6 +79,8 @@ class PolicyUploadService:
             PortfolioSessionDocumentConflict,
         ) as exc:
             raise _portfolio_session_error(exc) from None
+        except PortfolioSessionUnavailable as exc:
+            raise _portfolio_session_unavailable_error() from exc
 
     def _run_pipeline(
         self,
@@ -126,6 +129,8 @@ class PolicyUploadService:
             PortfolioSessionDocumentConflict,
         ) as exc:
             raise _portfolio_session_error(exc) from None
+        except PortfolioSessionUnavailable as exc:
+            raise _portfolio_session_unavailable_error() from exc
 
 
 def _portfolio_session_error(error: PortfolioUploadSessionError) -> ApiError:
@@ -151,6 +156,14 @@ def _portfolio_session_error(error: PortfolioUploadSessionError) -> ApiError:
         status_code=409,
         code="POLICY_UPLOAD_CANCELLED",
         message="취소된 업로드예요. 파일을 다시 선택해주세요.",
+    )
+
+
+def _portfolio_session_unavailable_error() -> ApiError:
+    return ApiError(
+        status_code=503,
+        code="portfolio_session_unavailable",
+        message="분석 세션을 준비하지 못했어요. 잠시 후 다시 시도해주세요.",
     )
 
 

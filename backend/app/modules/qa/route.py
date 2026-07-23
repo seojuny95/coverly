@@ -30,6 +30,7 @@ from app.modules.portfolio.session.service import (
     CounselTurnLimitReached,
     InvalidPortfolioSessionToken,
     PortfolioSessionService,
+    PortfolioSessionUnavailable,
 )
 from app.modules.qa.agent import AgentStreamRunner, create_agent, run_agent_streamed
 from app.modules.qa.context import QaContext
@@ -86,6 +87,12 @@ async def stream_qa_answer(
             code="INVALID_PORTFOLIO_SESSION",
             message="분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
         ) from None
+    except PortfolioSessionUnavailable:
+        raise ApiError(
+            status_code=503,
+            code="portfolio_session_unavailable",
+            message="분석 세션을 준비하지 못했어요. 잠시 후 다시 시도해주세요.",
+        ) from None
 
     try:
         turns_remaining = await asyncio.to_thread(
@@ -101,6 +108,12 @@ async def stream_qa_answer(
                 f"이 분석에서는 질문을 {settings.counsel_max_turns_per_session}번까지 할 수 "
                 "있어요. 새 증권을 올려 분석을 다시 시작하면 질문을 이어갈 수 있어요."
             ),
+        ) from None
+    except PortfolioSessionUnavailable:
+        raise ApiError(
+            status_code=503,
+            code="portfolio_session_unavailable",
+            message="분석 세션을 준비하지 못했어요. 잠시 후 다시 시도해주세요.",
         ) from None
 
     question = mask_qa_pii(request.question)
