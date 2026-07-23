@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
@@ -21,6 +21,7 @@ import { UploadInsuranceError } from "./api";
 import type { SelectedUploadFile, UploadInsurance } from "./types";
 import { useCompletionBeat } from "./use-completion-beat";
 import { useSelectedFiles } from "./use-selected-files";
+import { useUploadCleanup } from "./use-upload-cleanup";
 import {
   ROLLBACK_ERROR_MESSAGE,
   UploadRollbackError,
@@ -46,7 +47,7 @@ export function getInsuranceNameOptions(
   }));
 }
 
-// Owns the whole upload lifecycle: file selection, byte-dedup, parallel upload
+// Coordinates the upload lifecycle: file selection, byte-dedup, parallel upload
 // with per-file progress, post-parse duplicate + insured-name resolution, and
 // error/degrade handling. The server owns PDF validation.
 export function useUploadOrchestration({
@@ -102,10 +103,9 @@ export function useUploadOrchestration({
   const [pendingAnalysis, setPendingAnalysis] =
     useState<InsuranceAnalysis | null>(null);
   const [selectedName, setSelectedName] = useState("");
-  const pendingCleanupRef = useRef<{
-    portfolioSessionToken: string;
-    documentIds: string[];
-  } | null>(null);
+  const { resolvePendingCleanup, rollbackSessionDocuments } = useUploadCleanup(
+    deleteSessionDocuments,
+  );
 
   const {
     selectedUploadFiles,
@@ -132,23 +132,15 @@ export function useUploadOrchestration({
 
   // Retry a cleanup a previous failed submit left pending, before starting a
   // new upload. Returns false when the cleanup still fails and submit must abort.
-  const resolvePendingCleanup = async () => {
-    const pendingCleanup = pendingCleanupRef.current;
-    if (!pendingCleanup) return true;
+  const preparePendingCleanup = async () => {
     setIsAnalyzing(true);
     setError(null);
-    try {
-      await deleteSessionDocuments(
-        pendingCleanup.portfolioSessionToken,
-        pendingCleanup.documentIds,
-      );
-      pendingCleanupRef.current = null;
+    if (await resolvePendingCleanup()) {
       return true;
-    } catch {
-      setError(ROLLBACK_ERROR_MESSAGE);
-      setIsAnalyzing(false);
-      return false;
     }
+    setError(ROLLBACK_ERROR_MESSAGE);
+    setIsAnalyzing(false);
+    return false;
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -161,7 +153,7 @@ export function useUploadOrchestration({
     )
       return;
 
-    if (!(await resolvePendingCleanup())) return;
+    if (!(await preparePendingCleanup())) return;
 
     setIsAnalyzing(true);
     setAnalysisProgress({ completed: 0, total: selectedUploadFiles.length });
@@ -179,21 +171,13 @@ export function useUploadOrchestration({
     );
     let successfulDocumentIds: string[] = [];
     const rollbackDocuments = async (documentIds: string[]) => {
-      if (!portfolioSessionToken || documentIds.length === 0) return;
-      const uniqueDocumentIds = [...new Set(documentIds)];
-      try {
-        await deleteSessionDocuments(portfolioSessionToken, uniqueDocumentIds);
-        pendingCleanupRef.current = null;
-        successfulDocumentIds = successfulDocumentIds.filter(
-          (documentId) => !uniqueDocumentIds.includes(documentId),
-        );
-      } catch {
-        pendingCleanupRef.current = {
-          portfolioSessionToken,
-          documentIds: uniqueDocumentIds,
-        };
-        throw new UploadRollbackError();
-      }
+      const rolledBackDocumentIds = await rollbackSessionDocuments(
+        portfolioSessionToken,
+        documentIds,
+      );
+      successfulDocumentIds = successfulDocumentIds.filter(
+        (documentId) => !rolledBackDocumentIds.includes(documentId),
+      );
     };
     const rollbackSuccessfulDocuments = () =>
       rollbackDocuments(successfulDocumentIds);
