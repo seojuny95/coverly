@@ -14,7 +14,6 @@ export default function Error({
   useEffect(() => {
     console.error("app_render_error", {
       digest: error.digest,
-      message: error.message,
       name: error.name,
     });
   }, [error]);
