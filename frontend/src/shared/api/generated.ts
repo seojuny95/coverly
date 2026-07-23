@@ -249,6 +249,7 @@ export interface components {
       | "INVALID_POLICY_SELECTION"
       | "REQUEST_VALIDATION_ERROR"
       | "INVALID_MULTIPART_REQUEST"
+      | "HTTP_ERROR"
       | "INTERNAL_SERVER_ERROR";
     /** ApiErrorDetail */
     ApiErrorDetail: {
@@ -891,6 +892,24 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       409: {
         headers: {
           [name: string]: unknown;
@@ -956,6 +975,24 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
@@ -1008,6 +1045,24 @@ export interface operations {
       };
       /** @description Coverly API error */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
         headers: {
           [name: string]: unknown;
         };
@@ -1076,6 +1131,24 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
@@ -1128,6 +1201,24 @@ export interface operations {
       };
       /** @description Coverly API error */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
         headers: {
           [name: string]: unknown;
         };
@@ -1196,6 +1287,24 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
@@ -1248,6 +1357,24 @@ export interface operations {
       };
       /** @description Coverly API error */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
         headers: {
           [name: string]: unknown;
         };
@@ -1319,6 +1446,24 @@ export interface operations {
         };
       };
       /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
       422: {
         headers: {
           [name: string]: unknown;
@@ -1365,6 +1510,24 @@ export interface operations {
           "application/json": {
             [key: string]: string;
           };
+        };
+      };
+      /** @description Coverly API error */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
         };
       };
       /** @description Coverly API error */

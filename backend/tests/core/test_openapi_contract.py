@@ -145,6 +145,7 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
         "INVALID_POLICY_SELECTION",
         "REQUEST_VALIDATION_ERROR",
         "INVALID_MULTIPART_REQUEST",
+        "HTTP_ERROR",
         "INTERNAL_SERVER_ERROR",
     }
 

@@ -27,6 +27,7 @@ export const API_ERROR_CODES = [
   "INVALID_POLICY_SELECTION",
   "REQUEST_VALIDATION_ERROR",
   "INVALID_MULTIPART_REQUEST",
+  "HTTP_ERROR",
   "INTERNAL_SERVER_ERROR",
 ] as const satisfies readonly ApiErrorCode[];
 export const POLICY_CLASSIFICATIONS = [

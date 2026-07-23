@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 
 from fastapi import Request
-from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -33,6 +32,7 @@ type ApiErrorCode = Literal[
     "INVALID_POLICY_SELECTION",
     "REQUEST_VALIDATION_ERROR",
     "INVALID_MULTIPART_REQUEST",
+    "HTTP_ERROR",
     "INTERNAL_SERVER_ERROR",
 ]
 
@@ -53,7 +53,7 @@ def api_error_responses(
 ) -> dict[int | str, dict[str, Any]]:
     """Describe every route error with the shared public envelope."""
 
-    described_status_codes = dict.fromkeys((*status_codes, 422, 500))
+    described_status_codes = dict.fromkeys((*status_codes, 404, 405, 422, 500))
 
     if response_media_type is not None:
         return {
@@ -179,10 +179,30 @@ async def request_validation_error_handler(
 async def http_error_handler(request: Request, exc: Exception) -> Response:
     if not isinstance(exc, StarletteHTTPException):
         raise exc
-    if exc.status_code != 400 or request.url.path != "/policies/parse":
-        return await http_exception_handler(request, exc)
 
     request_id = getattr(request.state, REQUEST_ID_STATE_KEY, str(uuid.uuid4()))
+    if exc.status_code != 400 or request.url.path != "/policies/parse":
+        logger.info(
+            "http_error",
+            extra={
+                "code": "HTTP_ERROR",
+                "request_id": request_id,
+                "status_code": exc.status_code,
+                "path": request.url.path,
+            },
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            headers={"x-request-id": request_id, **(exc.headers or {})},
+            content={
+                "error": {
+                    "code": "HTTP_ERROR",
+                    "message": _http_error_message(exc.status_code),
+                    "request_id": request_id,
+                },
+            },
+        )
+
     logger.info(
         "invalid_multipart_request",
         extra={
@@ -203,3 +223,11 @@ async def http_error_handler(request: Request, exc: Exception) -> Response:
             },
         },
     )
+
+
+def _http_error_message(status_code: int) -> str:
+    if status_code == 404:
+        return "요청한 내용을 찾을 수 없어요."
+    if status_code == 405:
+        return "지원하지 않는 요청 방식이에요."
+    return "요청을 처리할 수 없어요. 입력 내용을 확인해주세요."
