@@ -34,7 +34,7 @@ app/
 │   │   ├── agent.py         # agent 정의·스트리밍. 지시문은 instructions.md
 │   │   ├── facts/           # 저장된 증권에 대한 순수 조회 (LLM 없음)
 │   │   ├── tools/           # facts·RAG를 agent 도구로 노출
-│   │   └── route.py         # SSE 라우트 (meta → delta* → end)
+│   │   └── route.py         # SSE 라우트 (meta → delta* → end/error)
 │   ├── coverage/            # 담보 분류·매칭·설명
 │   └── reference_data/      # 참조 데이터 계약·검증·조회 조정
 ├── rag/                     # 공유 런타임 RAG subsystem
@@ -64,6 +64,10 @@ FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별
 
 참조 데이터, 임시 포트폴리오 세션, RAG 테이블 경계와 Supabase migration을 포함한 DB 원본 정의는 [REFERENCE_DATA.md](REFERENCE_DATA.md)를 따른다. 운영 갱신 대상은 production에서 오래된 JSON으로 조용히 fallback하지 않으며, 실패 정책에 따라 오류나 확인 불가 응답으로 드러낸다. 분석과 상담은 프론트엔드가 증권 전체를 다시 보내는 방식보다 세션 토큰과 선택 문서 ID로 서버 저장 사실을 조회하는 방식을 우선한다.
 
+일반 HTTP 오류는 `{ "error": { "code", "message", "request_id" } }` 계약으로 반환하고, 서버가 만든 요청 ID를 `X-Request-ID`에도 넣는다. `POST /qa/stream`은 `meta` 뒤에 `delta`를 보내고 `end` 또는 `error` 중 하나로 종료한다. 공개 메시지와 로그에는 예외 원문·입력값·PII를 넣지 않고, 로그는 오류 코드·요청 ID·상태 코드·경로와 안전하게 추린 예외 위치만 기록한다. 재시도 간격이 필요한 오류는 `Retry-After`를 함께 반환한다.
+
+`GET /health`는 프로세스 생존만 확인하는 liveness 경로다. 트래픽을 받기 전 준비 여부는 `GET /ready`로 확인하며, 이 경로는 DB와 포트폴리오 세션 저장소 연결까지 검증한다.
+
 전역 원칙(내 편·판매원 아님, grounding)은 [../AGENTS.md](../AGENTS.md)에 있고, 아래는 백엔드에서 그걸 강제하는 규칙이다.
 
 - **특정 보험사·상품 전용 로직 금지.** 코드에 보험사/상품 이름이 등장하면 안 된다. 회사별 차이는 일반 로직 + 참조 데이터만으로 흡수한다.
@@ -91,6 +95,7 @@ FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별
 - **타입과 테스트가 회귀를 막는가**: Pydantic schema, mypy, pytest fixture가 실제 응답 계약을 반영하는지 본다. LLM/API/DB는 유닛 테스트에서 stub 가능해야 한다.
 - **성능·비용이 예측 가능한가**: 불필요한 LLM 호출, 반복 DB 조회, 대용량 PDF/RAG 처리의 중복 작업이 없는지 확인한다. 캐시는 소유권과 무효화 기준이 명확해야 한다. 사용량 상한은 세션당 상담 질문 수처럼 서버가 원자적으로 강제하고, 화면 비활성화는 안내일 뿐 방어선으로 보지 않는다.
 - **동시성과 취소가 끝까지 전파되는가**: 업로드 한도는 파싱 전에 원자적으로 예약하고 성공·실패·취소에서 해제한다. SSE 연결 종료는 ASGI disconnect부터 agent 실행과 외부 검색까지 취소가 전파돼야 하며, queue와 외부 검색 동시성에는 명시적인 상한을 둔다.
+- **스트림 수명 주기가 닫히는가**: QA turn처럼 사용량을 먼저 차감하는 흐름은 연결 종료·취소·생성 실패에서도 정확히 한 번 환급되어야 한다. 스트림 오류 응답에는 클라이언트가 복구된 상태를 동기화할 정보가 있어야 하며, `meta`를 받은 뒤 종료된 경로도 테스트한다.
 
 ## Coding Style & Naming Conventions
 
