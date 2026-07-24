@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.core.config import get_settings
+from app.core.diagnostics import safe_exception_context
 from app.integrations.postgres.reference_data_store import (
     ReferenceDataStoreError,
     load_reference_payloads,
@@ -56,7 +57,10 @@ def load_database_reference_data[T](
     except ReferenceDataUnavailableError:
         raise
     except (ReferenceDataStoreError, ValueError) as exc:
-        logger.exception("database_reference_data_unavailable", extra={"reference_key": key})
+        logger.error(
+            "database_reference_data_unavailable",
+            extra={"reference_key": key, **safe_exception_context(exc)},
+        )
         raise ReferenceDataUnavailableError(
             f"Database reference data '{key}' is unavailable"
         ) from exc

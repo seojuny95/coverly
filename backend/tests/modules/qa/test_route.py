@@ -15,6 +15,7 @@ are masked, and only the recent history window goes on the wire.
 """
 
 import json
+import logging
 from collections.abc import AsyncIterator
 
 import pytest
@@ -236,7 +237,7 @@ def test_empty_deltas_are_not_forwarded() -> None:
     assert _delta_texts(events) == ["안녕", "하세요"]
 
 
-def test_agent_failure_refunds_the_turn_and_finishes_the_stream() -> None:
+def test_agent_failure_refunds_the_turn_and_emits_a_typed_error() -> None:
     sessions = _FixtureSessions((_policy("암진단비", "2,000만원", "정액"),))
     client = _client(
         (),
@@ -253,10 +254,42 @@ def test_agent_failure_refunds_the_turn_and_finishes_the_stream() -> None:
     events = _events(response.text)
     assert response.status_code == 200
     assert events[0]["type"] == "meta"
-    assert events[-1]["type"] == "end"
-    assert "답을 가져오지 못했어요" in "".join(_delta_texts(events))
+    assert events[-1] == {
+        "type": "error",
+        "code": "QA_STREAM_FAILED",
+        "message": ("답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요."),
+        "request_id": response.headers["x-request-id"],
+        "retryable": False,
+    }
     assert sessions.refund_calls == 1
     assert sessions.turns_used == 0
+
+
+def test_agent_setup_failure_refunds_turn_and_hides_private_error(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    sessions = _FixtureSessions((_policy("암진단비", "2,000만원", "정액"),))
+    private_value = "010-1234-5678 contract-123"
+
+    def fail_create_agent(_model: str) -> None:
+        raise RuntimeError(private_value)
+
+    monkeypatch.setattr("app.modules.qa.route.create_agent", fail_create_agent)
+    client = _client((), [], sessions=sessions)
+
+    with caplog.at_level(logging.ERROR):
+        response = client.post(
+            "/qa/stream",
+            json={"question": "질문", "history": [], "session_id": _SESSION_ID},
+        )
+
+    events = _events(response.text)
+    assert events[-1]["type"] == "error"
+    assert events[-1]["retryable"] is False
+    assert sessions.refund_calls == 1
+    assert sessions.turns_used == 0
+    assert private_value not in caplog.text
 
 
 def test_agent_failure_finishes_the_stream_when_refund_fails() -> None:
@@ -276,8 +309,8 @@ def test_agent_failure_finishes_the_stream_when_refund_fails() -> None:
     events = _events(response.text)
     assert response.status_code == 200
     assert events[0]["type"] == "meta"
-    assert events[-1]["type"] == "end"
-    assert "답을 가져오지 못했어요" in "".join(_delta_texts(events))
+    assert events[-1]["type"] == "error"
+    assert events[-1]["request_id"] == response.headers["x-request-id"]
     assert sessions.refund_calls == 1
 
 

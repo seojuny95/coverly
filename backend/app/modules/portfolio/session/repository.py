@@ -13,7 +13,8 @@ from app.modules.portfolio.session.models import (
 
 ReserveDocumentResult = Literal[
     "reserved",
-    "duplicate",
+    "in_progress",
+    "completed",
     "missing",
     "limit_exceeded",
     "cancelled",

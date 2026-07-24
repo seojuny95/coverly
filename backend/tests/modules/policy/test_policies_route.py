@@ -16,7 +16,7 @@ from app.modules.policy.schemas import Coverage as CoverageResponse
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
 from app.modules.portfolio.session.models import PolicyDocumentReservation
 from app.modules.portfolio.session.service import (
-    PortfolioSessionDocumentConflict,
+    PortfolioSessionDocumentInProgress,
     PortfolioSessionDocumentLimitExceeded,
     RegisteredPolicyDocument,
 )
@@ -115,18 +115,16 @@ def test_parse_maps_malformed_multipart_to_common_error() -> None:
     response = TestClient(app).post(
         "/policies/parse",
         content=b"malformed multipart body",
-        headers={
-            "content-type": "multipart/form-data",
-            "x-request-id": "multipart-request",
-        },
+        headers={"content-type": "multipart/form-data"},
     )
 
     assert response.status_code == 400
+    request_id = response.headers["x-request-id"]
     assert response.json() == {
         "error": {
             "code": "INVALID_MULTIPART_REQUEST",
             "message": "업로드 요청 형식을 확인해주세요.",
-            "request_id": "multipart-request",
+            "request_id": request_id,
         }
     }
 
@@ -422,7 +420,7 @@ def test_parse_rejects_duplicate_document_before_running_pipeline(
             *,
             document_id: str,
         ) -> PolicyDocumentReservation:
-            raise PortfolioSessionDocumentConflict
+            raise PortfolioSessionDocumentInProgress
 
     monkeypatch.setattr(policies, "run_pipeline", _run)
     app.dependency_overrides[get_portfolio_session_service] = lambda: _Sessions()
@@ -436,7 +434,7 @@ def test_parse_rejects_duplicate_document_before_running_pipeline(
         app.dependency_overrides.pop(get_portfolio_session_service, None)
 
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "POLICY_UPLOAD_CANCELLED"
+    assert response.json()["error"]["code"] == "POLICY_UPLOAD_IN_PROGRESS"
     assert not pipeline_called
 
 

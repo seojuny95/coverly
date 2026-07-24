@@ -22,6 +22,8 @@ export const API_ERROR_CODES = [
   "INVALID_PORTFOLIO_SESSION",
   "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
   "COUNSEL_TURN_LIMIT_REACHED",
+  "POLICY_UPLOAD_IN_PROGRESS",
+  "POLICY_UPLOAD_ALREADY_COMPLETED",
   "POLICY_UPLOAD_CANCELLED",
   "portfolio_session_unavailable",
   "INVALID_POLICY_SELECTION",
@@ -37,6 +39,7 @@ export const POLICY_CLASSIFICATIONS = [
   "미분류",
 ] as const satisfies readonly PolicyClassification[];
 export const PORTFOLIO_MAX_DOCUMENTS = 5 as const;
+export const PDF_MAX_BYTES = 10485760 as const;
 
 export const QA_STREAM_JSON_SCHEMA = {
   schema: {
@@ -44,6 +47,7 @@ export const QA_STREAM_JSON_SCHEMA = {
       { $ref: "#/components/schemas/QaMetaEvent" },
       { $ref: "#/components/schemas/QaDeltaEvent" },
       { $ref: "#/components/schemas/QaEndEvent" },
+      { $ref: "#/components/schemas/QaErrorEvent" },
     ],
     title: "Response 200 Stream Qa Answer Qa Stream Post",
     discriminator: {
@@ -52,6 +56,7 @@ export const QA_STREAM_JSON_SCHEMA = {
         meta: "#/components/schemas/QaMetaEvent",
         delta: "#/components/schemas/QaDeltaEvent",
         end: "#/components/schemas/QaEndEvent",
+        error: "#/components/schemas/QaErrorEvent",
       },
     },
   },
@@ -83,6 +88,23 @@ export const QA_STREAM_JSON_SCHEMA = {
         type: "object",
         title: "QaEndEvent",
         required: ["type"],
+      },
+      QaErrorEvent: {
+        properties: {
+          type: {
+            type: "string",
+            enum: ["error"],
+            description:
+              "discriminator enum property added by openapi-typescript",
+          },
+          code: { type: "string", const: "QA_STREAM_FAILED", title: "Code" },
+          message: { type: "string", title: "Message" },
+          request_id: { type: "string", title: "Request Id" },
+          retryable: { type: "boolean", title: "Retryable" },
+        },
+        type: "object",
+        required: ["code", "message", "request_id", "retryable", "type"],
+        title: "QaErrorEvent",
       },
       QaMetaEvent: {
         properties: {

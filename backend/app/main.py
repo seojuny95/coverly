@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
         allow_origins=settings.parsed_backend_cors_origins(),
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID", "Retry-After"],
     )
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)

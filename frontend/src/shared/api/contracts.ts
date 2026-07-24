@@ -35,5 +35,9 @@ export type CoverageGroup = Schemas["CoverageGroup"];
 export type QaRequest = Schemas["QaRequest"];
 export type ChatHistoryItem = Schemas["QaMessage"];
 export type QaStreamEvent =
-  Schemas["QaMetaEvent"] | Schemas["QaDeltaEvent"] | Schemas["QaEndEvent"];
+  | Schemas["QaMetaEvent"]
+  | Schemas["QaDeltaEvent"]
+  | Schemas["QaEndEvent"]
+  | Schemas["QaErrorEvent"];
 export type QaMetaEvent = Schemas["QaMetaEvent"];
+export type QaErrorEvent = Schemas["QaErrorEvent"];

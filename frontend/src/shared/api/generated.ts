@@ -244,6 +244,8 @@ export interface components {
       | "INVALID_PORTFOLIO_SESSION"
       | "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED"
       | "COUNSEL_TURN_LIMIT_REACHED"
+      | "POLICY_UPLOAD_IN_PROGRESS"
+      | "POLICY_UPLOAD_ALREADY_COMPLETED"
       | "POLICY_UPLOAD_CANCELLED"
       | "portfolio_session_unavailable"
       | "INVALID_POLICY_SELECTION"
@@ -738,6 +740,25 @@ export interface components {
        */
       type: "end";
     };
+    /** QaErrorEvent */
+    QaErrorEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "error";
+      /**
+       * Code
+       * @constant
+       */
+      code: "QA_STREAM_FAILED";
+      /** Message */
+      message: string;
+      /** Request Id */
+      request_id: string;
+      /** Retryable */
+      retryable: boolean;
+    };
     /** QaMessage */
     QaMessage: {
       /**
@@ -876,6 +897,8 @@ export interface operations {
       /** @description Coverly API error */
       400: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -885,6 +908,8 @@ export interface operations {
       /** @description Coverly API error */
       403: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -894,6 +919,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -903,6 +930,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -912,6 +941,8 @@ export interface operations {
       /** @description Coverly API error */
       409: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -921,6 +952,8 @@ export interface operations {
       /** @description Coverly API error */
       413: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -930,6 +963,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -939,6 +974,8 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -948,6 +985,8 @@ export interface operations {
       /** @description Coverly API error */
       503: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -977,6 +1016,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -986,6 +1027,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -995,6 +1038,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1004,6 +1049,8 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1013,6 +1060,8 @@ export interface operations {
       /** @description Coverly API error */
       503: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1046,6 +1095,8 @@ export interface operations {
       /** @description Coverly API error */
       403: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1055,6 +1106,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1064,6 +1117,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1073,6 +1128,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1082,6 +1139,8 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1091,6 +1150,8 @@ export interface operations {
       /** @description Coverly API error */
       503: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1124,6 +1185,8 @@ export interface operations {
       /** @description Coverly API error */
       403: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1133,6 +1196,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1142,6 +1207,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1151,6 +1218,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1160,6 +1229,8 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1169,6 +1240,8 @@ export interface operations {
       /** @description Coverly API error */
       503: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1202,6 +1275,8 @@ export interface operations {
       /** @description Coverly API error */
       403: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1211,6 +1286,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1220,6 +1297,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1229,6 +1308,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1238,6 +1319,8 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1247,6 +1330,8 @@ export interface operations {
       /** @description Coverly API error */
       503: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1280,6 +1365,8 @@ export interface operations {
       /** @description Coverly API error */
       403: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1289,6 +1376,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1298,6 +1387,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1307,6 +1398,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1316,6 +1409,8 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1325,6 +1420,8 @@ export interface operations {
       /** @description Coverly API error */
       503: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1358,6 +1455,8 @@ export interface operations {
       /** @description Coverly API error */
       403: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1367,6 +1466,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1376,6 +1477,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1385,6 +1488,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1394,6 +1499,8 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1403,6 +1510,8 @@ export interface operations {
       /** @description Coverly API error */
       503: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1424,7 +1533,7 @@ export interface operations {
       };
     };
     responses: {
-      /** @description Server-Sent Events: meta → delta* → end */
+      /** @description Server-Sent Events: meta → delta* → (end | error) */
       200: {
         headers: {
           [name: string]: unknown;
@@ -1433,12 +1542,15 @@ export interface operations {
           "text/event-stream":
             | components["schemas"]["QaMetaEvent"]
             | components["schemas"]["QaDeltaEvent"]
-            | components["schemas"]["QaEndEvent"];
+            | components["schemas"]["QaEndEvent"]
+            | components["schemas"]["QaErrorEvent"];
         };
       };
       /** @description Coverly API error */
       403: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1448,6 +1560,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1457,6 +1571,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1466,6 +1582,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1475,6 +1593,8 @@ export interface operations {
       /** @description Coverly API error */
       429: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1484,6 +1604,19 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      503: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1515,6 +1648,8 @@ export interface operations {
       /** @description Coverly API error */
       404: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1524,6 +1659,8 @@ export interface operations {
       /** @description Coverly API error */
       405: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1533,6 +1670,8 @@ export interface operations {
       /** @description Coverly API error */
       422: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {
@@ -1542,6 +1681,8 @@ export interface operations {
       /** @description Coverly API error */
       500: {
         headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
           [name: string]: unknown;
         };
         content: {

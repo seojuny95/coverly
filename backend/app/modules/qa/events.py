@@ -31,10 +31,18 @@ class QaEndEvent(BaseModel):
     type: Literal["end"] = "end"
 
 
+class QaErrorEvent(BaseModel):
+    type: Literal["error"] = "error"
+    code: Literal["QA_STREAM_FAILED"]
+    message: str
+    request_id: str
+    retryable: bool
+
+
 # Discriminated so the published schema is a strict oneOf: a client validator can
 # then reject an event that only loosely resembles one of the shapes.
 QaStreamEvent = Annotated[
-    QaMetaEvent | QaDeltaEvent | QaEndEvent,
+    QaMetaEvent | QaDeltaEvent | QaEndEvent | QaErrorEvent,
     Field(discriminator="type"),
 ]
 

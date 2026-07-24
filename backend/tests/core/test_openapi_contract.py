@@ -21,6 +21,10 @@ def test_openapi_exposes_typed_json_api_contracts() -> None:
     assert parse_responses["500"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ApiErrorResponse"
     }
+    assert parse_responses["500"]["headers"]["X-Request-ID"]["schema"] == {
+        "type": "string",
+        "format": "uuid",
+    }
 
     session_responses = paths["/portfolio/sessions"]["post"]["responses"]
     assert session_responses["200"]["content"]["application/json"]["schema"] == {
@@ -143,6 +147,8 @@ def test_api_error_openapi_schema_matches_error_handler_payload() -> None:
         "INVALID_PORTFOLIO_SESSION",
         "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
         "COUNSEL_TURN_LIMIT_REACHED",
+        "POLICY_UPLOAD_IN_PROGRESS",
+        "POLICY_UPLOAD_ALREADY_COMPLETED",
         "POLICY_UPLOAD_CANCELLED",
         "portfolio_session_unavailable",
         "INVALID_POLICY_SELECTION",
@@ -164,6 +170,7 @@ def test_openapi_exposes_qa_sse_events_the_client_must_validate() -> None:
         "#/components/schemas/QaMetaEvent",
         "#/components/schemas/QaDeltaEvent",
         "#/components/schemas/QaEndEvent",
+        "#/components/schemas/QaErrorEvent",
     }
     assert stream_schema["discriminator"]["propertyName"] == "type"
     assert set(responses["403"]["content"]) == {"application/json"}
@@ -175,18 +182,18 @@ def test_request_validation_uses_common_error_envelope() -> None:
     try:
         response = TestClient(app).post(
             "/qa/stream",
-            headers={"x-request-id": "validation-request"},
             json={"question": "", "history": [], "session_id": "portfolio-token"},
         )
     finally:
         app.dependency_overrides.pop(get_portfolio_session_service, None)
 
     assert response.status_code == 422
+    request_id = response.headers["x-request-id"]
     assert response.json() == {
         "error": {
             "code": "REQUEST_VALIDATION_ERROR",
             "message": "요청 내용을 확인해주세요.",
-            "request_id": "validation-request",
+            "request_id": request_id,
         }
     }
 
@@ -219,3 +226,5 @@ def test_qa_stream_declares_the_turn_limit_response() -> None:
 
     assert "429" in responses
     assert set(responses["429"]["content"]) == {"application/json"}
+    assert "503" in responses
+    assert set(responses["503"]["content"]) == {"application/json"}

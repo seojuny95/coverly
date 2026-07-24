@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from app.core.diagnostics import safe_exception_context
 from app.core.prompts import load_prompt
 from app.integrations.openai.client import JsonCompleter, dump_prompt_json, structured_completer
 from app.modules.portfolio.overview_safety import (
@@ -86,16 +87,22 @@ def generate_summary_overview(
     try:
         raw = completer(_system_prompt(), _user_prompt(facts))
         draft = _LlmOverviewDraft.model_validate(raw)
-    except Exception:
-        logger.exception("portfolio_overview_generation_failed")
+    except Exception as exc:
+        logger.error(
+            "portfolio_overview_generation_failed",
+            extra=safe_exception_context(exc),
+        )
         return None
 
     if not _draft_is_safe(draft, facts):
         try:
             raw = completer(_system_prompt(), _correction_user_prompt(facts, raw))
             draft = _LlmOverviewDraft.model_validate(raw)
-        except Exception:
-            logger.exception("portfolio_overview_correction_failed")
+        except Exception as exc:
+            logger.error(
+                "portfolio_overview_correction_failed",
+                extra=safe_exception_context(exc),
+            )
             return None
         if not _draft_is_safe(draft, facts):
             logger.warning("portfolio_overview_grounding_failed")

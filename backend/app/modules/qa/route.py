@@ -17,11 +17,13 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.config import get_settings
+from app.core.diagnostics import safe_exception_context
 from app.core.errors import ApiError, api_error_responses
+from app.core.middleware import REQUEST_ID_STATE_KEY
 from app.core.responses import EventStreamOpenAPIResponse
 from app.integrations.openai import ConversationMessage
 from app.modules.portfolio.schemas import PolicyInput
@@ -37,6 +39,7 @@ from app.modules.qa.context import QaContext
 from app.modules.qa.events import (
     QaDeltaEvent,
     QaEndEvent,
+    QaErrorEvent,
     QaMetaEvent,
     QaStreamEvent,
     serialize_event,
@@ -65,12 +68,13 @@ AgentStreamRunnerDep = Annotated[AgentStreamRunner, Depends(get_agent_stream_run
     responses={
         200: {
             "model": QaStreamEvent,
-            "description": "Server-Sent Events: meta → delta* → end",
+            "description": "Server-Sent Events: meta → delta* → (end | error)",
         },
-        **api_error_responses(403, 429, response_media_type="application/json"),
+        **api_error_responses(403, 429, 503, response_media_type="application/json"),
     },
 )
 async def stream_qa_answer(
+    http_request: Request,
     request: QaRequest,
     sessions: PortfolioSessionServiceDep,
     agent_stream_runner: AgentStreamRunnerDep,
@@ -122,6 +126,7 @@ async def stream_qa_answer(
     )
 
     events = _build_event_stream(
+        request_id=getattr(http_request.state, REQUEST_ID_STATE_KEY),
         session_id=request.session_id,
         sessions=sessions,
         turns_remaining=turns_remaining,
@@ -137,6 +142,7 @@ async def stream_qa_answer(
 
 async def _build_event_stream(
     *,
+    request_id: str,
     session_id: str,
     sessions: PortfolioSessionService,
     turns_remaining: int,
@@ -156,14 +162,14 @@ async def _build_event_stream(
         )
     )
 
-    context = QaContext(policies=policies, policy_rag_session_ids=policy_rag_session_ids)
-    agent = create_agent(model)
-    conversation: list[ConversationMessage] = [
-        ConversationMessage(role=message.role, content=message.content) for message in history
-    ]
-    conversation.append(ConversationMessage(role="user", content=question))
-
     try:
+        context = QaContext(policies=policies, policy_rag_session_ids=policy_rag_session_ids)
+        agent = create_agent(model)
+        conversation: list[ConversationMessage] = [
+            ConversationMessage(role=message.role, content=message.content) for message in history
+        ]
+        conversation.append(ConversationMessage(role="user", content=question))
+
         async for delta in agent_stream_runner(agent, conversation, context):
             if delta:
                 yield serialize_event(QaDeltaEvent(text=delta))
@@ -171,11 +177,26 @@ async def _build_event_stream(
         await _refund_counsel_turn_best_effort(sessions, session_id)
         raise
     except Exception as exc:
-        logger.warning("qa_stream_failed", extra={"error_type": type(exc).__name__})
+        logger.error(
+            "qa_stream_failed",
+            extra={"request_id": request_id, **safe_exception_context(exc)},
+        )
         await _refund_counsel_turn_best_effort(sessions, session_id)
-        yield serialize_event(QaDeltaEvent(text=_QA_STREAM_FAILURE_MESSAGE))
+        yield serialize_event(
+            QaErrorEvent(
+                code="QA_STREAM_FAILED",
+                message=_QA_STREAM_FAILURE_MESSAGE,
+                request_id=request_id,
+                retryable=_qa_failure_is_retryable(exc),
+            )
+        )
+        return
 
     yield serialize_event(QaEndEvent())
+
+
+def _qa_failure_is_retryable(exc: Exception) -> bool:
+    return isinstance(exc, (ConnectionError, TimeoutError))
 
 
 async def _refund_counsel_turn_best_effort(

@@ -12,7 +12,7 @@ async def request_id_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
-    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request_id = str(uuid.uuid4())
     setattr(request.state, REQUEST_ID_STATE_KEY, request_id)
 
     response = await call_next(request)

@@ -57,8 +57,12 @@ class PortfolioSessionDocumentCancelled(Exception):
     """The client cancelled this document before parsing completed."""
 
 
-class PortfolioSessionDocumentConflict(Exception):
-    """The document id is already stored or has an upload in progress."""
+class PortfolioSessionDocumentInProgress(Exception):
+    """The document id has an active upload reservation."""
+
+
+class PortfolioSessionDocumentAlreadyCompleted(Exception):
+    """The document id is already stored in the portfolio."""
 
 
 class PortfolioSessionUnavailable(Exception):
@@ -168,8 +172,10 @@ class PortfolioSessionService:
             raise PortfolioSessionDocumentLimitExceeded
         if reserved == "cancelled":
             raise PortfolioSessionDocumentCancelled
-        if reserved == "duplicate":
-            raise PortfolioSessionDocumentConflict
+        if reserved == "in_progress":
+            raise PortfolioSessionDocumentInProgress
+        if reserved == "completed":
+            raise PortfolioSessionDocumentAlreadyCompleted
         if reserved == "missing":
             raise InvalidPortfolioSessionToken
         return PolicyDocumentReservation(

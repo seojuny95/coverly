@@ -7,6 +7,7 @@ from time import monotonic
 from typing import Protocol
 
 from app.core.config import get_settings
+from app.core.diagnostics import safe_exception_context
 from app.integrations.postgres.premium_benchmark_store import (
     PostgresPremiumBenchmarkRepository,
 )
@@ -61,9 +62,12 @@ def premium_benchmark_for_age(age: int | None) -> PremiumBenchmark | None:
             _cached_premium_benchmark_for_age.cache_clear()
         try:
             benchmark = _cached_premium_benchmark_for_age(age)
-        except Exception:
+        except Exception as exc:
             _defer_retry()
-            logger.exception("premium_benchmark_lookup_failed")
+            logger.error(
+                "premium_benchmark_lookup_failed",
+                extra=safe_exception_context(exc),
+            )
             return None
 
         _failure_retry_at = None
@@ -78,9 +82,12 @@ def warm_premium_benchmark_cache() -> int:
     with _lookup_lock:
         try:
             benchmarks = _repository().list_all()
-        except Exception:
+        except Exception as exc:
             _defer_retry()
-            logger.exception("premium_benchmark_cache_warm_failed")
+            logger.error(
+                "premium_benchmark_cache_warm_failed",
+                extra=safe_exception_context(exc),
+            )
             # An empty tuple is a successful result. Do not cache it after a
             # transient failure, or later requests could never retry the database.
             return 0

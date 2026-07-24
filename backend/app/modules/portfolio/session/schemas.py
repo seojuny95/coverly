@@ -32,7 +32,7 @@ class PortfolioSessionDocumentsDeleteRequest(PortfolioSessionRequest):
     document_ids: list[UUID] = Field(
         alias="documentIds",
         min_length=1,
-        max_length=50,
+        max_length=MAX_PORTFOLIO_DOCUMENTS,
     )
 
     def document_id_strings(self) -> list[str]:

@@ -22,8 +22,9 @@ from app.modules.portfolio.session.repository import (
 from app.modules.portfolio.session.service import (
     CounselTurnLimitReached,
     InvalidPortfolioSessionToken,
+    PortfolioSessionDocumentAlreadyCompleted,
     PortfolioSessionDocumentCancelled,
-    PortfolioSessionDocumentConflict,
+    PortfolioSessionDocumentInProgress,
     PortfolioSessionDocumentLimitExceeded,
     PortfolioSessionService,
 )
@@ -97,9 +98,9 @@ class _Repository:
             if reservation[1] > now
         }
         if document_id in self.reservations:
-            return "duplicate"
+            return "in_progress"
         if document_id in self.documents:
-            return "duplicate"
+            return "completed"
         if len(self.documents) + len(self.reservations) >= max_documents:
             return "limit_exceeded"
         self.reservations[document_id] = (reservation_id, expires_at)
@@ -532,12 +533,29 @@ def test_duplicate_document_id_does_not_share_or_release_an_active_reservation()
 
     first = sessions.begin_upload(access.token, document_id="document-1", now=now)
 
-    with pytest.raises(PortfolioSessionDocumentConflict):
+    with pytest.raises(PortfolioSessionDocumentInProgress):
         sessions.begin_upload(access.token, document_id="document-1", now=now)
 
     assert "document-1" in repository.reservations
     sessions.release_upload(first)
     assert repository.reservations == {}
+
+
+def test_completed_document_id_is_distinct_from_an_active_upload() -> None:
+    now = datetime(2026, 7, 18, tzinfo=UTC)
+    repository = _Repository()
+    sessions = PortfolioSessionService(repository, rag_store=_RagStore())
+    access = sessions.create(now=now)
+
+    reservation = sessions.begin_upload(
+        access.token,
+        document_id="document-1",
+        now=now,
+    )
+    sessions.complete_upload(reservation, _empty_pipeline_result(), now=now)
+
+    with pytest.raises(PortfolioSessionDocumentAlreadyCompleted):
+        sessions.begin_upload(access.token, document_id="document-1", now=now)
 
 
 def test_expired_upload_reservation_releases_its_document_slot(

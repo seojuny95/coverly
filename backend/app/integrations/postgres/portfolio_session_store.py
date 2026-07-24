@@ -160,14 +160,14 @@ class PgPortfolioSessionRepository:
                 (session_id, document_id),
             ).fetchone()
             if existing_reservation is not None:
-                return "duplicate"
+                return "in_progress"
             existing_document = connection.execute(
                 """SELECT 1 FROM private.policy_documents
                    WHERE portfolio_session_id = %s AND id = %s""",
                 (session_id, document_id),
             ).fetchone()
             if existing_document is not None:
-                return "duplicate"
+                return "completed"
             occupied_slots = connection.execute(
                 """SELECT
                        (SELECT count(*) FROM private.policy_documents

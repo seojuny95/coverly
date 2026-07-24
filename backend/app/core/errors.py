@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.diagnostics import safe_exception_context
 from app.core.middleware import REQUEST_ID_STATE_KEY
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,8 @@ type ApiErrorCode = Literal[
     "INVALID_PORTFOLIO_SESSION",
     "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
     "COUNSEL_TURN_LIMIT_REACHED",
+    "POLICY_UPLOAD_IN_PROGRESS",
+    "POLICY_UPLOAD_ALREADY_COMPLETED",
     "POLICY_UPLOAD_CANCELLED",
     "portfolio_session_unavailable",
     "INVALID_POLICY_SELECTION",
@@ -54,11 +57,18 @@ def api_error_responses(
     """Describe every route error with the shared public envelope."""
 
     described_status_codes = dict.fromkeys((*status_codes, 404, 405, 422, 500))
+    response_headers = {
+        "X-Request-ID": {
+            "description": "Server-generated identifier for safe error correlation.",
+            "schema": {"type": "string", "format": "uuid"},
+        }
+    }
 
     if response_media_type is not None:
         return {
             status_code: {
                 "description": "Coverly API error",
+                "headers": response_headers,
                 "content": {
                     response_media_type: {
                         "schema": {"$ref": "#/components/schemas/ApiErrorResponse"}
@@ -72,6 +82,7 @@ def api_error_responses(
         status_code: {
             "model": ApiErrorResponse,
             "description": "Coverly API error",
+            "headers": response_headers,
         }
         for status_code in described_status_codes
     }
@@ -107,10 +118,10 @@ async def unexpected_error_middleware(
             "unexpected_server_error",
             extra={
                 "code": "INTERNAL_SERVER_ERROR",
-                "error_type": type(exc).__name__,
                 "request_id": request_id,
                 "status_code": 500,
                 "path": request.url.path,
+                **safe_exception_context(exc),
             },
         )
         return JSONResponse(
@@ -142,7 +153,7 @@ async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
     )
     return JSONResponse(
         status_code=exc.status_code,
-        headers={"x-request-id": request_id, **exc.headers},
+        headers={**exc.headers, "x-request-id": request_id},
         content={
             "error": {
                 "code": exc.code,
@@ -201,7 +212,7 @@ async def http_error_handler(request: Request, exc: Exception) -> Response:
         )
         return JSONResponse(
             status_code=exc.status_code,
-            headers={"x-request-id": request_id, **(exc.headers or {})},
+            headers={**(exc.headers or {}), "x-request-id": request_id},
             content={
                 "error": {
                     "code": "HTTP_ERROR",

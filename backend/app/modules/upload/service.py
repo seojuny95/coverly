@@ -15,8 +15,9 @@ from app.modules.policy.schemas import PolicyParseResponse
 from app.modules.portfolio.session.models import PolicyDocumentReservation
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
+    PortfolioSessionDocumentAlreadyCompleted,
     PortfolioSessionDocumentCancelled,
-    PortfolioSessionDocumentConflict,
+    PortfolioSessionDocumentInProgress,
     PortfolioSessionDocumentLimitExceeded,
     PortfolioSessionService,
     PortfolioSessionUnavailable,
@@ -33,7 +34,8 @@ type PortfolioUploadSessionError = (
     InvalidPortfolioSessionToken
     | PortfolioSessionDocumentLimitExceeded
     | PortfolioSessionDocumentCancelled
-    | PortfolioSessionDocumentConflict
+    | PortfolioSessionDocumentInProgress
+    | PortfolioSessionDocumentAlreadyCompleted
 )
 
 
@@ -79,7 +81,8 @@ class PolicyUploadService:
             InvalidPortfolioSessionToken,
             PortfolioSessionDocumentLimitExceeded,
             PortfolioSessionDocumentCancelled,
-            PortfolioSessionDocumentConflict,
+            PortfolioSessionDocumentInProgress,
+            PortfolioSessionDocumentAlreadyCompleted,
         ) as exc:
             raise _portfolio_session_error(exc) from None
         except PortfolioSessionUnavailable as exc:
@@ -141,7 +144,8 @@ class PolicyUploadService:
             InvalidPortfolioSessionToken,
             PortfolioSessionDocumentLimitExceeded,
             PortfolioSessionDocumentCancelled,
-            PortfolioSessionDocumentConflict,
+            PortfolioSessionDocumentInProgress,
+            PortfolioSessionDocumentAlreadyCompleted,
         ) as exc:
             raise _portfolio_session_error(exc) from None
         except PortfolioSessionUnavailable as exc:
@@ -161,11 +165,17 @@ def _portfolio_session_error(error: PortfolioUploadSessionError) -> ApiError:
             code="PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
             message=f"보험증권은 최대 {MAX_PORTFOLIO_DOCUMENTS}개까지 분석할 수 있어요.",
         )
-    if isinstance(error, PortfolioSessionDocumentConflict):
+    if isinstance(error, PortfolioSessionDocumentInProgress):
         return ApiError(
             status_code=409,
-            code="POLICY_UPLOAD_CANCELLED",
-            message="같은 문서의 업로드가 이미 진행 중이거나 완료됐어요.",
+            code="POLICY_UPLOAD_IN_PROGRESS",
+            message="이 PDF를 이미 분석하고 있어요. 잠시 기다려주세요.",
+        )
+    if isinstance(error, PortfolioSessionDocumentAlreadyCompleted):
+        return ApiError(
+            status_code=409,
+            code="POLICY_UPLOAD_ALREADY_COMPLETED",
+            message="이 PDF는 이미 분석을 마쳤어요.",
         )
     return ApiError(
         status_code=409,
