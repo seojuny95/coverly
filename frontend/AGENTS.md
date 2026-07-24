@@ -65,7 +65,7 @@ src/
 - **API 계약이 백엔드에서 생성되는가**: backend OpenAPI 변경 후 `pnpm api:generate`로 타입을 갱신하고 fixture와 화면 테스트를 함께 반영한다. `*-api.ts`에 요청·응답 shape를 다시 선언하거나 `any`·불필요한 optional로 계약 깨짐을 숨기지 않는다. `pnpm api:check`가 생성 타입의 최신성을 검증한다.
 - **민감정보를 저장하지 않는가**: 보험증권 원문, 분석 결과, 피보험자 정보, 계약번호, 상담 내용은 localStorage/sessionStorage/IndexedDB/persisted query cache에 저장하지 않는다. 브라우저는 인메모리 상태와 짧은 세션 토큰만 유지하고, 로그·analytics·error reporting에도 원문 데이터를 보내지 않는다. 서버의 임시 저장 범위와 마스킹·만료 규칙은 [../backend/REFERENCE_DATA.md](../backend/REFERENCE_DATA.md)를 따른다.
 - **클라이언트 노출 경계가 안전한가**: 브라우저 번들에는 `NEXT_PUBLIC_*`로 공개해도 되는 값만 들어가야 한다. API key, service role key, DB URL, 내부 endpoint는 프론트 코드·테스트 fixture·환경 예시에 넣지 않는다.
-- **UX 카피 원칙을 지키는가**: 공포·판매 압박·가입 권유 카피를 넣지 않는다. 사용자 대상 문구는 [UX_COPY.md](UX_COPY.md)를 따른다.
+- **UX 카피 원칙을 지키는가**: 공포·판매 압박·특정 보험사나 상품의 가입 권유 카피를 넣지 않는다. 사용자 대상 문구는 [UX_COPY.md](UX_COPY.md)를 따른다.
 - **하드코딩이 정당한가**: 출처, 기준금액, 보험 판단, 보험사별 분기를 UI 코드에 박지 않는다. 표시용 label·정적 설명은 가능하지만 서버 데이터와 충돌하면 서버를 우선한다.
 - **접근성과 안전한 링크를 지키는가**: 버튼/링크의 의미, heading 구조, keyboard interaction, `safeHref` 같은 URL 방어를 확인한다. 서버가 준 URL·markdown·HTML은 신뢰하지 말고 허용된 프로토콜/렌더링 경로만 사용한다.
 - **렌더링 비용이 과하지 않은가**: 큰 리스트·계산·애니메이션이 불필요하게 매 렌더마다 반복되지 않는지 본다. 다만 성능 최적화 hook은 실제 병목과 팀 패턴이 있을 때만 추가한다.
