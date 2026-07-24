@@ -42,6 +42,9 @@ class _Repository:
         self.reservations: dict[str, tuple[str, datetime]] = {}
         self.counsel_turns_used = 0
 
+    def check_ready(self) -> None:
+        return None
+
     def counsel_turns_remaining(
         self,
         session_id: str,
@@ -67,13 +70,19 @@ class _Repository:
         self.counsel_turns_used += 1
         return max_turns - self.counsel_turns_used
 
-    def refund_counsel_turn(self, session_id: str, *, now: datetime) -> bool:
+    def refund_counsel_turn(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
         if self.session is None or self.session.id != session_id:
-            return False
+            return None
         if self.counsel_turns_used <= 0:
-            return False
+            return None
         self.counsel_turns_used -= 1
-        return True
+        return max_turns - self.counsel_turns_used
 
     def create(self, session: NewPortfolioSession) -> None:
         self.session = session
@@ -658,7 +667,7 @@ def test_refunding_a_failed_counsel_turn_restores_the_session_allowance() -> Non
 
     assert sessions.consume_counsel_turn(access.token, max_turns=2, now=now) == 1
 
-    sessions.refund_counsel_turn(access.token, now=now)
+    assert sessions.refund_counsel_turn(access.token, max_turns=2, now=now) == 2
 
     assert sessions.consume_counsel_turn(access.token, max_turns=2, now=now) == 1
 

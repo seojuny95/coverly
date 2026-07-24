@@ -43,6 +43,8 @@ class _Connection:
     def execute(self, query: str, params: object = None) -> _Result:
         normalized = " ".join(query.split())
         self.queries.append(normalized)
+        if normalized == "SELECT 1":
+            return _Result(one={"?column?": 1})
         if normalized.startswith("SELECT id FROM private.portfolio_sessions"):
             return _Result(one={"id": "session-1"})
         if normalized.startswith("SELECT rag_session_id FROM private.policy_documents"):
@@ -56,12 +58,18 @@ class _Pool:
     def __init__(self, connection: _Connection) -> None:
         self._connection = connection
 
-    def connection(self) -> AbstractContextManager[_Connection]:
+    def connection(
+        self,
+        timeout: float | None = None,
+    ) -> AbstractContextManager[_Connection]:
         return self._connection
 
 
 class _UnavailablePool:
-    def connection(self) -> AbstractContextManager[_Connection]:
+    def connection(
+        self,
+        timeout: float | None = None,
+    ) -> AbstractContextManager[_Connection]:
         raise PoolTimeout("pool unavailable")
 
 
@@ -87,3 +95,13 @@ def test_connection_pool_failures_are_typed_as_session_store_unavailable() -> No
         pass
     else:  # pragma: no cover
         raise AssertionError("expected PortfolioSessionRepositoryUnavailable")
+
+
+def test_readiness_runs_a_lightweight_query() -> None:
+    connection = _Connection()
+    repository = object.__new__(PgPortfolioSessionRepository)
+    repository._pool = cast(Any, _Pool(connection))
+
+    repository.check_ready()
+
+    assert connection.queries == ["SELECT 1"]

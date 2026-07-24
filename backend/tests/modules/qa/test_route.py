@@ -14,6 +14,7 @@ question ever reaching the model, the turn limit bites first, identifiers
 are masked, and only the recent history window goes on the wire.
 """
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -33,7 +34,7 @@ from app.modules.portfolio.session.service import (
 )
 from app.modules.qa.agent import AgentStreamRunner
 from app.modules.qa.context import QaContext
-from app.modules.qa.route import get_agent_stream_runner
+from app.modules.qa.route import _build_event_stream, get_agent_stream_runner
 
 _SESSION_ID = "test-session"
 
@@ -62,11 +63,14 @@ class _FixtureSessions:
         self.turns_used += 1
         return 9
 
-    def refund_counsel_turn(self, token: str, **_kwargs: object) -> None:
+    def refund_counsel_turn(self, token: str, **kwargs: object) -> int:
         if token != _SESSION_ID:
             raise InvalidPortfolioSessionToken
         self.refund_calls += 1
         self.turns_used = max(0, self.turns_used - 1)
+        max_turns = kwargs["max_turns"]
+        assert isinstance(max_turns, int)
+        return max_turns - self.turns_used
 
     def snapshot(self, token: str, **_kwargs: object) -> PortfolioSessionSnapshot:
         if token != _SESSION_ID:
@@ -86,7 +90,7 @@ class _ExhaustedSessions(_FixtureSessions):
 class _RefundFailingSessions(_FixtureSessions):
     """A session store that accepts the turn but cannot refund it later."""
 
-    def refund_counsel_turn(self, token: str, **_kwargs: object) -> None:
+    def refund_counsel_turn(self, token: str, **_kwargs: object) -> int:
         self.refund_calls += 1
         raise RuntimeError("store unavailable")
 
@@ -260,6 +264,7 @@ def test_agent_failure_refunds_the_turn_and_emits_a_typed_error() -> None:
         "message": ("답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요."),
         "request_id": response.headers["x-request-id"],
         "retryable": False,
+        "turns_remaining": 10,
     }
     assert sessions.refund_calls == 1
     assert sessions.turns_used == 0
@@ -312,6 +317,34 @@ def test_agent_failure_finishes_the_stream_when_refund_fails() -> None:
     assert events[-1]["type"] == "error"
     assert events[-1]["request_id"] == response.headers["x-request-id"]
     assert sessions.refund_calls == 1
+
+
+def test_closing_after_meta_refunds_the_consumed_turn() -> None:
+    sessions = _FixtureSessions()
+
+    async def scenario() -> None:
+        events = _build_event_stream(
+            request_id="request-1",
+            session_id=_SESSION_ID,
+            sessions=sessions,  # type: ignore[arg-type]
+            turns_remaining=9,
+            question="질문",
+            history=[],
+            policies=[],
+            policy_rag_session_ids=(),
+            model="test-model",
+            max_turns=10,
+            agent_stream_runner=_stub_runner(["답변"]),
+        )
+
+        first = json.loads((await anext(events)).removeprefix("data: "))
+        assert first["type"] == "meta"
+        await events.aclose()
+
+    asyncio.run(scenario())
+
+    assert sessions.refund_calls == 1
+    assert sessions.turns_used == 0
 
 
 def test_an_invalid_session_is_rejected_before_the_agent_runs() -> None:

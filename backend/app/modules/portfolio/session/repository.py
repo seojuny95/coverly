@@ -31,6 +31,10 @@ class PortfolioSessionRepositoryUnavailable(Exception):
 
 
 class PortfolioSessionRepository(Protocol):
+    def check_ready(self) -> None:
+        """Raise when the backing session store cannot serve requests."""
+        ...
+
     def create(self, session: NewPortfolioSession) -> None: ...
 
     def consume_counsel_turn(
@@ -48,8 +52,14 @@ class PortfolioSessionRepository(Protocol):
         """
         ...
 
-    def refund_counsel_turn(self, session_id: str, *, now: datetime) -> bool:
-        """Return one consumed counsel turn, if the live session still has one."""
+    def refund_counsel_turn(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
+        """Return one turn and report the restored allowance atomically."""
         ...
 
     def reserve_document(

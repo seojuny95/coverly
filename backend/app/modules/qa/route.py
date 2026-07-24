@@ -14,7 +14,7 @@ decline" must read the answer text, not this field.
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -135,6 +135,7 @@ async def stream_qa_answer(
         policies=list(snapshot.policies),
         policy_rag_session_ids=snapshot.rag_session_ids,
         model=settings.openai_model,
+        max_turns=settings.counsel_max_turns_per_session,
         agent_stream_runner=agent_stream_runner,
     )
     return StreamingResponse(events, media_type="text/event-stream")
@@ -151,18 +152,21 @@ async def _build_event_stream(
     policies: list[PolicyInput],
     policy_rag_session_ids: tuple[str, ...],
     model: str,
+    max_turns: int,
     agent_stream_runner: AgentStreamRunner,
-) -> AsyncIterator[str]:
-    yield serialize_event(
-        QaMetaEvent(
-            in_scope=True,
-            answered_question=question,
-            excluded_note=None,
-            turns_remaining=turns_remaining,
-        )
-    )
+) -> AsyncGenerator[str, None]:
+    completed = False
+    refunded = False
 
     try:
+        yield serialize_event(
+            QaMetaEvent(
+                in_scope=True,
+                answered_question=question,
+                excluded_note=None,
+                turns_remaining=turns_remaining,
+            )
+        )
         context = QaContext(policies=policies, policy_rag_session_ids=policy_rag_session_ids)
         agent = create_agent(model)
         conversation: list[ConversationMessage] = [
@@ -173,24 +177,37 @@ async def _build_event_stream(
         async for delta in agent_stream_runner(agent, conversation, context):
             if delta:
                 yield serialize_event(QaDeltaEvent(text=delta))
-    except asyncio.CancelledError:
-        await _refund_counsel_turn_best_effort(sessions, session_id)
-        raise
+        completed = True
     except Exception as exc:
         logger.error(
             "qa_stream_failed",
             extra={"request_id": request_id, **safe_exception_context(exc)},
         )
-        await _refund_counsel_turn_best_effort(sessions, session_id)
+        restored_turns = await _refund_counsel_turn_best_effort(
+            sessions,
+            session_id,
+            max_turns=max_turns,
+            request_id=request_id,
+        )
+        refunded = True
         yield serialize_event(
             QaErrorEvent(
                 code="QA_STREAM_FAILED",
                 message=_QA_STREAM_FAILURE_MESSAGE,
                 request_id=request_id,
                 retryable=_qa_failure_is_retryable(exc),
+                turns_remaining=restored_turns,
             )
         )
         return
+    finally:
+        if not completed and not refunded:
+            await _refund_counsel_turn_best_effort(
+                sessions,
+                session_id,
+                max_turns=max_turns,
+                request_id=request_id,
+            )
 
     yield serialize_event(QaEndEvent())
 
@@ -202,11 +219,22 @@ def _qa_failure_is_retryable(exc: Exception) -> bool:
 async def _refund_counsel_turn_best_effort(
     sessions: PortfolioSessionService,
     session_id: str,
-) -> None:
+    *,
+    max_turns: int,
+    request_id: str,
+) -> int | None:
     try:
-        await asyncio.to_thread(sessions.refund_counsel_turn, session_id)
+        return await asyncio.to_thread(
+            sessions.refund_counsel_turn,
+            session_id,
+            max_turns=max_turns,
+        )
     except Exception as exc:
         logger.warning(
             "qa_turn_refund_failed",
-            extra={"error_type": type(exc).__name__},
+            extra={
+                "request_id": request_id,
+                "error_type": type(exc).__name__,
+            },
         )
+        return None

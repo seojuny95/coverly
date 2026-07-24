@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.core.config import get_settings
 from app.core.errors import ApiError, api_error_responses
+from app.core.limits import MAX_PDF_BYTES
 from app.modules.policy.parsing import MAX_PDF_PAGES
 from app.modules.policy.pipeline import run_pipeline
 from app.modules.policy.schemas import PolicyParseResponse
@@ -21,7 +22,6 @@ from app.modules.upload.service import PolicyPipeline, PolicyUploadService
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
-MAX_PDF_BYTES = 10 * 1024 * 1024
 _CHUNK_SIZE = 1024 * 1024
 _PDF_UPLOAD_DESCRIPTION = (
     "PDF document only. The server verifies the %PDF signature and accepts at most "
@@ -46,7 +46,7 @@ async def _read_pdf(file: UploadFile) -> bytes:
             raise ApiError(
                 status_code=413,
                 code="PDF_TOO_LARGE",
-                message="파일이 너무 큽니다 (최대 10MB).",
+                message="파일이 너무 커요. PDF 한 개당 최대 10MB까지 올릴 수 있어요.",
             )
         chunks.append(chunk)
     data = b"".join(chunks)
@@ -54,7 +54,7 @@ async def _read_pdf(file: UploadFile) -> bytes:
         raise ApiError(
             status_code=400,
             code="INVALID_PDF",
-            message="유효한 PDF 파일이 아닙니다.",
+            message="올바른 PDF 파일이 아니에요.",
         )
     return data
 
@@ -83,7 +83,7 @@ async def parse_policy(
     sessions: PortfolioSessionServiceDep,
     parsing_capacity: PdfParsingCapacityDep,
     document_id: Annotated[UUID, Form(alias="documentId")],
-    password: str | None = Form(default=None),
+    password: str | None = Form(default=None, max_length=256),
     portfolio_session_token: str = Form(
         alias="portfolioSessionToken",
         min_length=1,

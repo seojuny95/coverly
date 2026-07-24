@@ -112,7 +112,7 @@ class PolicyUploadService:
             raise ApiError(
                 status_code=422,
                 code="PDF_TEXT_EXTRACTION_FAILED",
-                message="PDF에서 텍스트를 추출할 수 없습니다.",
+                message="PDF에서 텍스트를 추출할 수 없어요.",
             ) from None
         except PdfPageLimitExceededError:
             raise ApiError(

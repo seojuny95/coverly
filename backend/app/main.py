@@ -15,8 +15,14 @@ from app.core.errors import (
 from app.core.middleware import request_id_middleware
 from app.lifespan import lifespan
 from app.modules.portfolio.router import router as portfolio_router
-from app.modules.portfolio.session.router import router as portfolio_sessions_router
+from app.modules.portfolio.session.router import (
+    readiness_router,
+)
+from app.modules.portfolio.session.router import (
+    router as portfolio_sessions_router,
+)
 from app.modules.qa.route import router as qa_router
+from app.modules.upload.request_limits import UploadRequestSizeLimitMiddleware
 from app.modules.upload.router import router as policies_router
 
 
@@ -27,6 +33,7 @@ def health() -> dict[str, str]:
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Coverly API", lifespan=lifespan)
+    app.add_middleware(UploadRequestSizeLimitMiddleware)
     app.middleware("http")(unexpected_error_middleware)
     app.middleware("http")(request_id_middleware)
     app.add_middleware(
@@ -40,6 +47,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.include_router(policies_router)
+    app.include_router(readiness_router)
     app.include_router(portfolio_sessions_router)
     app.include_router(portfolio_router)
     app.include_router(qa_router)

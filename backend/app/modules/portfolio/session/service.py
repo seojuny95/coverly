@@ -90,6 +90,12 @@ class PortfolioSessionService:
         self._repository = repository
         self._rag_store = rag_store
 
+    def check_ready(self) -> None:
+        """Verify that the session store can serve a lightweight query."""
+
+        with self._translate_repository_errors():
+            self._repository.check_ready()
+
     def create(self, *, now: datetime | None = None) -> PortfolioSessionAccess:
         ensure_policy_session_secret_configured()
         created_at = now or datetime.now(UTC)
@@ -259,14 +265,19 @@ class PortfolioSessionService:
         self,
         token: str,
         *,
+        max_turns: int,
         now: datetime | None = None,
-    ) -> None:
-        """Return a counsel turn after a failed answer attempt."""
+    ) -> int | None:
+        """Return a counsel turn and report the restored allowance."""
 
         current = now or datetime.now(UTC)
         claims = self._verify(token, now=current)
         with self._translate_repository_errors():
-            self._repository.refund_counsel_turn(claims.session_id, now=current)
+            return self._repository.refund_counsel_turn(
+                claims.session_id,
+                now=current,
+                max_turns=max_turns,
+            )
 
     def counsel_turns_remaining(
         self,

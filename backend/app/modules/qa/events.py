@@ -37,6 +37,7 @@ class QaErrorEvent(BaseModel):
     message: str
     request_id: str
     retryable: bool
+    turns_remaining: int | None
 
 
 # Discriminated so the published schema is a strict oneOf: a client validator can

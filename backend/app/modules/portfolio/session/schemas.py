@@ -8,6 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.limits import MAX_PORTFOLIO_DOCUMENTS
 
 
+class ReadinessResponse(BaseModel):
+    status: Literal["ready"]
+
+
 class PortfolioSessionRequest(BaseModel):
     portfolio_session_token: str = Field(
         alias="portfolioSessionToken",

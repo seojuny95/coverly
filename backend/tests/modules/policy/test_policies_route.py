@@ -105,7 +105,7 @@ def test_parse_rejects_non_pdf_upload() -> None:
     assert response.json() == {
         "error": {
             "code": "INVALID_PDF",
-            "message": "유효한 PDF 파일이 아닙니다.",
+            "message": "올바른 PDF 파일이 아니에요.",
             "request_id": response.headers["x-request-id"],
         },
     }
@@ -141,7 +141,10 @@ def test_parse_rejects_pdf_larger_than_limit() -> None:
 
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "PDF_TOO_LARGE"
-    assert response.json()["error"]["message"] == "파일이 너무 큽니다 (최대 10MB)."
+    assert (
+        response.json()["error"]["message"]
+        == "파일이 너무 커요. PDF 한 개당 최대 10MB까지 올릴 수 있어요."
+    )
     assert response.json()["error"]["request_id"] == response.headers["x-request-id"]
 
 
@@ -229,7 +232,7 @@ def test_parse_rejects_unreadable_pdf_body() -> None:
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "PDF_TEXT_EXTRACTION_FAILED"
-    assert response.json()["error"]["message"] == "PDF에서 텍스트를 추출할 수 없습니다."
+    assert response.json()["error"]["message"] == "PDF에서 텍스트를 추출할 수 없어요."
 
 
 def test_parse_returns_pipeline_result_shape(monkeypatch: pytest.MonkeyPatch) -> None:

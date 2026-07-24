@@ -41,10 +41,18 @@ class PgPortfolioSessionRepository:
     def close(self) -> None:
         self._pool.close()
 
+    def check_ready(self) -> None:
+        with self._connection(timeout=3.0) as connection:
+            connection.execute("SELECT 1").fetchone()
+
     @contextmanager
-    def _connection(self) -> Iterator[Connection[dict[str, Any]]]:
+    def _connection(
+        self,
+        *,
+        timeout: float | None = None,
+    ) -> Iterator[Connection[dict[str, Any]]]:
         try:
-            with self._pool.connection() as connection:
+            with self._pool.connection(timeout=timeout) as connection:
                 yield connection
         except (OperationalError, InterfaceError, PoolTimeout) as exc:
             raise PortfolioSessionRepositoryUnavailable from exc
@@ -110,7 +118,13 @@ class PgPortfolioSessionRepository:
             return None
         return max(0, max_turns - int(row["counsel_turns_used"]))
 
-    def refund_counsel_turn(self, session_id: str, *, now: datetime) -> bool:
+    def refund_counsel_turn(
+        self,
+        session_id: str,
+        *,
+        now: datetime,
+        max_turns: int,
+    ) -> int | None:
         with self._connection() as connection:
             row = connection.execute(
                 """UPDATE private.portfolio_sessions
@@ -121,7 +135,9 @@ class PgPortfolioSessionRepository:
                 RETURNING counsel_turns_used""",
                 (session_id, now),
             ).fetchone()
-        return row is not None
+        if row is None:
+            return None
+        return max(0, max_turns - int(row["counsel_turns_used"]))
 
     def reserve_document(
         self,

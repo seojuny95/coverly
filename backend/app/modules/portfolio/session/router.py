@@ -14,6 +14,7 @@ from app.modules.portfolio.session.schemas import (
     PortfolioSessionDocumentsDeleteRequest,
     PortfolioSessionRequest,
     PortfolioSessionResponse,
+    ReadinessResponse,
 )
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
@@ -21,6 +22,22 @@ from app.modules.portfolio.session.service import (
 )
 
 router = APIRouter(prefix="/portfolio/sessions", tags=["portfolio-sessions"])
+readiness_router = APIRouter(tags=["operations"])
+
+
+@readiness_router.get(
+    "/ready",
+    response_model=ReadinessResponse,
+    responses=api_error_responses(503),
+)
+def check_readiness(
+    sessions: PortfolioSessionServiceDep,
+) -> ReadinessResponse:
+    try:
+        sessions.check_ready()
+    except PortfolioSessionUnavailable:
+        raise portfolio_session_unavailable_error() from None
+    return ReadinessResponse(status="ready")
 
 
 @router.post(

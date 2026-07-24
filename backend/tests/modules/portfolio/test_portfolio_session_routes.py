@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.core.errors import ApiError, api_error_handler
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
-from app.modules.portfolio.session.router import router
+from app.modules.portfolio.session.router import readiness_router, router
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
     PortfolioSessionAccess,
@@ -18,6 +18,9 @@ class _Sessions:
         self.refreshed: list[str] = []
         self.deleted: list[str] = []
         self.deleted_documents: list[tuple[str, list[str]]] = []
+
+    def check_ready(self) -> None:
+        pass
 
     def create(self) -> PortfolioSessionAccess:
         return _access("created-token")
@@ -44,6 +47,21 @@ class _RefreshRaceSessions(_Sessions):
 class _UnavailableSessions(_Sessions):
     def create(self) -> PortfolioSessionAccess:
         raise PortfolioSessionUnavailable
+
+
+class _NotReadySessions(_Sessions):
+    def check_ready(self) -> None:
+        raise PortfolioSessionUnavailable
+
+
+def test_readiness_checks_the_session_store() -> None:
+    ready = TestClient(_app_with_sessions(_Sessions())).get("/ready")
+    unavailable = TestClient(_app_with_sessions(_NotReadySessions())).get("/ready")
+
+    assert ready.status_code == 200
+    assert ready.json() == {"status": "ready"}
+    assert unavailable.status_code == 503
+    assert unavailable.json()["error"]["code"] == "portfolio_session_unavailable"
 
 
 def test_portfolio_session_lifecycle_uses_one_token_contract() -> None:
@@ -102,6 +120,7 @@ def test_create_maps_session_store_unavailable_to_api_error() -> None:
 def _app_with_sessions(sessions: _Sessions) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(ApiError, api_error_handler)
+    app.include_router(readiness_router)
     app.include_router(router)
     app.dependency_overrides[get_portfolio_session_service] = lambda: sessions
     return app
