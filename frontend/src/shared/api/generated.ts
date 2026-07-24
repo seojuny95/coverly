@@ -21,6 +21,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/ready": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Check Readiness */
+    get: operations["check_readiness_ready_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/portfolio/sessions": {
     parameters: {
       query?: never;
@@ -758,6 +775,8 @@ export interface components {
       request_id: string;
       /** Retryable */
       retryable: boolean;
+      /** Turns Remaining */
+      turns_remaining: number | null;
     };
     /** QaMessage */
     QaMessage: {
@@ -793,6 +812,14 @@ export interface components {
       history?: components["schemas"]["QaMessage"][];
       /** Session Id */
       session_id: string;
+    };
+    /** ReadinessResponse */
+    ReadinessResponse: {
+      /**
+       * Status
+       * @constant
+       */
+      status: "ready";
     };
     /** ReferenceSource */
     ReferenceSource: {
@@ -951,6 +978,81 @@ export interface operations {
       };
       /** @description Coverly API error */
       413: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      422: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      503: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+    };
+  };
+  check_readiness_ready_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReadinessResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      404: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
         headers: {
           /** @description Server-generated identifier for safe error correlation. */
           "X-Request-ID"?: string;

@@ -133,8 +133,10 @@ export function useInsuranceChat({
       // Another tab may have spent the last turn, so trust the server over local state.
       const outOfTurns = isTurnLimitError(error);
       const expiredSession = isExpiredSessionError(error);
+      const restoredTurns = restoredTurnsRemaining(error);
       reportClientOperationFailure("qa_stream", error);
       if (outOfTurns) setTurnsRemaining(0);
+      else if (restoredTurns !== null) setTurnsRemaining(restoredTurns);
       if (expiredSession) onSessionExpired?.();
       updateMessage(assistantId, (message) => ({
         ...message,
@@ -166,6 +168,20 @@ export function useInsuranceChat({
     submit,
     sendQuestion,
   };
+}
+
+function restoredTurnsRemaining(error: unknown): number | null {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("turnsRemaining" in error)
+  ) {
+    return null;
+  }
+  const value = error.turnsRemaining;
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : null;
 }
 
 function isTurnLimitError(error: unknown): boolean {

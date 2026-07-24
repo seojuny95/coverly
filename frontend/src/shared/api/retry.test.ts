@@ -45,20 +45,47 @@ describe("retryOperation", () => {
   });
 
   it("runs recovery before a retry", async () => {
+    vi.useFakeTimers();
     const recovery = vi.fn().mockResolvedValue(undefined);
     const operation = vi
       .fn<() => Promise<string>>()
       .mockRejectedValueOnce(new TypeError("network"))
       .mockResolvedValueOnce("ok");
 
-    await expect(
-      retryOperation(operation, {
-        maxAttempts: 2,
-        beforeRetry: recovery,
-      }),
-    ).resolves.toBe("ok");
+    const result = retryOperation(operation, {
+      maxAttempts: 2,
+      beforeRetry: recovery,
+      baseDelayMs: 100,
+    });
+    await vi.advanceTimersByTimeAsync(120);
 
+    await expect(result).resolves.toBe("ok");
     expect(recovery).toHaveBeenCalledWith(expect.any(TypeError), 2);
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not shorten a server Retry-After to the client backoff cap", async () => {
+    vi.useFakeTimers();
+    const operation = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(
+        new ApiResponseError({
+          status: 503,
+          retryAfterMs: 10_000,
+          userMessage: "잠시 후 다시 시도해주세요.",
+        }),
+      )
+      .mockResolvedValueOnce("ok");
+
+    const result = retryOperation(operation, {
+      maxAttempts: 2,
+      maxDelayMs: 1000,
+    });
+    await vi.advanceTimersByTimeAsync(9999);
+    expect(operation).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(result).resolves.toBe("ok");
   });
 
   it("stops before sending when already cancelled", async () => {

@@ -6,6 +6,7 @@ import { renderWithProviders } from "../../../test/render-with-providers";
 import { InsuranceChatbot } from "./chatbot";
 import * as api from "./api";
 import { ApiResponseError } from "@/shared/api/client";
+import { QaStreamResponseError } from "@/shared/api/qa-stream";
 
 type StreamHandlers = Parameters<typeof api.streamPortfolioQuestion>[2];
 
@@ -113,6 +114,36 @@ describe("InsuranceChatbot", () => {
         "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("restores the server-confirmed question allowance after a stream failure", async () => {
+    vi.spyOn(api, "streamPortfolioQuestion").mockImplementation(
+      async (_question, _history, handlers) => {
+        handlers.onMeta?.({
+          type: "meta",
+          in_scope: true,
+          answered_question: "질문",
+          excluded_note: null,
+          turns_remaining: 0,
+        });
+        throw new QaStreamResponseError({
+          type: "error",
+          code: "QA_STREAM_FAILED",
+          message: "답을 가져오지 못했어요. 잠시 후 다시 질문해주세요.",
+          request_id: "request-1",
+          retryable: true,
+          turns_remaining: 1,
+        });
+      },
+    );
+    const user = await openChat({ turnsRemaining: 1 });
+
+    await user.type(screen.getByLabelText("보험 질문"), "암 진단비는?");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+
+    expect(await screen.findByText("질문 1번 남음")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("보험 질문"), "다시 질문");
+    expect(screen.getByRole("button", { name: "질문하기" })).toBeEnabled();
   });
 
   it("reports an expired session when the qa request is rejected by the session boundary", async () => {

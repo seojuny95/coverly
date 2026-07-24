@@ -137,7 +137,8 @@ async function request(
       {
         signal,
         timeoutMs: PORTFOLIO_SESSION_REQUEST_TIMEOUT_MS,
-        timeoutMessage: "Portfolio session request timed out",
+        timeoutMessage:
+          "분석 세션을 확인하는 시간이 길어지고 있어요. 잠시 후 다시 시도해주세요.",
       },
     );
   } catch (error) {

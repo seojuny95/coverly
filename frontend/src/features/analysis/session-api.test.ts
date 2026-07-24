@@ -12,6 +12,7 @@ vi.mock("@/shared/api/readiness", () => ({
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });
@@ -54,6 +55,29 @@ describe("portfolio session API", () => {
     const signal = fetchMock.mock.calls[0]?.[1]?.signal;
     expect(signal).toBeInstanceOf(AbortSignal);
     expect(signal).not.toBe(caller.signal);
+  });
+
+  it("keeps timeout diagnostics out of the user-facing message", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("Aborted", "AbortError"));
+          });
+        }),
+    );
+
+    const request = createPortfolioSession();
+    const expectation = expect(request).rejects.toMatchObject({
+      name: "ApiRequestTimeoutError",
+      message: "API request deadline exceeded",
+      userMessage:
+        "분석 세션을 확인하는 시간이 길어지고 있어요. 잠시 후 다시 시도해주세요.",
+    });
+
+    await vi.advanceTimersByTimeAsync(15 * 1000);
+    await expectation;
   });
 
   it("refreshes and deletes the same bearer token", async () => {

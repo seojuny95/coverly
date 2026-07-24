@@ -41,7 +41,7 @@ export async function waitForBackendReady({
 
     try {
       const response = await requestWithDeadline(
-        apiUrl("/health"),
+        apiUrl("/ready"),
         {
           method: "GET",
           headers: { Accept: "application/json" },
@@ -101,7 +101,7 @@ async function isReadyResponse(response: Response) {
       typeof payload === "object" &&
       payload !== null &&
       "status" in payload &&
-      payload.status === "ok"
+      payload.status === "ready"
     );
   } catch {
     return false;

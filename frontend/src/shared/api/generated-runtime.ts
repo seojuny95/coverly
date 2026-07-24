@@ -101,9 +101,20 @@ export const QA_STREAM_JSON_SCHEMA = {
           message: { type: "string", title: "Message" },
           request_id: { type: "string", title: "Request Id" },
           retryable: { type: "boolean", title: "Retryable" },
+          turns_remaining: {
+            anyOf: [{ type: "integer" }, { type: "null" }],
+            title: "Turns Remaining",
+          },
         },
         type: "object",
-        required: ["code", "message", "request_id", "retryable", "type"],
+        required: [
+          "code",
+          "message",
+          "request_id",
+          "retryable",
+          "turns_remaining",
+          "type",
+        ],
         title: "QaErrorEvent",
       },
       QaMetaEvent: {

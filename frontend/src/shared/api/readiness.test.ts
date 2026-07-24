@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 describe("waitForBackendReady", () => {
-  it("accepts only the Coverly health response", async () => {
+  it("accepts only the Coverly readiness response", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
@@ -21,7 +21,7 @@ describe("waitForBackendReady", () => {
         }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ status: "ok" }), {
+        new Response(JSON.stringify({ status: "ready" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         }),
@@ -31,7 +31,7 @@ describe("waitForBackendReady", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "http://localhost:8000/health",
+      "http://localhost:8000/ready",
       expect.objectContaining({ method: "GET" }),
     );
   });
@@ -41,7 +41,7 @@ describe("waitForBackendReady", () => {
       .spyOn(globalThis, "fetch")
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ status: "ok" }), { status: 200 }),
+        new Response(JSON.stringify({ status: "ready" }), { status: 200 }),
       );
 
     await waitForBackendReady({ retryDelayMs: 0 });
@@ -60,7 +60,7 @@ describe("waitForBackendReady", () => {
         }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ status: "ok" }), { status: 200 }),
+        new Response(JSON.stringify({ status: "ready" }), { status: 200 }),
       );
 
     const readiness = waitForBackendReady({ timeoutMs: 5000 });

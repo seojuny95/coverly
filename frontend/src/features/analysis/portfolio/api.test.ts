@@ -304,6 +304,7 @@ describe("portfolio session requests", () => {
             "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
           request_id: "request-1",
           retryable: true,
+          turns_remaining: 10,
         },
       ]),
     );
@@ -320,6 +321,7 @@ describe("portfolio session requests", () => {
       name: "QaStreamResponseError",
       code: "QA_STREAM_FAILED",
       requestId: "request-1",
+      turnsRemaining: 10,
     });
     expect(onDelta).not.toHaveBeenCalled();
   });

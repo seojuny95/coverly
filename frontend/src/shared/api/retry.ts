@@ -4,6 +4,7 @@ import { ApiRequestTimeoutError } from "./request";
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 502, 503, 504]);
 const DEFAULT_BASE_DELAY_MS = 750;
 const DEFAULT_MAX_DELAY_MS = 5000;
+const MAX_SERVER_RETRY_AFTER_MS = 5 * 60 * 1000;
 
 type RetryOperationOptions = {
   maxAttempts: number;
@@ -43,12 +44,8 @@ export async function retryOperation<T>(
     } catch (error) {
       if (attempt >= maxAttempts || !shouldRetry(error)) throw error;
 
-      if (beforeRetry) {
-        await beforeRetry(error, attempt + 1);
-        continue;
-      }
-
       await wait(retryDelay(error, attempt, baseDelayMs, maxDelayMs), signal);
+      if (beforeRetry) await beforeRetry(error, attempt + 1);
     }
   }
 }
@@ -60,7 +57,9 @@ function retryDelay(
   maxDelayMs: number,
 ): number {
   const retryAfterMs = readRetryAfterMs(error);
-  if (retryAfterMs !== undefined) return Math.min(maxDelayMs, retryAfterMs);
+  if (retryAfterMs !== undefined) {
+    return Math.min(retryAfterMs, MAX_SERVER_RETRY_AFTER_MS);
+  }
 
   const exponentialDelay = Math.min(
     maxDelayMs,

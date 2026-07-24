@@ -17,6 +17,7 @@ export class QaStreamResponseError extends AppRequestError {
   readonly code: QaErrorEvent["code"];
   readonly requestId: string;
   readonly retryable: boolean;
+  readonly turnsRemaining: number | null;
 
   constructor(event: QaErrorEvent) {
     super({
@@ -27,6 +28,7 @@ export class QaStreamResponseError extends AppRequestError {
     this.code = event.code;
     this.requestId = event.request_id;
     this.retryable = event.retryable;
+    this.turnsRemaining = event.turns_remaining;
   }
 }
 
