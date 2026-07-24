@@ -1050,3 +1050,21 @@ test("explains when loading the analysis fails again", () => {
     "다시 불러오지 못했어요. 업로드한 증권은 그대로 있으니",
   );
 });
+
+test("keeps the previous result visible when new conditions fail to load", async () => {
+  const user = userEvent.setup();
+  const onRetry = vi.fn();
+  render(
+    <PortfolioAnalysisPanel {...baseProps()} refreshFailed onRetry={onRetry} />,
+  );
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "새 조건을 반영하지 못했어요. 이전에 확인한 결과를 그대로 보여드려요.",
+  );
+  expect(
+    screen.getByText("진단비 구성에서 더 확인할 부분이 있어요"),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "다시 반영하기" }));
+  expect(onRetry).toHaveBeenCalledOnce();
+});

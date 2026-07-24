@@ -60,12 +60,14 @@ const createSession = vi.fn(async () => ({
   expiresAt: "2030-01-01T00:00:00.000Z",
   counselTurnsRemaining: 10,
 }));
+const prepareServer = vi.fn(async () => undefined);
 
 function renderForm({
   uploadInsurance = vi.fn(),
   onAnalysisComplete = vi.fn(),
   navigateToAnalysis = vi.fn(),
   existingDocuments = [],
+  prepareServer: prepareServerOverride = prepareServer,
   deleteSessionDocuments = vi.fn().mockResolvedValue(undefined),
   initialAnalysis = null,
 }: {
@@ -73,19 +75,21 @@ function renderForm({
   onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
   navigateToAnalysis?: () => void;
   existingDocuments?: AnalyzedInsurance[];
+  prepareServer?: (signal?: AbortSignal) => Promise<void>;
   deleteSessionDocuments?: (
     portfolioSessionToken: string,
     documentIds: string[],
   ) => Promise<void>;
   initialAnalysis?: InsuranceAnalysis | null;
 } = {}) {
-  renderWithProviders(
+  const rendered = renderWithProviders(
     <>
       <InsuranceUploadForm
         uploadInsurance={uploadInsurance}
         onAnalysisComplete={onAnalysisComplete}
         navigateToAnalysis={navigateToAnalysis}
         existingDocuments={existingDocuments}
+        prepareServer={prepareServerOverride}
         createSession={createSession}
         deleteSessionDocuments={deleteSessionDocuments}
       />
@@ -97,7 +101,9 @@ function renderForm({
     uploadInsurance,
     onAnalysisComplete,
     navigateToAnalysis,
+    prepareServer: prepareServerOverride,
     deleteSessionDocuments,
+    unmount: rendered.unmount,
   };
 }
 
@@ -105,10 +111,61 @@ beforeEach(() => {
   routerPush.mockClear();
   routerPrefetch.mockClear();
   createSession.mockClear();
+  prepareServer.mockReset().mockResolvedValue(undefined);
   vi.mocked(isPdfPasswordProtected).mockReset().mockResolvedValue(false);
 });
 
 describe("InsuranceUploadForm", () => {
+  test("shows a distinct server preparation state before reading PDFs", async () => {
+    const user = userEvent.setup();
+    let markServerReady: () => void = () => undefined;
+    const pendingServer = new Promise<void>((resolve) => {
+      markServerReady = resolve;
+    });
+    const prepareServer = vi.fn(() => pendingServer);
+    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
+      ...POLICY_PARSE_RESPONSE_DEFAULTS,
+      documentId: "document-1",
+    });
+    renderForm({ prepareServer, uploadInsurance });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText("분석 서버를 준비하고 있어요"),
+    ).toBeVisible();
+    expect(
+      screen.getByText("처음 연결할 때는 최대 1분 정도 걸릴 수 있어요"),
+    ).toBeVisible();
+    expect(screen.getByText("대기 중")).toBeVisible();
+    expect(createSession).not.toHaveBeenCalled();
+    expect(uploadInsurance).not.toHaveBeenCalled();
+
+    markServerReady();
+
+    await waitFor(() => expect(createSession).toHaveBeenCalledOnce());
+    await waitFor(() => expect(uploadInsurance).toHaveBeenCalledOnce());
+  });
+
+  test("cancels server preparation when the upload form unmounts", async () => {
+    const user = userEvent.setup();
+    let requestSignal: AbortSignal | undefined;
+    const prepareServer = vi.fn((signal?: AbortSignal) => {
+      requestSignal = signal;
+      return new Promise<void>(() => {});
+    });
+    const { unmount } = renderForm({ prepareServer });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+    await waitFor(() => expect(prepareServer).toHaveBeenCalledOnce());
+
+    unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
   test("prefetches the programmatic analysis destination", async () => {
     renderForm();
 
@@ -317,7 +374,7 @@ describe("InsuranceUploadForm", () => {
       0,
     );
     expect(uploadInsurance).toHaveBeenCalledOnce();
-    expect(arrayBufferSpy).not.toHaveBeenCalled();
+    expect(arrayBufferSpy).toHaveBeenCalledOnce();
   });
 
   test("selects a PDF through drag and drop", async () => {
@@ -391,23 +448,27 @@ describe("InsuranceUploadForm", () => {
     );
   });
 
-  test("does not enforce the server size limit in the browser", async () => {
+  test("rejects an oversized PDF before reading or uploading it", async () => {
     const user = userEvent.setup();
-    const largePdf = new File(
-      [new Uint8Array(10 * 1024 * 1024 + 1)],
-      "large.pdf",
-      {
-        type: "application/pdf",
-      },
-    );
-    renderForm();
+    const largePdf = new File(["%PDF-1.7"], "large.pdf", {
+      type: "application/pdf",
+    });
+    Object.defineProperty(largePdf, "size", {
+      value: 10 * 1024 * 1024 + 1,
+    });
+    const arrayBufferSpy = vi.spyOn(largePdf, "arrayBuffer");
+    const uploadInsurance = vi.fn<UploadInsurance>();
+    renderForm({ uploadInsurance });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), largePdf);
 
-    expect(screen.getByText("large.pdf")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "내 보험 분석하기" }),
-    ).toBeEnabled();
+      screen.getByText(
+        "파일이 너무 커요. PDF 한 개당 최대 10MB까지 올릴 수 있어요.",
+      ),
+    ).toBeInTheDocument();
+    expect(arrayBufferSpy).not.toHaveBeenCalled();
+    expect(uploadInsurance).not.toHaveBeenCalled();
   });
 
   test("uploads selected files and navigates to the analysis page", async () => {
@@ -463,22 +524,24 @@ describe("InsuranceUploadForm", () => {
     ]);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
-    expect(uploadInsurance).toHaveBeenCalledWith(
-      expect.objectContaining({
-        file: insuranceFile,
-        portfolioSessionToken: "test-portfolio-token",
-        documentId: expect.any(String),
-      }),
-      expect.anything(),
-    );
-    expect(uploadInsurance).toHaveBeenCalledWith(
-      expect.objectContaining({
-        file: secondInsuranceFile,
-        portfolioSessionToken: "test-portfolio-token",
-        documentId: expect.any(String),
-      }),
-      expect.anything(),
-    );
+    await waitFor(() => {
+      expect(uploadInsurance).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file: insuranceFile,
+          portfolioSessionToken: "test-portfolio-token",
+          documentId: expect.any(String),
+        }),
+        expect.anything(),
+      );
+      expect(uploadInsurance).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file: secondInsuranceFile,
+          portfolioSessionToken: "test-portfolio-token",
+          documentId: expect.any(String),
+        }),
+        expect.anything(),
+      );
+    });
     await waitFor(() => {
       expect(onAnalysisComplete).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -817,7 +880,7 @@ describe("InsuranceUploadForm", () => {
     });
   });
 
-  test("shows backend error details when upload fails", async () => {
+  test("does not expose an unexpected internal error message", async () => {
     const user = userEvent.setup();
     const uploadInsurance = vi
       .fn<UploadInsurance>()
@@ -828,8 +891,13 @@ describe("InsuranceUploadForm", () => {
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     expect(
-      await screen.findByText("파일을 분석할 수 없습니다."),
+      await screen.findByText(
+        "업로드에 실패했어요. 잠시 후 다시 시도해주세요.",
+      ),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText("파일을 분석할 수 없습니다."),
+    ).not.toBeInTheDocument();
   });
 
   test("shows unreadable PDFs in the selected list and lets the user remove only those files", async () => {
@@ -886,7 +954,7 @@ describe("InsuranceUploadForm", () => {
     expect(await screen.findByText("읽을 수 없는 PDF")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "텍스트를 추출할 수 없는 PDF가 있어요. 표시된 파일을 제거한 뒤 다시 시도해주세요.",
+        "일부 PDF를 읽지 못했어요. 표시된 파일의 안내를 확인한 뒤 다시 시도해주세요.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("insurance.pdf")).toBeInTheDocument();
@@ -1325,11 +1393,11 @@ describe("InsuranceUploadForm", () => {
         "이미 올린 보험증권이에요. same-policy-copy.pdf 파일을 제거하고 다시 시도해주세요.",
       ),
     ).toBeInTheDocument();
-    expect(uploadInsurance).toHaveBeenCalledTimes(2);
+    expect(uploadInsurance).not.toHaveBeenCalled();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 
-  test("rejects a byte-identical re-upload after server acceptance", async () => {
+  test("rejects a byte-identical re-upload before server processing", async () => {
     const user = userEvent.setup();
     const fingerprintOf = async (file: File) => {
       const buffer = await file.arrayBuffer();
@@ -1379,7 +1447,7 @@ describe("InsuranceUploadForm", () => {
         "이미 올린 보험증권이에요. insurance.pdf 파일을 제거하고 다시 시도해주세요.",
       ),
     ).toBeInTheDocument();
-    expect(uploadInsurance).toHaveBeenCalledOnce();
+    expect(uploadInsurance).not.toHaveBeenCalled();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 
@@ -1455,6 +1523,7 @@ describe("InsuranceUploadForm", () => {
       <>
         <InsuranceUploadForm
           uploadInsurance={uploadInsurance}
+          prepareServer={prepareServer}
           createSession={createSession}
         />
         <InsuranceDataProbe />

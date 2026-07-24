@@ -4,6 +4,7 @@ import type {
   ApiErrorDetail,
   ApiErrorResponse,
 } from "./contracts";
+import { AppRequestError } from "./errors";
 import { isApiErrorCode } from "./generated-runtime";
 
 const API_BASE_URL =
@@ -13,26 +14,33 @@ export function apiUrl(path: keyof paths): string {
   return `${API_BASE_URL}${path}`;
 }
 
-export class ApiResponseError extends Error {
+export class ApiResponseError extends AppRequestError {
   readonly code?: ApiErrorCode;
   readonly requestId?: string;
+  readonly retryAfterMs?: number;
   readonly status: number;
 
   constructor({
     code,
-    message,
     requestId,
+    retryAfterMs,
     status,
+    userMessage,
   }: {
     code?: ApiErrorCode;
-    message: string;
     requestId?: string;
+    retryAfterMs?: number;
     status: number;
+    userMessage: string;
   }) {
-    super(message);
-    this.name = "ApiResponseError";
+    super({
+      developerMessage: `API request failed (status=${status}, code=${code ?? "UNKNOWN"})`,
+      name: "ApiResponseError",
+      userMessage,
+    });
     this.code = code;
     this.requestId = requestId;
+    this.retryAfterMs = retryAfterMs;
     this.status = status;
   }
 }
@@ -61,11 +69,23 @@ export async function apiResponseError(
   const detail = await readApiError(response);
   return new ApiResponseError({
     code: detail?.code,
-    message: detail?.message ?? fallbackMessage,
     requestId:
       detail?.request_id ?? response.headers.get("x-request-id") ?? undefined,
+    retryAfterMs: retryAfterMilliseconds(response.headers.get("retry-after")),
     status: response.status,
+    userMessage: detail?.message ?? fallbackMessage,
   });
+}
+
+function retryAfterMilliseconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+
+  const retryAt = Date.parse(value);
+  if (!Number.isFinite(retryAt)) return undefined;
+  return Math.max(0, retryAt - Date.now());
 }
 
 async function readApiError(

@@ -4,6 +4,7 @@ import { requestWithDeadline } from "./request";
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("requestWithDeadline", () => {
@@ -32,7 +33,8 @@ describe("requestWithDeadline", () => {
       expect.objectContaining({
         name: "ApiRequestTimeoutError",
         code: "REQUEST_TIMEOUT",
-        message: "요청 시간이 초과됐어요.",
+        message: "API request deadline exceeded",
+        userMessage: "요청 시간이 초과됐어요.",
       }),
     );
     await vi.advanceTimersByTimeAsync(500);
@@ -71,6 +73,25 @@ describe("requestWithDeadline", () => {
     rejectFetch(abortError);
 
     await expectation;
+  });
+
+  it("does not start fetch when the caller already cancelled", async () => {
+    const caller = new AbortController();
+    caller.abort();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await expect(
+      requestWithDeadline(
+        "https://example.test/summary",
+        {},
+        {
+          signal: caller.signal,
+          timeoutMs: 10_000,
+          timeoutMessage: "요청 시간이 초과됐어요.",
+        },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("cleans up its timeout and caller listener after a response", async () => {

@@ -11,6 +11,7 @@ export function PortfolioAnalysisPanel({
   deathBenefitContext,
   onDeathBenefitContextChange,
   isDeathBenefitRefreshing = false,
+  refreshFailed = false,
   policyCount,
   onRetry,
   isRetrying = false,
@@ -24,6 +25,7 @@ export function PortfolioAnalysisPanel({
   deathBenefitContext: DeathBenefitGuideInput;
   onDeathBenefitContextChange: (context: DeathBenefitGuideInput) => void;
   isDeathBenefitRefreshing?: boolean;
+  refreshFailed?: boolean;
   policyCount: number;
   onRetry: () => void;
   isRetrying?: boolean;
@@ -65,6 +67,25 @@ export function PortfolioAnalysisPanel({
 
   return (
     <div className="space-y-8">
+      {refreshFailed ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p>
+            새 조건을 반영하지 못했어요. 이전에 확인한 결과를 그대로 보여드려요.
+          </p>
+          <RetryButton
+            type="button"
+            variant="outline"
+            onClick={onRetry}
+            isPending={isRetrying}
+            label="다시 반영하기"
+            pendingLabel="다시 반영하는 중…"
+          />
+        </div>
+      ) : null}
+
       <PortfolioOverview
         summary={summary}
         items={items}

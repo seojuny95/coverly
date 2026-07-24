@@ -120,8 +120,8 @@ describe("InsuranceChatbot", () => {
     vi.spyOn(api, "streamPortfolioQuestion").mockRejectedValue(
       new ApiResponseError({
         code: "INVALID_PORTFOLIO_SESSION",
-        message: "분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
         status: 403,
+        userMessage: "분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
       }),
     );
     const user = await openChat({ onSessionExpired });

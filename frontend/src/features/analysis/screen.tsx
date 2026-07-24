@@ -229,6 +229,7 @@ export function InsuranceAnalysisPage({
                 deathBenefitContext={deathBenefitContext}
                 onDeathBenefitContextChange={setDeathBenefitContext}
                 isDeathBenefitRefreshing={portfolioSummary.isRefreshing}
+                refreshFailed={portfolioSummary.refreshFailed}
                 policyCount={insuranceDocuments.length}
                 onRetry={portfolioSummary.retry}
                 isRetrying={portfolioSummary.isRetrying}

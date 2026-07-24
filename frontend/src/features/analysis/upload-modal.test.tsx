@@ -15,6 +15,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
 }));
 
+vi.mock("@/shared/api/readiness", () => ({
+  waitForBackendReady: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("../upload/pdf-password-check", () => ({
   isPdfPasswordProtected: vi.fn(),
 }));

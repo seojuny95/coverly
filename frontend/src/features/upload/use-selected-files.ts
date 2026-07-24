@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
+import {
+  PDF_MAX_BYTES,
+  PORTFOLIO_MAX_DOCUMENTS,
+} from "@/shared/api/generated-runtime";
 import { isPdfPasswordProtected } from "./pdf-password-check";
 import type { SelectedUploadFile } from "./types";
 import {
@@ -47,6 +50,16 @@ export function useSelectedFiles({
         maxSelectableFiles > 0
           ? `보험증권은 최대 ${PORTFOLIO_MAX_DOCUMENTS}개까지 분석할 수 있어요. 지금은 ${maxSelectableFiles}개까지 추가할 수 있어요.`
           : `보험증권은 최대 ${PORTFOLIO_MAX_DOCUMENTS}개까지 분석할 수 있어요.`,
+      );
+      return;
+    }
+    const oversizedFiles = incomingFiles.filter(
+      (file) => file.size > PDF_MAX_BYTES,
+    );
+    if (oversizedFiles.length > 0) {
+      setSelectedUploadFiles([]);
+      setError(
+        `파일이 너무 커요. PDF 한 개당 최대 ${PDF_MAX_BYTES / (1024 * 1024)}MB까지 올릴 수 있어요.`,
       );
       return;
     }

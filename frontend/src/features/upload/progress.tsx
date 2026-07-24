@@ -22,18 +22,21 @@ export function AnalysisProgress({
   files,
   surface,
   isCompleting = false,
+  isPreparingServer = false,
 }: {
   progress: { completed: number; total: number };
-  files: Array<{ name: string; status: "done" | "reading" }>;
+  files: Array<{ name: string; status: "done" | "reading" | "waiting" }>;
   surface: "page" | "modal";
   isCompleting?: boolean;
+  isPreparingServer?: boolean;
 }) {
   const milestonePercent =
     progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
   // Trickle only fills up to 90% of the in-flight file's share; real
   // completions move the milestone, so the bar never fakes a finish.
-  const trickleCapPercent =
-    progress.total > 0
+  const trickleCapPercent = isPreparingServer
+    ? 0
+    : progress.total > 0
       ? Math.min(((progress.completed + 0.9) / progress.total) * 100, 100)
       : 90;
   const [displayPercent, setDisplayPercent] = useState(0);
@@ -73,11 +76,15 @@ export function AnalysisProgress({
   ];
   const statusMessage = isCompleting
     ? COMPLETE_MESSAGE
-    : statusMessages[messageIndex % statusMessages.length];
+    : isPreparingServer
+      ? "서버가 준비되면 증권을 바로 읽기 시작해요."
+      : statusMessages[messageIndex % statusMessages.length];
   // Real milestones floor the trickle so completed files always show through.
   const percent = isCompleting
     ? 100
-    : Math.round(Math.max(displayPercent, milestonePercent));
+    : isPreparingServer
+      ? 0
+      : Math.round(Math.max(displayPercent, milestonePercent));
   const fileListClassName =
     files.length === 1
       ? "mt-5 grid w-full max-w-md grid-cols-1 gap-1.5 text-left"
@@ -104,10 +111,14 @@ export function AnalysisProgress({
           ))}
         </div>
         <h1 className="mt-8 text-2xl font-semibold tracking-[-0.04em] text-zinc-950">
-          증권을 한 장씩 읽고 있어요
+          {isPreparingServer
+            ? "분석 서버를 준비하고 있어요"
+            : "증권을 한 장씩 읽고 있어요"}
         </h1>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          보통 1~2분 정도 걸려요
+          {isPreparingServer
+            ? "처음 연결할 때는 최대 1분 정도 걸릴 수 있어요"
+            : "보통 1~2분 정도 걸려요"}
         </p>
         <div
           role="progressbar"
@@ -119,7 +130,9 @@ export function AnalysisProgress({
         >
           <div
             className="h-full bg-blue-600 transition-all duration-300"
-            style={{ width: `${Math.max(percent, 4)}%` }}
+            style={{
+              width: isPreparingServer ? "0%" : `${Math.max(percent, 4)}%`,
+            }}
           />
         </div>
         {files.length > 0 ? (
@@ -134,6 +147,8 @@ export function AnalysisProgress({
                   <span className="shrink-0 font-medium text-blue-600">
                     완료
                   </span>
+                ) : file.status === "waiting" ? (
+                  <span className="shrink-0 text-zinc-400">대기 중</span>
                 ) : (
                   <span className="shrink-0 animate-pulse text-zinc-400">
                     읽는 중

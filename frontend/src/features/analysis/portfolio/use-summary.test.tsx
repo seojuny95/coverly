@@ -124,6 +124,33 @@ describe("usePortfolioSummary", () => {
     expect(result.current.isRefreshing).toBe(true);
   });
 
+  it("marks a failed context refresh without discarding the previous summary", async () => {
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockResolvedValueOnce(summaryWithoutOverview)
+      .mockRejectedValueOnce(new Error("temporary failure"));
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ context }) => usePortfolioSummary(docs, context, "portfolio-token"),
+      {
+        initialProps: { context: deathBenefitContext },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    rerender({
+      context: {
+        ...deathBenefitContext,
+        has_dependent_family: true,
+      },
+    });
+
+    await waitFor(() => expect(result.current.refreshFailed).toBe(true));
+    expect(result.current.state.status).toBe("success");
+  });
+
   it("does not keep the previous summary when documents change", async () => {
     const nextRequest = new Promise<api.PortfolioSummary>(() => undefined);
     vi.spyOn(api, "requestPortfolioSummary")
@@ -383,7 +410,7 @@ describe("usePortfolioSummary", () => {
       new ApiResponseError({
         status: 403,
         code: "INVALID_PORTFOLIO_SESSION",
-        message: "세션이 만료됐어요.",
+        userMessage: "세션이 만료됐어요.",
       }),
     );
     const onSessionExpired = vi.fn();
@@ -415,7 +442,7 @@ describe("usePortfolioSummary", () => {
       new ApiResponseError({
         status: 403,
         code: "INVALID_PORTFOLIO_SESSION",
-        message: "세션이 만료됐어요.",
+        userMessage: "세션이 만료됐어요.",
       }),
     );
     const onSessionExpired = vi.fn();

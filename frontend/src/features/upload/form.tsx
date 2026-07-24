@@ -16,6 +16,7 @@ import { AnalysisProgress } from "./progress";
 import { PolicyDocumentGuide } from "./document-guide";
 import { SelectedFileList } from "./file-list";
 import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
+import { waitForBackendReady } from "@/shared/api/readiness";
 import type { UploadInsurance } from "./types";
 import {
   getInsuranceNameOptions,
@@ -32,12 +33,16 @@ type InsuranceUploadFormProps = {
   existingDocuments?: AnalyzedInsurance[];
   surface?: "page" | "modal";
   onUploadInFlightChange?: (isUploadInFlight: boolean) => void;
-  createSession?: () => Promise<PortfolioSessionResult>;
+  prepareServer?: (signal?: AbortSignal) => Promise<void>;
+  createSession?: (signal?: AbortSignal) => Promise<PortfolioSessionResult>;
   deleteSessionDocuments?: (
     portfolioSessionToken: string,
     documentIds: string[],
   ) => Promise<void>;
 };
+
+const prepareUploadServer = (signal?: AbortSignal) =>
+  waitForBackendReady({ signal });
 
 export function InsuranceUploadForm({
   uploadInsurance,
@@ -50,6 +55,7 @@ export function InsuranceUploadForm({
   existingDocuments = [],
   surface = "page",
   onUploadInFlightChange,
+  prepareServer = prepareUploadServer,
   createSession = createPortfolioSession,
   deleteSessionDocuments = deletePortfolioSessionDocuments,
 }: InsuranceUploadFormProps) {
@@ -59,6 +65,7 @@ export function InsuranceUploadForm({
     isCheckingPasswords,
     isAnalyzing,
     isCompleting,
+    isPreparingServer,
     analysisProgress,
     pendingAnalysis,
     selectedName,
@@ -76,6 +83,7 @@ export function InsuranceUploadForm({
     navigateToAnalysis,
     fixedSelectedName,
     existingDocuments,
+    prepareServer,
     createSession,
     deleteSessionDocuments,
   });
@@ -133,10 +141,15 @@ export function InsuranceUploadForm({
         files={selectedUploadFiles.map((selectedFile) => ({
           name: selectedFile.file.name,
           status:
-            selectedFile.status === "done" ? "done" : ("reading" as const),
+            selectedFile.status === "done"
+              ? "done"
+              : isPreparingServer
+                ? "waiting"
+                : ("reading" as const),
         }))}
         surface={surface}
         isCompleting={isCompleting}
+        isPreparingServer={isPreparingServer}
       />
     );
   }

@@ -4,6 +4,10 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import type { ChatMessageData } from "./chat-message";
 import { streamPortfolioQuestion, type ChatHistoryItem } from "./api";
 import { isExpiredSessionError } from "./session-errors";
+import {
+  reportClientOperationFailure,
+  userMessageForError,
+} from "@/shared/api/errors";
 
 // Kept in step with the suggestion_* cases in backend/evals/qa/dataset.json:
 // a question the product offers first has to be one it can actually answer.
@@ -37,6 +41,7 @@ export function useInsuranceChat({
   const [suggestions, setSuggestions] = useState(INITIAL_SUGGESTIONS);
   const [streaming, setStreaming] = useState(false);
   const [turnsRemaining, setTurnsRemaining] = useState(initialTurnsRemaining);
+  const streamingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const nextMessageId = useRef(1);
@@ -79,7 +84,9 @@ export function useInsuranceChat({
 
   async function sendQuestion(rawQuestion: string) {
     const text = rawQuestion.trim();
-    if (!text || streaming || sessionExpired || turnsRemaining <= 0) return;
+    if (!text || streamingRef.current || sessionExpired || turnsRemaining <= 0)
+      return;
+    streamingRef.current = true;
     const userId = nextMessageId.current;
     const assistantId = userId + 1;
     nextMessageId.current += 2;
@@ -126,11 +133,13 @@ export function useInsuranceChat({
       // Another tab may have spent the last turn, so trust the server over local state.
       const outOfTurns = isTurnLimitError(error);
       const expiredSession = isExpiredSessionError(error);
+      reportClientOperationFailure("qa_stream", error);
       if (outOfTurns) setTurnsRemaining(0);
       if (expiredSession) onSessionExpired?.();
       updateMessage(assistantId, (message) => ({
         ...message,
         text: chatErrorMessage({
+          error,
           outOfTurns,
           expiredSession,
         }),
@@ -139,8 +148,9 @@ export function useInsuranceChat({
     } finally {
       if (activeRequest.current === request) {
         activeRequest.current = null;
+        streamingRef.current = false;
+        setStreaming(false);
       }
-      setStreaming(false);
     }
   }
 
@@ -168,9 +178,11 @@ function isTurnLimitError(error: unknown): boolean {
 }
 
 function chatErrorMessage({
+  error,
   outOfTurns,
   expiredSession,
 }: {
+  error: unknown;
   outOfTurns: boolean;
   expiredSession: boolean;
 }) {
@@ -178,5 +190,8 @@ function chatErrorMessage({
     return "분석 세션이 만료됐어요. 다시 분석하려면 보험증권을 다시 올려주세요.";
   }
   if (outOfTurns) return "이 분석에서 할 수 있는 질문을 모두 사용했어요.";
-  return "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.";
+  return userMessageForError(
+    error,
+    "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
+  );
 }

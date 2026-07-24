@@ -1,9 +1,14 @@
 import type { AnalyzedInsurance } from "../store";
-import { apiResponseError, apiUrl } from "../../../shared/api/client";
+import {
+  apiResponseError,
+  apiUrl,
+  hasApiErrorCode,
+} from "../../../shared/api/client";
 import {
   PORTFOLIO_REQUEST_TIMEOUT_MS,
   requestWithDeadline,
 } from "../../../shared/api/request";
+import { retryOperation } from "../../../shared/api/retry";
 import type { PortfolioSummaryRequest } from "../../../shared/api/contracts";
 import { portfolioSelection } from "./session-selection";
 import type { DeathBenefitGuideInput, PortfolioOverview } from "./types";
@@ -12,23 +17,36 @@ async function postPortfolioOverview(
   body: PortfolioSummaryRequest,
   signal?: AbortSignal,
 ): Promise<PortfolioOverview> {
-  const response = await requestWithDeadline(
-    apiUrl("/portfolio/overview"),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+  return retryOperation(
+    async () => {
+      const response = await requestWithDeadline(
+        apiUrl("/portfolio/overview"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+        {
+          signal,
+          timeoutMs: PORTFOLIO_REQUEST_TIMEOUT_MS,
+          timeoutMessage:
+            "총평 생성 시간이 초과됐어요. 잠시 후 다시 시도해주세요.",
+        },
+      );
+      if (!response.ok) {
+        throw await apiResponseError(response, "총평 생성에 실패했어요.");
+      }
+      return (await response.json()) as PortfolioOverview;
     },
     {
+      maxAttempts: 2,
       signal,
-      timeoutMs: PORTFOLIO_REQUEST_TIMEOUT_MS,
-      timeoutMessage: "총평 생성 시간이 초과됐어요. 잠시 후 다시 시도해주세요.",
+      // A timeout or lost response may mean the LLM already completed.
+      // Retry only when the application explicitly reports no result.
+      shouldRetry: (error) =>
+        hasApiErrorCode(error, "portfolio_overview_unavailable"),
     },
   );
-  if (!response.ok) {
-    throw await apiResponseError(response, "총평 생성에 실패했어요.");
-  }
-  return (await response.json()) as PortfolioOverview;
 }
 
 export function requestPortfolioOverview(

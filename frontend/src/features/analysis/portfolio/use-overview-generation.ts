@@ -10,6 +10,7 @@ import type { AnalyzedInsurance } from "../store";
 import { requestPortfolioOverview } from "./api";
 import { isExpiredSessionError } from "./session-errors";
 import type { DeathBenefitGuideInput, PortfolioSummary } from "./api";
+import { reportClientOperationFailure } from "@/shared/api/errors";
 
 type OverviewState = {
   attemptId: number;
@@ -85,8 +86,11 @@ export function usePortfolioOverviewGeneration({
       queryClient.setQueryData<PortfolioSummary>(queryKey, (current) =>
         current ? { ...current, overview } : current,
       );
-    } catch {
-      if (!controller.signal.aborted) status = "failed";
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        reportClientOperationFailure("portfolio_overview", error);
+        status = "failed";
+      }
     } finally {
       if (overviewRequest.current === controller) {
         overviewRequest.current = null;

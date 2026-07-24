@@ -19,6 +19,13 @@ type UploadingWorkflowState = {
   selectedName: "";
 };
 
+type PreparingServerWorkflowState = {
+  phase: "preparing-server";
+  analysisProgress: AnalysisProgress;
+  pendingAnalysis: null;
+  selectedName: "";
+};
+
 type NameSelectionWorkflowState = {
   phase: "name-selection";
   analysisProgress: AnalysisProgress;
@@ -35,12 +42,14 @@ type CompletingWorkflowState = {
 
 export type UploadWorkflowState =
   | IdleWorkflowState
+  | PreparingServerWorkflowState
   | UploadingWorkflowState
   | NameSelectionWorkflowState
   | CompletingWorkflowState;
 
 export type UploadWorkflowAction =
   | { type: "start"; total: number }
+  | { type: "server-ready" }
   | { type: "uploaded" }
   | {
       type: "require-name-selection";
@@ -67,11 +76,15 @@ export function uploadWorkflowReducer(
   switch (action.type) {
     case "start":
       return {
-        phase: "uploading",
+        phase: "preparing-server",
         analysisProgress: { completed: 0, total: action.total },
         pendingAnalysis: null,
         selectedName: "",
       };
+    case "server-ready":
+      return state.phase === "preparing-server"
+        ? { ...state, phase: "uploading" }
+        : state;
     case "uploaded":
       return state.phase === "uploading"
         ? {
@@ -125,5 +138,9 @@ export function uploadWorkflowReducer(
 }
 
 export function isUploadInFlight(state: UploadWorkflowState) {
-  return state.phase === "uploading" || state.phase === "completing";
+  return (
+    state.phase === "preparing-server" ||
+    state.phase === "uploading" ||
+    state.phase === "completing"
+  );
 }

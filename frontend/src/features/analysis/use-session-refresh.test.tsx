@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PORTFOLIO_SESSION_REFRESH_FALLBACK_MS,
   PORTFOLIO_SESSION_REFRESH_RETRY_MS,
+  portfolioSessionNeedsRefresh,
   portfolioSessionRefreshDelay,
   usePortfolioSessionRefresh,
 } from "./use-session-refresh";
@@ -55,6 +56,7 @@ describe("usePortfolioSessionRefresh", () => {
     expect(refreshPortfolioSession).toHaveBeenCalledOnce();
     expect(refreshPortfolioSession).toHaveBeenCalledWith(
       "current-portfolio-token",
+      expect.any(AbortSignal),
     );
     expect(onRefreshed).toHaveBeenCalledWith({
       portfolioSessionToken: "next-portfolio-token",
@@ -173,16 +175,91 @@ describe("usePortfolioSessionRefresh", () => {
       await Promise.resolve();
     });
 
-    expect(refreshPortfolioSession).toHaveBeenCalledTimes(3);
+    expect(refreshPortfolioSession).toHaveBeenCalledTimes(2);
     expect(onExpired).toHaveBeenCalledOnce();
   });
 
-  it("refreshes one minute before the server expiry", () => {
+  it("refreshes five minutes before the server expiry", () => {
     expect(
       portfolioSessionRefreshDelay(
         "2026-07-18T00:15:00.000Z",
-        Date.parse("2026-07-18T00:10:00.000Z"),
+        Date.parse("2026-07-18T00:05:00.000Z"),
       ),
-    ).toBe(4 * 60 * 1000);
+    ).toBe(5 * 60 * 1000);
+  });
+
+  it("does not refresh on tab focus while the session has enough time", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-18T00:00:00.000Z"));
+    vi.mocked(refreshPortfolioSession).mockResolvedValue({
+      portfolioSessionToken: "next-portfolio-token",
+      expiresAt: "2026-07-18T00:30:00.000Z",
+      counselTurnsRemaining: 10,
+    });
+
+    renderHook(() =>
+      usePortfolioSessionRefresh({
+        session: {
+          portfolioSessionToken: "current-portfolio-token",
+          expiresAt: "2026-07-18T00:15:00.000Z",
+          counselTurnsRemaining: 10,
+        },
+        enabled: true,
+        onRefreshed: vi.fn(),
+        onExpired: vi.fn(),
+      }),
+    );
+
+    window.dispatchEvent(new Event("focus"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(refreshPortfolioSession).not.toHaveBeenCalled();
+  });
+
+  it("refreshes when the user returns near session expiry", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-18T00:11:00.000Z"));
+    vi.mocked(refreshPortfolioSession).mockResolvedValue({
+      portfolioSessionToken: "next-portfolio-token",
+      expiresAt: "2026-07-18T00:30:00.000Z",
+      counselTurnsRemaining: 10,
+    });
+
+    renderHook(() =>
+      usePortfolioSessionRefresh({
+        session: {
+          portfolioSessionToken: "current-portfolio-token",
+          expiresAt: "2026-07-18T00:15:00.000Z",
+          counselTurnsRemaining: 10,
+        },
+        enabled: true,
+        onRefreshed: vi.fn(),
+        onExpired: vi.fn(),
+      }),
+    );
+
+    window.dispatchEvent(new Event("focus"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(refreshPortfolioSession).toHaveBeenCalledWith(
+      "current-portfolio-token",
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("classifies invalid and near-expiry timestamps for recovery", () => {
+    const now = Date.parse("2026-07-18T00:00:00.000Z");
+
+    expect(portfolioSessionNeedsRefresh("invalid", now)).toBe(true);
+    expect(portfolioSessionNeedsRefresh("2026-07-18T00:04:59.000Z", now)).toBe(
+      true,
+    );
+    expect(portfolioSessionNeedsRefresh("2026-07-18T00:05:01.000Z", now)).toBe(
+      false,
+    );
   });
 });

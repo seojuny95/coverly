@@ -1,9 +1,18 @@
 import { apiResponseError, apiUrl } from "../../shared/api/client";
 import {
+  AppRequestError,
+  GENERIC_REQUEST_ERROR_MESSAGE,
+} from "../../shared/api/errors";
+import {
   ApiRequestTimeoutError,
   PORTFOLIO_SESSION_REQUEST_TIMEOUT_MS,
   requestWithDeadline,
 } from "../../shared/api/request";
+import { waitForBackendReady } from "../../shared/api/readiness";
+import {
+  isTransientRequestError,
+  retryOperation,
+} from "../../shared/api/retry";
 import type {
   PortfolioSessionDocumentsDeleteRequest,
   PortfolioSessionRequest,
@@ -28,6 +37,17 @@ export class PortfolioSessionExpiredError extends Error {
   }
 }
 
+export class PortfolioSessionRequestError extends AppRequestError {
+  constructor(cause?: unknown) {
+    super({
+      cause,
+      developerMessage: "Portfolio session request failed",
+      name: "PortfolioSessionRequestError",
+      userMessage: GENERIC_REQUEST_ERROR_MESSAGE,
+    });
+  }
+}
+
 export async function createPortfolioSession(
   signal?: AbortSignal,
 ): Promise<PortfolioSessionResult> {
@@ -38,10 +58,21 @@ export async function refreshPortfolioSession(
   portfolioSessionToken: string,
   signal?: AbortSignal,
 ): Promise<PortfolioSessionResult> {
-  return requestSession(
-    "/portfolio/sessions/refresh",
-    portfolioSessionToken,
-    signal,
+  return retryOperation(
+    () =>
+      requestSession(
+        "/portfolio/sessions/refresh",
+        portfolioSessionToken,
+        signal,
+      ),
+    {
+      maxAttempts: 2,
+      signal,
+      shouldRetry: (error) =>
+        error instanceof PortfolioSessionRequestError ||
+        isTransientRequestError(error),
+      beforeRetry: () => waitForBackendReady({ signal }),
+    },
   );
 }
 
@@ -112,13 +143,13 @@ async function request(
   } catch (error) {
     if (error instanceof ApiRequestTimeoutError) throw error;
     if (error instanceof Error && error.name === "AbortError") throw error;
-    throw new Error("Portfolio session request failed");
+    throw new PortfolioSessionRequestError(error);
   }
 
   if (!response.ok) {
     const error = await apiResponseError(
       response,
-      "Portfolio session request failed",
+      GENERIC_REQUEST_ERROR_MESSAGE,
     );
     const code = error.code;
     if (response.status === 403 || code === "INVALID_PORTFOLIO_SESSION") {

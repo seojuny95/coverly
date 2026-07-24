@@ -1,4 +1,5 @@
 import { isExpiredPortfolioSessionApiError } from "@/shared/api/client";
+import { userMessageForError } from "@/shared/api/errors";
 
 import { UploadInsuranceError, type UploadErrorCode } from "./api";
 
@@ -63,14 +64,14 @@ export function messageForFailedUploads(uploadErrors: UploadInsuranceError[]) {
     ? "비밀번호가 필요한 PDF가 있어요. 표시된 파일에 비밀번호를 입력한 뒤 다시 시도해주세요."
     : hasPasswordErrors
       ? "일부 PDF는 비밀번호가 필요해요. 읽을 수 없는 PDF는 제거한 뒤 다시 시도해주세요."
-      : "텍스트를 추출할 수 없는 PDF가 있어요. 표시된 파일을 제거한 뒤 다시 시도해주세요.";
+      : "일부 PDF를 읽지 못했어요. 표시된 파일의 안내를 확인한 뒤 다시 시도해주세요.";
 }
 
 // Map a caught submit-flow error to its user-facing message.
 export function messageForSubmitFailure(err: unknown) {
   if (err instanceof UploadRollbackError) return ROLLBACK_ERROR_MESSAGE;
-  if (err instanceof UploadInsuranceError) return err.userMessage;
-  return err instanceof Error
-    ? err.message
-    : "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
+  return userMessageForError(
+    err,
+    "업로드에 실패했어요. 잠시 후 다시 시도해주세요.",
+  );
 }

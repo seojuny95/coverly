@@ -36,21 +36,27 @@ export type UploadTransactionResult =
 export async function runUploadTransaction({
   selectedUploadFiles,
   currentAnalysis,
+  prepareServer,
   createSession,
   uploadInsurance,
-  fingerprintSelectedFiles,
+  fileFingerprints,
+  signal,
   rollbackSessionDocuments,
   onFileSettled,
+  onServerReady,
   onFileSucceeded,
   onFileRejected,
 }: {
   selectedUploadFiles: SelectedUploadFile[];
   currentAnalysis: InsuranceAnalysis | null;
-  createSession: () => Promise<PortfolioSessionResult>;
+  prepareServer: (signal?: AbortSignal) => Promise<void>;
+  createSession: (signal?: AbortSignal) => Promise<PortfolioSessionResult>;
   uploadInsurance: UploadInsurance;
-  fingerprintSelectedFiles: (files: SelectedUploadFile[]) => Promise<string[]>;
+  fileFingerprints: string[];
+  signal?: AbortSignal;
   rollbackSessionDocuments: RollbackSessionDocuments;
   onFileSettled: () => void;
+  onServerReady: () => void;
   onFileSucceeded: (selectedFileId: string) => void;
   onFileRejected: (
     selectedFileId: string,
@@ -78,6 +84,8 @@ export async function runUploadTransaction({
     rollbackDocuments(successfulDocumentIds);
 
   try {
+    await prepareServer(signal);
+    onServerReady();
     const portfolioSession = currentAnalysis
       ? {
           portfolioSessionToken: currentAnalysis.portfolioSessionToken,
@@ -85,7 +93,7 @@ export async function runUploadTransaction({
           // Adding a policy must not hand back question turns already spent.
           counselTurnsRemaining: currentAnalysis.counselTurnsRemaining,
         }
-      : await createSession();
+      : await createSession(signal);
     portfolioSessionToken = portfolioSession.portfolioSessionToken;
 
     const uploadSelectedFile = async (
@@ -97,6 +105,7 @@ export async function runUploadTransaction({
           documentId: assignedDocumentIds.get(selectedFile.id)!,
           ...(selectedFile.password ? { password: selectedFile.password } : {}),
           portfolioSessionToken: portfolioSession.portfolioSessionToken,
+          signal,
         };
         const result = await uploadInsurance(uploadInput);
         successfulDocumentIds = [
@@ -166,8 +175,6 @@ export async function runUploadTransaction({
       };
     }
 
-    const fileFingerprints =
-      await fingerprintSelectedFiles(selectedUploadFiles);
     const { insuranceDocuments, selectedFileIdsByDocumentId } =
       normalizeSuccessfulUploadResults({
         uploadResults,

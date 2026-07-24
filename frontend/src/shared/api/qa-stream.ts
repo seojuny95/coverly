@@ -1,10 +1,32 @@
-import type { QaStreamEvent } from "./contracts";
+import type { QaErrorEvent, QaStreamEvent } from "./contracts";
+import { AppRequestError } from "./errors";
 import { QA_STREAM_JSON_SCHEMA } from "./generated-runtime";
 
-export class QaStreamProtocolError extends Error {
-  constructor(message = "상담 응답 형식을 확인할 수 없어요.") {
-    super(message);
-    this.name = "QaStreamProtocolError";
+export class QaStreamProtocolError extends AppRequestError {
+  constructor() {
+    super({
+      developerMessage: "QA stream violated the generated SSE protocol",
+      name: "QaStreamProtocolError",
+      userMessage:
+        "답변을 정상적으로 확인하지 못했어요. 잠시 후 다시 질문해주세요.",
+    });
+  }
+}
+
+export class QaStreamResponseError extends AppRequestError {
+  readonly code: QaErrorEvent["code"];
+  readonly requestId: string;
+  readonly retryable: boolean;
+
+  constructor(event: QaErrorEvent) {
+    super({
+      developerMessage: `QA stream failed (code=${event.code}, requestId=${event.request_id})`,
+      name: "QaStreamResponseError",
+      userMessage: event.message,
+    });
+    this.code = event.code;
+    this.requestId = event.request_id;
+    this.retryable = event.retryable;
   }
 }
 

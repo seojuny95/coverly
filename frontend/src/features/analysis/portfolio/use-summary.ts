@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import type { AnalyzedInsurance } from "../store";
 import { requestPortfolioSummary } from "./api";
@@ -8,6 +8,7 @@ import { isExpiredSessionError } from "./session-errors";
 import type { DeathBenefitGuideInput, PortfolioSummary } from "./api";
 import { usePortfolioOverviewGeneration } from "./use-overview-generation";
 import { portfolioKey } from "./query-key";
+import { reportClientOperationFailure } from "@/shared/api/errors";
 
 type SummaryState =
   | { status: "loading" }
@@ -46,6 +47,7 @@ export function usePortfolioSummary(
   const queryEnabled =
     documents.length > 0 && Boolean(portfolioSessionToken) && !sessionExpired;
   const retryAttemptId = useRef(0);
+  const queryClient = useQueryClient();
   const [retryState, setRetryState] = useState<RetryState>({
     attemptId: 0,
     key: null,
@@ -64,6 +66,9 @@ export function usePortfolioSummary(
         signal,
       ).catch((error: unknown) => {
         if (isExpiredSessionError(error)) onSessionExpired?.();
+        if (!(error instanceof Error && error.name === "AbortError")) {
+          reportClientOperationFailure("portfolio_summary", error);
+        }
         throw error;
       });
     },
@@ -83,9 +88,22 @@ export function usePortfolioSummary(
     onSessionExpired,
     enabled: queryEnabled,
   });
+  const retainedSummary = query.isError
+    ? [
+        ...queryClient.getQueriesData<PortfolioSummary>({
+          queryKey: ["portfolio-summary", currentPortfolioKey],
+        }),
+      ]
+        .reverse()
+        .find(([candidateKey, data]) => {
+          return JSON.stringify(candidateKey) !== retryKey && Boolean(data);
+        })?.[1]
+    : undefined;
+  const displayedSummary =
+    query.data ?? (query.isError ? retainedSummary : undefined);
 
-  const state: SummaryState = query.data
-    ? { status: "success", summary: query.data }
+  const state: SummaryState = displayedSummary
+    ? { status: "success", summary: displayedSummary }
     : query.isError
       ? { status: "error" }
       : { status: "loading" };
@@ -97,7 +115,8 @@ export function usePortfolioSummary(
   // useCallback never actually memoized anything.
   return {
     state,
-    isRefreshing: query.isFetching && Boolean(query.data),
+    isRefreshing: query.isFetching && Boolean(displayedSummary),
+    refreshFailed: query.isError && Boolean(displayedSummary),
     isRetrying: isCurrentRetry && retryState.status === "pending",
     isOverviewRetrying: overview.isOverviewRetrying,
     retryFailed: isCurrentRetry && retryState.status === "request_failed",

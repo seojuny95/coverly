@@ -5,6 +5,7 @@ export type UploadInsuranceInput = {
   documentId: string;
   password?: string;
   portfolioSessionToken: string;
+  signal?: AbortSignal;
 };
 
 export type UploadInsurance = (

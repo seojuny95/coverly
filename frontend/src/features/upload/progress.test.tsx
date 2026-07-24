@@ -115,4 +115,23 @@ describe("AnalysisProgress", () => {
     );
     expect(screen.getByText("다 읽었어요. 결과를 보여드릴게요.")).toBeVisible();
   });
+
+  it("does not claim to read files while the backend is starting", () => {
+    render(
+      <AnalysisProgress
+        progress={{ completed: 0, total: 1 }}
+        files={[{ name: "a.pdf", status: "waiting" }]}
+        surface="page"
+        isPreparingServer
+      />,
+    );
+
+    expect(screen.getByText("분석 서버를 준비하고 있어요")).toBeVisible();
+    expect(screen.getByText("대기 중")).toBeVisible();
+    expect(screen.queryByText("읽는 중")).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+  });
 });

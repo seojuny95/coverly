@@ -17,16 +17,24 @@ const analysis = {
 
 describe("uploadWorkflowReducer", () => {
   test("tracks upload progress only while the upload is active", () => {
-    const uploading = uploadWorkflowReducer(initialUploadWorkflowState, {
+    const preparing = uploadWorkflowReducer(initialUploadWorkflowState, {
       type: "start",
       total: 2,
     });
+    const uploading = uploadWorkflowReducer(preparing, {
+      type: "server-ready",
+    });
     const progressed = uploadWorkflowReducer(uploading, { type: "uploaded" });
 
+    expect(preparing).toMatchObject({
+      phase: "preparing-server",
+      analysisProgress: { completed: 0, total: 2 },
+    });
     expect(progressed).toMatchObject({
       phase: "uploading",
       analysisProgress: { completed: 1, total: 2 },
     });
+    expect(isUploadInFlight(preparing)).toBe(true);
     expect(isUploadInFlight(progressed)).toBe(true);
     expect(
       uploadWorkflowReducer(initialUploadWorkflowState, { type: "uploaded" }),
@@ -35,10 +43,13 @@ describe("uploadWorkflowReducer", () => {
 
   test("restores name selection when its document cleanup fails", () => {
     const selectingName = uploadWorkflowReducer(
-      uploadWorkflowReducer(initialUploadWorkflowState, {
-        type: "start",
-        total: 2,
-      }),
+      uploadWorkflowReducer(
+        uploadWorkflowReducer(initialUploadWorkflowState, {
+          type: "start",
+          total: 2,
+        }),
+        { type: "server-ready" },
+      ),
       {
         type: "require-name-selection",
         analysis,
@@ -63,10 +74,13 @@ describe("uploadWorkflowReducer", () => {
 
   test("clears pending name selection when the user replaces selected files", () => {
     const selectingName = uploadWorkflowReducer(
-      uploadWorkflowReducer(initialUploadWorkflowState, {
-        type: "start",
-        total: 2,
-      }),
+      uploadWorkflowReducer(
+        uploadWorkflowReducer(initialUploadWorkflowState, {
+          type: "start",
+          total: 2,
+        }),
+        { type: "server-ready" },
+      ),
       {
         type: "require-name-selection",
         analysis,

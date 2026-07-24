@@ -53,11 +53,7 @@ export function getPolicyIdentityKeys(
   return keys;
 }
 
-// Byte-level duplicate check that runs BEFORE upload, using only the SHA-256
-// fingerprints already computed for each selected file. Catches re-adding the
-// exact same file (against existing documents or earlier in the same batch)
-// without paying for a full parse + LLM pass. Content-identical-but-rebyted
-// copies fall through to findDuplicatePolicyDocuments after parsing.
+// Catches exact re-uploads before the server receives the files.
 export function findByteIdenticalDuplicateIndexes({
   fingerprints,
   existingDocuments = [],

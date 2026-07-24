@@ -2,18 +2,20 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useReducer } from "react";
+import { type FormEvent, useEffect, useReducer, useRef } from "react";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
   getInsuredPersonName,
   useInsuranceData,
 } from "../../analysis/store";
+import { findByteIdenticalDuplicateIndexes } from "../../analysis/policy-identity";
 import {
   deletePortfolioSessionDocuments,
   type PortfolioSessionResult,
 } from "../../analysis/session-api";
 import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
+import { reportClientOperationFailure } from "@/shared/api/errors";
 import type { UploadInsurance } from "../types";
 import { useCompletionBeat } from "../use-completion-beat";
 import { useSelectedFiles } from "../use-selected-files";
@@ -40,7 +42,8 @@ type UploadOrchestrationProps = {
   navigateToAnalysis: () => void;
   fixedSelectedName?: string;
   existingDocuments: AnalyzedInsurance[];
-  createSession: () => Promise<PortfolioSessionResult>;
+  prepareServer: (signal?: AbortSignal) => Promise<void>;
+  createSession: (signal?: AbortSignal) => Promise<PortfolioSessionResult>;
   deleteSessionDocuments?: (
     portfolioSessionToken: string,
     documentIds: string[],
@@ -53,6 +56,7 @@ export function useUploadOrchestration({
   navigateToAnalysis,
   fixedSelectedName,
   existingDocuments,
+  prepareServer,
   createSession,
   deleteSessionDocuments = deletePortfolioSessionDocuments,
 }: UploadOrchestrationProps) {
@@ -63,7 +67,13 @@ export function useUploadOrchestration({
   } = useInsuranceData();
   const router = useRouter();
   const uploadMutation = useMutation({ mutationFn: uploadInsurance });
-  const sessionMutation = useMutation({ mutationFn: createSession });
+  const readinessMutation = useMutation({
+    mutationFn: (signal?: AbortSignal) => prepareServer(signal),
+  });
+  const sessionMutation = useMutation({
+    mutationFn: (signal?: AbortSignal) => createSession(signal),
+  });
+  const activeUploadController = useRef<AbortController | null>(null);
   const [workflow, dispatch] = useReducer(
     uploadWorkflowReducer,
     initialUploadWorkflowState,
@@ -78,6 +88,13 @@ export function useUploadOrchestration({
     // This route is reached after a long-running upload, not through a Link.
     router.prefetch("/analysis");
   }, [router]);
+
+  useEffect(
+    () => () => {
+      activeUploadController.current?.abort();
+    },
+    [],
+  );
 
   const completeAnalysis =
     onAnalysisComplete ??
@@ -146,17 +163,51 @@ export function useUploadOrchestration({
       return;
     }
 
+    let fileFingerprints: string[];
+    try {
+      fileFingerprints = await fingerprintSelectedFiles(selectedUploadFiles);
+    } catch (error) {
+      reportClientOperationFailure("policy_fingerprint", error);
+      setError(
+        "PDF 파일을 확인하지 못했어요. 파일을 다시 선택한 뒤 시도해주세요.",
+      );
+      dispatch({ type: "finish" });
+      return;
+    }
+    const duplicateIndexes = findByteIdenticalDuplicateIndexes({
+      fingerprints: fileFingerprints,
+      existingDocuments,
+    });
+    if (duplicateIndexes.size > 0) {
+      rejectDuplicateFiles(
+        selectedUploadFiles
+          .filter((_, index) => duplicateIndexes.has(index))
+          .map((selectedFile) => ({
+            id: selectedFile.id,
+            fileName: selectedFile.file.name,
+          })),
+      );
+      dispatch({ type: "finish" });
+      return;
+    }
+
     markSelectedFilesReading();
+    activeUploadController.current?.abort();
+    const uploadController = new AbortController();
+    activeUploadController.current = uploadController;
     let outcome: "finished" | "retained" = "finished";
     try {
       const transaction = await runUploadTransaction({
         selectedUploadFiles,
         currentAnalysis,
+        prepareServer: readinessMutation.mutateAsync,
         createSession: sessionMutation.mutateAsync,
         uploadInsurance: uploadMutation.mutateAsync,
-        fingerprintSelectedFiles,
+        fileFingerprints,
+        signal: uploadController.signal,
         rollbackSessionDocuments,
         onFileSettled: () => dispatch({ type: "uploaded" }),
+        onServerReady: () => dispatch({ type: "server-ready" }),
         onFileSucceeded: (selectedFileId) =>
           setSelectedUploadFiles((current) =>
             current.map((file) =>
@@ -201,9 +252,13 @@ export function useUploadOrchestration({
       });
     } catch (error) {
       if (isExpiredUploadSessionError(error)) expireSession();
+      reportClientOperationFailure("policy_upload", error);
       resetReadingFilesToIdle();
       setError(messageForSubmitFailure(error));
     } finally {
+      if (activeUploadController.current === uploadController) {
+        activeUploadController.current = null;
+      }
       if (outcome === "finished") dispatch({ type: "finish" });
     }
   };
@@ -223,7 +278,8 @@ export function useUploadOrchestration({
         excludedDocumentIds,
       );
       saveSelectedNameAnalysis(pendingAnalysis, selectedName);
-    } catch {
+    } catch (error) {
+      reportClientOperationFailure("policy_selection_cleanup", error);
       dispatch({ type: "return-to-name-selection" });
       setError(ROLLBACK_ERROR_MESSAGE);
     }
@@ -234,6 +290,7 @@ export function useUploadOrchestration({
     isCheckingPasswords,
     isAnalyzing,
     isCompleting,
+    isPreparingServer: workflow.phase === "preparing-server",
     analysisProgress: workflow.analysisProgress,
     pendingAnalysis:
       workflow.phase === "name-selection" ? workflow.pendingAnalysis : null,

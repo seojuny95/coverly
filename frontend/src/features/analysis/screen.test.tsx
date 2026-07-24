@@ -26,6 +26,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
 }));
 
+vi.mock("@/shared/api/readiness", () => ({
+  waitForBackendReady: vi.fn().mockResolvedValue(undefined),
+}));
+
 const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
   type: "application/pdf",
 });

@@ -9,6 +9,7 @@ import {
 } from "./api";
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -74,6 +75,46 @@ describe("portfolio session requests", () => {
     expect(body).not.toHaveProperty("policies");
   });
 
+  test("retries a transient summary failure", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "portfolio_session_unavailable",
+              message: "분석 세션을 준비하지 못했어요.",
+              request_id: "request-1",
+            },
+          }),
+          { status: 503, headers: { "Retry-After": "0" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            totals: [],
+            actual_loss_coverages: [],
+            excluded_coverages: [],
+            excluded_auto_policy_count: 0,
+          }),
+          { status: 200 },
+        ),
+      );
+
+    await requestPortfolioSummary(
+      sessionDocuments,
+      {
+        has_dependent_family: false,
+        has_minor_children: false,
+        has_major_debt: false,
+      },
+      "portfolio-token",
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   test("composes the caller cancellation signal for summary requests", async () => {
     const caller = new AbortController();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -137,6 +178,65 @@ describe("portfolio session requests", () => {
     expect(body).not.toHaveProperty("policies");
   });
 
+  test("retries overview only when the server confirms no result was produced", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "portfolio_overview_unavailable",
+              message: "총평을 생성하지 못했어요.",
+              request_id: "request-1",
+            },
+          }),
+          { status: 503, headers: { "Retry-After": "0" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            generation: "llm",
+            title: "확인된 보장을 기준으로 총평을 정리했어요",
+            paragraphs: ["확인된 보장 정보만 사용해 총평을 만들었어요."],
+          }),
+          { status: 200 },
+        ),
+      );
+
+    await requestPortfolioOverview(
+      sessionDocuments,
+      {
+        has_dependent_family: false,
+        has_minor_children: false,
+        has_major_debt: false,
+      },
+      "portfolio-token",
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test("does not repeat overview generation after an ambiguous network failure", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(
+      requestPortfolioOverview(
+        sessionDocuments,
+        {
+          has_dependent_family: false,
+          has_minor_children: false,
+          has_major_debt: false,
+        },
+        "portfolio-token",
+      ),
+    ).rejects.toBeInstanceOf(TypeError);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   test("asks with the session token and history, never the structured policies", async () => {
     const question = "가".repeat(400);
     const history = [{ role: "user" as const, content: "이전 질문" }];
@@ -193,6 +293,88 @@ describe("portfolio session requests", () => {
     expect(onEnd).toHaveBeenCalledOnce();
   });
 
+  test("surfaces a typed server failure without treating it as answer text", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      sseResponse([
+        metaEvent(),
+        {
+          type: "error",
+          code: "QA_STREAM_FAILED",
+          message:
+            "답을 가져오지 못했어요. 대화 내용은 그대로 있으니 잠시 후 다시 질문해주세요.",
+          request_id: "request-1",
+          retryable: true,
+        },
+      ]),
+    );
+    const onDelta = vi.fn();
+
+    await expect(
+      streamPortfolioQuestion(
+        "보험을 알려줘",
+        [],
+        { onDelta, onEnd: vi.fn() },
+        "portfolio-token",
+      ),
+    ).rejects.toMatchObject({
+      name: "QaStreamResponseError",
+      code: "QA_STREAM_FAILED",
+      requestId: "request-1",
+    });
+    expect(onDelta).not.toHaveBeenCalled();
+  });
+
+  test("stops waiting when the server never opens the stream", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(init.signal?.reason);
+          });
+        }),
+    );
+
+    const request = streamPortfolioQuestion(
+      "보험을 알려줘",
+      [],
+      { onDelta: vi.fn(), onEnd: vi.fn() },
+      "portfolio-token",
+    );
+    const expectation = expect(request).rejects.toMatchObject({
+      name: "QaStreamTimeoutError",
+      userMessage:
+        "답변을 기다리는 시간이 길어지고 있어요. 잠시 후 다시 질문해주세요.",
+    });
+
+    await vi.advanceTimersByTimeAsync(30 * 1000);
+    await expectation;
+  });
+
+  test("stops a stream that becomes idle after opening", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new ReadableStream({ cancel }), {
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+    );
+
+    const request = streamPortfolioQuestion(
+      "보험을 알려줘",
+      [],
+      { onDelta: vi.fn(), onEnd: vi.fn() },
+      "portfolio-token",
+    );
+    const expectation = expect(request).rejects.toMatchObject({
+      name: "QaStreamTimeoutError",
+    });
+
+    await vi.advanceTimersByTimeAsync(45 * 1000);
+    await expectation;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   test("rejects a malformed SSE event instead of trusting its discriminator", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       sseResponse([metaEvent(), { type: "delta", text: 42 }]),
@@ -205,7 +387,11 @@ describe("portfolio session requests", () => {
         { onDelta: vi.fn(), onEnd: vi.fn() },
         "portfolio-token",
       ),
-    ).rejects.toThrow("상담 응답 형식을 확인할 수 없어요.");
+    ).rejects.toMatchObject({
+      name: "QaStreamProtocolError",
+      userMessage:
+        "답변을 정상적으로 확인하지 못했어요. 잠시 후 다시 질문해주세요.",
+    });
   });
 
   test("rejects an SSE event that omits a field the generated schema requires", async () => {
@@ -220,7 +406,11 @@ describe("portfolio session requests", () => {
         { onDelta: vi.fn(), onEnd: vi.fn() },
         "portfolio-token",
       ),
-    ).rejects.toThrow("상담 응답 형식을 확인할 수 없어요.");
+    ).rejects.toMatchObject({
+      name: "QaStreamProtocolError",
+      userMessage:
+        "답변을 정상적으로 확인하지 못했어요. 잠시 후 다시 질문해주세요.",
+    });
   });
 
   test("rejects an answer that starts before the meta event", async () => {
@@ -235,7 +425,11 @@ describe("portfolio session requests", () => {
         { onDelta: vi.fn(), onEnd: vi.fn() },
         "portfolio-token",
       ),
-    ).rejects.toThrow("상담 응답 형식을 확인할 수 없어요.");
+    ).rejects.toMatchObject({
+      name: "QaStreamProtocolError",
+      userMessage:
+        "답변을 정상적으로 확인하지 못했어요. 잠시 후 다시 질문해주세요.",
+    });
   });
 
   test("rejects a stream that closes without a terminal end event", async () => {
@@ -250,7 +444,11 @@ describe("portfolio session requests", () => {
         { onDelta: vi.fn(), onEnd: vi.fn() },
         "portfolio-token",
       ),
-    ).rejects.toThrow("상담 응답 형식을 확인할 수 없어요.");
+    ).rejects.toMatchObject({
+      name: "QaStreamProtocolError",
+      userMessage:
+        "답변을 정상적으로 확인하지 못했어요. 잠시 후 다시 질문해주세요.",
+    });
   });
 
   test("finishes at the terminal end even when the server keeps the connection open", async () => {

@@ -5,9 +5,15 @@ import {
   deletePortfolioSession,
   refreshPortfolioSession,
 } from "./session-api";
+import { waitForBackendReady } from "@/shared/api/readiness";
+
+vi.mock("@/shared/api/readiness", () => ({
+  waitForBackendReady: vi.fn(),
+}));
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 describe("portfolio session API", () => {
@@ -75,6 +81,31 @@ describe("portfolio session API", () => {
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
       body: JSON.stringify({ portfolioSessionToken: "next-token" }),
     });
+  });
+
+  it("waits for a sleeping backend before retrying a safe refresh", async () => {
+    vi.mocked(waitForBackendReady).mockResolvedValue(undefined);
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("network"))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            portfolioSessionToken: "next-token",
+            expiresAt: "2026-07-18T10:00:00Z",
+          }),
+          { status: 200 },
+        ),
+      );
+
+    await expect(
+      refreshPortfolioSession("current-token"),
+    ).resolves.toMatchObject({
+      portfolioSessionToken: "next-token",
+    });
+
+    expect(waitForBackendReady).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("deletes selected documents from a valid portfolio session", async () => {

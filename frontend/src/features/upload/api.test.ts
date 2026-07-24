@@ -9,6 +9,7 @@ const documentId = "11111111-1111-4111-8111-111111111111";
 
 describe("uploadInsurance", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -135,7 +136,8 @@ describe("uploadInsurance", () => {
       requestId: "req_123",
       status: 422,
       userMessage: "파일을 분석할 수 없습니다.",
-      message: "파일을 분석할 수 없습니다.",
+      message:
+        "Policy upload failed (status=422, code=PDF_TEXT_EXTRACTION_FAILED)",
     });
   });
 
@@ -257,7 +259,46 @@ describe("uploadInsurance", () => {
     expect(signal).toBeInstanceOf(AbortSignal);
   });
 
-  test("surfaces the same connection message when the request times out", async () => {
+  test("retries only when server capacity rejects work before parsing", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "PDF_PARSING_BUSY",
+              message: "PDF 분석 요청이 많아요.",
+              request_id: "request-1",
+            },
+          }),
+          { status: 503, headers: { "Retry-After": "0" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: "accepted", 문자수: 32 }), {
+          status: 200,
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      uploadInsurance({
+        file: insuranceFile,
+        documentId,
+        portfolioSessionToken: "portfolio-token",
+      }),
+    ).resolves.toMatchObject({ status: "accepted" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      (fetchMock.mock.calls[0]?.[1]?.body as FormData).get("documentId"),
+    ).toBe(documentId);
+    expect(
+      (fetchMock.mock.calls[1]?.[1]?.body as FormData).get("documentId"),
+    ).toBe(documentId);
+  });
+
+  test("distinguishes an upload timeout from a connection failure", async () => {
     // Mirrors what fetch rejects with once AbortSignal.timeout fires on a
     // stalled connection: a TimeoutError DOMException, not a TypeError.
     vi.stubGlobal(
@@ -277,7 +318,8 @@ describe("uploadInsurance", () => {
       }),
     ).rejects.toMatchObject({
       code: "UPLOAD_NETWORK_ERROR",
-      userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+      userMessage:
+        "PDF 분석 시간이 오래 걸리고 있어요. 잠시 후 다시 시도해주세요.",
     });
   });
 });

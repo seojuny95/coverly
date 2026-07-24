@@ -49,9 +49,10 @@ describe("shared API client", () => {
 
     expect(error).toMatchObject({
       code: undefined,
-      message: "요청에 실패했어요.",
+      message: "API request failed (status=502, code=UNKNOWN)",
       requestId: "request-2",
       status: 502,
+      userMessage: "요청에 실패했어요.",
     });
   });
 
@@ -74,8 +75,8 @@ describe("shared API client", () => {
   it("identifies typed API error codes without duplicating status checks", () => {
     const error = new ApiResponseError({
       code: "INVALID_PORTFOLIO_SESSION",
-      message: "expired",
       status: 403,
+      userMessage: "expired",
     });
 
     expect(hasApiErrorCode(error, "INVALID_PORTFOLIO_SESSION")).toBe(true);
