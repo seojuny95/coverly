@@ -183,13 +183,17 @@ async def _build_event_stream(
             "qa_stream_failed",
             extra={"request_id": request_id, **safe_exception_context(exc)},
         )
+        # Claim the refund before awaiting it. The await suspends this
+        # generator, so a client disconnect here closes it mid-refund and skips
+        # everything below -- the finally would then issue a second refund for
+        # the same turn.
+        refunded = True
         restored_turns = await _refund_counsel_turn_best_effort(
             sessions,
             session_id,
             max_turns=max_turns,
             request_id=request_id,
         )
-        refunded = True
         yield serialize_event(
             QaErrorEvent(
                 code="QA_STREAM_FAILED",

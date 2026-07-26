@@ -361,6 +361,44 @@ def test_closing_after_meta_refunds_the_consumed_turn() -> None:
     assert sessions.turns_used == 0
 
 
+def test_a_disconnect_during_the_failure_refund_does_not_refund_twice() -> None:
+    # The failure branch awaits its refund, and that await suspends this
+    # generator. A client leaving right then tears it down before the branch
+    # can record that it already refunded, so the finally used to hand back a
+    # second turn for the same question.
+    sessions = _FixtureSessions()
+
+    async def scenario() -> None:
+        events = _build_event_stream(
+            request_id="request-1",
+            session_id=_SESSION_ID,
+            sessions=sessions,  # type: ignore[arg-type]
+            turns_remaining=9,
+            question="질문",
+            history=[],
+            policies=[],
+            policy_rag_session_ids=(),
+            model="test-model",
+            max_turns=10,
+            agent_stream_runner=_failing_runner(),
+        )
+
+        assert json.loads((await anext(events)).removeprefix("data: "))["type"] == "meta"
+        assert json.loads((await anext(events)).removeprefix("data: "))["type"] == "delta"
+
+        pending = asyncio.ensure_future(anext(events))
+        await asyncio.sleep(0)
+        pending.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await pending
+        await events.aclose()
+
+    asyncio.run(scenario())
+
+    assert sessions.refund_calls == 1
+    assert sessions.turns_used == 0
+
+
 def test_the_route_returns_a_closing_streaming_response() -> None:
     # A plain StreamingResponse leaves the generator suspended on disconnect,
     # so the turn refund in _build_event_stream would depend on GC timing.
