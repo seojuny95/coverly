@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -99,30 +99,39 @@ class Recorder:
         agent: Agent[QaContext],
         conversation: list[ConversationMessage],
         context: QaContext,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         result = Runner.run_streamed(
             agent,
             input=list(conversation),
             context=context,
             max_turns=get_settings().counsel_agent_max_turns,
         )
-        async for event in result.stream_events():
-            if event.type == "run_item_stream_event":
-                if event.item.type == "tool_call_item":
-                    raw_item = event.item.raw_item
-                    name = getattr(raw_item, "name", None)
-                    arguments = getattr(raw_item, "arguments", None)
-                    if name:
-                        self.current.tool_calls.append(
-                            ToolCall(name=name, arguments=arguments or "{}")
-                        )
-                elif event.item.type == "tool_call_output_item":
-                    self.current.tool_outputs.append(str(event.item.output))
-                continue
-            if event.type != "raw_response_event":
-                continue
-            if event.data.type == "response.output_text.delta":
-                yield event.data.delta
+        try:
+            async for event in result.stream_events():
+                if event.type == "run_item_stream_event":
+                    if event.item.type == "tool_call_item":
+                        raw_item = event.item.raw_item
+                        name = getattr(raw_item, "name", None)
+                        arguments = getattr(raw_item, "arguments", None)
+                        if name:
+                            self.current.tool_calls.append(
+                                ToolCall(name=name, arguments=arguments or "{}")
+                            )
+                    elif event.item.type == "tool_call_output_item":
+                        self.current.tool_outputs.append(str(event.item.output))
+                    continue
+                if event.type != "raw_response_event":
+                    continue
+                if event.data.type == "response.output_text.delta":
+                    yield event.data.delta
+        finally:
+            # TestClient drains the SSE body fully on a successful turn, so this
+            # is a no-op then (the run already finished). It is not unreachable,
+            # though: a tool or model error raises out of the loop above and is
+            # caught by route.py's _build_event_stream, which propagates it
+            # through this generator on its way there -- exactly the crash path
+            # run_agent_streamed's own `finally: result.cancel()` exists for.
+            result.cancel()
 
 
 def build_client(recorder: Recorder, policies: tuple[PolicyInput, ...]) -> TestClient:
