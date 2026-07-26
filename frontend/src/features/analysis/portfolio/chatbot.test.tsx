@@ -246,9 +246,6 @@ describe("InsuranceChatbot", () => {
   });
 
   it("restores the on-screen turn count once a mid-question close is cancelled", async () => {
-    // The server refunds the turn when the stream closes early, so the
-    // screen must not keep showing the count it optimistically decremented
-    // from the meta event.
     let handlers: StreamHandlers | undefined;
     let rejectStream: ((error: unknown) => void) | undefined;
     vi.spyOn(api, "streamPortfolioQuestion").mockImplementation(
@@ -284,6 +281,59 @@ describe("InsuranceChatbot", () => {
       screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
     );
     expect(await screen.findByText("질문 10번 남음")).toBeInTheDocument();
+  });
+
+  it("corrects the optimistically restored turn count from the server limit", async () => {
+    // The count restored after a cancel assumes the server's best-effort refund
+    // worked. When it did not, the server rejects the next question and the
+    // screen has to take the server's answer, not keep its own.
+    let handlers: StreamHandlers | undefined;
+    let rejectStream: ((error: unknown) => void) | undefined;
+    vi.spyOn(api, "streamPortfolioQuestion").mockImplementation(
+      (_question, _history, streamHandlers) => {
+        handlers = streamHandlers;
+        return new Promise<void>((_resolve, reject) => {
+          rejectStream = reject;
+        });
+      },
+    );
+    const user = await openChat({ turnsRemaining: 1 });
+
+    await user.type(screen.getByLabelText("보험 질문"), "암 진단비는?");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+
+    await act(async () => {
+      handlers?.onMeta?.({
+        type: "meta",
+        in_scope: true,
+        answered_question: "질문",
+        excluded_note: null,
+        turns_remaining: 0,
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: "닫기" }));
+    await act(async () => {
+      rejectStream?.(new DOMException("Aborted", "AbortError"));
+    });
+    await user.click(
+      screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
+    );
+    expect(await screen.findByText("질문 1번 남음")).toBeInTheDocument();
+
+    vi.spyOn(api, "streamPortfolioQuestion").mockRejectedValue(
+      new ApiResponseError({
+        code: "COUNSEL_TURN_LIMIT_REACHED",
+        status: 429,
+        userMessage: "이 분석에서는 질문을 10번까지 할 수 있어요.",
+      }),
+    );
+    await user.type(screen.getByLabelText("보험 질문"), "하나만 더");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+
+    expect(await screen.findByText("질문 0번 남음")).toBeInTheDocument();
+    expect(screen.getByLabelText("보험 질문")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "질문하기" })).toBeDisabled();
   });
 
   it("opens the full 상담 tab from the floating chat", async () => {

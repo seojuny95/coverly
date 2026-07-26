@@ -153,8 +153,12 @@ export function useInsuranceChat({
     assistantId: number,
     turnsBeforeThisQuestion: number,
   ) {
-    // The server refunds the turn when the stream closes early, so the
-    // screen must not keep showing the decremented count.
+    // Deliberately optimistic: a cancelled stream ends the connection, so the
+    // server's best-effort refund is never reported back. Assuming it worked is
+    // the safe direction -- it normally does, and the count here only enables
+    // the composer. The real limit is enforced server-side per request, so an
+    // over-counted turn surfaces as the turn-limit error below (which sets the
+    // count from the server), never as an extra answer.
     setTurnsRemaining(turnsBeforeThisQuestion);
     updateMessage(assistantId, (message) => ({
       ...message,
