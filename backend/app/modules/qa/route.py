@@ -18,13 +18,13 @@ from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
 
 from app.core.config import get_settings
 from app.core.diagnostics import safe_exception_context
 from app.core.errors import ApiError, api_error_responses
 from app.core.middleware import REQUEST_ID_STATE_KEY
 from app.core.responses import EventStreamOpenAPIResponse
+from app.core.streaming import ClosingStreamingResponse
 from app.integrations.openai import ConversationMessage
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
@@ -78,7 +78,7 @@ async def stream_qa_answer(
     request: QaRequest,
     sessions: PortfolioSessionServiceDep,
     agent_stream_runner: AgentStreamRunnerDep,
-) -> StreamingResponse:
+) -> ClosingStreamingResponse:
     """Resolve the session, then stream one agent's answer as SSE."""
 
     settings = get_settings()
@@ -138,7 +138,7 @@ async def stream_qa_answer(
         max_turns=settings.counsel_max_turns_per_session,
         agent_stream_runner=agent_stream_runner,
     )
-    return StreamingResponse(events, media_type="text/event-stream")
+    return ClosingStreamingResponse(events, media_type="text/event-stream")
 
 
 async def _build_event_stream(

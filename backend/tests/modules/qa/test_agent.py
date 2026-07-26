@@ -8,7 +8,7 @@ cap must actually reach Runner.run_streamed. Route tests can't see either
 """
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -54,6 +54,11 @@ def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
                 data=SimpleNamespace(type="response.output_text.delta", delta="하세요"),
             )
 
+        def cancel(self) -> None:
+            # The runner cancels the SDK run on the way out; cancellation
+            # itself is asserted in the test below.
+            return None
+
     def fake_run_streamed(
         agent: object, *, input: list[Any], context: object, max_turns: object = None
     ) -> object:
@@ -82,3 +87,54 @@ def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
     # without this assertion, removing the argument from agent.py would
     # leave this test green.
     assert captured["max_turns"] == get_settings().counsel_agent_max_turns
+
+
+def test_run_agent_streamed_cancels_the_sdk_run_when_the_consumer_stops(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Runner.run_streamed spawns a detached background task. If nobody cancels
+    # it, a client disconnect leaves the agent burning model calls and tool
+    # queries to completion.
+    class _FakeStreamingResult:
+        def __init__(self) -> None:
+            self.cancelled = False
+
+        async def stream_events(self) -> AsyncIterator[object]:
+            while True:
+                yield SimpleNamespace(
+                    type="raw_response_event",
+                    data=SimpleNamespace(type="response.output_text.delta", delta="조각"),
+                )
+
+        def cancel(self) -> None:
+            self.cancelled = True
+
+    result = _FakeStreamingResult()
+
+    def fake_run_streamed(
+        agent: object, *, input: list[Any], context: object, max_turns: object = None
+    ) -> object:
+        return result
+
+    monkeypatch.setattr(Runner, "run_streamed", cast(Any, fake_run_streamed))
+
+    agent = create_agent("gpt-4.1-mini")
+
+    async def scenario() -> None:
+        # The runner is declared as AsyncIterator (the injectable
+        # AgentStreamRunner alias), but the route consumes it as a generator
+        # that gets closed -- which is exactly what this test drives.
+        stream = cast(
+            AsyncGenerator[str, None],
+            run_agent_streamed(
+                agent,
+                [ConversationMessage(role="user", content="질문")],
+                QaContext(policies=[]),
+            ),
+        )
+        assert await anext(stream) == "조각"
+        await stream.aclose()
+
+    asyncio.run(scenario())
+
+    assert result.cancelled is True

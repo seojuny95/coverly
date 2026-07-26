@@ -95,7 +95,7 @@ FastAPI 라우터는 기능 모듈 가까이에 둔다. `APIRouter`는 모듈별
 - **타입과 테스트가 회귀를 막는가**: Pydantic schema, mypy, pytest fixture가 실제 응답 계약을 반영하는지 본다. LLM/API/DB는 유닛 테스트에서 stub 가능해야 한다.
 - **성능·비용이 예측 가능한가**: 불필요한 LLM 호출, 반복 DB 조회, 대용량 PDF/RAG 처리의 중복 작업이 없는지 확인한다. 캐시는 소유권과 무효화 기준이 명확해야 한다. 사용량 상한은 세션당 상담 질문 수처럼 서버가 원자적으로 강제하고, 화면 비활성화는 안내일 뿐 방어선으로 보지 않는다.
 - **동시성과 취소가 끝까지 전파되는가**: 업로드 한도는 파싱 전에 원자적으로 예약하고 성공·실패·취소에서 해제한다. SSE 연결 종료는 ASGI disconnect부터 agent 실행과 외부 검색까지 취소가 전파돼야 하며, queue와 외부 검색 동시성에는 명시적인 상한을 둔다.
-- **스트림 수명 주기가 닫히는가**: QA turn처럼 사용량을 먼저 차감하는 흐름은 연결 종료·취소·생성 실패에서도 정확히 한 번 환급되어야 한다. 스트림 오류 응답에는 클라이언트가 복구된 상태를 동기화할 정보가 있어야 하며, `meta`를 받은 뒤 종료된 경로도 테스트한다.
+- **스트림 수명 주기가 닫히는가**: QA turn처럼 사용량을 먼저 차감하는 흐름은 연결 종료·취소·생성 실패에서도 정확히 한 번 환급되어야 한다. 스트림 오류 응답에는 클라이언트가 복구된 상태를 동기화할 정보가 있어야 하며, `meta`를 받은 뒤 종료된 경로도 테스트한다. uvicorn은 ASGI spec_version 2.3을 광고하므로 Starlette는 disconnect 시 스트림 task만 취소하고 async generator는 닫지 않는다. 정리를 요청 수명 주기 안에 두려면 `app/core/streaming.py`의 `ClosingStreamingResponse`처럼 body iterator를 shield된 스코프에서 명시적으로 닫아야 한다.
 
 ## Coding Style & Naming Conventions
 

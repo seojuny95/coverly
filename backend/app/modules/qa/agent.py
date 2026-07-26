@@ -75,6 +75,10 @@ async def run_agent_streamed(
 
     Yields the agent's natural-language text delta, unmodified -- nothing
     downstream rewrites or validates it. See this module's docstring for why.
+
+    Runner.run_streamed spawns a detached background task, so abandoning the
+    iterator is not enough to stop it: the run is cancelled explicitly when
+    this generator closes (client disconnect, or an error upstream).
     """
 
     result = Runner.run_streamed(
@@ -83,8 +87,11 @@ async def run_agent_streamed(
         context=context,
         max_turns=get_settings().counsel_agent_max_turns,
     )
-    async for event in result.stream_events():
-        if event.type != "raw_response_event":
-            continue
-        if event.data.type == "response.output_text.delta":
-            yield event.data.delta
+    try:
+        async for event in result.stream_events():
+            if event.type != "raw_response_event":
+                continue
+            if event.data.type == "response.output_text.delta":
+                yield event.data.delta
+    finally:
+        result.cancel()

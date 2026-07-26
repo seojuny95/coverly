@@ -21,8 +21,11 @@ from collections.abc import AsyncIterator
 
 import pytest
 from agents import Agent
+from fastapi import Request
 from fastapi.testclient import TestClient
 
+from app.core.middleware import REQUEST_ID_STATE_KEY
+from app.core.streaming import ClosingStreamingResponse
 from app.integrations.openai import ConversationMessage
 from app.main import create_app
 from app.modules.portfolio.schemas import PolicyInput
@@ -34,7 +37,12 @@ from app.modules.portfolio.session.service import (
 )
 from app.modules.qa.agent import AgentStreamRunner
 from app.modules.qa.context import QaContext
-from app.modules.qa.route import _build_event_stream, get_agent_stream_runner
+from app.modules.qa.route import (
+    _build_event_stream,
+    get_agent_stream_runner,
+    stream_qa_answer,
+)
+from app.modules.qa.schemas import QaRequest
 
 _SESSION_ID = "test-session"
 
@@ -139,6 +147,12 @@ def _client(
         runner or _stub_runner(chunks, seen_conversations)
     )
     return TestClient(app)
+
+
+def _http_request() -> Request:
+    request = Request({"type": "http", "method": "POST", "path": "/qa/stream", "headers": []})
+    setattr(request.state, REQUEST_ID_STATE_KEY, "request-1")
+    return request
 
 
 def _events(body: str) -> list[dict[str, object]]:
@@ -345,6 +359,24 @@ def test_closing_after_meta_refunds_the_consumed_turn() -> None:
 
     assert sessions.refund_calls == 1
     assert sessions.turns_used == 0
+
+
+def test_the_route_returns_a_closing_streaming_response() -> None:
+    # A plain StreamingResponse leaves the generator suspended on disconnect,
+    # so the turn refund in _build_event_stream would depend on GC timing.
+    sessions = _FixtureSessions()
+
+    async def scenario() -> None:
+        response = await stream_qa_answer(
+            _http_request(),
+            QaRequest(question="질문", history=[], session_id=_SESSION_ID),
+            sessions,  # type: ignore[arg-type]
+            _stub_runner(["답변"]),
+        )
+
+        assert isinstance(response, ClosingStreamingResponse)
+
+    asyncio.run(scenario())
 
 
 def test_an_invalid_session_is_rejected_before_the_agent_runs() -> None:
