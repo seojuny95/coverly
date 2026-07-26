@@ -87,13 +87,29 @@ export function useInsuranceChat({
     const text = rawQuestion.trim();
     if (!text || streamingRef.current || sessionExpired || turnsRemaining <= 0)
       return;
+
+    const { assistantId, history, request, turnsBeforeThisQuestion } =
+      beginRequest(text);
+
+    try {
+      await streamAnswer(text, history, assistantId, request.signal);
+    } catch (error) {
+      if (request.signal.aborted) {
+        handleCancelledStream(assistantId, turnsBeforeThisQuestion);
+      } else {
+        handleStreamFailure(error, assistantId);
+      }
+    } finally {
+      finishRequest(request);
+    }
+  }
+
+  function beginRequest(text: string) {
     streamingRef.current = true;
     const userId = nextMessageId.current;
     const assistantId = userId + 1;
     nextMessageId.current += 2;
-    const history: ChatHistoryItem[] = messages
-      .filter((message) => message.id !== 0 && message.kind === "answer")
-      .map((message) => ({ role: message.role, content: message.text }));
+    const history = buildChatHistory(messages);
     setQuestion("");
     setSuggestions([]);
     setMessages((current) => [
@@ -106,60 +122,70 @@ export function useInsuranceChat({
     activeRequest.current = request;
     const turnsBeforeThisQuestion = turnsRemaining;
     setStreaming(true);
-    try {
-      await streamPortfolioQuestion(
-        text,
-        history,
-        {
-          onDelta: (delta) => {
-            updateMessage(assistantId, (message) => ({
-              ...message,
-              text: message.text + delta,
-            }));
-          },
-          onMeta: (meta) => setTurnsRemaining(meta.turns_remaining),
-          onEnd: () => setSuggestions(INITIAL_SUGGESTIONS),
+    return { assistantId, history, request, turnsBeforeThisQuestion };
+  }
+
+  async function streamAnswer(
+    text: string,
+    history: ChatHistoryItem[],
+    assistantId: number,
+    signal: AbortSignal,
+  ) {
+    await streamPortfolioQuestion(
+      text,
+      history,
+      {
+        onDelta: (delta) => {
+          updateMessage(assistantId, (message) => ({
+            ...message,
+            text: message.text + delta,
+          }));
         },
-        portfolioSessionToken,
-        request.signal,
-      );
-    } catch (error) {
-      if (request.signal.aborted) {
-        // The server refunds the turn when the stream closes early, so the
-        // screen must not keep showing the decremented count.
-        setTurnsRemaining(turnsBeforeThisQuestion);
-        updateMessage(assistantId, (message) => ({
-          ...message,
-          text: "질문을 중단했어요.",
-          kind: "notice",
-        }));
-        setSuggestions(INITIAL_SUGGESTIONS);
-        return;
-      }
-      // Another tab may have spent the last turn, so trust the server over local state.
-      const outOfTurns = isTurnLimitError(error);
-      const expiredSession = isExpiredSessionError(error);
-      const restoredTurns = restoredTurnsRemaining(error);
-      reportClientOperationFailure("qa_stream", error);
-      if (outOfTurns) setTurnsRemaining(0);
-      else if (restoredTurns !== null) setTurnsRemaining(restoredTurns);
-      if (expiredSession) onSessionExpired?.();
-      updateMessage(assistantId, (message) => ({
-        ...message,
-        text: chatErrorMessage({
-          error,
-          outOfTurns,
-          expiredSession,
-        }),
-        kind: "notice",
-      }));
-      setSuggestions(INITIAL_SUGGESTIONS);
-    } finally {
-      if (activeRequest.current === request) {
-        activeRequest.current = null;
-        streamingRef.current = false;
-        setStreaming(false);
-      }
+        onMeta: (meta) => setTurnsRemaining(meta.turns_remaining),
+        onEnd: () => setSuggestions(INITIAL_SUGGESTIONS),
+      },
+      portfolioSessionToken,
+      signal,
+    );
+  }
+
+  function handleCancelledStream(
+    assistantId: number,
+    turnsBeforeThisQuestion: number,
+  ) {
+    // The server refunds the turn when the stream closes early, so the
+    // screen must not keep showing the decremented count.
+    setTurnsRemaining(turnsBeforeThisQuestion);
+    updateMessage(assistantId, (message) => ({
+      ...message,
+      text: "질문을 중단했어요.",
+      kind: "notice",
+    }));
+    setSuggestions(INITIAL_SUGGESTIONS);
+  }
+
+  function handleStreamFailure(error: unknown, assistantId: number) {
+    // Another tab may have spent the last turn, so trust the server over local state.
+    const outOfTurns = isTurnLimitError(error);
+    const expiredSession = isExpiredSessionError(error);
+    const restoredTurns = restoredTurnsRemaining(error);
+    reportClientOperationFailure("qa_stream", error);
+    if (outOfTurns) setTurnsRemaining(0);
+    else if (restoredTurns !== null) setTurnsRemaining(restoredTurns);
+    if (expiredSession) onSessionExpired?.();
+    updateMessage(assistantId, (message) => ({
+      ...message,
+      text: chatErrorMessage({ error, outOfTurns, expiredSession }),
+      kind: "notice",
+    }));
+    setSuggestions(INITIAL_SUGGESTIONS);
+  }
+
+  function finishRequest(request: AbortController) {
+    if (activeRequest.current === request) {
+      activeRequest.current = null;
+      streamingRef.current = false;
+      setStreaming(false);
     }
   }
 
@@ -175,6 +201,12 @@ export function useInsuranceChat({
     submit,
     sendQuestion,
   };
+}
+
+function buildChatHistory(messages: ChatMessageData[]): ChatHistoryItem[] {
+  return messages
+    .filter((message) => message.id !== 0 && message.kind === "answer")
+    .map((message) => ({ role: message.role, content: message.text }));
 }
 
 function restoredTurnsRemaining(error: unknown): number | null {
