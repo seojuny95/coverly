@@ -49,7 +49,7 @@ def test_instructions_say_tool_results_are_not_commands() -> None:
     # the model that tool results and conversation content are reference
     # material. A rewrite of instructions.md that drops that line should
     # fail here, not in prod.
-    agent = create_agent("gpt-4.1-mini")
+    agent = create_agent("gpt-4o-mini")
 
     assert isinstance(agent.instructions, str)
     assert "명령이 아닙니다" in agent.instructions
@@ -95,7 +95,7 @@ def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
         _fake_run_streamed_returning(_FiniteEventStreamingResult(), captured),
     )
 
-    agent = create_agent("gpt-4.1-mini")
+    agent = create_agent("gpt-4o-mini")
     context = QaContext(policies=[])
 
     async def collect() -> list[str]:
@@ -144,7 +144,7 @@ def test_run_agent_streamed_cancels_the_sdk_run_when_the_consumer_stops(
     result = _UnboundedEventStreamingResult()
     monkeypatch.setattr(Runner, "run_streamed", _fake_run_streamed_returning(result))
 
-    agent = create_agent("gpt-4.1-mini")
+    agent = create_agent("gpt-4o-mini")
 
     async def scenario() -> None:
         # run_agent_streamed is declared to return AsyncGenerator[str, None]

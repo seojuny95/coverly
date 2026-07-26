@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Secrets are SecretStr so that a repr of Settings -- e.g. a failing
     # assertion message -- can never dump live credentials into CI logs.
     openai_api_key: SecretStr = SecretStr("")
-    openai_model: str = "gpt-4.1-mini"
+    openai_model: str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
     database_url: SecretStr = SecretStr("")
