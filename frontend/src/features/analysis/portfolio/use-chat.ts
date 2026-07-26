@@ -36,6 +36,7 @@ export function useInsuranceChat({
       id: 0,
       role: "assistant",
       text: "안녕하세요. 올려주신 보험을 같이 살펴볼게요. 궁금한 건 편하게 말씀해 주세요.",
+      kind: "answer",
     },
   ]);
   const [suggestions, setSuggestions] = useState(INITIAL_SUGGESTIONS);
@@ -91,18 +92,19 @@ export function useInsuranceChat({
     const assistantId = userId + 1;
     nextMessageId.current += 2;
     const history: ChatHistoryItem[] = messages
-      .filter((message) => message.id !== 0)
+      .filter((message) => message.id !== 0 && message.kind === "answer")
       .map((message) => ({ role: message.role, content: message.text }));
     setQuestion("");
     setSuggestions([]);
     setMessages((current) => [
       ...current,
-      { id: userId, role: "user", text },
-      { id: assistantId, role: "assistant", text: "" },
+      { id: userId, role: "user", text, kind: "answer" },
+      { id: assistantId, role: "assistant", text: "", kind: "answer" },
     ]);
     activeRequest.current?.abort();
     const request = new AbortController();
     activeRequest.current = request;
+    const turnsBeforeThisQuestion = turnsRemaining;
     setStreaming(true);
     try {
       await streamPortfolioQuestion(
@@ -123,9 +125,13 @@ export function useInsuranceChat({
       );
     } catch (error) {
       if (request.signal.aborted) {
+        // The server refunds the turn when the stream closes early, so the
+        // screen must not keep showing the decremented count.
+        setTurnsRemaining(turnsBeforeThisQuestion);
         updateMessage(assistantId, (message) => ({
           ...message,
           text: "질문을 중단했어요.",
+          kind: "notice",
         }));
         setSuggestions(INITIAL_SUGGESTIONS);
         return;
@@ -145,6 +151,7 @@ export function useInsuranceChat({
           outOfTurns,
           expiredSession,
         }),
+        kind: "notice",
       }));
       setSuggestions(INITIAL_SUGGESTIONS);
     } finally {

@@ -3,14 +3,19 @@ import { describe, expect, it } from "vitest";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 
 function assistant(overrides: Partial<ChatMessageData> = {}): ChatMessageData {
-  return { id: 1, role: "assistant", text: "", ...overrides };
+  return { id: 1, role: "assistant", text: "", kind: "answer", ...overrides };
 }
 
 describe("ChatMessage", () => {
   it("renders a user message as plain text", () => {
     render(
       <ChatMessage
-        message={{ id: 1, role: "user", text: "겹치는 보장 있어?" }}
+        message={{
+          id: 1,
+          role: "user",
+          text: "겹치는 보장 있어?",
+          kind: "answer",
+        }}
       />,
     );
     expect(screen.getByText("겹치는 보장 있어?")).toBeInTheDocument();

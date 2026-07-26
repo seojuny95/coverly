@@ -71,6 +71,9 @@ export type ChatMessageData = {
   id: number;
   role: "user" | "assistant";
   text: string;
+  // "notice" is UI-authored copy (errors, cancellation). It renders like an
+  // assistant bubble but must never be replayed as a model turn.
+  kind: "answer" | "notice";
 };
 
 function ChatMessageComponent({ message }: { message: ChatMessageData }) {

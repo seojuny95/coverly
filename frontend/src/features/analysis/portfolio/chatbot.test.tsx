@@ -210,6 +210,82 @@ describe("InsuranceChatbot", () => {
     expect(screen.queryByLabelText("답변 준비 중")).not.toBeInTheDocument();
   });
 
+  it("does not send a failure notice back as conversation history", async () => {
+    // A notice is something the UI said, not something the agent answered.
+    // Sending it back as an assistant turn makes the model read words it
+    // never produced.
+    const historyByCall: Array<
+      Parameters<typeof api.streamPortfolioQuestion>[1]
+    > = [];
+    vi.spyOn(api, "streamPortfolioQuestion").mockImplementation(
+      async (_question, history, handlers) => {
+        historyByCall.push(history);
+        if (historyByCall.length === 1) {
+          throw new Error("boom");
+        }
+        handlers.onDelta("네.");
+        handlers.onEnd();
+      },
+    );
+    const user = await openChat();
+
+    await user.type(screen.getByLabelText("보험 질문"), "첫 질문");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+    await screen.findByText(/답을 가져오지 못했어요/);
+
+    await user.type(screen.getByLabelText("보험 질문"), "두 번째 질문");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+
+    const secondHistory = historyByCall[1];
+    expect(
+      secondHistory.some((turn) =>
+        turn.content.includes("답을 가져오지 못했어요"),
+      ),
+    ).toBe(false);
+    expect(secondHistory.map((turn) => turn.content)).toContain("첫 질문");
+  });
+
+  it("restores the on-screen turn count once a mid-question close is cancelled", async () => {
+    // The server refunds the turn when the stream closes early, so the
+    // screen must not keep showing the count it optimistically decremented
+    // from the meta event.
+    let handlers: StreamHandlers | undefined;
+    let rejectStream: ((error: unknown) => void) | undefined;
+    vi.spyOn(api, "streamPortfolioQuestion").mockImplementation(
+      (_question, _history, streamHandlers) => {
+        handlers = streamHandlers;
+        return new Promise<void>((_resolve, reject) => {
+          rejectStream = reject;
+        });
+      },
+    );
+    const user = await openChat({ turnsRemaining: 10 });
+
+    await user.type(screen.getByLabelText("보험 질문"), "암 진단비는?");
+    await user.click(screen.getByRole("button", { name: "질문하기" }));
+
+    await act(async () => {
+      handlers?.onMeta?.({
+        type: "meta",
+        in_scope: true,
+        answered_question: "질문",
+        excluded_note: null,
+        turns_remaining: 9,
+      });
+    });
+    expect(await screen.findByText("질문 9번 남음")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "닫기" }));
+    await act(async () => {
+      rejectStream?.(new DOMException("Aborted", "AbortError"));
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "AI 상담사에게 질문하기" }),
+    );
+    expect(await screen.findByText("질문 10번 남음")).toBeInTheDocument();
+  });
+
   it("opens the full 상담 tab from the floating chat", async () => {
     const onExpand = vi.fn();
     const user = userEvent.setup();
