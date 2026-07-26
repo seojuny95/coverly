@@ -33,6 +33,7 @@ describe("AnalysisProgress", () => {
     );
 
     expect(screen.getByRole("status")).toHaveClass("bg-white");
+    expect(screen.getByRole("status")).not.toHaveClass("animate-enter-overlay");
     expect(screen.getByText(/coverly/)).toBeInTheDocument();
   });
 

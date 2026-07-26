@@ -96,7 +96,7 @@ export function AnalysisProgress({
       className={`${
         surface === "modal"
           ? "flex w-full max-w-none flex-col items-center py-8 text-center"
-          : "animate-enter-overlay fixed inset-0 z-50 flex items-center justify-center bg-white px-6 py-10 text-center"
+          : "fixed inset-0 z-50 flex items-center justify-center bg-white px-6 py-10 text-center"
       }`}
     >
       {surface === "page" ? (
