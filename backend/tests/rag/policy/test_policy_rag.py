@@ -25,6 +25,7 @@ from evals.rag.policy.retrieval import (
     EVAL_FIXTURE,
     _text_matches_expected_group,
     evaluate_policy_retrieval,
+    load_policy_retrieval_eval_cases,
     policy_retrieval_eval_context,
 )
 
@@ -534,7 +535,7 @@ def test_policy_retrieval_evaluation_passes_fixture() -> None:
         ),
     }
     raw = {
-        "source": "sample-insurance-input",
+        "source": "sample_policy",
         "documents": [
             {"session_id": "session-a", "filename": "policy-a.pdf"},
             {"session_id": "session-b", "filename": "policy-b.pdf"},
@@ -559,7 +560,7 @@ def test_policy_retrieval_evaluation_passes_fixture() -> None:
 
     with TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        sample_dir = root / "sample-insurance-input"
+        sample_dir = root / "sample_policy"
         sample_dir.mkdir()
         for filename in documents:
             (sample_dir / filename).write_bytes(b"fake-pdf")
@@ -592,7 +593,7 @@ def test_policy_retrieval_evaluation_can_use_production_embedder(
         ),
     }
     raw = {
-        "source": "sample-insurance-input",
+        "source": "sample_policy",
         "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
         "cases": [
             {
@@ -618,7 +619,7 @@ def test_policy_retrieval_evaluation_can_use_production_embedder(
 
     with TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        sample_dir = root / "sample-insurance-input"
+        sample_dir = root / "sample_policy"
         sample_dir.mkdir()
         (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
         dataset = root / "evaluation_dataset.json"
@@ -640,7 +641,7 @@ def test_policy_retrieval_evaluation_can_use_production_embedder(
 
 def test_policy_e2e_production_context_cleans_up_after_failure() -> None:
     raw = {
-        "source": "sample-insurance-input",
+        "source": "sample_policy",
         "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
         "cases": [],
     }
@@ -652,7 +653,7 @@ def test_policy_e2e_production_context_cleans_up_after_failure() -> None:
 
     with TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        sample_dir = root / "sample-insurance-input"
+        sample_dir = root / "sample_policy"
         sample_dir.mkdir()
         (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
         dataset = root / "evaluation_dataset.json"
@@ -679,15 +680,14 @@ def test_policy_e2e_production_context_cleans_up_after_failure() -> None:
 
 
 def test_local_policy_eval_dataset_has_product_scale_cases() -> None:
-    raw = json.loads(EVAL_FIXTURE.read_text(encoding="utf-8"))
-    cases = raw["cases"]
-    case_ids = [case["id"] for case in cases]
+    cases = load_policy_retrieval_eval_cases(EVAL_FIXTURE)
+    case_ids = [case.id for case in cases]
 
     assert len(cases) >= 120
     assert len(case_ids) == len(set(case_ids))
     assert sum(case_id.startswith("paraphrase-") for case_id in case_ids) >= 12
     assert sum(case_id.startswith("noisy-") for case_id in case_ids) >= 8
-    assert sum(len(case["session_ids"]) > 1 for case in cases) >= 14
+    assert sum(len(case.session_ids) > 1 for case in cases) >= 14
 
 
 def test_local_policy_eval_dataset_does_not_contain_sample_pii() -> None:
@@ -715,7 +715,7 @@ def test_policy_eval_normalizes_expected_term_matching() -> None:
         ),
     }
     raw = {
-        "source": "sample-insurance-input",
+        "source": "sample_policy",
         "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
         "cases": [
             {
@@ -730,7 +730,7 @@ def test_policy_eval_normalizes_expected_term_matching() -> None:
 
     with TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        sample_dir = root / "sample-insurance-input"
+        sample_dir = root / "sample_policy"
         sample_dir.mkdir()
         (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
         dataset = root / "evaluation_dataset.json"
@@ -754,7 +754,7 @@ def test_policy_eval_accepts_masked_or_plain_phone_numbers() -> None:
         ),
     }
     raw = {
-        "source": "sample-insurance-input",
+        "source": "sample_policy",
         "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
         "cases": [
             {
@@ -769,7 +769,7 @@ def test_policy_eval_accepts_masked_or_plain_phone_numbers() -> None:
 
     with TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        sample_dir = root / "sample-insurance-input"
+        sample_dir = root / "sample_policy"
         sample_dir.mkdir()
         (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
         dataset = root / "evaluation_dataset.json"
@@ -793,7 +793,7 @@ def test_policy_eval_accepts_any_expected_term_variant() -> None:
         ),
     }
     raw = {
-        "source": "sample-insurance-input",
+        "source": "sample_policy",
         "documents": [{"session_id": "session-a", "filename": "policy-a.pdf"}],
         "cases": [
             {
@@ -811,7 +811,7 @@ def test_policy_eval_accepts_any_expected_term_variant() -> None:
 
     with TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        sample_dir = root / "sample-insurance-input"
+        sample_dir = root / "sample_policy"
         sample_dir.mkdir()
         (sample_dir / "policy-a.pdf").write_bytes(b"fake-pdf")
         dataset = root / "evaluation_dataset.json"
@@ -851,7 +851,7 @@ def test_policy_eval_session_precision_uses_all_requested_sessions() -> None:
         ),
     }
     raw = {
-        "source": "sample-insurance-input",
+        "source": "sample_policy",
         "documents": [
             {"session_id": "session-a", "filename": "policy-a.pdf"},
             {"session_id": "session-b", "filename": "policy-b.pdf"},
@@ -869,7 +869,7 @@ def test_policy_eval_session_precision_uses_all_requested_sessions() -> None:
 
     with TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        sample_dir = root / "sample-insurance-input"
+        sample_dir = root / "sample_policy"
         sample_dir.mkdir()
         for filename in documents:
             (sample_dir / filename).write_bytes(b"fake-pdf")

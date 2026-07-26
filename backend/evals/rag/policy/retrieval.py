@@ -103,7 +103,11 @@ class OfflinePolicyRetrievalContext:
 
 def load_policy_retrieval_eval_cases(path: Path = EVAL_FIXTURE) -> tuple[PolicyEvalCase, ...]:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    return tuple(_case_from_json(item) for item in raw["cases"])
+    explicit_cases = tuple(_case_from_json(item) for item in raw.get("cases", ()))
+    grouped_cases = tuple(
+        case for group in raw.get("case_groups", ()) for case in _cases_from_group(group)
+    )
+    return explicit_cases + grouped_cases
 
 
 def build_offline_policy_retrieval_context(
@@ -484,6 +488,24 @@ def _case_from_json(raw: dict[str, object]) -> PolicyEvalCase:
         session_ids=tuple(str(item) for item in session_ids),
         expected_session_id=str(raw["expected_session_id"]),
         expected_term_groups=expected_term_groups,
+    )
+
+
+def _cases_from_group(raw: dict[str, object]) -> tuple[PolicyEvalCase, ...]:
+    queries = tuple(str(query) for query in cast(list[object], raw["queries"]))
+    prefixes = ("", "paraphrase-", "noisy-", "alternate-")
+    if len(queries) != len(prefixes):
+        raise ValueError("policy retrieval case group must contain exactly four queries")
+
+    return tuple(
+        _case_from_json(
+            {
+                **raw,
+                "id": f"{prefix}{raw['id']}",
+                "query": query,
+            }
+        )
+        for prefix, query in zip(prefixes, queries, strict=True)
     )
 
 

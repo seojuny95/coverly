@@ -795,15 +795,15 @@ def test_degrades_to_empty_partial_when_normalization_raises() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Real-sample source building (pdfplumber on real documents; no LLM calls)
+# Sample source building (pdfplumber on fictional documents; no LLM calls)
 
 _SAMPLES_AVAILABLE = SAMPLE_PDF_DIR.exists()
 
 SAMPLE_FILENAMES = [
-    "DB운전자보험증권.pdf",
-    "NH농협보험증권.pdf",
-    "현대해상자동차보험.pdf",
-    "흥국보험증권.pdf",
+    "01_건강보험_기본형.pdf",
+    "02_건강보험_추가형.pdf",
+    "03_자동차_운전자_복합보험.pdf",
+    "04_여행_화재_복합보험.pdf",
 ]
 
 _AMOUNT_HEADERS = ("가입금액", "보험가입금액", "보장금액", "보험금액", "한도")
@@ -825,11 +825,11 @@ def test_extracts_markdown_coverage_source_from_real_policy(filename: str) -> No
 
 @pytest.mark.skipif(not _SAMPLES_AVAILABLE, reason="local sample PDFs are not available")
 def test_wrapped_cell_lines_rejoined_with_a_space_not_merged_or_slashed() -> None:
-    # NH cells wrap across visual lines (e.g. "수술을\n받은 경우"). Rejoin with a
+    # Sample cells wrap across visual lines (e.g. "수술을\n받은 경우"). Rejoin with a
     # space so distinct words are not merged ("수술을받은"), and never with the old
     # " / " marker, which leaked into 보장내용 as a stray slash. Only "\n" is
     # rewritten, so a genuine "/" in the policy text is never touched.
-    doc = parse_document((SAMPLE_PDF_DIR / "NH농협보험증권.pdf").read_bytes())
+    doc = parse_document((SAMPLE_PDF_DIR / "01_건강보험_기본형.pdf").read_bytes())
     source = build_coverage_source(doc)
 
     assert "수술을 받은" in source

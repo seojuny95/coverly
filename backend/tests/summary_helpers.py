@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SAMPLE_PDF_DIR = REPO_ROOT / "sample-insurance-input"
-EXPECTED_PATH = SAMPLE_PDF_DIR / "expected-policy-summary.local.json"
+SAMPLE_PDF_DIR = REPO_ROOT / "sample_policy"
+EXPECTED_PATH = SAMPLE_PDF_DIR / "expected-policy-summary.json"
 
 
 def _load_required_display_values() -> dict[str, dict[str, Any]]:

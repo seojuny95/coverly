@@ -402,7 +402,7 @@ describe("InsuranceAnalysisPage", () => {
       insuranceDocuments: [
         {
           id: "db-driver-insurance",
-          fileName: "DB운전자보험증권.pdf",
+          fileName: "03_자동차_운전자_복합보험.pdf",
           result: {
             ...POLICY_RESULT_DEFAULTS,
             status: "accepted",

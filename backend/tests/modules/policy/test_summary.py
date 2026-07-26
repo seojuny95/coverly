@@ -453,7 +453,7 @@ def test_extract_policy_summary_reads_payment_period_and_maturity_date() -> None
 def test_extract_local_policy_summary_reads_premium_from_doubled_bold_glyphs() -> None:
     # pdfplumber renders some bold table labels/amounts with every character
     # doubled back-to-back (a rendering artifact, e.g. "납입보험료" ->
-    # "납납입입보보험험료료"); this mirrors a real NH농협보험증권 fragment.
+    # "납납입입보보험험료료"); this mirrors a duplicated-glyph OCR fragment.
     result = extract_local_policy_summary(
         "계계약약자자주주소소 (자택) 테스트주소\n"
         "납납입입보보험험료료 42,615원 납납입입주주기기 월납\n"
@@ -466,7 +466,7 @@ def test_extract_local_policy_summary_reads_premium_from_doubled_bold_glyphs() -
 def test_extract_local_policy_summary_truncates_product_name_at_glued_policy_number() -> None:
     # Some layouts squeeze multiple fields onto one text line, e.g.
     # "보험종목 <상품명> 증권번호 <번호>" with no newline between them; mirrors a
-    # real DB운전자보험증권 fragment.
+    # a representative driver-policy OCR fragment.
     masked_identifier = f"{ADULT_BIRTH}-1******"
 
     result = extract_local_policy_summary(

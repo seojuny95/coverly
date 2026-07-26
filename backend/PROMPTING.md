@@ -9,7 +9,7 @@ Coverly의 LLM 프롬프트는 사용자의 보험 정보를 근거 기반으로
 - **근거 없으면 거절**: 원문, retrieval hit, evidence catalog에 없는 보장 판단·지급 판단·가입 권유를 만들지 않는다.
 - **빈 값이 틀린 값보다 낫다**: 기본정보, 금액, 사람 이름, 증권번호처럼 사용자 화면의 사실값은 확실하지 않으면 `null`, `미분류`, `확인 불가`를 선택한다.
 - **후처리와 한 세트로 설계**: 프롬프트 지시만 믿지 않고 schema, enum, citation 검증, grounding, 안전 문구 필터로 강제한다.
-- **실데이터로 평가**: `sample-insurance-input` 같은 실제 PDF와 골든 기대값으로 before/after를 비교한다.
+- **대표 문서로 평가**: `sample_policy`의 비식별 샘플 PDF와 골든 기대값으로 before/after를 비교한다.
 
 ## 권장 프롬프트 구조
 
