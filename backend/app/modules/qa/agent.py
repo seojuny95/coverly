@@ -29,7 +29,7 @@ failures came from, because it commits to an interpretation before any tool
 result is seen.
 """
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from functools import lru_cache
 from pathlib import Path
 
@@ -62,7 +62,7 @@ def create_agent(model: str) -> Agent[QaContext]:
 
 AgentStreamRunner = Callable[
     [Agent[QaContext], list[ConversationMessage], QaContext],
-    AsyncIterator[str],
+    AsyncGenerator[str, None],
 ]
 
 
@@ -70,7 +70,7 @@ async def run_agent_streamed(
     agent: Agent[QaContext],
     conversation: list[ConversationMessage],
     context: QaContext,
-) -> AsyncIterator[str]:
+) -> AsyncGenerator[str, None]:
     """Thin, injectable wrapper around Runner.run_streamed so tests can fake it.
 
     Yields the agent's natural-language text delta, unmodified -- nothing

@@ -17,7 +17,7 @@ are masked, and only the recent history window goes on the wire.
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 import pytest
 from agents import Agent
@@ -109,7 +109,7 @@ def _stub_runner(
 ) -> AgentStreamRunner:
     async def runner(
         agent: Agent[QaContext], conversation: list[ConversationMessage], context: QaContext
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         if seen_conversations is not None:
             seen_conversations.append(list(conversation))
         for chunk in chunks:
@@ -123,7 +123,7 @@ def _failing_runner(
 ) -> AgentStreamRunner:
     async def runner(
         agent: Agent[QaContext], conversation: list[ConversationMessage], context: QaContext
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         if seen_conversations is not None:
             seen_conversations.append(list(conversation))
         yield "확인 중이에요."
