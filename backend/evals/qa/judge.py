@@ -48,6 +48,8 @@ def judge_turn(
     question: str,
     history_text: str,
     answer: str,
+    grounding_context: str,
+    reference_facts: list[str],
     rubric_keys: list[str],
     rubric_descriptions: dict[str, str],
     completer_factory: CompleterFactory = structured_completer,
@@ -64,10 +66,13 @@ def judge_turn(
     criteria = "\n".join(
         f"- {key}: {rubric_descriptions.get(key, '(설명 없음)')}" for key in unique_keys
     )
+    expected = "\n".join(f"- {fact}" for fact in reference_facts) or "없음"
     user = (
         f"이전 대화:\n{history_text or '없음'}\n\n"
         f"질문: {question}\n\n"
         f"답변: {answer}\n\n"
+        f"이 턴에서 실제로 조회한 도구 근거:\n{grounding_context or '없음'}\n\n"
+        f"평가셋 작성자가 확인한 기준 사실:\n{expected}\n\n"
         f"채점 기준:\n{criteria}"
     )
     raw = complete(_SYSTEM, user)

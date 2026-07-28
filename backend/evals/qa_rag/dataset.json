@@ -1,0 +1,600 @@
+{
+  "version": "2026-07-28-draft-3",
+  "fixture": "evals/qa_rag/fixture_policies.json",
+  "policy_retrieval_dataset": "evals/rag/policy/retrieval_dataset.json",
+  "policy_session_ids": [
+    "sample-health-basic",
+    "sample-health-extra",
+    "sample-auto-driver",
+    "sample-travel-fire"
+  ],
+  "judge_rubrics": {
+    "evidence_grade": "증권에서 확인된 계약 사실, 공식 자료의 일반 기준, 확인할 수 없는 내용을 분명히 구분했는가",
+    "rag_boundary": "Policy RAG의 사용자 증권 내용과 Official RAG의 일반 기준을 서로 바꾸거나 섞지 않았는가",
+    "no_fabrication": "검색 근거에 없는 조건·금액·기간·보험사를 만들어내지 않았는가",
+    "no_product_sales": "특정 보험사나 상품 가입·해지·증액을 권하지 않고 최종 선택을 사용자에게 남겼는가",
+    "completeness": "질문이 요구한 핵심 조건을 빠뜨리지 않고 간결하게 설명했는가"
+  },
+  "cases": [
+    {
+      "id": "policy_cancer_waiting_period",
+      "intent": "업로드 증권에 적힌 암 보장개시일",
+      "tags": ["policy", "condition"],
+      "turns": [
+        {
+          "question": "첫 번째 건강보험에서 암진단비는 언제부터 보장된다고 적혀 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "forbidden_tools": ["retrieve_official_guidance"],
+          "include_all": ["90일"],
+          "judge": ["evidence_grade", "no_fabrication"],
+          "reference_facts": [
+            "암진단비의 보장개시일은 계약일부터 90일이 지난 다음 날이다.",
+            "유사암진단비는 계약일부터 보장한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy_cancer_reduction",
+      "intent": "업로드 증권의 진단비 감액 조건",
+      "tags": ["policy", "condition"],
+      "turns": [
+        {
+          "question": "첫 번째 건강보험 암·뇌·심장 진단비의 1년 이내 감액 조건을 알려줘.",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["1년", "50%"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "암·뇌·심장 진단비는 계약일부터 1년 이내 진단 시 가입금액의 50%를 지급한다.",
+            "1년 이후에는 가입금액의 100%를 지급한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy_medical_deductible",
+      "intent": "업로드 증권의 실손 자기부담금",
+      "tags": ["policy", "condition"],
+      "turns": [
+        {
+          "question": "첫 번째 건강보험 증권에는 실손 자기부담금이 어떻게 적혀 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["급여", "20%", "비급여", "30%"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": ["급여 20%, 비급여 30%의 자기부담금을 적용한다."]
+        }
+      ]
+    },
+    {
+      "id": "policy_renewal_condition",
+      "intent": "업로드 증권의 갱신 조건",
+      "tags": ["policy", "renewal"],
+      "turns": [
+        {
+          "question": "두 번째 건강보험의 실손은 몇 년마다 갱신된다고 적혀 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["1년", "갱신"],
+          "judge": ["evidence_grade"],
+          "reference_facts": [
+            "두 번째 건강보험의 실손의료비 담보는 1년 단위 갱신형이다.",
+            "갱신 시 보험료가 달라질 수 있으나 정확한 인상률은 적혀 있지 않다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy_auto_deductible",
+      "intent": "자동차 증권의 자기차량손해 자기부담금",
+      "tags": ["policy", "auto", "condition"],
+      "turns": [
+        {
+          "question": "내 자동차 증권에서 자기차량손해 자기부담금은 얼마라고 되어 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["20%", "20만원", "50만원"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "자기차량손해는 손해액의 20%를 자기부담금으로 적용한다.",
+            "자기부담금은 최소 20만원, 최대 50만원이다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy_annual_premium",
+      "intent": "증권 원문에 적힌 연납 보험료와 월납 합계 경계",
+      "tags": ["policy", "premium"],
+      "turns": [
+        {
+          "question": "자동차·운전자 보험료는 얼마고 월납 보험료 합계에서는 어떻게 표시된다고 적혀 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "required_tool_groups": [["list_policies", "portfolio_overview"]],
+          "include_all": ["720,000원", "연납", "월납"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "자동차·운전자 보험료는 연납 720,000원이다.",
+            "월납 보험료 합계 화면에서는 납입주기가 다른 계약으로 별도 표시될 수 있다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy_flight_delay",
+      "intent": "여행자 증권의 항공기 지연 조건",
+      "tags": ["policy", "travel"],
+      "turns": [
+        {
+          "question": "여행 증권에는 비행기가 얼마나 지연돼야 어떤 비용을 보상한다고 적혀 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["4시간", "식사비", "교통비", "숙박비"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "항공편이 4시간 이상 지연된 경우 식사비, 교통비, 숙박비 등 약관에서 정한 실제 비용을 보상한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy_lost_cash_exclusion",
+      "intent": "여행자 증권의 휴대품 제외 조건",
+      "tags": ["policy", "travel", "exclusion"],
+      "turns": [
+        {
+          "question": "여행 중 현금을 잃어버린 경우 이 증권 문구상 휴대품손해로 보상된다고 되어 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["현금", "보상하지"],
+          "judge": ["evidence_grade", "no_fabrication"],
+          "reference_facts": [
+            "휴대품손해는 현금, 유가증권, 분실을 보상하지 않는다고 적혀 있다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy_fire_damage_boundary",
+      "intent": "본인 주택 손해와 제3자 배상 구분",
+      "tags": ["policy", "fire", "multi_evidence"],
+      "turns": [
+        {
+          "question": "내 집이 탄 손해와 이웃집 피해는 이 증권에서 각각 어떤 담보를 보라고 해?",
+          "required_tools": ["special_policy_overview", "retrieve_policy_terms"],
+          "required_tool_order": ["special_policy_overview", "retrieve_policy_terms"],
+          "include_all": ["주택화재손해", "화재배상책임"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "본인 주택의 직접 손해는 주택화재손해 담보에서 확인한다.",
+            "이웃집 등 제3자 피해는 화재배상책임 담보에서 확인한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy_unknown_renewal_rate",
+      "intent": "증권에 없는 미래 갱신 인상률 거절",
+      "tags": ["policy", "no_evidence"],
+      "turns": [
+        {
+          "question": "두 번째 건강보험은 다음 갱신 때 보험료가 정확히 몇 퍼센트 오를까?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_any": ["확인할 수", "알 수", "예측"],
+          "judge": ["evidence_grade", "no_fabrication"],
+          "reference_facts": [
+            "갱신 시 보험료가 달라질 수 있다고만 적혀 있고 정확한 인상률은 확인되지 않는다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "official_cooling_off",
+      "intent": "공식 자료의 청약철회 기간과 예외",
+      "tags": ["official", "consumer_protection"],
+      "turns": [
+        {
+          "question": "보험증권을 받은 뒤 청약을 철회할 수 있는 기간과 주요 예외를 알려줘.",
+          "required_tools": ["retrieve_official_guidance"],
+          "forbidden_tools": ["retrieve_policy_terms"],
+          "include_all": ["15일", "90일"],
+          "include_any": ["건강진단", "건강상태 진단"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "보험증권을 받은 날부터 15일 이내 청약을 철회할 수 있다.",
+            "보험기간이 90일 이내인 계약과 건강상태 진단을 지원하는 계약 등에는 제한이 있다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "official_disclosure_violation",
+      "intent": "공식 자료의 계약 전 알릴 의무 위반",
+      "tags": ["official", "consumer_protection"],
+      "turns": [
+        {
+          "question": "보험 가입 때 건강 관련 질문에 사실과 다르게 답하면 계약에 어떤 영향이 있어?",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_all": ["해지"],
+          "include_any": ["보장 제한", "보장을 제한"],
+          "judge": ["evidence_grade", "no_fabrication"],
+          "reference_facts": [
+            "계약 전 알릴 의무를 위반하면 회사가 계약을 해지하거나 보장을 제한할 수 있다.",
+            "모든 경우에 반드시 해지되는 것은 아니다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "official_late_premium",
+      "intent": "공식 자료의 보험료 연체와 독촉",
+      "tags": ["official", "contract"],
+      "turns": [
+        {
+          "question": "두 번째 이후 보험료를 제때 못 내면 바로 계약이 끝나는지 공식 기준으로 알려줘.",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_all": ["14일"],
+          "include_any": ["독촉", "납입최고"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "회사는 14일 이상의 납입최고(독촉)기간을 정해 안내한다.",
+            "그 기간까지 보험료를 내지 않으면 기간이 끝나는 날의 다음 날 계약이 해지된다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "official_dispute_mediation",
+      "intent": "공식 자료의 보험 분쟁 조정과 자료 열람",
+      "tags": ["official", "consumer_protection"],
+      "turns": [
+        {
+          "question": "보험금 분쟁을 금융감독원에 조정 신청하고 회사 자료도 열람할 수 있어?",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_all": ["금융감독원", "조정"],
+          "include_any": ["열람", "사본", "청취"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "보험 분쟁은 금융감독원 등에 조정을 신청할 수 있다.",
+            "분쟁조정 과정에서 회사가 보관하는 자료의 열람·사본 제공 등을 요구할 수 있다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "official_insurance_age",
+      "intent": "공식 자료의 보험나이 계산",
+      "tags": ["official", "term"],
+      "turns": [
+        {
+          "question": "보험나이의 6개월 반올림과 매년 나이가 늘어나는 기준일을 알려줘.",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_all": ["6개월", "1년", "계약해당일"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "보험나이는 6개월 미만은 버리고 6개월 이상은 1년으로 계산한다.",
+            "이후 매년 계약해당일에 나이가 증가한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "official_subrogation",
+      "intent": "공식 자료의 보험자대위와 예외",
+      "tags": ["official", "term"],
+      "turns": [
+        {
+          "question": "화재보험 대위권의 뜻과 가족·임차인에게 적용되는 예외를 알려줘.",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_any": ["대위권", "손해배상청구권"],
+          "include_all": ["가족", "임차인"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "회사는 지급한 보험금 한도에서 제3자에 대한 손해배상청구권을 취득한다.",
+            "가족이나 임차인에 대해서는 예외가 적용될 수 있다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "official_suitability",
+      "intent": "공식 자료의 적합성 원칙",
+      "tags": ["official", "consumer_protection"],
+      "turns": [
+        {
+          "question": "보험을 권유하기 전에 소비자 정보를 확인하고 맞지 않으면 권유하지 않아야 하는 원칙이 뭐야?",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_all": ["적합성"],
+          "include_any": ["소비자 정보", "정보를 확인", "질문"],
+          "judge": ["evidence_grade"],
+          "reference_facts": [
+            "권유 전에 소비자 정보를 확인하고 적합하지 않은 상품을 권유해서는 안 되는 적합성 원칙이다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "official_unrelated_question",
+      "intent": "보험과 무관한 질문에서 RAG 미호출",
+      "tags": ["official", "out_of_scope"],
+      "turns": [
+        {
+          "question": "노트북 배터리가 충전되지 않는데 어떻게 고쳐?",
+          "forbidden_tools": ["retrieve_official_guidance", "retrieve_policy_terms"],
+          "exclude": ["표준약관", "증권"],
+          "expect_in_scope": false
+        }
+      ]
+    },
+    {
+      "id": "mixed_waiting_period_meaning",
+      "intent": "내 증권의 암 보장개시일과 공식적인 면책 개념 구분",
+      "tags": ["mixed", "policy", "official"],
+      "turns": [
+        {
+          "question": "내 첫 번째 건강보험의 암 90일 조건과 보험에서 말하는 일반적인 면책 개념을 구분해서 설명해줘.",
+          "required_tools": ["retrieve_policy_terms", "retrieve_official_guidance"],
+          "include_all": ["90일"],
+          "include_any": ["일반적", "일반적으로", "공식"],
+          "judge": ["rag_boundary", "evidence_grade", "completeness"],
+          "reference_facts": [
+            "첫 번째 건강보험의 암 보장개시일은 계약일부터 90일이 지난 다음 날이다.",
+            "면책은 일정한 사유나 기간에 보험회사의 지급 책임이 제한되는 일반 개념이며 개별 계약과 구분해야 한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mixed_indemnity_duplicates",
+      "intent": "내 실손 중복과 일반적인 비례보상 원칙",
+      "tags": ["mixed", "portfolio", "official"],
+      "turns": [
+        {
+          "question": "내 실손의료비가 두 계약에 있는데, 확인된 계약과 일반적인 중복 보상 원칙을 함께 설명해줘.",
+          "required_tools": ["find_overlapping_coverages", "retrieve_official_guidance"],
+          "include_any": ["비례보상", "실제 부담"],
+          "judge": ["rag_boundary", "evidence_grade", "no_product_sales"],
+          "reference_facts": [
+            "구조화된 계약 정보에서 질병실손의료비가 두 계약에 확인된다.",
+            "실손형 보장은 여러 계약이 있어도 실제 부담한 손해 범위에서 비례보상될 수 있다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mixed_auto_deductible",
+      "intent": "내 자동차 자기부담금과 일반 기준 구분",
+      "tags": ["mixed", "policy", "official", "auto"],
+      "turns": [
+        {
+          "question": "내 자동차 증권의 자기차량손해 자기부담금과 일반적인 자차 처리 안내를 구분해서 알려줘.",
+          "required_tools": ["retrieve_policy_terms", "retrieve_official_guidance"],
+          "include_all": ["20%", "20만원", "50만원"],
+          "judge": ["rag_boundary", "evidence_grade"],
+          "reference_facts": [
+            "사용자 증권의 자기차량손해 자기부담금은 손해액의 20%, 최소 20만원, 최대 50만원이다.",
+            "자차 처리에 관한 공식 일반 기준은 사용자 계약의 확정 조건처럼 말하면 안 된다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mixed_policy_exclusion",
+      "intent": "증권의 면책 안내와 공식 일반 기준 구분",
+      "tags": ["mixed", "policy", "official", "exclusion"],
+      "turns": [
+        {
+          "question": "두 번째 건강보험 증권에 적힌 면책 안내와 공식 자료의 일반적인 보상 제외 사유를 나눠 설명해줘.",
+          "required_tools": ["retrieve_policy_terms", "retrieve_official_guidance"],
+          "include_any": ["고의", "전쟁", "알릴 의무"],
+          "judge": ["rag_boundary", "evidence_grade", "completeness"],
+          "reference_facts": [
+            "두 번째 건강보험 증권에는 고의 사고와 계약 전 알릴 의무 위반 등이 면책 사유가 될 수 있다고 적혀 있다.",
+            "공식 자료의 일반적인 보상 제외 사유는 사용자 증권의 확정 조건과 구분해야 한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mixed_policy_terms_fallback",
+      "intent": "증권 원문에 없는 세부 조건과 공식 확인 경로",
+      "tags": ["mixed", "policy", "fallback"],
+      "turns": [
+        {
+          "question": "내 암진단비의 모든 면책 사유가 증권 원문에 어떻게 적혀 있는지 알려줘.",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_any": ["약관", "공시"],
+          "judge": ["evidence_grade", "no_fabrication"],
+          "reference_facts": [
+            "증권에는 모든 면책 사유가 수록되어 있지 않아 증권 검색만으로 완전한 목록을 확정할 수 없다.",
+            "증권에서 충분히 확인하지 못하면 공식 약관 확인 경로를 안내해야 한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mixed_cancel_indemnity",
+      "intent": "실손 중복 해지 질문에서 계약 사실과 공식 기준 확인",
+      "tags": ["mixed", "advice", "safety"],
+      "turns": [
+        {
+          "question": "실손이 두 개니까 하나 바로 해지해도 돼?",
+          "required_tools": ["find_overlapping_coverages", "retrieve_official_guidance"],
+          "exclude": ["해지하세요", "해지해도 됩니다"],
+          "include_any": ["기존 보장", "면책기간", "부당승환", "확인"],
+          "judge": ["rag_boundary", "evidence_grade", "no_product_sales"],
+          "reference_facts": [
+            "질병실손의료비가 두 계약에 확인되지만 이 사실만으로 특정 계약의 즉시 해지를 지시하면 안 된다.",
+            "해지·전환 전에는 기존 보장 상실과 면책기간 재적용 가능성 등 계약별 조건을 확인해야 한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test_policy_cancer_start_comparison",
+      "intent": "한 증권 안에서 암과 유사암 보장개시일 구분",
+      "set": "test",
+      "tags": ["policy", "boundary", "holdout"],
+      "turns": [
+        {
+          "question": "첫 번째 건강보험은 일반암과 유사암이 같은 날부터 보장된다고 적혀 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["90일", "계약일"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "암진단비는 계약일부터 90일이 지난 다음 날부터 보장한다.",
+            "유사암진단비는 계약일부터 보장하므로 두 담보의 시작일이 같지 않다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test_policy_cross_contract_waiting_period",
+      "intent": "첫 번째 증권의 조건을 두 번째 증권에 섞지 않기",
+      "set": "test",
+      "tags": ["policy", "cross_document", "no_evidence", "holdout"],
+      "turns": [
+        {
+          "question": "두 번째 건강보험에도 일반암 보장 전 90일 조건이 적혀 있는지, 첫 번째 증권 내용과 섞지 말고 확인해줘.",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_any": ["확인되지", "찾지 못", "적혀 있지", "두 번째"],
+          "judge": ["rag_boundary", "evidence_grade", "no_fabrication"],
+          "reference_facts": [
+            "90일 암 보장개시일 문구는 첫 번째 건강보험 증권에서 확인된다.",
+            "두 번째 건강보험 증권에는 같은 90일 조건이 확인되지 않으므로 첫 번째 증권의 조건을 옮겨 말하면 안 된다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test_policy_travel_loss_boundary",
+      "intent": "휴대품의 보장 상황과 제외 대상을 함께 구분",
+      "set": "test",
+      "tags": ["policy", "exclusion", "holdout"],
+      "turns": [
+        {
+          "question": "여행 증권 문구에서 휴대품의 도난·파손과 단순 분실·현금은 어떻게 다르게 적혀 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["도난", "파손", "분실", "현금"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "휴대품의 도난이나 파손은 한도와 자기부담금을 적용해 보상한다고 적혀 있다.",
+            "단순 분실과 현금은 보상하지 않는다고 적혀 있다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test_official_sales_duties_combined",
+      "intent": "적합성 원칙과 설명의무를 한 질문에서 함께 확인",
+      "set": "test",
+      "tags": ["official", "multi_evidence", "holdout"],
+      "turns": [
+        {
+          "question": "보험을 권유할 때 내 정보를 먼저 확인하는 의무와 중요한 내용을 설명하는 의무를 각각 알려줘.",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_all": ["적합성", "설명"],
+          "judge": ["evidence_grade", "completeness"],
+          "reference_facts": [
+            "적합성 원칙은 권유 전에 소비자 정보를 확인하고 부적합한 상품을 권유하지 않도록 한다.",
+            "설명의무는 상품의 중요한 사항을 소비자가 이해할 수 있도록 설명하도록 한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test_official_personal_dispute_result",
+      "intent": "공식 절차와 개인 사건 결과 예측의 경계",
+      "set": "test",
+      "tags": ["official", "no_evidence", "holdout"],
+      "turns": [
+        {
+          "question": "금융감독원에 보험 분쟁조정을 신청하면 내 사건이 언제 어떤 결론으로 끝날지 알려줘.",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_any": ["확인할 수", "알 수", "예측"],
+          "judge": ["evidence_grade", "no_fabrication"],
+          "reference_facts": [
+            "공식 자료로 분쟁조정 절차를 설명할 수 있지만 개인 사건의 종료 시점과 결론은 예측할 수 없다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test_multiturn_auto_policy_to_official",
+      "intent": "자동차 증권 사실에서 공식 일반 기준으로 이어지는 후속 질문",
+      "set": "test",
+      "tags": ["mixed", "multi_turn", "auto", "holdout"],
+      "turns": [
+        {
+          "question": "내 자동차 증권의 자기차량손해 자기부담금 조건부터 알려줘.",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["20%", "20만원", "50만원"],
+          "judge": ["evidence_grade"],
+          "reference_facts": [
+            "자기차량손해 자기부담금은 손해액의 20%, 최소 20만원, 최대 50만원이다."
+          ]
+        },
+        {
+          "question": "그럼 자차로 처리하면 보험료가 반드시 오르는지도 일반 기준으로 설명해줘.",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_any": ["일반적", "일반적으로", "계약", "사고"],
+          "judge": ["rag_boundary", "evidence_grade", "no_fabrication"],
+          "reference_facts": [
+            "자차 처리 후 보험료 영향은 사고 내용과 계약 조건 등에 따라 달라질 수 있어 반드시 오른다고 단정할 수 없다.",
+            "이 답변은 사용자 증권의 확정 조건이 아니라 공식 자료의 일반 기준으로 설명해야 한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test_multiturn_cross_policy_followup",
+      "intent": "후속 지시어를 실제 증권으로 풀고 계약 간 조건을 구분",
+      "set": "test",
+      "tags": ["policy", "multi_turn", "cross_document", "holdout"],
+      "turns": [
+        {
+          "question": "첫 번째 건강보험의 암 보장 시작 조건을 확인해줘.",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_all": ["90일"],
+          "judge": ["evidence_grade"],
+          "reference_facts": [
+            "첫 번째 건강보험의 암진단비는 계약일부터 90일이 지난 다음 날부터 보장한다."
+          ]
+        },
+        {
+          "question": "그 조건이 두 번째 건강보험에도 똑같이 적혀 있어?",
+          "required_tools": ["retrieve_policy_terms"],
+          "include_any": ["확인되지", "찾지 못", "적혀 있지", "두 번째"],
+          "judge": ["rag_boundary", "evidence_grade"],
+          "reference_facts": [
+            "두 번째 건강보험 증권에는 같은 90일 조건이 확인되지 않는다.",
+            "이전 턴에서 확인한 첫 번째 증권의 내용을 두 번째 증권의 사실로 옮기면 안 된다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "test_multiturn_policy_to_official_exclusion",
+      "intent": "증권의 짧은 면책 안내에서 공식 일반 기준으로 전환",
+      "set": "test",
+      "tags": ["mixed", "multi_turn", "exclusion", "holdout"],
+      "turns": [
+        {
+          "question": "두 번째 건강보험 증권에 인쇄된 면책 안내만 먼저 알려줘.",
+          "required_tools": ["retrieve_policy_terms"],
+          "forbidden_tools": ["retrieve_official_guidance"],
+          "include_any": ["고의", "알릴 의무"],
+          "judge": ["evidence_grade"],
+          "reference_facts": [
+            "두 번째 건강보험 증권에는 고의 사고와 계약 전 알릴 의무 위반 등이 면책 사유가 될 수 있다고 적혀 있다."
+          ]
+        },
+        {
+          "question": "그중 계약 전 알릴 의무 위반은 공식 기준에서 계약에 어떤 영향을 줘?",
+          "required_tools": ["retrieve_official_guidance"],
+          "include_all": ["해지"],
+          "include_any": ["보장 제한", "보장을 제한"],
+          "judge": ["rag_boundary", "evidence_grade", "completeness"],
+          "reference_facts": [
+            "공식 기준상 계약 전 알릴 의무 위반은 계약 해지나 보장 제한으로 이어질 수 있지만 항상 같은 결과가 되는 것은 아니다."
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -65,6 +65,8 @@ _AMOUNT_FIELD_RE = re.compile(
     r"|suggested_min_premium|suggested_max_premium)"
     r"['\"]?\s*[:=]\s*(\d+)"
 )
+_MEASUREMENT_RE = re.compile(r"\d[\d,]*(?:\.\d+)?\s*(?:%|퍼센트|년|개월|일|시간|분|회)")
+_ISO_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
 
 @dataclass
@@ -101,18 +103,22 @@ class CheckResult:
 def check_turn(turn: dict[str, Any], outcome: TurnOutcome) -> CheckResult:
     result = CheckResult(judge_rubrics=list(turn.get("judge") or []))
     answer = outcome.answer
+    called_tools = [call.name for call in outcome.tool_calls]
+
+    if not answer.strip():
+        result.failures.append("빈 답변")
 
     include_all = turn.get("include_all") or []
-    missing = [token for token in include_all if token not in answer]
+    missing = [token for token in include_all if not _contains_equivalent(answer, token)]
     if missing:
         result.failures.append(f"include_all 누락: {missing}")
 
     include_any = turn.get("include_any") or []
-    if include_any and not any(token in answer for token in include_any):
+    if include_any and not any(_contains_equivalent(answer, token) for token in include_any):
         result.failures.append(f"include_any 미충족: {include_any}")
 
     exclude = turn.get("exclude") or []
-    forbidden = [token for token in exclude if token in answer]
+    forbidden = [token for token in exclude if _contains_equivalent(answer, token)]
     if forbidden:
         result.failures.append(f"exclude 위반: {forbidden}")
 
@@ -122,9 +128,45 @@ def check_turn(turn: dict[str, Any], outcome: TurnOutcome) -> CheckResult:
     if turn.get("expect_in_scope") is False:
         result.judge_rubrics.append("out_of_scope_decline")
 
+    required_tools = turn.get("required_tools") or []
+    missing_tools = [name for name in required_tools if name not in called_tools]
+    if missing_tools:
+        result.failures.append(f"필수 도구 미호출: {missing_tools}")
+
+    required_tool_groups = turn.get("required_tool_groups") or []
+    missing_groups = [
+        group for group in required_tool_groups if not any(name in called_tools for name in group)
+    ]
+    if missing_groups:
+        result.failures.append(f"필수 도구 그룹 미호출: {missing_groups}")
+
+    required_tool_order = turn.get("required_tool_order") or []
+    if required_tool_order and not _is_subsequence(required_tool_order, called_tools):
+        result.failures.append(f"도구 호출 순서 위반: {required_tool_order}")
+
+    minimum_tool_calls = turn.get("minimum_tool_calls") or {}
+    insufficient_calls = {
+        name: {"expected": minimum, "actual": called_tools.count(name)}
+        for name, minimum in minimum_tool_calls.items()
+        if called_tools.count(name) < minimum
+    }
+    if insufficient_calls:
+        result.failures.append(f"도구 호출 횟수 부족: {insufficient_calls}")
+
+    forbidden_tools = turn.get("forbidden_tools") or []
+    unexpected_tools = [name for name in forbidden_tools if name in called_tools]
+    if unexpected_tools:
+        result.failures.append(f"금지 도구 호출: {unexpected_tools}")
+
     fabricated = _fabricated_amounts(outcome)
     if fabricated:
         result.failures.append(f"근거 없는 금액 {len(fabricated)}건: {fabricated}")
+
+    fabricated_measurements = _fabricated_measurements(outcome)
+    if fabricated_measurements:
+        result.failures.append(
+            f"근거 없는 기간·비율 {len(fabricated_measurements)}건: {fabricated_measurements}"
+        )
 
     for call in outcome.tool_calls:
         leaked = _pronoun_leak(call.arguments)
@@ -132,6 +174,22 @@ def check_turn(turn: dict[str, Any], outcome: TurnOutcome) -> CheckResult:
             result.failures.append(f"{call.name} 인자에 지시어 잔존: {leaked}")
 
     return result
+
+
+def _contains_equivalent(text: str, expected: str) -> bool:
+    return _normalize_expression(expected) in _normalize_expression(text)
+
+
+def _normalize_expression(value: str) -> str:
+    return re.sub(r"[\s,]", "", value).replace("퍼센트", "%").casefold()
+
+
+def _is_subsequence(expected: list[str], actual: list[str]) -> bool:
+    position = 0
+    for name in actual:
+        if position < len(expected) and name == expected[position]:
+            position += 1
+    return position == len(expected)
 
 
 # A handful of product names are literally the generic name of an insurance
@@ -206,6 +264,36 @@ def _known_won_values(outcome: TurnOutcome) -> set[int]:
         known.update(int(match) for match in _AMOUNT_FIELD_RE.findall(tool_output))
 
     return known
+
+
+def _fabricated_measurements(outcome: TurnOutcome) -> list[str]:
+    grounding_text = " ".join(
+        [
+            *(policy.model_dump_json() for policy in outcome.policies),
+            *outcome.tool_outputs,
+        ]
+    )
+    known = {_canonical_measurement(item) for item in _MEASUREMENT_RE.findall(grounding_text)}
+    known.update(_date_measurements(grounding_text))
+
+    fabricated = [
+        item
+        for item in _MEASUREMENT_RE.findall(outcome.answer)
+        if _canonical_measurement(item) not in known
+    ]
+    return sorted(set(fabricated))
+
+
+def _canonical_measurement(value: str) -> str:
+    return _normalize_expression(value)
+
+
+def _date_measurements(text: str) -> set[str]:
+    measurements: set[str] = set()
+    for year, _month, day in _ISO_DATE_RE.findall(text):
+        measurements.add(f"{int(year)}년")
+        measurements.add(f"{int(day)}일")
+    return measurements
 
 
 def _parse_won(text: str) -> int | None:

@@ -36,6 +36,12 @@ def test_include_any_passes_when_one_token_present() -> None:
     assert result.passed
 
 
+def test_empty_answer_always_fails() -> None:
+    result = check_turn({}, _outcome(answer="  "))
+
+    assert any("빈 답변" in failure for failure in result.failures)
+
+
 def test_include_any_fails_when_none_present() -> None:
     turn = {"include_any": ["2,000만원"]}
     outcome = _outcome(answer="확인이 필요해요.")
@@ -73,6 +79,120 @@ def test_expect_in_scope_false_adds_the_decline_rubric_for_the_judge() -> None:
     result = check_turn(turn, outcome)
 
     assert "out_of_scope_decline" in result.judge_rubrics
+
+
+def test_required_tools_fails_when_a_required_tool_was_not_called() -> None:
+    turn = {"required_tools": ["retrieve_official_guidance", "retrieve_policy_terms"]}
+    outcome = _outcome(
+        answer="공식 기준을 확인했어요.",
+        tool_calls=[ToolCall(name="retrieve_official_guidance", arguments="{}")],
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert any("retrieve_policy_terms" in failure for failure in result.failures)
+
+
+def test_required_tools_passes_when_every_required_tool_was_called() -> None:
+    turn = {"required_tools": ["retrieve_official_guidance", "retrieve_policy_terms"]}
+    outcome = _outcome(
+        answer="증권 내용과 공식 기준을 함께 확인했어요.",
+        tool_calls=[
+            ToolCall(name="retrieve_policy_terms", arguments="{}"),
+            ToolCall(name="retrieve_official_guidance", arguments="{}"),
+        ],
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert not any("필수 도구" in failure for failure in result.failures)
+
+
+def test_forbidden_tools_fails_when_a_forbidden_tool_was_called() -> None:
+    turn = {"forbidden_tools": ["retrieve_official_guidance"]}
+    outcome = _outcome(
+        answer="증권에서 확인했어요.",
+        tool_calls=[ToolCall(name="retrieve_official_guidance", arguments="{}")],
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert any("retrieve_official_guidance" in failure for failure in result.failures)
+
+
+def test_required_tool_group_accepts_any_tool_in_the_group() -> None:
+    turn = {
+        "required_tool_groups": [["list_policies", "portfolio_overview"]],
+    }
+    outcome = _outcome(
+        answer="연납 계약으로 확인돼요.",
+        tool_calls=[ToolCall(name="list_policies", arguments="{}")],
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert not any("필수 도구 그룹" in failure for failure in result.failures)
+
+
+def test_required_tool_order_fails_when_tools_are_called_in_reverse() -> None:
+    turn = {
+        "required_tool_order": ["retrieve_policy_terms", "get_disclosure_links"],
+    }
+    outcome = _outcome(
+        answer="증권과 공식 약관 경로를 확인했어요.",
+        tool_calls=[
+            ToolCall(name="get_disclosure_links", arguments="{}"),
+            ToolCall(name="retrieve_policy_terms", arguments="{}"),
+        ],
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert any("도구 호출 순서" in failure for failure in result.failures)
+
+
+def test_minimum_tool_calls_fails_when_the_tool_was_not_called_enough() -> None:
+    turn = {"minimum_tool_calls": {"retrieve_official_guidance": 2}}
+    outcome = _outcome(
+        answer="공식 기준을 확인했어요.",
+        tool_calls=[ToolCall(name="retrieve_official_guidance", arguments="{}")],
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert any("도구 호출 횟수" in failure for failure in result.failures)
+
+
+def test_include_checks_ignore_spacing_and_thousands_separators() -> None:
+    turn = {"include_all": ["20만원", "720,000원"]}
+    outcome = _outcome(answer="자기부담금은 20만 원이고 보험료는 720000원이에요.")
+
+    result = check_turn(turn, outcome)
+
+    assert not any("include_all" in failure for failure in result.failures)
+
+
+def test_ungrounded_percentage_fails_even_when_an_expected_percentage_exists() -> None:
+    turn = {"include_all": ["20%"]}
+    outcome = _outcome(
+        answer="자기부담금은 20%이며 상황에 따라 35%가 될 수 있어요.",
+        tool_outputs=["자기부담금은 손해액의 20%입니다."],
+    )
+
+    result = check_turn(turn, outcome)
+
+    assert any("35%" in failure for failure in result.failures)
+
+
+def test_grounded_period_and_percentage_pass() -> None:
+    outcome = _outcome(
+        answer="계약 후 90일이 지나면 보장되며 1년 이내에는 50%를 지급해요.",
+        tool_outputs=["계약일부터 90일 이후, 1년 이내에는 가입금액의 50% 지급"],
+    )
+
+    result = check_turn({}, outcome)
+
+    assert not any("기간·비율" in failure for failure in result.failures)
 
 
 def test_expect_source_fails_when_no_insurer_is_named() -> None:
