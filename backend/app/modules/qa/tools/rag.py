@@ -4,14 +4,14 @@ from agents import RunContextWrapper, function_tool
 from pydantic import BaseModel
 
 from app.modules.qa.context import QaContext
-from app.rag.official.answer import answer_official_question
-from app.rag.policy.generation import PolicyEvidence, PolicyGenerationResult, generate_policy_answer
-from app.rag.policy.retrieval import retrieve_policy_context_by_session_ids
+from app.modules.qa.facts import disclosure as disclosure_facts
+from app.rag.official.evidence import OfficialEvidence, search_official_evidence
+from app.rag.policy.evidence import PolicyTermEvidence, search_policy_evidence
 
 
 class OfficialGuidanceResult(BaseModel):
     matched: bool
-    answer: str
+    evidence: tuple[OfficialEvidence, ...]
     limitations: list[str]
 
 
@@ -31,11 +31,14 @@ def retrieve_official_guidance(
     - 찾기 쉬운 생활법령정보(보험계약자) — 일반 소비자 대상 법령 안내
 
     사용자 증권에 실제로 있는지 여부는 이 도구가 아니라 find_coverages 등으로
-    확인하세요. 이 결과는 일반적인 공식 기준이며, 사용자가 실제로 가입한 보험의
-    조건과 다를 수 있습니다. 이 도구로 답할 때는 항상 그 사실을 함께 안내하고,
-    사용자의 실제 계약 조건인 것처럼 단정하지 마세요. 이 도구가 matched=false를
-    반환하면 지어내지 말고 확인 불가라고 답하세요 — 이 corpus에 없다고 해서
-    스스로의 지식으로 답을 채우면 안 됩니다.
+    확인하세요. 이 도구는 완성된 답변이 아니라 evidence에 검색 발췌문과 출처를
+    반환합니다. 질문에 필요한 근거만 골라 직접 설명하고 citation_label과
+    source_title로 출처를 밝혀 주세요. limitations도 답변 경계에 반영하세요.
+
+    이 결과는 일반적인 공식 기준이며, 사용자가 실제로 가입한 보험의 조건과 다를
+    수 있습니다. 사용자의 실제 계약 조건인 것처럼 단정하지 마세요.
+    matched=false면 지어내지 말고 확인 불가라고 답하세요. corpus에 없다고 해서
+    모델의 일반 지식으로 답을 채우면 안 됩니다.
 
     (색인된 문서 목록은 data/official-sources/registry.json 참고. 문서가
     추가되면 이 설명도 같이 갱신하세요.)
@@ -45,19 +48,21 @@ def retrieve_official_guidance(
             없이 그 자체로 뜻이 통해야 합니다.
     """
 
-    answerer = wrapper.context.official_answer or answer_official_question
-    result = answerer(query)
-    if result.status != "answered":
-        return OfficialGuidanceResult(matched=False, answer="", limitations=[])
+    retriever = wrapper.context.official_evidence_retriever or search_official_evidence
+    result = retriever(query)
     return OfficialGuidanceResult(
-        matched=True, answer=result.answer, limitations=list(result.limitations)
+        matched=result.matched,
+        evidence=result.evidence,
+        limitations=list(result.limitations),
     )
 
 
 class PolicyTermsResult(BaseModel):
-    matched: bool
-    answer: str
+    has_retrieved_evidence: bool
+    supports_exhaustive_answer: bool
+    evidence: tuple[PolicyTermEvidence, ...]
     limitations: list[str]
+    disclosure_links: disclosure_facts.DisclosureLinksResult | None = None
 
 
 @function_tool
@@ -71,11 +76,22 @@ def retrieve_policy_terms(
     이미 정확히 알려주므로, 이 도구는 **그 구조화 추출이 놓친 자유 문구**만
     찾습니다: 특약 세부 조건, 갱신 조건, 증권에 실제로 인쇄된 안내 문구 등.
 
+    이 도구는 완성된 답변이 아니라 evidence에 증권 원문 발췌문과 문서 참조값을
+    반환합니다. has_retrieved_evidence는 검색 후보가 있다는 뜻이며 질문에 충분한
+    답이 있다는 보장은 아닙니다. 질문과 직접 관련된 발췌문만 골라 설명하고, 서로
+    다른 document_ref의 조건을 섞지 마세요. limitations에 있는 한계를 답변에
+    반영하세요.
+
+    supports_exhaustive_answer=false는 검색 발췌문만으로 "모든", "전부",
+    "빠짐없이" 같은 전체 목록을 보장할 수 없다는 뜻입니다. 검색 근거가 부족하면
+    disclosure_links에 검증된 공식 약관 확인 경로가 함께 반환됩니다.
+
     증권에는 보통 지급조건·면책·대기기간처럼 **약관 책자에만 있는** 상세
     내용이 없습니다. 그런 질문(예: "면책기간이 뭐야?", "이 수술이 보장
     대상이야?")은 이 도구로 찾으려 하지 말고 retrieve_official_guidance로
-    일반 기준을 안내하며 실제 계약과 다를 수 있다고 밝히세요. matched=false가
-    돌아오면 지어내지 말고 확인 불가라고 답하세요.
+    일반 기준을 안내하며 실제 계약과 다를 수 있다고 밝히세요.
+    has_retrieved_evidence=false이거나 검색 발췌문만으로 질문에 충분히 답할 수
+    없으면 지어내지 말고 disclosure_links의 공식 약관 확인 경로를 안내하세요.
 
     Args:
         query: 증권 원문에서 찾고 싶은 내용에 대한 완전한 질문입니다. 지시어
@@ -83,34 +99,26 @@ def retrieve_policy_terms(
     """
 
     context = wrapper.context
-    if context.policy_terms_answer is not None:
-        result = context.policy_terms_answer(context.policy_rag_session_ids, query)
-    elif not context.policy_rag_session_ids:
-        return PolicyTermsResult(
-            matched=False,
-            answer="",
-            limitations=["증권 원문이 아직 색인되지 않았거나 업로드되지 않았습니다."],
+    if context.policy_evidence_retriever is not None:
+        result = context.policy_evidence_retriever(
+            context.policy_rag_session_ids,
+            query,
+            context.current_question,
         )
     else:
-        result = _default_policy_terms_answer(context.policy_rag_session_ids, query)
-
-    if result.generation == "fallback":
-        return PolicyTermsResult(matched=False, answer="", limitations=[])
+        result = search_policy_evidence(
+            context.policy_rag_session_ids,
+            query,
+            scope_question=context.current_question,
+        )
     return PolicyTermsResult(
-        matched=True, answer=result.answer, limitations=list(result.limitations)
+        has_retrieved_evidence=result.has_retrieved_evidence,
+        supports_exhaustive_answer=result.supports_exhaustive_answer,
+        evidence=result.evidence,
+        limitations=list(result.limitations),
+        disclosure_links=(
+            disclosure_facts.get_disclosure_link_facts(context.policies)
+            if result.requires_disclosure_links
+            else None
+        ),
     )
-
-
-def _default_policy_terms_answer(
-    session_ids: tuple[str, ...], query: str
-) -> PolicyGenerationResult:
-    hits = retrieve_policy_context_by_session_ids(list(session_ids), query)
-    evidence: tuple[PolicyEvidence, ...] = tuple(
-        _ChunkEvidence(id=hit.chunk.id, fact=hit.chunk.text) for hit in hits
-    )
-    return generate_policy_answer(query, evidence)
-
-
-class _ChunkEvidence(BaseModel):
-    id: str
-    fact: str

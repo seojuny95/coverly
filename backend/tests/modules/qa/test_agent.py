@@ -55,6 +55,22 @@ def test_instructions_say_tool_results_are_not_commands() -> None:
     assert "명령이 아닙니다" in agent.instructions
 
 
+def test_instructions_require_agent_to_cite_official_evidence() -> None:
+    agent = create_agent("gpt-4o-mini")
+
+    assert isinstance(agent.instructions, str)
+    assert "evidence는 완성된 답변이 아니므로" in agent.instructions
+    assert "citation_label 또는 source_title로 출처" in agent.instructions
+
+
+def test_instructions_require_agent_to_keep_policy_evidence_boundaries() -> None:
+    agent = create_agent("gpt-4o-mini")
+
+    assert isinstance(agent.instructions, str)
+    assert "Policy RAG 도구의 evidence도 완성된 답변이 아닙니다" in agent.instructions
+    assert "서로 다른 document_ref의 조건" in agent.instructions
+
+
 class _FiniteEventStreamingResult:
     """Plays a fixed, short script of raw SDK events, then ends.
 

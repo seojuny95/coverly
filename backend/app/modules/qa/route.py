@@ -167,7 +167,11 @@ async def _build_event_stream(
                 turns_remaining=turns_remaining,
             )
         )
-        context = QaContext(policies=policies, policy_rag_session_ids=policy_rag_session_ids)
+        context = QaContext(
+            policies=policies,
+            current_question=question,
+            policy_rag_session_ids=policy_rag_session_ids,
+        )
         agent = create_agent(model)
         conversation: list[ConversationMessage] = [
             ConversationMessage(role=message.role, content=message.content) for message in history

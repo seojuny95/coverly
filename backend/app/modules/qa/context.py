@@ -4,16 +4,17 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.modules.portfolio.schemas import PolicyInput
-from app.rag.official.answer import RagAnswer
-from app.rag.policy.generation import PolicyGenerationResult
+from app.rag.official.evidence import OfficialEvidenceResult
+from app.rag.policy.evidence import PolicyEvidenceResult
 
-OfficialAnswerer = Callable[[str], RagAnswer]
-PolicyTermsAnswerer = Callable[[tuple[str, ...], str], PolicyGenerationResult]
+OfficialEvidenceRetriever = Callable[[str], OfficialEvidenceResult]
+PolicyEvidenceRetriever = Callable[[tuple[str, ...], str, str], PolicyEvidenceResult]
 
 
 @dataclass
 class QaContext:
     policies: list[PolicyInput]
+    current_question: str = ""
     policy_rag_session_ids: tuple[str, ...] = ()
-    official_answer: OfficialAnswerer | None = None
-    policy_terms_answer: PolicyTermsAnswerer | None = None
+    official_evidence_retriever: OfficialEvidenceRetriever | None = None
+    policy_evidence_retriever: PolicyEvidenceRetriever | None = None

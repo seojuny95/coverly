@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
@@ -10,6 +9,10 @@ from pydantic import BaseModel, Field
 
 from app.core.generation import GenerationMode
 from app.integrations.openai import JsonCompleter, dump_prompt_json, structured_completer
+from app.rag.policy.boundaries import (
+    requires_unavailable_policy_context,
+    safe_policy_evidence_fact,
+)
 
 _UNSAFE_POLICY_TEXT = (
     "면책이 없",
@@ -57,35 +60,6 @@ _PERSONAL_VERDICT_SUBJECTS = (
     "따라서",
 )
 _CERTAINTY_TERMS = ("무조건", "반드시", "확실히", "틀림없이")
-_PERSONAL_CONTEXT_TERMS = ("내가", "제가", "저는", "나는", "저에게", "나한테")
-_TIME_CONTEXT_TERMS = ("오늘", "어제", "방금", "지난주", "지난달")
-_INCIDENT_TERMS = ("진단", "확진", "사고", "다친", "입원", "수술", "치료")
-_COMPLETED_INCIDENT_TERMS = (
-    "진단받았",
-    "진단 받았",
-    "진단을 받았",
-    "확진받았",
-    "확진 받았",
-    "확진을 받았",
-    "확진됐",
-    "사고가 났",
-    "사고 났",
-    "다쳤",
-    "입원했",
-    "수술했",
-    "치료받았",
-    "치료 받았",
-    "치료를 받았",
-)
-_CLAIM_VERDICT_TERMS = (
-    "받을 수",
-    "받을수",
-    "나와",
-    "지급",
-    "보상",
-    "청구 가능",
-    "해당",
-)
 
 
 def _markdown_section(title: str, content: str) -> str:
@@ -127,7 +101,10 @@ def generate_policy_answer(
     normalized_question = " ".join(question.split())
     if not normalized_question or not evidence:
         return _fallback()
-    if _requires_unavailable_policy_context(normalized_question, evidence):
+    if requires_unavailable_policy_context(
+        normalized_question,
+        [item.fact for item in evidence],
+    ):
         return _fallback()
 
     try:
@@ -145,7 +122,7 @@ def generate_policy_answer(
         return _fallback()
 
     confirmed_facts = tuple(
-        _safe_evidence_fact(evidence_by_id[item_id].fact) for item_id in evidence_ids
+        safe_policy_evidence_fact(evidence_by_id[item_id].fact) for item_id in evidence_ids
     )
     if any(not fact for fact in confirmed_facts):
         return _fallback()
@@ -226,89 +203,6 @@ def _question_invites_guidance(question: str) -> bool:
         term in question
         for term in ("어떻게 준비", "어떻게 볼", "검토", "고려", "추천", "줄일", "늘릴")
     )
-
-
-def _requires_unavailable_policy_context(
-    question: str, evidence: tuple[PolicyEvidence, ...]
-) -> bool:
-    evidence_text = " ".join(item.fact for item in evidence)
-    if _asks_personal_adequacy(question):
-        return True
-    if _asks_exact_renewal_value(question):
-        return True
-    if _asks_actual_incident_verdict(question):
-        return True
-    if _asks_complete_claim_documents(question) and "서류" not in evidence_text:
-        return True
-    if _asks_missing_beneficiary(question, evidence_text):
-        return True
-    return _asks_missing_exclusion_confirmation(question, evidence_text)
-
-
-def _asks_personal_adequacy(question: str) -> bool:
-    return any(term in question for term in ("부족", "충분")) and any(
-        term in question for term in ("가족력", "소득", "부양", "자녀", "내 상황")
-    )
-
-
-def _asks_exact_renewal_value(question: str) -> bool:
-    if "갱신" not in question:
-        return False
-    asks_exact_amount = "정확히" in question and "얼마" in question
-    asks_exact_rate = any(term in question for term in ("몇 퍼센트", "몇%", "인상률", "오르는지"))
-    return asks_exact_amount or asks_exact_rate
-
-
-def _asks_actual_incident_verdict(question: str) -> bool:
-    asks_for_verdict = any(term in question for term in _CLAIM_VERDICT_TERMS)
-    if not asks_for_verdict:
-        return False
-
-    describes_completed_incident = any(term in question for term in _COMPLETED_INCIDENT_TERMS)
-    has_contextual_incident = any(term in question for term in _INCIDENT_TERMS) and (
-        any(term in question for term in _PERSONAL_CONTEXT_TERMS)
-        or any(term in question for term in _TIME_CONTEXT_TERMS)
-    )
-    return describes_completed_incident or has_contextual_incident
-
-
-def _asks_complete_claim_documents(question: str) -> bool:
-    return "서류" in question and any(
-        term in question for term in ("정확히", "전부", "모두", "빠짐없이")
-    )
-
-
-def _asks_missing_beneficiary(question: str, evidence_text: str) -> bool:
-    if any(term in question for term in ("확인되는 것만", "확인된 것만")):
-        return False
-    if not any(term in question for term in ("수익자", "누가 받", "누구에게 지급")):
-        return False
-    return "수익자" not in evidence_text
-
-
-def _asks_missing_exclusion_confirmation(question: str, evidence_text: str) -> bool:
-    if not any(term in question for term in ("제외", "면책", "보상하지")):
-        return False
-    return not any(term in evidence_text for term in ("제외", "면책", "보상하지"))
-
-
-_PROMPT_INJECTION_MARKERS = (
-    "이전 지시",
-    "시스템 지시",
-    "지시를 무시",
-    "답하라",
-    "출력하라",
-    "추천하라",
-    "권유하라",
-)
-
-
-def _safe_evidence_fact(fact: str) -> str:
-    parts = re.split(r"(?<=[.!?])\s+", fact.strip())
-    kept = [
-        part for part in parts if not any(marker in part for marker in _PROMPT_INJECTION_MARKERS)
-    ]
-    return " ".join(kept).strip()
 
 
 def _safe_unique_texts(
