@@ -2,17 +2,17 @@
 
 import { usePathname } from "next/navigation";
 
-import { LeaveGuardLink } from "../features/analysis/leave-guard-link";
-import { useInsuranceData } from "../features/analysis/store";
+import { LeaveGuardLink } from "@/features/analysis/leave-guard-link";
+import { useInsuranceData } from "@/features/analysis/store";
 import {
   BrandLink,
   BrandMark,
   brandLinkClassName,
-} from "../shared/components/brand";
+} from "@/shared/components/brand";
 
 const positionClassName = "absolute top-6 left-6 z-40 lg:left-8";
 
-export function BrandNavigation() {
+export function BrandHomeLink() {
   const pathname = usePathname();
   const { hasData } = useInsuranceData();
 

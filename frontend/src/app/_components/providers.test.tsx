@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useQuery } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { Providers } from "./providers";
-import { useInsuranceData } from "../features/analysis/store";
-import { POLICY_RESULT_DEFAULTS } from "../test/api-fixtures";
+import { useInsuranceData } from "@/features/analysis/store";
+import { POLICY_RESULT_DEFAULTS } from "@/test/api-fixtures";
 
 const navigation = vi.hoisted(() => ({ pathname: "/upload" }));
 

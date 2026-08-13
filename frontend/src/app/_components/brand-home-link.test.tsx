@@ -2,9 +2,9 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { renderWithProviders } from "../test/render-with-providers";
-import { POLICY_RESULT_DEFAULTS } from "../test/api-fixtures";
-import { BrandNavigation } from "./brand-navigation";
+import { renderWithProviders } from "@/test/render-with-providers";
+import { POLICY_RESULT_DEFAULTS } from "@/test/api-fixtures";
+import { BrandHomeLink } from "./brand-home-link";
 
 const navigation = vi.hoisted(() => ({
   pathname: "/",
@@ -16,10 +16,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: navigation.push }),
 }));
 
-describe("BrandNavigation", () => {
+describe("BrandHomeLink", () => {
   it("renders a direct home link outside the analysis route", () => {
     navigation.pathname = "/upload";
-    renderWithProviders(<BrandNavigation />);
+    renderWithProviders(<BrandHomeLink />);
 
     expect(screen.getByRole("link", { name: "Coverly AI 홈" })).toHaveAttribute(
       "href",
@@ -30,7 +30,7 @@ describe("BrandNavigation", () => {
   it("guards the home link when analysis data would be lost", async () => {
     navigation.pathname = "/analysis";
     const user = userEvent.setup();
-    renderWithProviders(<BrandNavigation />, {
+    renderWithProviders(<BrandHomeLink />, {
       initialAnalysis: {
         generatedAt: "2026-07-19T00:00:00.000Z",
         portfolioSessionToken: "test-token",

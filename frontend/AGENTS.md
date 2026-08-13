@@ -22,16 +22,18 @@ pnpm format
 
 ## Project Structure
 
-라우트는 얇게 유지하고 화면 로직은 `features/`의 기능 폴더로 분리한다.
+라우트 파일은 얇게 유지한다. 루트 레이아웃과 랜딩 전용 UI는
+`app/_components/`에 함께 두고, 업로드·분석처럼 상태와 API 호출을 포함하는 제품
+기능은 `features/`로 분리한다.
 
 ```text
 src/
-├── app/                         # App Router 페이지 (얇은 진입점)
-│   ├── page.tsx                 # 랜딩
-│   ├── upload/page.tsx          # 업로드
-│   ├── analysis/page.tsx        # 분석 결과
-│   ├── layout.tsx / globals.css # 전역 레이아웃, 공통 브랜드 내비게이션
-│   ├── brand-navigation.tsx / providers.tsx
+├── app/                         # App Router 라우트와 루트 전용 코드
+│   ├── _components/             # 루트 레이아웃·랜딩 전용 UI와 인접 테스트
+│   ├── page.tsx                 # 랜딩 조립
+│   ├── upload/page.tsx          # 업로드 진입점
+│   ├── analysis/page.tsx        # 분석 결과 진입점
+│   ├── layout.tsx / globals.css # 전역 레이아웃과 스타일
 │   └── error.tsx / global-error.tsx / not-found.tsx
 ├── features/
 │   ├── upload/                  # 업로드 폼, 진행 화면, 업로드 API
@@ -56,7 +58,7 @@ src/
 프론트엔드 리뷰는 UI가 서버 사실을 왜곡하지 않고, Next.js/React 경계를 지키는지 우선 확인한다.
 
 - **서버 사실을 만들지 않는가**: 분석 총평, 보장 판단, 기준금액, 출처를 프론트에서 synthetic fallback으로 생성하지 않는다. 서버가 실패하면 재시도/오류/미확인을 보여준다.
-- **컴포넌트 경계가 명확한가**: route file은 얇게 유지하고, 화면 상태·API 호출·표시 로직은 `features/` 안에서 기능별로 나눈다. 독립적으로 이름 붙일 수 있는 상태 관리·파생 계산·화면 섹션이 한 파일에 쌓이면 hook, helper, 하위 컴포넌트로 분리한다.
+- **컴포넌트 경계가 명확한가**: route file은 얇게 유지한다. 라우트 전용 UI는 가까운 `app/_components/`에 두고, 상태·API 호출을 포함하는 제품 기능은 `features/` 안에서 기능별로 나눈다. 독립적으로 이름 붙일 수 있는 상태 관리·파생 계산·화면 섹션이 한 파일에 쌓이면 hook, helper, 하위 컴포넌트로 분리한다.
 - **공통 경계를 놓치지 않는가**: 둘 이상의 화면이나 기능에서 재사용할 수 있는 UI와 hook을 각 사용처에 복제하지 않는다. 앱 전체에서 쓰는 UI는 `shared/components/`에 두고, 한 기능 안에서만 공유하면 해당 `features/*/` 안의 공통 컴포넌트나 hook으로 둔다. 이름만 공통인 억지 추상화는 만들지 않되, 같은 동작·접근성·스타일 규칙의 중복은 공통 경계로 올린다.
 - **공용 UI를 우회하지 않는가**: 버튼처럼 앱 전체에서 동작·접근성·스타일이 같아야 하는 요소는 `shared/components/ui/`의 shadcn/ui 컴포넌트를 사용한다. 링크를 버튼처럼 표시할 때는 별도 class 문자열을 복제하지 않고 `Button`의 `asChild`를 사용한다.
 - **Next.js/React 관용 방식인가**: 기본은 Server Components이고, 상호작용·브라우저 API·client state가 필요한 파일에만 `"use client"`를 둔다. 불필요한 client boundary를 만들지 않는다.

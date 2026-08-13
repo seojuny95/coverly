@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
-import { BrandNavigation } from "./brand-navigation";
-import { Providers } from "./providers";
+import { BrandHomeLink } from "./_components/brand-home-link";
+import { Providers } from "./_components/providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +33,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <Providers>
-          <BrandNavigation />
+          <BrandHomeLink />
           {children}
         </Providers>
         <Analytics />

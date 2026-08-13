@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   InsuranceDataProvider,
   useInsuranceData,
-} from "../features/analysis/store";
+} from "@/features/analysis/store";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 
 // In-memory only: no persister. Cache is intentionally lost on full reload so
