@@ -1,7 +1,7 @@
-"use client";
-
 import { useEffect, useState } from "react";
-import { BrandMark } from "../../shared/components/brand";
+import { BrandMark } from "@/shared/components/brand";
+import type { UploadSurface } from "../types";
+import type { UploadInFlightState } from "./upload-state";
 
 const ANALYSIS_STEP_MESSAGES = [
   "증권에서 보장 내용을 찾고 있어요",
@@ -17,19 +17,19 @@ const COMPLETE_MESSAGE = "다 읽었어요. 결과를 보여드릴게요.";
 // Full-screen (page) / inline (modal) progress view shown while uploads are in
 // flight. Owns its own trickle/message/elapsed timers; the caller only feeds it
 // milestone progress and the per-file done/reading state.
-export function AnalysisProgress({
+export function PolicyAnalysisProgress({
   progress,
   files,
   surface,
-  isCompleting = false,
-  isPreparingServer = false,
+  phase,
 }: {
   progress: { completed: number; total: number };
   files: Array<{ name: string; status: "done" | "reading" | "waiting" }>;
-  surface: "page" | "modal";
-  isCompleting?: boolean;
-  isPreparingServer?: boolean;
+  surface: UploadSurface;
+  phase: UploadInFlightState["phase"];
 }) {
+  const isCompleting = phase === "completing";
+  const isPreparingServer = phase === "preparing-server";
   const milestonePercent =
     progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
   // Trickle only fills up to 90% of the in-flight file's share; real

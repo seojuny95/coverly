@@ -2,6 +2,7 @@ import { apiResponseError, apiUrl } from "../../shared/api/client";
 import {
   AppRequestError,
   GENERIC_REQUEST_ERROR_MESSAGE,
+  isAbortError,
 } from "../../shared/api/errors";
 import {
   ApiRequestTimeoutError,
@@ -143,7 +144,7 @@ async function request(
     );
   } catch (error) {
     if (error instanceof ApiRequestTimeoutError) throw error;
-    if (error instanceof Error && error.name === "AbortError") throw error;
+    if (isAbortError(error)) throw error;
     throw new PortfolioSessionRequestError(error);
   }
 

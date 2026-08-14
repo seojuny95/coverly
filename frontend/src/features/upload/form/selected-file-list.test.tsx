@@ -1,11 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { SelectedFileList } from "./file-list";
-import type { SelectedUploadFile } from "./types";
+import { SelectedFileList } from "./selected-file-list";
+import type { SelectedPolicyFile } from "../types";
 
 function file(
-  overrides: Partial<SelectedUploadFile> & { id: string; name: string },
-): SelectedUploadFile {
+  overrides: Partial<SelectedPolicyFile> & { id: string; name: string },
+): SelectedPolicyFile {
   const { name, ...rest } = overrides;
   return {
     status: "idle",

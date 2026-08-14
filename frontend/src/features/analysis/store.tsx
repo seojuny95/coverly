@@ -7,28 +7,14 @@ import {
   useMemo,
   useState,
 } from "react";
-import type { InsurancePolicyResult } from "../upload/api";
+import type { AnalyzedInsurance, InsuranceAnalysis } from "./types";
 import { getPolicyIdentityKeys } from "./policy-identity";
 import {
   deletePortfolioSession,
   type PortfolioSessionResult,
 } from "./session-api";
 
-export type AnalyzedInsurance = {
-  id: string;
-  fileName: string;
-  fileFingerprint?: string;
-  result: InsurancePolicyResult;
-};
-
-export type InsuranceAnalysis = {
-  generatedAt: string;
-  selectedName?: string;
-  portfolioSessionToken: string;
-  portfolioSessionExpiresAt: string;
-  counselTurnsRemaining: number;
-  insuranceDocuments: AnalyzedInsurance[];
-};
+export type { AnalyzedInsurance, InsuranceAnalysis } from "./types";
 
 // Merge by document id first, then by policy identity as a defensive boundary.
 export function mergeInsuranceAnalysis(
@@ -72,12 +58,6 @@ export function mergeInsuranceAnalysis(
     ),
     insuranceDocuments: [...byId.values()],
   };
-}
-
-export function getInsuredPersonName(
-  insuranceDocument: AnalyzedInsurance,
-): string | null {
-  return insuranceDocument.result.기본정보?.피보험자?.trim() || null;
 }
 
 type InsuranceDataValue = {

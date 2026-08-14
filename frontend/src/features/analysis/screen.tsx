@@ -7,7 +7,7 @@ import { forwardRef, type ReactNode, useMemo, useState } from "react";
 import { SectionLabel } from "../../shared/components/section-label";
 import { Button } from "@/shared/components/ui/button";
 
-import { UploadInsuranceModal } from "./upload-modal";
+import { UploadPolicyDocumentModal } from "./upload-modal";
 import {
   type AnalyzedInsurance,
   type InsuranceAnalysis,
@@ -18,7 +18,7 @@ import { useBeforeUnloadGuard } from "./use-leave-guard";
 import { useTabNavigation } from "./use-tab-navigation";
 import { useExpandedRows } from "./use-expanded-rows";
 import { InsuranceListPanel } from "./insurance-list-panel";
-import type { UploadInsurance } from "../upload/form";
+import type { UploadPolicyDocument } from "../upload/types";
 import { PortfolioAnalysisPanel } from "./portfolio/panel";
 import { usePortfolioSummary } from "./portfolio/use-summary";
 import type { DeathBenefitGuideInput } from "./portfolio/api";
@@ -32,11 +32,11 @@ const InsuranceChatbot = dynamic(
 );
 
 type InsuranceAnalysisPageProps = {
-  uploadInsurance?: UploadInsurance;
+  uploadPolicyDocument?: UploadPolicyDocument;
 };
 
 export function InsuranceAnalysisPage({
-  uploadInsurance,
+  uploadPolicyDocument,
 }: InsuranceAnalysisPageProps = {}) {
   const {
     analysis,
@@ -266,10 +266,10 @@ export function InsuranceAnalysisPage({
       </section>
 
       {isUploadModalOpen ? (
-        <UploadInsuranceModal
+        <UploadPolicyDocumentModal
           selectedName={analysis.selectedName}
           existingDocuments={insuranceDocuments}
-          uploadInsurance={uploadInsurance}
+          uploadPolicyDocument={uploadPolicyDocument}
           onClose={closeUploadModal}
           onAnalysisComplete={handleAdditionalAnalysisComplete}
         />

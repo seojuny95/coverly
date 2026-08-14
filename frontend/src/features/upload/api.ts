@@ -1,33 +1,13 @@
 import { apiUrl, readApiErrorPayload } from "../../shared/api/client";
-import { AppRequestError } from "../../shared/api/errors";
+import { AppRequestError, isAbortError } from "../../shared/api/errors";
 import { retryOperation } from "../../shared/api/retry";
 import type {
-  ApiErrorCode,
-  CoveragePeriod,
-  InsuredDemographics,
-  PolicyCoverage,
-  PolicyParseResponse,
-  PolicySummary,
-  PremiumSummary,
-  VehicleInfo,
-} from "../../shared/api/contracts";
+  PolicyUploadResult,
+  UploadErrorCode,
+  UploadPolicyDocumentInput,
+} from "./types";
 
-export type InsurancePeriod = CoveragePeriod;
-export type InsurancePremium = PremiumSummary;
-export type InsuranceVehicleInfo = VehicleInfo;
-export type InsuranceDemographics = InsuredDemographics;
-export type InsuranceBasicInfo = PolicySummary;
-export type InsuranceCoverage = PolicyCoverage;
-export type InsuranceUploadResult = PolicyParseResponse;
-
-export type InsurancePolicyResult = Omit<InsuranceUploadResult, "documentId">;
-
-export type LocalUploadErrorCode =
-  | "UPLOAD_NETWORK_ERROR"
-  | "UPLOAD_FAILED"
-  | "DUPLICATE_POLICY"
-  | "MISSING_INSURED_PERSON";
-export type UploadErrorCode = ApiErrorCode | LocalUploadErrorCode;
+export type { PolicyUploadResult } from "./types";
 
 const GENERIC_UPLOAD_MESSAGE =
   "업로드에 실패했어요. 잠시 후 다시 시도해주세요.";
@@ -37,17 +17,16 @@ const SERVER_UPLOAD_MESSAGE =
 // The backend runs several sequential LLM calls (summary, coverage
 // extraction, indexing), each with its own retry budget, so a legitimate
 // parse can run well past the "보통 1~2분" the UI sets as the typical
-// expectation (progress.tsx). This only needs to catch a truly stalled
+// expectation (policy-analysis-progress.tsx). This only needs to catch a truly stalled
 // connection (dead socket, captive portal) — not shave time off slow but
 // working uploads — so it is set generously above that typical range.
 const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
-export class UploadInsuranceError extends AppRequestError {
+export class PolicyUploadError extends AppRequestError {
   readonly code: UploadErrorCode;
   readonly requestId?: string;
   readonly retryAfterMs?: number;
   readonly status?: number;
-  readonly userMessage: string;
 
   constructor({
     code,
@@ -64,33 +43,26 @@ export class UploadInsuranceError extends AppRequestError {
   }) {
     super({
       developerMessage: `Policy upload failed (status=${status ?? "NETWORK"}, code=${code})`,
-      name: "UploadInsuranceError",
+      name: "PolicyUploadError",
       userMessage,
     });
     this.code = code;
     this.requestId = requestId;
     this.retryAfterMs = retryAfterMs;
     this.status = status;
-    this.userMessage = userMessage;
   }
 }
 
-export async function uploadInsurance({
+export async function uploadPolicyDocument({
   file,
   documentId,
   password,
   portfolioSessionToken,
   signal,
-}: {
-  file: File;
-  documentId: string;
-  password?: string;
-  portfolioSessionToken: string;
-  signal?: AbortSignal;
-}): Promise<InsuranceUploadResult> {
+}: UploadPolicyDocumentInput): Promise<PolicyUploadResult> {
   return retryOperation(
     () =>
-      uploadInsuranceOnce({
+      uploadPolicyDocumentOnce({
         file,
         documentId,
         password,
@@ -101,25 +73,18 @@ export async function uploadInsurance({
       maxAttempts: 2,
       signal,
       shouldRetry: (error) =>
-        error instanceof UploadInsuranceError &&
-        error.code === "PDF_PARSING_BUSY",
+        error instanceof PolicyUploadError && error.code === "PDF_PARSING_BUSY",
     },
   );
 }
 
-async function uploadInsuranceOnce({
+async function uploadPolicyDocumentOnce({
   file,
   documentId,
   password,
   portfolioSessionToken,
   signal,
-}: {
-  file: File;
-  documentId: string;
-  password?: string;
-  portfolioSessionToken: string;
-  signal?: AbortSignal;
-}): Promise<InsuranceUploadResult> {
+}: UploadPolicyDocumentInput): Promise<PolicyUploadResult> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("documentId", documentId);
@@ -136,8 +101,8 @@ async function uploadInsuranceOnce({
         : AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
     });
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") throw error;
-    throw new UploadInsuranceError({
+    if (isAbortError(error)) throw error;
+    throw new PolicyUploadError({
       code: "UPLOAD_NETWORK_ERROR",
       userMessage:
         error instanceof DOMException && error.name === "TimeoutError"
@@ -165,7 +130,7 @@ async function uploadInsuranceOnce({
     } else if (isJson && response.status >= 500) {
       userMessage = SERVER_UPLOAD_MESSAGE;
     }
-    throw new UploadInsuranceError({
+    throw new PolicyUploadError({
       code,
       requestId,
       status: response.status,
@@ -177,7 +142,7 @@ async function uploadInsuranceOnce({
     });
   }
 
-  return (await response.json()) as InsuranceUploadResult;
+  return (await response.json()) as PolicyUploadResult;
 }
 
 function retryAfterMilliseconds(value: string | null): number | undefined {

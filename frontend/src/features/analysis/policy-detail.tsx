@@ -7,7 +7,7 @@ import type {
   InsuranceBasicInfo,
   InsurancePeriod,
   InsurancePremium,
-} from "../upload/api";
+} from "./types";
 import { formatWon } from "./portfolio/money-format";
 import type { AnalyzedInsurance } from "./store";
 import { InsuranceCoverageList } from "./coverage-list";

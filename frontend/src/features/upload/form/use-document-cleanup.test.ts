@@ -1,14 +1,14 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UploadRollbackError } from "./upload-helpers";
-import { useUploadCleanup } from "./use-upload-cleanup";
+import { UploadedDocumentCleanupError } from "../errors";
+import { useServerDocumentCleanup } from "./use-document-cleanup";
 
-describe("useUploadCleanup", () => {
+describe("useServerDocumentCleanup", () => {
   it("deduplicates document ids when rolling back uploaded documents", async () => {
     const deleteSessionDocuments = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
-      useUploadCleanup(deleteSessionDocuments),
+      useServerDocumentCleanup(deleteSessionDocuments),
     );
 
     await act(async () => {
@@ -31,12 +31,12 @@ describe("useUploadCleanup", () => {
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(undefined);
     const { result } = renderHook(() =>
-      useUploadCleanup(deleteSessionDocuments),
+      useServerDocumentCleanup(deleteSessionDocuments),
     );
 
     await expect(
       result.current.rollbackSessionDocuments("session-token", ["document-1"]),
-    ).rejects.toBeInstanceOf(UploadRollbackError);
+    ).rejects.toBeInstanceOf(UploadedDocumentCleanupError);
 
     await expect(result.current.resolvePendingCleanup()).resolves.toBe(true);
     expect(deleteSessionDocuments).toHaveBeenLastCalledWith("session-token", [
@@ -49,12 +49,12 @@ describe("useUploadCleanup", () => {
       .fn()
       .mockRejectedValue(new Error("offline"));
     const { result } = renderHook(() =>
-      useUploadCleanup(deleteSessionDocuments),
+      useServerDocumentCleanup(deleteSessionDocuments),
     );
 
     await expect(
       result.current.rollbackSessionDocuments("session-token", ["document-1"]),
-    ).rejects.toBeInstanceOf(UploadRollbackError);
+    ).rejects.toBeInstanceOf(UploadedDocumentCleanupError);
 
     await expect(result.current.resolvePendingCleanup()).resolves.toBe(false);
   });

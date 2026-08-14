@@ -3,11 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { useState } from "react";
-import { UploadInsuranceModal } from "./upload-modal";
-import type { InsuranceAnalysis } from "./store";
-import type { UploadInsurance } from "../upload/form";
-import { UploadInsuranceError } from "../upload/api";
-import { isPdfPasswordProtected } from "../upload/pdf-password-check";
+import { UploadPolicyDocumentModal } from "./upload-modal";
+import type { InsuranceAnalysis } from "./types";
+import type { UploadPolicyDocument } from "../upload/types";
+import { PolicyUploadError } from "../upload/api";
+import { isPdfPasswordProtected } from "../upload/form/pdf-password-check";
 import { renderWithProviders } from "../../test/render-with-providers";
 import { POLICY_PARSE_RESPONSE_DEFAULTS } from "../../test/api-fixtures";
 
@@ -19,7 +19,7 @@ vi.mock("@/shared/api/readiness", () => ({
   waitForBackendReady: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../upload/pdf-password-check", () => ({
+vi.mock("../upload/form/pdf-password-check", () => ({
   isPdfPasswordProtected: vi.fn(),
 }));
 
@@ -38,7 +38,7 @@ const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
 });
 
 function uploadOnePolicy() {
-  return vi.fn<UploadInsurance>().mockResolvedValue({
+  return vi.fn<UploadPolicyDocument>().mockResolvedValue({
     ...POLICY_PARSE_RESPONSE_DEFAULTS,
     status: "accepted",
     documentId: "test-document-id",
@@ -61,32 +61,32 @@ beforeEach(() => {
 // Mirrors the analysis screen: closing the modal unmounts it, which is what
 // would cancel an in-flight completion beat.
 function ModalHost({
-  uploadInsurance,
+  uploadPolicyDocument,
   onAnalysisComplete,
 }: {
-  uploadInsurance: UploadInsurance;
+  uploadPolicyDocument: UploadPolicyDocument;
   onAnalysisComplete: (analysis: InsuranceAnalysis) => void;
 }) {
   const [isOpen, setIsOpen] = useState(true);
   if (!isOpen) return <p>모달이 닫혔어요</p>;
   return (
-    <UploadInsuranceModal
+    <UploadPolicyDocumentModal
       selectedName="테스트고객"
       existingDocuments={[]}
-      uploadInsurance={uploadInsurance}
+      uploadPolicyDocument={uploadPolicyDocument}
       onClose={() => setIsOpen(false)}
       onAnalysisComplete={onAnalysisComplete}
     />
   );
 }
 
-describe("UploadInsuranceModal", () => {
+describe("UploadPolicyDocumentModal", () => {
   test("keeps the finished upload when the user tries to close during the completion beat", async () => {
     const user = userEvent.setup();
     const onAnalysisComplete = vi.fn();
     renderWithProviders(
       <ModalHost
-        uploadInsurance={uploadOnePolicy()}
+        uploadPolicyDocument={uploadOnePolicy()}
         onAnalysisComplete={onAnalysisComplete}
       />,
     );
@@ -119,15 +119,17 @@ describe("UploadInsuranceModal", () => {
     // api.ts converts a stalled/timed-out request into the same
     // UPLOAD_NETWORK_ERROR a plain connection failure produces, so this
     // stands in for what the modal sees once the upload timeout fires.
-    const uploadInsurance = vi.fn<UploadInsurance>().mockRejectedValue(
-      new UploadInsuranceError({
-        code: "UPLOAD_NETWORK_ERROR",
-        userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
-      }),
-    );
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockRejectedValue(
+        new PolicyUploadError({
+          code: "UPLOAD_NETWORK_ERROR",
+          userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+        }),
+      );
     renderWithProviders(
       <ModalHost
-        uploadInsurance={uploadInsurance}
+        uploadPolicyDocument={uploadPolicyDocument}
         onAnalysisComplete={onAnalysisComplete}
       />,
     );

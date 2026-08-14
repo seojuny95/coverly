@@ -9,7 +9,7 @@ export const PASSWORD_CHECK_TIMEOUT_MS = 8000;
 // Client-side pre-check only: flags encrypted PDFs right after file selection
 // so the password field appears before the user submits, instead of after a
 // round trip to the server. The server remains the source of truth for PDF
-// validation (see use-orchestration.ts) — any failure or timeout here fails
+// validation (see use-policy-upload.ts) — any failure or timeout here fails
 // open (false) and lets the upload proceed to the server's own check.
 export async function isPdfPasswordProtected(file: File): Promise<boolean> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;

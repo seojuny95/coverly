@@ -1,4 +1,4 @@
-import type { AnalyzedInsurance } from "./store";
+import type { AnalyzedInsurance } from "./types";
 
 function normalizeValue(value: string) {
   return value.trim().replace(/\s+/g, "").toLowerCase();

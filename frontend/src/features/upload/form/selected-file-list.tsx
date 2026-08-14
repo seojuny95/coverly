@@ -1,16 +1,17 @@
-"use client";
-
 import { Card } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
-import type { FileReadStatus, SelectedUploadFile } from "./types";
+import { isPdfPasswordError } from "../errors";
+import type {
+  SelectedFileStatus,
+  SelectedPolicyFile,
+  UploadErrorCode,
+  UploadSurface,
+} from "../types";
 
 // Per-row stagger, capped at 150ms so a long file list doesn't push the
 // last row's entrance noticeably later than the first.
 const ENTER_DELAY_CLASSES = ["delay-0", "delay-75", "delay-150"];
 
-// The list of PDFs the user has picked (before submitting), with per-file
-// status/error badges and a remove button. Presentational: all state lives in
-// the parent form; this only renders and reports removals.
 export function SelectedFileList({
   files,
   surface,
@@ -18,8 +19,8 @@ export function SelectedFileList({
   onPasswordChange,
   disableRemove,
 }: {
-  files: SelectedUploadFile[];
-  surface: "page" | "modal";
+  files: SelectedPolicyFile[];
+  surface: UploadSurface;
   onRemove: (fileId: string) => void;
   onPasswordChange: (fileId: string, password: string) => void;
   disableRemove: boolean;
@@ -53,7 +54,7 @@ export function SelectedFileList({
       </div>
       <ul className="mt-3 space-y-2">
         {files.map((selectedFile, index) => {
-          const needsPassword = isPasswordError(selectedFile.errorCode);
+          const needsPassword = isPdfPasswordError(selectedFile.errorCode);
           const enterDelayClassName =
             ENTER_DELAY_CLASSES[
               Math.min(index, ENTER_DELAY_CLASSES.length - 1)
@@ -134,17 +135,10 @@ export function SelectedFileList({
   );
 }
 
-function isPasswordError(errorCode?: string): boolean {
-  return (
-    errorCode === "PDF_PASSWORD_REQUIRED" ||
-    errorCode === "PDF_PASSWORD_INCORRECT"
-  );
-}
-
-function failedBadgeLabel(errorCode?: string): string {
+function failedBadgeLabel(errorCode?: UploadErrorCode): string {
   if (errorCode === "INVALID_PDF") return "PDF 형식 아님";
   if (errorCode === "DUPLICATE_POLICY") return "중복 증권";
-  if (isPasswordError(errorCode)) return "비밀번호 필요";
+  if (isPdfPasswordError(errorCode)) return "비밀번호 필요";
   if (errorCode === "MISSING_INSURED_PERSON") return "피보험자 미확인";
   return "읽을 수 없는 PDF";
 }
@@ -153,10 +147,10 @@ function SelectedFileStatusBadge({
   status,
   errorCode,
 }: {
-  status: FileReadStatus;
-  errorCode?: string;
+  status: SelectedFileStatus;
+  errorCode?: UploadErrorCode;
 }) {
-  if (isPasswordError(errorCode)) {
+  if (isPdfPasswordError(errorCode)) {
     return (
       <span className="rounded-md border border-amber-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
         {failedBadgeLabel(errorCode)}

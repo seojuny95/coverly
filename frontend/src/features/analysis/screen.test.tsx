@@ -16,12 +16,11 @@ import {
 import { InsuranceAnalysisPage } from "./screen";
 import type { InsuranceAnalysis } from "./store";
 import { PORTFOLIO_SESSION_REFRESH_FALLBACK_MS } from "./use-session-refresh";
-import type { UploadInsurance } from "../upload/form";
+import type { UploadPolicyDocument } from "../upload/types";
 import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 
-// The upload modal renders InsuranceUploadForm, which calls useRouter even
-// when onAnalysisComplete is provided (it also prefetches the destination).
-// Mock next/navigation so it doesn't need a real App Router context in tests.
+// PolicyUploadForm keeps a standalone navigation fallback, so the modal's
+// tests still need a router context even though the caller owns completion.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
 }));
@@ -594,19 +593,21 @@ describe("InsuranceAnalysisPage", () => {
 
   test("opens an upload modal and merges uploaded insuranceDocuments into the current analysis", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
-      ...POLICY_PARSE_RESPONSE_DEFAULTS,
-      status: "accepted",
-      documentId: "new-document-id",
-      문자수: 80,
-      기본정보: {
-        보험사: "현대해상화재보험",
-        상품명: "개인용자동차보험",
-        피보험자: "테스트고객",
-        보험분류: "손해보험",
-        상품태그: ["자동차보험"],
-      },
-    });
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockResolvedValue({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "new-document-id",
+        문자수: 80,
+        기본정보: {
+          보험사: "현대해상화재보험",
+          상품명: "개인용자동차보험",
+          피보험자: "테스트고객",
+          보험분류: "손해보험",
+          상품태그: ["자동차보험"],
+        },
+      });
 
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
@@ -635,7 +636,7 @@ describe("InsuranceAnalysisPage", () => {
     };
 
     renderWithProviders(
-      <InsuranceAnalysisPage uploadInsurance={uploadInsurance} />,
+      <InsuranceAnalysisPage uploadPolicyDocument={uploadPolicyDocument} />,
       { initialAnalysis },
     );
 
@@ -656,7 +657,7 @@ describe("InsuranceAnalysisPage", () => {
     await user.click(screen.getByRole("button", { name: "분석에 추가하기" }));
 
     await waitFor(() => {
-      expect(uploadInsurance).toHaveBeenCalledWith(
+      expect(uploadPolicyDocument).toHaveBeenCalledWith(
         expect.objectContaining({
           file: insuranceFile,
           documentId: expect.any(String),
@@ -678,20 +679,22 @@ describe("InsuranceAnalysisPage", () => {
 
   test("keeps duplicate policy uploads out of the current analysis", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
-      ...POLICY_PARSE_RESPONSE_DEFAULTS,
-      status: "accepted",
-      documentId: "duplicate-document-id",
-      문자수: 80,
-      기본정보: {
-        보험사: "삼성화재",
-        상품명: "건강보험",
-        증권번호: "POLICY-TEST-001",
-        피보험자: "테스트고객",
-        보험분류: "제3보험",
-        상품태그: ["질병보험"],
-      },
-    });
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockResolvedValue({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "duplicate-document-id",
+        문자수: 80,
+        기본정보: {
+          보험사: "삼성화재",
+          상품명: "건강보험",
+          증권번호: "POLICY-TEST-001",
+          피보험자: "테스트고객",
+          보험분류: "제3보험",
+          상품태그: ["질병보험"],
+        },
+      });
 
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
@@ -721,7 +724,7 @@ describe("InsuranceAnalysisPage", () => {
     };
 
     renderWithProviders(
-      <InsuranceAnalysisPage uploadInsurance={uploadInsurance} />,
+      <InsuranceAnalysisPage uploadPolicyDocument={uploadPolicyDocument} />,
       { initialAnalysis },
     );
 

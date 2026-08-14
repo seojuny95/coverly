@@ -28,6 +28,15 @@ export function userMessageForError(
   return error instanceof AppRequestError ? error.userMessage : fallback;
 }
 
+export function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  );
+}
+
 export function safeErrorDiagnostics(error: unknown): {
   name: string;
   developerMessage?: string;

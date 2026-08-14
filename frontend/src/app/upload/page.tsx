@@ -1,4 +1,4 @@
-import { InsuranceUploadForm } from "@/features/upload/form";
+import { PolicyUploadForm } from "@/features/upload/form/upload-form";
 import { SectionLabel } from "@/shared/components/section-label";
 
 export default function UploadPage() {
@@ -10,8 +10,6 @@ export default function UploadPage() {
         </p>
       </header>
 
-      {/* Top-anchored, not centered: centering re-balances the whole column
-          when the guide expands, dragging the heading upward. */}
       <div className="animate-enter mx-auto flex w-full max-w-4xl flex-1 flex-col py-12 sm:py-16">
         <section className="mx-auto w-full max-w-2xl text-center">
           <div className="mb-5 flex justify-center">
@@ -27,7 +25,7 @@ export default function UploadPage() {
         </section>
 
         <div className="mx-auto mt-10 w-full max-w-2xl">
-          <InsuranceUploadForm />
+          <PolicyUploadForm />
         </div>
       </div>
     </main>

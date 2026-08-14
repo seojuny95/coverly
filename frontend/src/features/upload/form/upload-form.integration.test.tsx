@@ -2,8 +2,8 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { type UploadInsurance } from "./form";
-import { UploadInsuranceError } from "./api";
+import type { UploadPolicyDocument } from "../types";
+import { PolicyUploadError } from "../api";
 import {
   createSession,
   insuranceFile,
@@ -13,22 +13,22 @@ import {
   resetFormTestState,
   routerPush,
   secondInsuranceFile,
-} from "./form.test-support";
-import type { AnalyzedInsurance } from "../analysis/store";
+} from "./test-utils";
+import type { AnalyzedInsurance } from "../../analysis/types";
 import {
   POLICY_PARSE_RESPONSE_DEFAULTS,
   POLICY_RESULT_DEFAULTS,
-} from "../../test/api-fixtures";
+} from "../../../test/api-fixtures";
 
 beforeEach(resetFormTestState);
 
-describe("InsuranceUploadForm failures and upload lifecycle", () => {
+describe("PolicyUploadForm failures and upload lifecycle", () => {
   test("does not expose an unexpected internal error message", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi
-      .fn<UploadInsurance>()
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
       .mockRejectedValue(new Error("파일을 분석할 수 없습니다."));
-    renderForm({ uploadInsurance });
+    renderForm({ uploadPolicyDocument });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
@@ -45,10 +45,10 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
 
   test("shows unreadable PDFs in the selected list and lets the user remove only those files", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi
-      .fn<UploadInsurance>()
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
       .mockRejectedValueOnce(
-        new UploadInsuranceError({
+        new PolicyUploadError({
           code: "PDF_TEXT_EXTRACTION_FAILED",
           status: 422,
           userMessage: "PDF에서 텍스트를 추출할 수 없어요.",
@@ -81,11 +81,9 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
         },
       });
     const onAnalysisComplete = vi.fn();
-    const navigateToAnalysis = vi.fn();
     const { deleteSessionDocuments } = renderForm({
-      uploadInsurance,
+      uploadPolicyDocument,
       onAnalysisComplete,
-      navigateToAnalysis,
     });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
@@ -126,14 +124,14 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
         }),
       );
     });
-    expect(navigateToAnalysis).toHaveBeenCalledOnce();
+    expect(onAnalysisComplete).toHaveBeenCalledOnce();
   });
 
   test("asks for a password right after selecting an encrypted PDF, before submitting", async () => {
     const user = userEvent.setup();
     passwordProtectedMock.mockResolvedValueOnce(true);
-    const uploadInsurance = vi.fn<UploadInsurance>();
-    renderForm({ uploadInsurance });
+    const uploadPolicyDocument = vi.fn<UploadPolicyDocument>();
+    renderForm({ uploadPolicyDocument });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
 
@@ -142,7 +140,7 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),
     ).toBeDisabled();
-    expect(uploadInsurance).not.toHaveBeenCalled();
+    expect(uploadPolicyDocument).not.toHaveBeenCalled();
   });
 
   test("blocks submit while the password pre-check is still running", async () => {
@@ -198,10 +196,10 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
 
   test("asks for a password only for encrypted PDFs and retries with it", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi
-      .fn<UploadInsurance>()
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
       .mockRejectedValueOnce(
-        new UploadInsuranceError({
+        new PolicyUploadError({
           code: "PDF_PASSWORD_REQUIRED",
           status: 422,
           userMessage: "PDF 비밀번호를 입력해주세요.",
@@ -221,7 +219,7 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
         },
       });
     const onAnalysisComplete = vi.fn();
-    renderForm({ uploadInsurance, onAnalysisComplete });
+    renderForm({ uploadPolicyDocument, onAnalysisComplete });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
@@ -247,7 +245,7 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
     await waitFor(() => {
-      expect(uploadInsurance).toHaveBeenLastCalledWith(
+      expect(uploadPolicyDocument).toHaveBeenLastCalledWith(
         expect.objectContaining({
           file: insuranceFile,
           documentId: expect.any(String),
@@ -266,13 +264,15 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
 
   test("keeps network errors as a global upload error", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi.fn<UploadInsurance>().mockRejectedValue(
-      new UploadInsuranceError({
-        code: "UPLOAD_NETWORK_ERROR",
-        userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
-      }),
-    );
-    renderForm({ uploadInsurance });
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockRejectedValue(
+        new PolicyUploadError({
+          code: "UPLOAD_NETWORK_ERROR",
+          userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
+        }),
+      );
+    renderForm({ uploadPolicyDocument });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
@@ -285,19 +285,43 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
     expect(screen.queryByText("읽을 수 없는 PDF")).not.toBeInTheDocument();
   });
 
+  test("keeps portfolio limits as a global upload error", async () => {
+    const user = userEvent.setup();
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockRejectedValue(
+        new PolicyUploadError({
+          code: "PORTFOLIO_DOCUMENT_LIMIT_EXCEEDED",
+          status: 422,
+          userMessage: "보험증권은 최대 5개까지 분석할 수 있어요.",
+        }),
+      );
+    renderForm({ uploadPolicyDocument });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText("보험증권은 최대 5개까지 분석할 수 있어요."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("읽을 수 없는 PDF")).not.toBeInTheDocument();
+  });
+
   test("marks the analysis session expired when an additional upload is rejected by the session boundary", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi.fn<UploadInsurance>().mockRejectedValue(
-      new UploadInsuranceError({
-        code: "INVALID_PORTFOLIO_SESSION",
-        status: 403,
-        userMessage: "분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
-      }),
-    );
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockRejectedValue(
+        new PolicyUploadError({
+          code: "INVALID_PORTFOLIO_SESSION",
+          status: 403,
+          userMessage: "분석 세션이 만료됐어요. 보험증권을 다시 올려주세요.",
+        }),
+      );
     const deleteSessionDocuments = vi.fn().mockResolvedValue(undefined);
 
     renderForm({
-      uploadInsurance,
+      uploadPolicyDocument,
       deleteSessionDocuments,
       initialAnalysis: {
         generatedAt: "2026-07-23T00:00:00.000Z",
@@ -335,15 +359,62 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
     expect(createSession).not.toHaveBeenCalled();
   });
 
+  test("rolls back an additional policy for a different insured person", async () => {
+    const user = userEvent.setup();
+    const onAnalysisComplete = vi.fn();
+    const deleteSessionDocuments = vi.fn().mockResolvedValue(undefined);
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockResolvedValue({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        documentId: "different-person-document",
+        기본정보: {
+          보험사: "테스트보험",
+          피보험자: "다른고객",
+          보험분류: "제3보험",
+          상품태그: [],
+        },
+      });
+    renderForm({
+      uploadPolicyDocument,
+      onAnalysisComplete,
+      requiredInsuredPersonName: "테스트고객",
+      deleteSessionDocuments,
+      initialAnalysis: {
+        generatedAt: "2026-08-14T00:00:00.000Z",
+        portfolioSessionToken: "existing-portfolio-token",
+        portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+        counselTurnsRemaining: 10,
+        selectedName: "테스트고객",
+        insuranceDocuments: [],
+      },
+    });
+
+    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
+
+    expect(
+      await screen.findByText(
+        "테스트고객님의 보험증권만 추가할 수 있어요. 같은 피보험자의 증권만 선택해주세요.",
+      ),
+    ).toBeVisible();
+    expect(deleteSessionDocuments).toHaveBeenCalledWith(
+      "existing-portfolio-token",
+      [expect.any(String)],
+    );
+    expect(onAnalysisComplete).not.toHaveBeenCalled();
+    expect(screen.queryByText("완료")).not.toBeInTheDocument();
+  });
+
   test("rolls back an already-succeeded upload when another file in the batch times out, and clears the in-flight state", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi
-      .fn<UploadInsurance>()
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
       .mockImplementation(async (input) => {
         if (input.file === secondInsuranceFile) {
           // A stalled connection surfaces through api.ts as the same
           // UPLOAD_NETWORK_ERROR a plain connection failure produces.
-          throw new UploadInsuranceError({
+          throw new PolicyUploadError({
             code: "UPLOAD_NETWORK_ERROR",
             userMessage: "서버에 연결하지 못했어요. 잠시 후 다시 시도해주세요.",
           });
@@ -363,7 +434,7 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
           },
         };
       });
-    const { deleteSessionDocuments } = renderForm({ uploadInsurance });
+    const { deleteSessionDocuments } = renderForm({ uploadPolicyDocument });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
       insuranceFile,
@@ -397,22 +468,24 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
 
   test("rejects duplicate policies in the same upload batch", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
-      ...POLICY_PARSE_RESPONSE_DEFAULTS,
-      status: "accepted",
-      documentId: "test-document-id",
-      문자수: 20,
-      기본정보: {
-        보험사: "삼성화재",
-        상품명: "건강보험",
-        증권번호: "POLICY-TEST-001",
-        피보험자: "테스트고객",
-        보험분류: "제3보험",
-        상품태그: ["질병보험"],
-      },
-    });
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockResolvedValue({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "test-document-id",
+        문자수: 20,
+        기본정보: {
+          보험사: "삼성화재",
+          상품명: "건강보험",
+          증권번호: "POLICY-TEST-001",
+          피보험자: "테스트고객",
+          보험분류: "제3보험",
+          상품태그: ["질병보험"],
+        },
+      });
     const onAnalysisComplete = vi.fn();
-    renderForm({ uploadInsurance, onAnalysisComplete });
+    renderForm({ uploadPolicyDocument, onAnalysisComplete });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
       insuranceFile,
@@ -437,8 +510,8 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
     const uniqueNamedFile = new File(["%PDF-1.7\nunique"], "policy.pdf", {
       type: "application/pdf",
     });
-    const uploadInsurance = vi
-      .fn<UploadInsurance>()
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
       .mockResolvedValueOnce({
         ...POLICY_PARSE_RESPONSE_DEFAULTS,
         status: "accepted",
@@ -487,7 +560,7 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
       },
     ];
     const onAnalysisComplete = vi.fn();
-    renderForm({ uploadInsurance, onAnalysisComplete, existingDocuments });
+    renderForm({ uploadPolicyDocument, onAnalysisComplete, existingDocuments });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
       duplicateNamedFile,
@@ -511,19 +584,21 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
     const samePdfAgain = new File(["%PDF-1.7"], "same-policy-copy.pdf", {
       type: "application/pdf",
     });
-    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
-      ...POLICY_PARSE_RESPONSE_DEFAULTS,
-      status: "accepted",
-      documentId: "test-document-id",
-      문자수: 20,
-      기본정보: {
-        피보험자: "테스트고객",
-        보험분류: "미분류",
-        상품태그: [],
-      },
-    });
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockResolvedValue({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "test-document-id",
+        문자수: 20,
+        기본정보: {
+          피보험자: "테스트고객",
+          보험분류: "미분류",
+          상품태그: [],
+        },
+      });
     const onAnalysisComplete = vi.fn();
-    renderForm({ uploadInsurance, onAnalysisComplete });
+    renderForm({ uploadPolicyDocument, onAnalysisComplete });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
       insuranceFile,
@@ -536,7 +611,7 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
         "이미 올린 보험증권이에요. same-policy-copy.pdf 파일을 제거하고 다시 시도해주세요.",
       ),
     ).toBeInTheDocument();
-    expect(uploadInsurance).not.toHaveBeenCalled();
+    expect(uploadPolicyDocument).not.toHaveBeenCalled();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 
@@ -568,19 +643,21 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
         },
       },
     ];
-    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
-      ...POLICY_PARSE_RESPONSE_DEFAULTS,
-      status: "accepted",
-      documentId: "test-document-id",
-      문자수: 20,
-      기본정보: {
-        피보험자: "테스트고객",
-        보험분류: "미분류",
-        상품태그: [],
-      },
-    });
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockResolvedValue({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "test-document-id",
+        문자수: 20,
+        기본정보: {
+          피보험자: "테스트고객",
+          보험분류: "미분류",
+          상품태그: [],
+        },
+      });
     const onAnalysisComplete = vi.fn();
-    renderForm({ uploadInsurance, onAnalysisComplete, existingDocuments });
+    renderForm({ uploadPolicyDocument, onAnalysisComplete, existingDocuments });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
@@ -590,35 +667,37 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
         "이미 올린 보험증권이에요. insurance.pdf 파일을 제거하고 다시 시도해주세요.",
       ),
     ).toBeInTheDocument();
-    expect(uploadInsurance).not.toHaveBeenCalled();
+    expect(uploadPolicyDocument).not.toHaveBeenCalled();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
   });
 
   test("disables upload while a request is pending", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi.fn<UploadInsurance>().mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(
-            () =>
-              resolve({
-                ...POLICY_PARSE_RESPONSE_DEFAULTS,
-                status: "accepted",
-                documentId: "test-document-id",
-                문자수: 32,
-                기본정보: {
-                  보험사: "삼성화재",
-                  피보험자: "테스트고객",
-                  보험분류: "제3보험",
-                  상품태그: ["질병보험"],
-                  만기일: "2027-01-01",
-                },
-              }),
-            50,
-          );
-        }),
-    );
-    renderForm({ uploadInsurance });
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(
+              () =>
+                resolve({
+                  ...POLICY_PARSE_RESPONSE_DEFAULTS,
+                  status: "accepted",
+                  documentId: "test-document-id",
+                  문자수: 32,
+                  기본정보: {
+                    보험사: "삼성화재",
+                    피보험자: "테스트고객",
+                    보험분류: "제3보험",
+                    상품태그: ["질병보험"],
+                    만기일: "2027-01-01",
+                  },
+                }),
+              50,
+            );
+          }),
+      );
+    renderForm({ uploadPolicyDocument });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
@@ -641,20 +720,22 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
 
   test("default behavior writes the analysis into context and navigates client-side", async () => {
     const user = userEvent.setup();
-    const uploadInsurance = vi.fn<UploadInsurance>().mockResolvedValue({
-      ...POLICY_PARSE_RESPONSE_DEFAULTS,
-      status: "accepted",
-      documentId: "test-document-id",
-      문자수: 20,
-      기본정보: {
-        보험사: "삼성화재",
-        상품명: "건강보험",
-        계약자: "테스트고객",
-        피보험자: "테스트고객",
-        보험분류: "제3보험",
-        상품태그: ["질병보험"],
-      },
-    });
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
+      .mockResolvedValue({
+        ...POLICY_PARSE_RESPONSE_DEFAULTS,
+        status: "accepted",
+        documentId: "test-document-id",
+        문자수: 20,
+        기본정보: {
+          보험사: "삼성화재",
+          상품명: "건강보험",
+          계약자: "테스트고객",
+          피보험자: "테스트고객",
+          보험분류: "제3보험",
+          상품태그: ["질병보험"],
+        },
+      });
     const originalLocation = window.location;
     const assignSpy = vi.fn();
     Object.defineProperty(window, "location", {
@@ -662,7 +743,7 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
       value: { ...originalLocation, assign: assignSpy },
     });
 
-    renderDefaultForm(uploadInsurance);
+    renderDefaultForm(uploadPolicyDocument);
 
     expect(screen.getByTestId("probe")).toHaveTextContent("");
 
@@ -692,8 +773,8 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
   test("shows per-file reading status and grounding note while analyzing", async () => {
     const user = userEvent.setup();
     let resolveFirstUpload: (() => void) | undefined;
-    const uploadInsurance = vi
-      .fn<UploadInsurance>()
+    const uploadPolicyDocument = vi
+      .fn<UploadPolicyDocument>()
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {
@@ -713,7 +794,7 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
           }),
       )
       .mockImplementationOnce(() => new Promise(() => {}));
-    renderForm({ uploadInsurance });
+    renderForm({ uploadPolicyDocument });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
       insuranceFile,
@@ -721,7 +802,9 @@ describe("InsuranceUploadForm failures and upload lifecycle", () => {
     ]);
     await user.click(screen.getByRole("button", { name: "내 보험 분석하기" }));
 
-    expect(screen.getByText("보통 1~2분 정도 걸려요")).toBeInTheDocument();
+    expect(
+      await screen.findByText("보통 1~2분 정도 걸려요"),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("확인이 안 되는 내용은 추측하지 않아요."),
     ).toBeInTheDocument();

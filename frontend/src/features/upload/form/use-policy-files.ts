@@ -1,23 +1,14 @@
-"use client";
-
 import { useRef, useState } from "react";
 import {
   PDF_MAX_BYTES,
   PORTFOLIO_MAX_DOCUMENTS,
 } from "@/shared/api/generated-runtime";
 import { isPdfPasswordProtected } from "./pdf-password-check";
-import type { SelectedUploadFile } from "./types";
-import {
-  type ApiErrorCodeOrLocalUiCode,
-  createFileFingerprint,
-  toFiles,
-} from "./upload-helpers";
+import type { PolicyUploadError } from "../api";
+import type { SelectedPolicyFile } from "../types";
+import type { SelectedFileErrorCode } from "../errors";
 
-// Owns the list of picked files and their per-file status/error/password
-// state — selection, removal, password entry, and the fail/duplicate badges
-// shown before and during upload. The submit transaction that actually
-// uploads these files lives in use-orchestration.ts.
-export function useSelectedFiles({
+export function usePolicyFiles({
   isLocked,
   maxSelectableFiles,
   onSelectionReset,
@@ -26,26 +17,24 @@ export function useSelectedFiles({
   maxSelectableFiles: number;
   onSelectionReset: () => void;
 }) {
-  const [selectedUploadFiles, setSelectedUploadFiles] = useState<
-    SelectedUploadFile[]
-  >([]);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedPolicyFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const isCheckingPasswords = selectedUploadFiles.some(
+  const isCheckingPasswords = selectedFiles.some(
     (selectedFile) => selectedFile.status === "checking",
   );
 
   const selectFiles = (files: FileList | File[]) => {
     if (isLocked) return;
-    const incomingFiles = toFiles(files);
+    const incomingFiles = Array.from(files);
     onSelectionReset();
     if (incomingFiles.length === 0) {
-      setSelectedUploadFiles([]);
+      setSelectedFiles([]);
       setError("올릴 파일을 찾지 못했어요. PDF를 다시 선택해주세요.");
       return;
     }
     if (incomingFiles.length > maxSelectableFiles) {
-      setSelectedUploadFiles([]);
+      setSelectedFiles([]);
       setError(
         maxSelectableFiles > 0
           ? `보험증권은 최대 ${PORTFOLIO_MAX_DOCUMENTS}개까지 분석할 수 있어요. 지금은 ${maxSelectableFiles}개까지 추가할 수 있어요.`
@@ -57,7 +46,7 @@ export function useSelectedFiles({
       (file) => file.size > PDF_MAX_BYTES,
     );
     if (oversizedFiles.length > 0) {
-      setSelectedUploadFiles([]);
+      setSelectedFiles([]);
       setError(
         `파일이 너무 커요. PDF 한 개당 최대 ${PDF_MAX_BYTES / (1024 * 1024)}MB까지 올릴 수 있어요.`,
       );
@@ -69,7 +58,7 @@ export function useSelectedFiles({
       file,
       status: "checking" as const,
     }));
-    setSelectedUploadFiles(selectedFiles);
+    setSelectedFiles(selectedFiles);
     setError(null);
     flagPasswordProtectedFiles(selectedFiles);
   };
@@ -79,9 +68,9 @@ export function useSelectedFiles({
   // upload round trip. Matches by id so a removed/superseded file is a no-op.
   // A file left in "checking" keeps submit disabled forever, so both outcomes
   // of the check must clear it.
-  const flagPasswordProtectedFiles = (files: SelectedUploadFile[]) => {
+  const flagPasswordProtectedFiles = (files: SelectedPolicyFile[]) => {
     const clearChecking = (fileId: string, needsPassword: boolean) => {
-      setSelectedUploadFiles((current) =>
+      setSelectedFiles((current) =>
         current.map((currentFile) => {
           if (currentFile.id !== fileId) return currentFile;
           if (currentFile.status !== "checking") return currentFile;
@@ -106,7 +95,7 @@ export function useSelectedFiles({
   };
 
   const removeSelectedFile = (fileId: string) => {
-    setSelectedUploadFiles((current) => {
+    setSelectedFiles((current) => {
       const next = current.filter((selectedFile) => selectedFile.id !== fileId);
       if (next.length === 0 && inputRef.current) inputRef.current.value = "";
       return next;
@@ -116,7 +105,7 @@ export function useSelectedFiles({
   };
 
   const updateSelectedFilePassword = (fileId: string, password: string) => {
-    setSelectedUploadFiles((current) =>
+    setSelectedFiles((current) =>
       current.map((selectedFile) =>
         selectedFile.id === fileId
           ? { ...selectedFile, password }
@@ -125,15 +114,13 @@ export function useSelectedFiles({
     );
   };
 
-  // Mark the given selected files as failed with a shared code + message and
-  // surface one "remove and retry" summary. Non-listed files are left as-is.
   const failSelectedFiles = (
     files: Array<{ id: string; fileName: string }>,
-    code: ApiErrorCodeOrLocalUiCode,
+    code: SelectedFileErrorCode,
     message: string,
   ) => {
     const failedIds = new Set(files.map((file) => file.id));
-    setSelectedUploadFiles((current) =>
+    setSelectedFiles((current) =>
       current.map((selectedFile) => {
         if (failedIds.has(selectedFile.id)) {
           return {
@@ -143,9 +130,10 @@ export function useSelectedFiles({
             errorMessage: message,
           };
         }
-        // This aborts the batch, so clear the transient "reading" state set at
-        // submit — untouched files must not stay stuck mid-read.
-        if (selectedFile.status === "reading") {
+        if (
+          selectedFile.status === "reading" ||
+          selectedFile.status === "done"
+        ) {
           return { ...selectedFile, status: "idle" as const };
         }
         return selectedFile;
@@ -169,7 +157,7 @@ export function useSelectedFiles({
   };
 
   const markSelectedFilesReading = () => {
-    setSelectedUploadFiles((current) =>
+    setSelectedFiles((current) =>
       current.map((selectedFile) => ({
         ...selectedFile,
         status: "reading",
@@ -179,31 +167,45 @@ export function useSelectedFiles({
     );
   };
 
-  // Clear the transient "reading" state so files left untouched by an aborted
-  // batch don't stay stuck mid-read.
-  const resetReadingFilesToIdle = () => {
-    setSelectedUploadFiles((current) =>
+  const markFileSucceeded = (fileId: string) => {
+    setSelectedFiles((current) =>
+      current.map((file) =>
+        file.id === fileId ? { ...file, status: "done" } : file,
+      ),
+    );
+  };
+
+  const markFileRejected = (
+    fileId: string,
+    uploadError?: PolicyUploadError,
+  ) => {
+    setSelectedFiles((current) =>
+      current.map((file) => {
+        if (file.id !== fileId) return file;
+        return uploadError
+          ? {
+              ...file,
+              status: "failed",
+              errorCode: uploadError.code,
+              errorMessage: uploadError.userMessage,
+            }
+          : { ...file, status: "idle" };
+      }),
+    );
+  };
+
+  const resetProcessedFilesToIdle = () => {
+    setSelectedFiles((current) =>
       current.map((selectedFile) =>
-        selectedFile.status === "reading"
+        selectedFile.status === "reading" || selectedFile.status === "done"
           ? { ...selectedFile, status: "idle" }
           : selectedFile,
       ),
     );
   };
 
-  // Only accepted PDFs reach this stage, so the server's size gate has already
-  // bounded the sequential reads used for local duplicate UX.
-  const fingerprintSelectedFiles = async (files: SelectedUploadFile[]) => {
-    const fingerprints: string[] = [];
-    for (const selectedFile of files) {
-      fingerprints.push(await createFileFingerprint(selectedFile.file));
-    }
-    return fingerprints;
-  };
-
   return {
-    selectedUploadFiles,
-    setSelectedUploadFiles,
+    selectedFiles,
     isCheckingPasswords,
     error,
     setError,
@@ -214,7 +216,8 @@ export function useSelectedFiles({
     failSelectedFiles,
     rejectDuplicateFiles,
     markSelectedFilesReading,
-    resetReadingFilesToIdle,
-    fingerprintSelectedFiles,
+    markFileSucceeded,
+    markFileRejected,
+    resetProcessedFilesToIdle,
   };
 }

@@ -1,8 +1,8 @@
-import type { InsuranceCoverage, InsurancePolicyResult } from "../upload/api";
+import type { InsuranceCoverage, PolicyAnalysisResult } from "./types";
 
 type InsuranceCoverageListProps = {
   coverages?: InsuranceCoverage[];
-  status?: InsurancePolicyResult["분석상태"];
+  status?: PolicyAnalysisResult["분석상태"];
 };
 
 export function InsuranceCoverageList({

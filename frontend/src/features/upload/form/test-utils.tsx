@@ -1,10 +1,14 @@
 import { vi } from "vitest";
 
-import { InsuranceUploadForm, type UploadInsurance } from "./form";
+import { PolicyUploadForm } from "./upload-form";
+import type { UploadPolicyDocument } from "../types";
 import { isPdfPasswordProtected } from "./pdf-password-check";
-import type { AnalyzedInsurance, InsuranceAnalysis } from "../analysis/store";
-import { useInsuranceData } from "../analysis/store";
-import { renderWithProviders } from "../../test/render-with-providers";
+import type {
+  AnalyzedInsurance,
+  InsuranceAnalysis,
+} from "../../analysis/types";
+import { useInsuranceData } from "../../analysis/store";
+import { renderWithProviders } from "../../../test/render-with-providers";
 
 function InsuranceDataProbe() {
   const { analysis, sessionExpired } = useInsuranceData();
@@ -55,31 +59,32 @@ export const createSession = vi.fn(async () => ({
 export const prepareServer = vi.fn(async () => undefined);
 
 export function renderForm({
-  uploadInsurance = vi.fn(),
+  uploadPolicyDocument = vi.fn(),
   onAnalysisComplete = vi.fn(),
-  navigateToAnalysis = vi.fn(),
+  requiredInsuredPersonName,
   existingDocuments = [],
   prepareServer: prepareServerOverride = prepareServer,
   deleteSessionDocuments = vi.fn().mockResolvedValue(undefined),
   initialAnalysis = null,
 }: {
-  uploadInsurance?: UploadInsurance;
+  uploadPolicyDocument?: UploadPolicyDocument;
   onAnalysisComplete?: (analysis: InsuranceAnalysis) => void;
-  navigateToAnalysis?: () => void;
+  requiredInsuredPersonName?: string;
   existingDocuments?: AnalyzedInsurance[];
   prepareServer?: (signal?: AbortSignal) => Promise<void>;
   deleteSessionDocuments?: (
     portfolioSessionToken: string,
     documentIds: string[],
+    signal?: AbortSignal,
   ) => Promise<void>;
   initialAnalysis?: InsuranceAnalysis | null;
 } = {}) {
   const rendered = renderWithProviders(
     <>
-      <InsuranceUploadForm
-        uploadInsurance={uploadInsurance}
+      <PolicyUploadForm
+        uploadPolicyDocument={uploadPolicyDocument}
         onAnalysisComplete={onAnalysisComplete}
-        navigateToAnalysis={navigateToAnalysis}
+        requiredInsuredPersonName={requiredInsuredPersonName}
         existingDocuments={existingDocuments}
         prepareServer={prepareServerOverride}
         createSession={createSession}
@@ -90,20 +95,19 @@ export function renderForm({
     { initialAnalysis },
   );
   return {
-    uploadInsurance,
+    uploadPolicyDocument,
     onAnalysisComplete,
-    navigateToAnalysis,
     prepareServer: prepareServerOverride,
     deleteSessionDocuments,
     unmount: rendered.unmount,
   };
 }
 
-export function renderDefaultForm(uploadInsurance: UploadInsurance) {
+export function renderDefaultForm(uploadPolicyDocument: UploadPolicyDocument) {
   return renderWithProviders(
     <>
-      <InsuranceUploadForm
-        uploadInsurance={uploadInsurance}
+      <PolicyUploadForm
+        uploadPolicyDocument={uploadPolicyDocument}
         prepareServer={prepareServer}
         createSession={createSession}
       />

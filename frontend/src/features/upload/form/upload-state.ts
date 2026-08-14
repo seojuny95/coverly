@@ -1,53 +1,54 @@
-import type { InsuranceAnalysis } from "../../analysis/store";
+import type { InsuranceAnalysis } from "../../analysis/types";
 
-export type AnalysisProgress = {
+export type UploadProgress = {
   completed: number;
   total: number;
 };
 
-type IdleWorkflowState = {
+type IdlePolicyUploadState = {
   phase: "idle";
-  analysisProgress: AnalysisProgress;
+  analysisProgress: UploadProgress;
   pendingAnalysis: null;
   selectedName: "";
 };
 
-type UploadingWorkflowState = {
+type UploadingPolicyUploadState = {
   phase: "uploading";
-  analysisProgress: AnalysisProgress;
+  analysisProgress: UploadProgress;
   pendingAnalysis: null;
   selectedName: "";
 };
 
-type PreparingServerWorkflowState = {
+type PreparingServerPolicyUploadState = {
   phase: "preparing-server";
-  analysisProgress: AnalysisProgress;
+  analysisProgress: UploadProgress;
   pendingAnalysis: null;
   selectedName: "";
 };
 
-type NameSelectionWorkflowState = {
+type NameSelectionPolicyUploadState = {
   phase: "name-selection";
-  analysisProgress: AnalysisProgress;
+  analysisProgress: UploadProgress;
   pendingAnalysis: InsuranceAnalysis;
   selectedName: string;
 };
 
-type CompletingWorkflowState = {
+type CompletingPolicyUploadState = {
   phase: "completing";
-  analysisProgress: AnalysisProgress;
+  analysisProgress: UploadProgress;
   pendingAnalysis: InsuranceAnalysis | null;
   selectedName: string;
 };
 
-export type UploadWorkflowState =
-  | IdleWorkflowState
-  | PreparingServerWorkflowState
-  | UploadingWorkflowState
-  | NameSelectionWorkflowState
-  | CompletingWorkflowState;
+export type UploadInFlightState =
+  | PreparingServerPolicyUploadState
+  | UploadingPolicyUploadState
+  | CompletingPolicyUploadState;
 
-export type UploadWorkflowAction =
+export type PolicyUploadState =
+  IdlePolicyUploadState | UploadInFlightState | NameSelectionPolicyUploadState;
+
+export type PolicyUploadAction =
   | { type: "start"; total: number }
   | { type: "server-ready" }
   | { type: "uploaded" }
@@ -62,17 +63,17 @@ export type UploadWorkflowAction =
   | { type: "finish" }
   | { type: "reset" };
 
-export const initialUploadWorkflowState: UploadWorkflowState = {
+export const initialPolicyUploadState: PolicyUploadState = {
   phase: "idle",
   analysisProgress: { completed: 0, total: 0 },
   pendingAnalysis: null,
   selectedName: "",
 };
 
-export function uploadWorkflowReducer(
-  state: UploadWorkflowState,
-  action: UploadWorkflowAction,
-): UploadWorkflowState {
+export function policyUploadReducer(
+  state: PolicyUploadState,
+  action: PolicyUploadAction,
+): PolicyUploadState {
   switch (action.type) {
     case "start":
       return {
@@ -133,11 +134,13 @@ export function uploadWorkflowReducer(
       return state;
     case "finish":
     case "reset":
-      return initialUploadWorkflowState;
+      return initialPolicyUploadState;
   }
 }
 
-export function isUploadInFlight(state: UploadWorkflowState) {
+export function isUploadInFlight(
+  state: PolicyUploadState,
+): state is UploadInFlightState {
   return (
     state.phase === "preparing-server" ||
     state.phase === "uploading" ||

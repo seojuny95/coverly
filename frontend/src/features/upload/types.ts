@@ -1,6 +1,19 @@
-import type { InsuranceUploadResult } from "./api";
+import type {
+  ApiErrorCode,
+  PolicyParseResponse,
+} from "../../shared/api/contracts";
 
-export type UploadInsuranceInput = {
+export type PolicyUploadResult = PolicyParseResponse;
+
+export type LocalUploadErrorCode =
+  | "UPLOAD_NETWORK_ERROR"
+  | "UPLOAD_FAILED"
+  | "DUPLICATE_POLICY"
+  | "MISSING_INSURED_PERSON";
+
+export type UploadErrorCode = ApiErrorCode | LocalUploadErrorCode;
+
+export type UploadPolicyDocumentInput = {
   file: File;
   documentId: string;
   password?: string;
@@ -8,18 +21,20 @@ export type UploadInsuranceInput = {
   signal?: AbortSignal;
 };
 
-export type UploadInsurance = (
-  input: UploadInsuranceInput,
-) => Promise<InsuranceUploadResult>;
+export type UploadPolicyDocument = (
+  input: UploadPolicyDocumentInput,
+) => Promise<PolicyUploadResult>;
 
-export type FileReadStatus =
+export type SelectedFileStatus =
   "idle" | "checking" | "reading" | "done" | "failed";
 
-export type SelectedUploadFile = {
+export type SelectedPolicyFile = {
   id: string;
   file: File;
-  status: FileReadStatus;
+  status: SelectedFileStatus;
   password?: string;
-  errorCode?: string;
+  errorCode?: UploadErrorCode;
   errorMessage?: string;
 };
+
+export type UploadSurface = "page" | "modal";

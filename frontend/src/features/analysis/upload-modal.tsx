@@ -9,19 +9,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
-import { InsuranceUploadForm, type UploadInsurance } from "../upload/form";
-import type { AnalyzedInsurance, InsuranceAnalysis } from "./store";
+import { PolicyUploadForm } from "../upload/form/upload-form";
+import type { UploadPolicyDocument } from "../upload/types";
+import type { AnalyzedInsurance, InsuranceAnalysis } from "./types";
 
-export function UploadInsuranceModal({
+export function UploadPolicyDocumentModal({
   selectedName,
   existingDocuments,
-  uploadInsurance,
+  uploadPolicyDocument,
   onClose,
   onAnalysisComplete,
 }: {
   selectedName?: string;
   existingDocuments: AnalyzedInsurance[];
-  uploadInsurance?: UploadInsurance;
+  uploadPolicyDocument?: UploadPolicyDocument;
   onClose: () => void;
   onAnalysisComplete: (analysis: InsuranceAnalysis) => void;
 }) {
@@ -55,12 +56,14 @@ export function UploadInsuranceModal({
         </DialogHeader>
 
         <div className="mt-6">
-          <InsuranceUploadForm
-            uploadInsurance={uploadInsurance}
+          <PolicyUploadForm
+            uploadPolicyDocument={uploadPolicyDocument}
             existingDocuments={existingDocuments}
-            fixedSelectedName={selectedName}
-            onAnalysisComplete={onAnalysisComplete}
-            navigateToAnalysis={onClose}
+            requiredInsuredPersonName={selectedName}
+            onAnalysisComplete={(analysis) => {
+              onAnalysisComplete(analysis);
+              onClose();
+            }}
             surface="modal"
             onUploadInFlightChange={setIsUploadInFlight}
           />

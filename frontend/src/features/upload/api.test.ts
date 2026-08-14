@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { UploadInsuranceError, uploadInsurance } from "./api";
+import { PolicyUploadError, uploadPolicyDocument } from "./api";
 
 const insuranceFile = new File(["%PDF-1.7"], "insurance.pdf", {
   type: "application/pdf",
 });
 const documentId = "11111111-1111-4111-8111-111111111111";
 
-describe("uploadInsurance", () => {
+describe("uploadPolicyDocument", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -43,7 +43,7 @@ describe("uploadInsurance", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await uploadInsurance({
+    const result = await uploadPolicyDocument({
       file: insuranceFile,
       documentId,
       portfolioSessionToken: "portfolio-token",
@@ -69,7 +69,7 @@ describe("uploadInsurance", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await uploadInsurance({
+    await uploadPolicyDocument({
       file: insuranceFile,
       documentId,
       password: "900101",
@@ -94,7 +94,7 @@ describe("uploadInsurance", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await uploadInsurance({
+    const result = await uploadPolicyDocument({
       file: insuranceFile,
       documentId,
       portfolioSessionToken: "portfolio-token",
@@ -126,7 +126,7 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({
+      uploadPolicyDocument({
         file: insuranceFile,
         documentId,
         portfolioSessionToken: "portfolio-token",
@@ -155,7 +155,7 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({
+      uploadPolicyDocument({
         file: insuranceFile,
         documentId,
         portfolioSessionToken: "portfolio-token",
@@ -186,7 +186,7 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({
+      uploadPolicyDocument({
         file: insuranceFile,
         documentId,
         portfolioSessionToken: "portfolio-token",
@@ -209,13 +209,13 @@ describe("uploadInsurance", () => {
         ),
     );
 
-    const error = await uploadInsurance({
+    const error = await uploadPolicyDocument({
       file: insuranceFile,
       documentId,
       portfolioSessionToken: "portfolio-token",
     }).catch((err: unknown) => err);
 
-    expect(error).toBeInstanceOf(UploadInsuranceError);
+    expect(error).toBeInstanceOf(PolicyUploadError);
     expect(error).toMatchObject({
       code: "UPLOAD_FAILED",
       status: 500,
@@ -230,7 +230,7 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({
+      uploadPolicyDocument({
         file: insuranceFile,
         documentId,
         portfolioSessionToken: "portfolio-token",
@@ -249,7 +249,7 @@ describe("uploadInsurance", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await uploadInsurance({
+    await uploadPolicyDocument({
       file: insuranceFile,
       documentId,
       portfolioSessionToken: "portfolio-token",
@@ -282,7 +282,7 @@ describe("uploadInsurance", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      uploadInsurance({
+      uploadPolicyDocument({
         file: insuranceFile,
         documentId,
         portfolioSessionToken: "portfolio-token",
@@ -311,7 +311,7 @@ describe("uploadInsurance", () => {
     );
 
     await expect(
-      uploadInsurance({
+      uploadPolicyDocument({
         file: insuranceFile,
         documentId,
         portfolioSessionToken: "portfolio-token",

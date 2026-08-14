@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 
-import type { InsuranceAnalysis } from "../../analysis/store";
+import type { InsuranceAnalysis } from "../../analysis/types";
 import {
-  initialUploadWorkflowState,
+  initialPolicyUploadState,
   isUploadInFlight,
-  uploadWorkflowReducer,
-} from "./state";
+  policyUploadReducer,
+} from "./upload-state";
 
 const analysis = {
   generatedAt: "2030-01-01T00:00:00.000Z",
@@ -15,16 +15,16 @@ const analysis = {
   insuranceDocuments: [],
 } satisfies InsuranceAnalysis;
 
-describe("uploadWorkflowReducer", () => {
+describe("policy upload state", () => {
   test("tracks upload progress only while the upload is active", () => {
-    const preparing = uploadWorkflowReducer(initialUploadWorkflowState, {
+    const preparing = policyUploadReducer(initialPolicyUploadState, {
       type: "start",
       total: 2,
     });
-    const uploading = uploadWorkflowReducer(preparing, {
+    const uploading = policyUploadReducer(preparing, {
       type: "server-ready",
     });
-    const progressed = uploadWorkflowReducer(uploading, { type: "uploaded" });
+    const progressed = policyUploadReducer(uploading, { type: "uploaded" });
 
     expect(preparing).toMatchObject({
       phase: "preparing-server",
@@ -37,14 +37,14 @@ describe("uploadWorkflowReducer", () => {
     expect(isUploadInFlight(preparing)).toBe(true);
     expect(isUploadInFlight(progressed)).toBe(true);
     expect(
-      uploadWorkflowReducer(initialUploadWorkflowState, { type: "uploaded" }),
-    ).toBe(initialUploadWorkflowState);
+      policyUploadReducer(initialPolicyUploadState, { type: "uploaded" }),
+    ).toBe(initialPolicyUploadState);
   });
 
   test("restores name selection when its document cleanup fails", () => {
-    const selectingName = uploadWorkflowReducer(
-      uploadWorkflowReducer(
-        uploadWorkflowReducer(initialUploadWorkflowState, {
+    const selectingName = policyUploadReducer(
+      policyUploadReducer(
+        policyUploadReducer(initialPolicyUploadState, {
           type: "start",
           total: 2,
         }),
@@ -56,10 +56,10 @@ describe("uploadWorkflowReducer", () => {
         selectedName: "테스트고객",
       },
     );
-    const completing = uploadWorkflowReducer(selectingName, {
+    const completing = policyUploadReducer(selectingName, {
       type: "begin-completion",
     });
-    const restored = uploadWorkflowReducer(completing, {
+    const restored = policyUploadReducer(completing, {
       type: "return-to-name-selection",
     });
 
@@ -73,9 +73,9 @@ describe("uploadWorkflowReducer", () => {
   });
 
   test("clears pending name selection when the user replaces selected files", () => {
-    const selectingName = uploadWorkflowReducer(
-      uploadWorkflowReducer(
-        uploadWorkflowReducer(initialUploadWorkflowState, {
+    const selectingName = policyUploadReducer(
+      policyUploadReducer(
+        policyUploadReducer(initialPolicyUploadState, {
           type: "start",
           total: 2,
         }),
@@ -88,8 +88,8 @@ describe("uploadWorkflowReducer", () => {
       },
     );
 
-    expect(uploadWorkflowReducer(selectingName, { type: "reset" })).toBe(
-      initialUploadWorkflowState,
+    expect(policyUploadReducer(selectingName, { type: "reset" })).toBe(
+      initialPolicyUploadState,
     );
   });
 });

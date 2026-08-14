@@ -1,12 +1,11 @@
-"use client";
-
 import { useRef } from "react";
 
-import { UploadRollbackError } from "../upload-helpers";
+import { UploadedDocumentCleanupError } from "../errors";
 
 type DeleteSessionDocuments = (
   portfolioSessionToken: string,
   documentIds: string[],
+  signal?: AbortSignal,
 ) => Promise<void>;
 
 type PendingCleanup = {
@@ -14,20 +13,28 @@ type PendingCleanup = {
   documentIds: string[];
 };
 
-export function useUploadCleanup(
+export function useServerDocumentCleanup(
   deleteSessionDocuments: DeleteSessionDocuments,
 ) {
   const pendingCleanupRef = useRef<PendingCleanup | null>(null);
 
-  const resolvePendingCleanup = async () => {
+  const resolvePendingCleanup = async (signal?: AbortSignal) => {
     const pendingCleanup = pendingCleanupRef.current;
     if (!pendingCleanup) return true;
 
     try {
-      await deleteSessionDocuments(
-        pendingCleanup.portfolioSessionToken,
-        pendingCleanup.documentIds,
-      );
+      if (signal) {
+        await deleteSessionDocuments(
+          pendingCleanup.portfolioSessionToken,
+          pendingCleanup.documentIds,
+          signal,
+        );
+      } else {
+        await deleteSessionDocuments(
+          pendingCleanup.portfolioSessionToken,
+          pendingCleanup.documentIds,
+        );
+      }
       pendingCleanupRef.current = null;
       return true;
     } catch {
@@ -51,7 +58,7 @@ export function useUploadCleanup(
         portfolioSessionToken,
         documentIds: uniqueDocumentIds,
       };
-      throw new UploadRollbackError();
+      throw new UploadedDocumentCleanupError();
     }
   };
 

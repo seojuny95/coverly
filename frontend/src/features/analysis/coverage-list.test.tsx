@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 
 import { InsuranceCoverageList } from "./coverage-list";
-import type { InsuranceCoverage } from "../upload/api";
+import type { InsuranceCoverage } from "./types";
 
 const withDetail: InsuranceCoverage = {
   담보명: "암진단비",

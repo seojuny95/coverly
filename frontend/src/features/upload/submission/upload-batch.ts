@@ -1,75 +1,92 @@
-import type { InsuranceAnalysis } from "../../analysis/store";
+import type {
+  InsuranceAnalysis,
+  PolicyAnalysisResult,
+} from "../../analysis/types";
 import type { PortfolioSessionResult } from "../../analysis/session-api";
-import { UploadInsuranceError } from "../api";
-import type { SelectedUploadFile, UploadInsurance } from "../types";
+import { PolicyUploadError } from "../api";
+import type { SelectedPolicyFile, UploadPolicyDocument } from "../types";
 import {
-  UploadRollbackError,
+  UploadedDocumentCleanupError,
+  isAbortError,
   isExpiredUploadSessionError,
   isFileSpecificUploadError,
-} from "../upload-helpers";
-import {
-  normalizeSuccessfulUploadResults,
-  type UploadResult,
-} from "./result-normalization";
+} from "../errors";
+
+type FulfilledUploadResult = {
+  status: "fulfilled";
+  selectedFileId: string;
+  documentId: string;
+  fileName: string;
+  policyResult: PolicyAnalysisResult;
+};
+
+type RejectedUploadResult = {
+  status: "rejected";
+  fileName: string;
+  error: unknown;
+  uploadError?: PolicyUploadError;
+};
+
+type UploadResult = FulfilledUploadResult | RejectedUploadResult;
 
 type RollbackSessionDocuments = (
   portfolioSessionToken: string | undefined,
   documentIds: string[],
 ) => Promise<string[]>;
 
-export type SuccessfulUploadTransaction = {
+export type SuccessfulUploadBatch = {
   kind: "success";
   analysis: InsuranceAnalysis;
-  fileFingerprints: string[];
   selectedFileIdsByDocumentId: Map<string, string>;
   rollbackUploadedDocuments: () => Promise<void>;
 };
 
-type FileErrorUploadTransaction = {
+type FileErrorUploadBatch = {
   kind: "file-errors";
-  uploadErrors: UploadInsuranceError[];
+  uploadErrors: PolicyUploadError[];
 };
 
-export type UploadTransactionResult =
-  SuccessfulUploadTransaction | FileErrorUploadTransaction;
+export type UploadBatchResult = SuccessfulUploadBatch | FileErrorUploadBatch;
 
-export async function runUploadTransaction({
-  selectedUploadFiles,
-  currentAnalysis,
-  prepareServer,
-  createSession,
-  uploadInsurance,
-  fileFingerprints,
-  signal,
-  rollbackSessionDocuments,
-  onFileSettled,
-  onServerReady,
-  onFileSucceeded,
-  onFileRejected,
+export type UploadBatchProgressEvent =
+  | { type: "server-ready" }
+  | { type: "file-succeeded"; selectedFileId: string }
+  | {
+      type: "file-rejected";
+      selectedFileId: string;
+      uploadError?: PolicyUploadError;
+    };
+
+export async function uploadPolicyBatch({
+  input,
+  services,
+  onProgress,
 }: {
-  selectedUploadFiles: SelectedUploadFile[];
-  currentAnalysis: InsuranceAnalysis | null;
-  prepareServer: (signal?: AbortSignal) => Promise<void>;
-  createSession: (signal?: AbortSignal) => Promise<PortfolioSessionResult>;
-  uploadInsurance: UploadInsurance;
-  fileFingerprints: string[];
-  signal?: AbortSignal;
-  rollbackSessionDocuments: RollbackSessionDocuments;
-  onFileSettled: () => void;
-  onServerReady: () => void;
-  onFileSucceeded: (selectedFileId: string) => void;
-  onFileRejected: (
-    selectedFileId: string,
-    uploadError: UploadInsuranceError | undefined,
-  ) => void;
-}): Promise<UploadTransactionResult> {
+  input: {
+    selectedFiles: SelectedPolicyFile[];
+    currentAnalysis: InsuranceAnalysis | null;
+    fileFingerprints: string[];
+    signal?: AbortSignal;
+  };
+  services: {
+    prepareServer: (signal?: AbortSignal) => Promise<void>;
+    createSession: (signal?: AbortSignal) => Promise<PortfolioSessionResult>;
+    uploadPolicyDocument: UploadPolicyDocument;
+    rollbackSessionDocuments: RollbackSessionDocuments;
+  };
+  onProgress: (event: UploadBatchProgressEvent) => void;
+}): Promise<UploadBatchResult> {
+  const { selectedFiles, currentAnalysis, fileFingerprints, signal } = input;
+  const {
+    prepareServer,
+    createSession,
+    uploadPolicyDocument,
+    rollbackSessionDocuments,
+  } = services;
   let portfolioSessionToken: string | undefined;
   let successfulDocumentIds: string[] = [];
   const assignedDocumentIds = new Map(
-    selectedUploadFiles.map((selectedFile) => [
-      selectedFile.id,
-      crypto.randomUUID(),
-    ]),
+    selectedFiles.map((selectedFile) => [selectedFile.id, crypto.randomUUID()]),
   );
   const rollbackDocuments = async (documentIds: string[]) => {
     const rolledBackDocumentIds = await rollbackSessionDocuments(
@@ -85,7 +102,7 @@ export async function runUploadTransaction({
 
   try {
     await prepareServer(signal);
-    onServerReady();
+    onProgress({ type: "server-ready" });
     const portfolioSession = currentAnalysis
       ? {
           portfolioSessionToken: currentAnalysis.portfolioSessionToken,
@@ -97,7 +114,7 @@ export async function runUploadTransaction({
     portfolioSessionToken = portfolioSession.portfolioSessionToken;
 
     const uploadSelectedFile = async (
-      selectedFile: SelectedUploadFile,
+      selectedFile: SelectedPolicyFile,
     ): Promise<UploadResult> => {
       try {
         const uploadInput = {
@@ -107,15 +124,17 @@ export async function runUploadTransaction({
           portfolioSessionToken: portfolioSession.portfolioSessionToken,
           signal,
         };
-        const result = await uploadInsurance(uploadInput);
+        const result = await uploadPolicyDocument(uploadInput);
         successfulDocumentIds = [
           ...successfulDocumentIds,
           uploadInput.documentId,
         ];
         const { documentId: _documentId, ...policyResult } = result;
         void _documentId;
-        onFileSettled();
-        onFileSucceeded(selectedFile.id);
+        onProgress({
+          type: "file-succeeded",
+          selectedFileId: selectedFile.id,
+        });
         return {
           status: "fulfilled",
           selectedFileId: selectedFile.id,
@@ -124,11 +143,17 @@ export async function runUploadTransaction({
           policyResult,
         };
       } catch (error) {
+        const isCancelled = signal?.aborted || isAbortError(error);
         const uploadError = isFileSpecificUploadError(error)
-          ? (error as UploadInsuranceError)
+          ? (error as PolicyUploadError)
           : undefined;
-        onFileSettled();
-        onFileRejected(selectedFile.id, uploadError);
+        if (!isCancelled) {
+          onProgress({
+            type: "file-rejected",
+            selectedFileId: selectedFile.id,
+            uploadError,
+          });
+        }
         return {
           status: "rejected",
           fileName: selectedFile.file.name,
@@ -139,7 +164,7 @@ export async function runUploadTransaction({
     };
 
     const uploadResults = await Promise.all(
-      selectedUploadFiles.map(uploadSelectedFile),
+      selectedFiles.map(uploadSelectedFile),
     );
     const failedUploads = uploadResults.filter(
       (result) => result.status === "rejected",
@@ -156,7 +181,7 @@ export async function runUploadTransaction({
       if (unexpectedFailure) {
         const rejectedDocumentIds = uploadResults.flatMap((result, index) =>
           result.status === "rejected"
-            ? [assignedDocumentIds.get(selectedUploadFiles[index].id)!]
+            ? [assignedDocumentIds.get(selectedFiles[index].id)!]
             : [],
         );
         await rollbackDocuments([
@@ -176,7 +201,7 @@ export async function runUploadTransaction({
     }
 
     const { insuranceDocuments, selectedFileIdsByDocumentId } =
-      normalizeSuccessfulUploadResults({
+      buildAnalysisDocuments({
         uploadResults,
         fileFingerprints,
       });
@@ -189,7 +214,6 @@ export async function runUploadTransaction({
         counselTurnsRemaining: portfolioSession.counselTurnsRemaining,
         insuranceDocuments,
       },
-      fileFingerprints,
       selectedFileIdsByDocumentId,
       rollbackUploadedDocuments,
     };
@@ -197,15 +221,40 @@ export async function runUploadTransaction({
     const expiredSessionError = isExpiredUploadSessionError(error);
     if (
       !expiredSessionError &&
-      !(error instanceof UploadRollbackError) &&
+      !(error instanceof UploadedDocumentCleanupError) &&
       successfulDocumentIds.length > 0
     ) {
       try {
         await rollbackUploadedDocuments();
       } catch {
-        throw new UploadRollbackError();
+        throw new UploadedDocumentCleanupError();
       }
     }
     throw error;
   }
+}
+
+function buildAnalysisDocuments({
+  uploadResults,
+  fileFingerprints,
+}: {
+  uploadResults: UploadResult[];
+  fileFingerprints: string[];
+}) {
+  const insuranceDocuments: InsuranceAnalysis["insuranceDocuments"] = [];
+  const selectedFileIdsByDocumentId = new Map<string, string>();
+
+  for (const [index, result] of uploadResults.entries()) {
+    if (result.status !== "fulfilled") continue;
+
+    insuranceDocuments.push({
+      id: result.documentId,
+      fileName: result.fileName,
+      fileFingerprint: fileFingerprints[index],
+      result: result.policyResult,
+    });
+    selectedFileIdsByDocumentId.set(result.documentId, result.selectedFileId);
+  }
+
+  return { insuranceDocuments, selectedFileIdsByDocumentId };
 }

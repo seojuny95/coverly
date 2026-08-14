@@ -1,17 +1,18 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { AnalysisProgress } from "./progress";
+import { PolicyAnalysisProgress } from "./policy-analysis-progress";
 
-describe("AnalysisProgress", () => {
+describe("PolicyAnalysisProgress", () => {
   it("floors the progress bar at the completed-file milestone", () => {
     render(
-      <AnalysisProgress
+      <PolicyAnalysisProgress
         progress={{ completed: 1, total: 2 }}
         files={[
           { name: "a.pdf", status: "done" },
           { name: "b.pdf", status: "reading" },
         ]}
         surface="page"
+        phase="uploading"
       />,
     );
 
@@ -25,10 +26,11 @@ describe("AnalysisProgress", () => {
 
   it("fully covers the previous page and keeps the analysis header mark", () => {
     render(
-      <AnalysisProgress
+      <PolicyAnalysisProgress
         progress={{ completed: 0, total: 1 }}
         files={[{ name: "a.pdf", status: "reading" }]}
         surface="page"
+        phase="uploading"
       />,
     );
 
@@ -39,13 +41,14 @@ describe("AnalysisProgress", () => {
 
   it("shows each file with its done/reading label", () => {
     render(
-      <AnalysisProgress
+      <PolicyAnalysisProgress
         progress={{ completed: 1, total: 2 }}
         files={[
           { name: "a.pdf", status: "done" },
           { name: "b.pdf", status: "reading" },
         ]}
         surface="page"
+        phase="uploading"
       />,
     );
 
@@ -57,10 +60,11 @@ describe("AnalysisProgress", () => {
 
   it("centers a single file instead of leaving it in the first grid column", () => {
     render(
-      <AnalysisProgress
+      <PolicyAnalysisProgress
         progress={{ completed: 0, total: 1 }}
         files={[{ name: "only.pdf", status: "reading" }]}
         surface="page"
+        phase="uploading"
       />,
     );
 
@@ -69,13 +73,14 @@ describe("AnalysisProgress", () => {
 
   it("keeps the two-column grid for multiple files", () => {
     render(
-      <AnalysisProgress
+      <PolicyAnalysisProgress
         progress={{ completed: 0, total: 2 }}
         files={[
           { name: "a.pdf", status: "reading" },
           { name: "b.pdf", status: "reading" },
         ]}
         surface="page"
+        phase="uploading"
       />,
     );
 
@@ -86,10 +91,11 @@ describe("AnalysisProgress", () => {
 
   it("stays at 0 with no files/progress", () => {
     render(
-      <AnalysisProgress
+      <PolicyAnalysisProgress
         progress={{ completed: 0, total: 0 }}
         files={[]}
         surface="modal"
+        phase="uploading"
       />,
     );
     const bar = screen.getByRole("progressbar");
@@ -99,14 +105,14 @@ describe("AnalysisProgress", () => {
 
   it("shows a finished state when completing", () => {
     render(
-      <AnalysisProgress
+      <PolicyAnalysisProgress
         progress={{ completed: 1, total: 2 }}
         files={[
           { name: "a.pdf", status: "done" },
           { name: "b.pdf", status: "reading" },
         ]}
         surface="page"
-        isCompleting
+        phase="completing"
       />,
     );
 
@@ -119,11 +125,11 @@ describe("AnalysisProgress", () => {
 
   it("does not claim to read files while the backend is starting", () => {
     render(
-      <AnalysisProgress
+      <PolicyAnalysisProgress
         progress={{ completed: 0, total: 1 }}
         files={[{ name: "a.pdf", status: "waiting" }]}
         surface="page"
-        isPreparingServer
+        phase="preparing-server"
       />,
     );
 
