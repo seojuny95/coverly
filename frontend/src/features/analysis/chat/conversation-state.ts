@@ -28,11 +28,6 @@ export type ChatConversationAction =
   | { type: "turns_updated"; turnsRemaining: number }
   | { type: "suggestions_restored" }
   | {
-      type: "request_cancelled";
-      assistantId: number;
-      turnsRemaining: number;
-    }
-  | {
       type: "request_failed";
       assistantId: number;
       message: string;
@@ -101,21 +96,6 @@ export function chatConversationReducer(
       return { ...state, turnsRemaining: action.turnsRemaining };
     case "suggestions_restored":
       return { ...state, suggestions: INITIAL_SUGGESTIONS };
-    case "request_cancelled":
-      return {
-        ...state,
-        turnsRemaining: action.turnsRemaining,
-        suggestions: INITIAL_SUGGESTIONS,
-        messages: updateMessage(
-          state.messages,
-          action.assistantId,
-          (message) => ({
-            ...message,
-            text: "질문을 중단했어요.",
-            kind: "notice",
-          }),
-        ),
-      };
     case "request_failed":
       return {
         ...state,

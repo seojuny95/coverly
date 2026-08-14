@@ -41,7 +41,6 @@ export function useInsuranceChat({
 
   const { streaming, startStream } = useChatStream({
     portfolioSessionToken,
-    isChatVisible,
     onDelta: (assistantId, delta) =>
       dispatch({ type: "answer_received", assistantId, delta }),
     onTurnsChanged: (nextTurnsRemaining) =>
@@ -50,7 +49,6 @@ export function useInsuranceChat({
         turnsRemaining: nextTurnsRemaining,
       }),
     onCompleted: () => dispatch({ type: "suggestions_restored" }),
-    onCancelled: handleCancelledStream,
     onFailed: handleStreamFailure,
   });
 
@@ -81,7 +79,6 @@ export function useInsuranceChat({
         question: text,
         history,
         assistantId,
-        turnsBeforeQuestion: turnsRemaining,
       },
       () => {
         nextMessageId.current += 2;
@@ -93,23 +90,6 @@ export function useInsuranceChat({
         });
       },
     );
-  }
-
-  function handleCancelledStream(
-    assistantId: number,
-    turnsBeforeThisQuestion: number,
-  ) {
-    // Deliberately optimistic: a cancelled stream ends the connection, so the
-    // server's best-effort refund is never reported back. Assuming it worked is
-    // the safe direction -- it normally does, and the count here only enables
-    // the composer. The real limit is enforced server-side per request, so an
-    // over-counted turn surfaces as the turn-limit error below (which sets the
-    // count from the server), never as an extra answer.
-    dispatch({
-      type: "request_cancelled",
-      assistantId,
-      turnsRemaining: turnsBeforeThisQuestion,
-    });
   }
 
   function handleStreamFailure(error: unknown, assistantId: number) {

@@ -59,7 +59,11 @@ export function InsuranceChatbot({
 
   if (isFloating && !open) {
     return (
-      <ChatLauncher disabled={sessionExpired} onOpen={() => setOpen(true)} />
+      <ChatLauncher
+        disabled={sessionExpired}
+        streaming={streaming}
+        onOpen={() => setOpen(true)}
+      />
     );
   }
 
