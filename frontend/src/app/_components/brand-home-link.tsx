@@ -2,8 +2,9 @@
 
 import { usePathname } from "next/navigation";
 
-import { LeaveGuardLink } from "@/features/analysis/leave-guard-link";
-import { useInsuranceData } from "@/features/analysis/store";
+import { LeaveGuardLink } from "@/features/analysis/session/leave-guard-link";
+import { useInsuranceData } from "@/features/analysis/session/store";
+import { isAnalysisPath } from "@/features/analysis/routes";
 import {
   BrandLink,
   BrandMark,
@@ -16,7 +17,7 @@ export function BrandHomeLink() {
   const pathname = usePathname();
   const { hasData } = useInsuranceData();
 
-  if (pathname === "/analysis" && hasData) {
+  if (isAnalysisPath(pathname) && hasData) {
     return (
       <LeaveGuardLink
         href="/"

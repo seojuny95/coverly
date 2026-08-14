@@ -1,0 +1,597 @@
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiResponseError } from "@/shared/api/client";
+import { makeTestQueryClient } from "../../../test/render-with-providers";
+import { POLICY_RESULT_DEFAULTS } from "../../../test/api-fixtures";
+import type { AnalyzedInsurance } from "../session/store";
+import { useCoverageAnalysis } from "./use-analysis";
+import * as api from "./api";
+
+const docs: AnalyzedInsurance[] = [
+  { id: "1", fileName: "1.pdf", result: POLICY_RESULT_DEFAULTS },
+];
+const deathBenefitContext: api.DeathBenefitGuideInput = {
+  has_dependent_family: false,
+  has_minor_children: false,
+  has_major_debt: false,
+};
+const summaryWithoutOverview = {
+  totals: [],
+  actual_loss_coverages: [],
+  excluded_coverages: [],
+  excluded_auto_policy_count: 0,
+} satisfies api.PortfolioSummary;
+const generatedOverview = {
+  generation: "llm" as const,
+  title: "확인된 보장을 기준으로 총평을 정리했어요",
+  paragraphs: ["확인된 보장 정보만 사용해 총평을 만들었어요."],
+} satisfies api.PortfolioOverview;
+
+const ignoreSessionExpiration = () => undefined;
+
+function useAnalysisUnderTest(
+  documents: AnalyzedInsurance[],
+  context: api.DeathBenefitGuideInput,
+  portfolioSessionToken?: string,
+  onSessionExpired = ignoreSessionExpiration,
+  sessionExpired = false,
+) {
+  return useCoverageAnalysis({
+    documents,
+    deathBenefitContext: context,
+    portfolioSessionToken,
+    onSessionExpired,
+    sessionExpired,
+  });
+}
+
+describe("useCoverageAnalysis", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(api, "requestPortfolioOverview").mockResolvedValue(
+      generatedOverview,
+    );
+  });
+
+  it("returns success state from the query", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => useAnalysisUnderTest(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+  });
+
+  it("does not request summary or overview after the session is expired", async () => {
+    const requestPortfolioSummary = vi.spyOn(api, "requestPortfolioSummary");
+    const requestPortfolioOverview = vi.spyOn(api, "requestPortfolioOverview");
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () =>
+        useAnalysisUnderTest(
+          docs,
+          deathBenefitContext,
+          "portfolio-token",
+          vi.fn(),
+          true,
+        ),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await act(async () => {
+      await result.current.retry();
+      await result.current.retryOverview();
+    });
+
+    expect(result.current.state.status).toBe("expired");
+    expect(requestPortfolioSummary).not.toHaveBeenCalled();
+    expect(requestPortfolioOverview).not.toHaveBeenCalled();
+    expect(result.current.isRetrying).toBe(false);
+    expect(result.current.isOverviewRetrying).toBe(false);
+  });
+
+  it("keeps the previous summary while death benefit context refreshes", async () => {
+    const nextRequest = new Promise<api.PortfolioSummary>(() => undefined);
+    const requestPortfolioSummary = vi
+      .spyOn(api, "requestPortfolioSummary")
+      .mockResolvedValueOnce({
+        ...summaryWithoutOverview,
+        overview: {
+          generation: "llm",
+          title: "첫 총평",
+          paragraphs: ["첫 총평 문장"],
+        },
+      })
+      .mockReturnValueOnce(nextRequest);
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ context }) => useAnalysisUnderTest(docs, context, "portfolio-token"),
+      {
+        initialProps: { context: deathBenefitContext },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    rerender({
+      context: {
+        ...deathBenefitContext,
+        has_dependent_family: true,
+      },
+    });
+
+    await waitFor(() =>
+      expect(requestPortfolioSummary).toHaveBeenCalledTimes(2),
+    );
+    expect(result.current.state.status).toBe("success");
+    expect(result.current.isRefreshing).toBe(true);
+  });
+
+  it("marks a failed context refresh without discarding the previous summary", async () => {
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockResolvedValueOnce(summaryWithoutOverview)
+      .mockRejectedValueOnce(new Error("temporary failure"));
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ context }) => useAnalysisUnderTest(docs, context, "portfolio-token"),
+      {
+        initialProps: { context: deathBenefitContext },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    rerender({
+      context: {
+        ...deathBenefitContext,
+        has_dependent_family: true,
+      },
+    });
+
+    await waitFor(() => expect(result.current.refreshFailed).toBe(true));
+    expect(result.current.state.status).toBe("success");
+  });
+
+  it("retains the immediately previous successful context after a later refresh fails", async () => {
+    const firstSummary: api.PortfolioSummary = {
+      ...summaryWithoutOverview,
+      overview: {
+        generation: "llm",
+        title: "첫 번째 총평",
+        paragraphs: ["첫 번째 조건의 총평이에요."],
+      },
+    };
+    const secondSummary: api.PortfolioSummary = {
+      ...summaryWithoutOverview,
+      overview: {
+        generation: "llm",
+        title: "두 번째 총평",
+        paragraphs: ["두 번째 조건의 총평이에요."],
+      },
+    };
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockResolvedValueOnce(firstSummary)
+      .mockResolvedValueOnce(secondSummary)
+      .mockRejectedValueOnce(new Error("third context failed"));
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ context }) => useAnalysisUnderTest(docs, context, "portfolio-token"),
+      {
+        initialProps: { context: deathBenefitContext },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() =>
+      expect(result.current.state).toEqual({
+        status: "success",
+        summary: firstSummary,
+      }),
+    );
+
+    rerender({
+      context: { ...deathBenefitContext, has_dependent_family: true },
+    });
+    await waitFor(() =>
+      expect(result.current.state).toEqual({
+        status: "success",
+        summary: secondSummary,
+      }),
+    );
+
+    rerender({
+      context: {
+        ...deathBenefitContext,
+        has_dependent_family: true,
+        has_minor_children: true,
+      },
+    });
+
+    await waitFor(() => expect(result.current.refreshFailed).toBe(true));
+    expect(result.current.state).toEqual({
+      status: "success",
+      summary: secondSummary,
+    });
+  });
+
+  it("does not keep the previous summary when documents change", async () => {
+    const nextRequest = new Promise<api.PortfolioSummary>(() => undefined);
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockResolvedValueOnce({
+        ...summaryWithoutOverview,
+        overview: {
+          generation: "llm",
+          title: "첫 총평",
+          paragraphs: ["첫 총평 문장"],
+        },
+      })
+      .mockReturnValueOnce(nextRequest);
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ documents }) =>
+        useAnalysisUnderTest(documents, deathBenefitContext, "portfolio-token"),
+      {
+        initialProps: { documents: docs },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    rerender({
+      documents: [
+        ...docs,
+        {
+          id: "2",
+          fileName: "2.pdf",
+          result: { ...POLICY_RESULT_DEFAULTS, 문자수: 2 },
+        } satisfies AnalyzedInsurance,
+      ],
+    });
+
+    expect(result.current.state.status).toBe("loading");
+    expect(result.current.isRefreshing).toBe(false);
+  });
+
+  it("exposes a retrying state while an error is requested again", async () => {
+    let resolveRetry: ((summary: api.PortfolioSummary) => void) | undefined;
+    const retryRequest = new Promise<api.PortfolioSummary>((resolve) => {
+      resolveRetry = resolve;
+    });
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockReturnValueOnce(retryRequest);
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => useAnalysisUnderTest(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    let retryPromise: Promise<void> | undefined;
+    act(() => {
+      retryPromise = result.current.retry();
+    });
+
+    await waitFor(() => expect(result.current.isRetrying).toBe(true));
+
+    resolveRetry?.(summaryWithoutOverview);
+    await act(async () => {
+      await retryPromise;
+    });
+
+    expect(result.current.state.status).toBe("success");
+    expect(result.current.isRetrying).toBe(false);
+    expect(result.current.overviewRetryFailed).toBe(false);
+  });
+
+  it("generates a missing overview through a separate request and merges it", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    const requestPortfolioOverview = vi.spyOn(api, "requestPortfolioOverview");
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => useAnalysisUnderTest(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+    await waitFor(() =>
+      expect(requestPortfolioOverview).toHaveBeenCalledOnce(),
+    );
+
+    expect(result.current.state).toEqual({
+      status: "success",
+      summary: { ...summaryWithoutOverview, overview: generatedOverview },
+    });
+  });
+
+  it("aborts an in-flight overview when the screen unmounts", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    let requestSignal: AbortSignal | undefined;
+    vi.spyOn(api, "requestPortfolioOverview").mockImplementation(
+      (_documents, _context, _token, signal) => {
+        requestSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    );
+    const client = makeTestQueryClient();
+    const { unmount } = renderHook(
+      () => useAnalysisUnderTest(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(requestSignal).toBeDefined());
+    expect(requestSignal?.aborted).toBe(false);
+
+    unmount();
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("aborts an older overview request before retrying", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    const requestSignals: AbortSignal[] = [];
+    vi.spyOn(api, "requestPortfolioOverview").mockImplementation(
+      (_documents, _context, _token, signal) => {
+        if (signal) requestSignals.push(signal);
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    );
+    const client = makeTestQueryClient();
+    const { result, unmount } = renderHook(
+      () => useAnalysisUnderTest(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(requestSignals).toHaveLength(1));
+    act(() => {
+      void result.current.retryOverview();
+    });
+    await waitFor(() => expect(requestSignals).toHaveLength(2));
+
+    expect(requestSignals[0]?.aborted).toBe(true);
+    expect(requestSignals[1]?.aborted).toBe(false);
+    unmount();
+  });
+
+  it("keeps summary content visible when overview generation fails", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    vi.spyOn(api, "requestPortfolioOverview").mockRejectedValue(
+      new Error("offline"),
+    );
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => useAnalysisUnderTest(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+    await waitFor(() => expect(result.current.overviewRetryFailed).toBe(true));
+
+    expect(result.current.state).toEqual({
+      status: "success",
+      summary: summaryWithoutOverview,
+    });
+  });
+
+  it("keeps previous summary content visible when a refresh fails", async () => {
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockResolvedValueOnce({
+        ...summaryWithoutOverview,
+        overview: generatedOverview,
+      })
+      .mockRejectedValueOnce(new Error("offline"));
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => useAnalysisUnderTest(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("success"));
+
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(result.current.state.status).toBe("success");
+    expect(result.current.retryFailed).toBe(false);
+  });
+
+  it("reports when a manual retry also fails", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockRejectedValue(
+      new Error("offline"),
+    );
+    const client = makeTestQueryClient();
+    const { result } = renderHook(
+      () => useAnalysisUnderTest(docs, deathBenefitContext, "portfolio-token"),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(result.current.state.status).toBe("error");
+    expect(result.current.retryFailed).toBe(true);
+  });
+
+  it("reports an expired session from summary requests", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockRejectedValue(
+      new ApiResponseError({
+        status: 403,
+        code: "INVALID_PORTFOLIO_SESSION",
+        userMessage: "세션이 만료됐어요.",
+      }),
+    );
+    const onSessionExpired = vi.fn();
+    const client = makeTestQueryClient();
+
+    renderHook(
+      () =>
+        useAnalysisUnderTest(
+          docs,
+          deathBenefitContext,
+          "portfolio-token",
+          onSessionExpired,
+        ),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(onSessionExpired).toHaveBeenCalledOnce());
+  });
+
+  it("reports an expired session from overview requests", async () => {
+    vi.spyOn(api, "requestPortfolioSummary").mockResolvedValue(
+      summaryWithoutOverview,
+    );
+    vi.spyOn(api, "requestPortfolioOverview").mockRejectedValue(
+      new ApiResponseError({
+        status: 403,
+        code: "INVALID_PORTFOLIO_SESSION",
+        userMessage: "세션이 만료됐어요.",
+      }),
+    );
+    const onSessionExpired = vi.fn();
+    const client = makeTestQueryClient();
+
+    renderHook(
+      () =>
+        useAnalysisUnderTest(
+          docs,
+          deathBenefitContext,
+          "portfolio-token",
+          onSessionExpired,
+        ),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(onSessionExpired).toHaveBeenCalledOnce());
+  });
+
+  it("ignores the outcome of an older retry after the query key changes", async () => {
+    let resolveOldRetry: ((summary: api.PortfolioSummary) => void) | undefined;
+    const oldRetryRequest = new Promise<api.PortfolioSummary>((resolve) => {
+      resolveOldRetry = resolve;
+    });
+    vi.spyOn(api, "requestPortfolioSummary")
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockReturnValueOnce(oldRetryRequest)
+      .mockRejectedValueOnce(new Error("offline"));
+    const client = makeTestQueryClient();
+    const { result, rerender } = renderHook(
+      ({ context }) => useAnalysisUnderTest(docs, context, "portfolio-token"),
+      {
+        initialProps: { context: deathBenefitContext },
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+
+    let oldRetryPromise: Promise<void> | undefined;
+    act(() => {
+      oldRetryPromise = result.current.retry();
+    });
+    await waitFor(() => expect(result.current.isRetrying).toBe(true));
+
+    rerender({
+      context: {
+        ...deathBenefitContext,
+        has_dependent_family: true,
+      },
+    });
+
+    await waitFor(() => expect(result.current.state.status).toBe("error"));
+    expect(result.current.isRetrying).toBe(false);
+
+    resolveOldRetry?.(summaryWithoutOverview);
+    await act(async () => {
+      await oldRetryPromise;
+    });
+
+    expect(result.current.overviewRetryFailed).toBe(false);
+    expect(result.current.retryFailed).toBe(false);
+  });
+});

@@ -4,7 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 import {
   InsuranceDataProvider,
   type InsuranceAnalysis,
-} from "../features/analysis/store";
+} from "../features/analysis/session/store";
 import { TooltipProvider } from "../shared/components/ui/tooltip";
 
 export function makeTestQueryClient() {

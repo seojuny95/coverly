@@ -453,7 +453,6 @@ describe("PolicyUploadForm selection and completion", () => {
           portfolioSessionToken: "test-portfolio-token",
           documentId: expect.any(String),
         }),
-        expect.anything(),
       );
       expect(uploadPolicyDocument).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -461,7 +460,6 @@ describe("PolicyUploadForm selection and completion", () => {
           portfolioSessionToken: "test-portfolio-token",
           documentId: expect.any(String),
         }),
-        expect.anything(),
       );
     });
     await waitFor(() => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { findByteIdenticalDuplicateIndexes } from "./policy-identity";
-import type { AnalyzedInsurance } from "./store";
+import type { AnalyzedInsurance } from "./session/store";
 import { POLICY_RESULT_DEFAULTS } from "../../test/api-fixtures";
 
 function documentWithFingerprint(fileFingerprint?: string): AnalyzedInsurance {

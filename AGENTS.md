@@ -57,7 +57,7 @@ pnpm api:check && pnpm test && pnpm lint && pnpm typecheck && pnpm format:check 
 
 ## 문서 유지보수
 
-- 코드 변경으로 이 가이드(`AGENTS.md`/`CLAUDE.md`), `LOGS.md`, `UX_COPY.md` 등이 낡을 때, **곧바로 고치지 말고 먼저 "문서도 수정할까요?"라고 확인한다.** 사용자가 원할 때 코드와 함께 정리하고, 문서만 따로 여러 번 건드리지 않는다.
+- 코드 변경으로 이 가이드(`AGENTS.md`/`CLAUDE.md`), `README.md`, `UX_COPY.md` 등이 낡을 때, **곧바로 고치지 말고 먼저 "문서도 수정할까요?"라고 확인한다.** 사용자가 원할 때 코드와 함께 정리하고, 문서만 따로 여러 번 건드리지 않는다.
 - `docs/`의 설계·제안 문서는 참고용으로 파일에 남기되 git에 커밋하지 않는다.
 
 ## Language Convention

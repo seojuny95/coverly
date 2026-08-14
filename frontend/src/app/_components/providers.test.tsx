@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useQuery } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Providers } from "./providers";
-import { useInsuranceData } from "@/features/analysis/store";
+import { useInsuranceData } from "@/features/analysis/session/store";
 import { POLICY_RESULT_DEFAULTS } from "@/test/api-fixtures";
+import { ANALYSIS_QUERY_KEY } from "@/features/analysis/query-cache";
+import { isAnalysisPath } from "@/features/analysis/routes";
 
 const navigation = vi.hoisted(() => ({ pathname: "/upload" }));
 
@@ -52,7 +55,41 @@ function InsuranceDataProbe() {
   );
 }
 
+function AnalysisQueryProbe() {
+  const queryClient = useQueryClient();
+  const [cacheState, setCacheState] = useState("not-inspected");
+  const { data } = useQuery({
+    queryKey: [...ANALYSIS_QUERY_KEY, "test-sensitive-result"],
+    queryFn: () => Promise.resolve("cached-analysis"),
+    enabled: isAnalysisPath(navigation.pathname),
+  });
+
+  return (
+    <>
+      <span>{data ?? "no-analysis-cache"}</span>
+      <button
+        type="button"
+        onClick={() =>
+          setCacheState(
+            queryClient.getQueriesData({ queryKey: ANALYSIS_QUERY_KEY })
+              .length === 0
+              ? "cache-empty"
+              : "cache-retained",
+          )
+        }
+      >
+        inspect cache
+      </button>
+      <span>{cacheState}</span>
+    </>
+  );
+}
+
 describe("Providers", () => {
+  beforeEach(() => {
+    navigation.pathname = "/upload";
+  });
+
   it("supplies a QueryClient to children", async () => {
     render(
       <Providers>
@@ -62,7 +99,33 @@ describe("Providers", () => {
     expect(await screen.findByText("ok")).toBeInTheDocument();
   });
 
-  it("clears in-memory analysis after leaving the analysis route", async () => {
+  it("clears analysis state and cache after leaving the analysis route", async () => {
+    navigation.pathname = "/analysis";
+    const { rerender } = render(
+      <Providers>
+        <InsuranceDataProbe />
+        <AnalysisQueryProbe />
+      </Providers>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "seed" }));
+    expect(screen.getByText("has-data")).toBeInTheDocument();
+    expect(await screen.findByText("cached-analysis")).toBeInTheDocument();
+
+    navigation.pathname = "/upload";
+    rerender(
+      <Providers>
+        <InsuranceDataProbe />
+        <AnalysisQueryProbe />
+      </Providers>,
+    );
+
+    await waitFor(() => expect(screen.getByText("empty")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "inspect cache" }));
+    expect(screen.getByText("cache-empty")).toBeInTheDocument();
+  });
+
+  it("keeps in-memory analysis while navigating between analysis routes", () => {
     navigation.pathname = "/analysis";
     const { rerender } = render(
       <Providers>
@@ -71,17 +134,13 @@ describe("Providers", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "seed" }));
-    expect(screen.getByText("has-data")).toBeInTheDocument();
-
-    navigation.pathname = "/upload";
+    navigation.pathname = "/analysis/coverage";
     rerender(
       <Providers>
         <InsuranceDataProbe />
       </Providers>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("empty")).toBeInTheDocument();
-    });
+    expect(screen.getByText("has-data")).toBeInTheDocument();
   });
 });

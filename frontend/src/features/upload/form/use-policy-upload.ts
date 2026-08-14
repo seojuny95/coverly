@@ -1,4 +1,3 @@
-import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useReducer, useRef } from "react";
 import {
@@ -6,11 +5,11 @@ import {
   type InsuranceAnalysis,
   getInsuredPersonName,
 } from "../../analysis/types";
-import { useInsuranceData } from "../../analysis/store";
+import { useInsuranceData } from "../../analysis/session/store";
 import {
   deletePortfolioSessionDocuments,
   type PortfolioSessionResult,
-} from "../../analysis/session-api";
+} from "../../analysis/session/api";
 import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 import { reportClientOperationFailure } from "@/shared/api/errors";
 import type { UploadPolicyDocument } from "../types";
@@ -63,13 +62,6 @@ export function usePolicyUpload({
     expireSession,
   } = useInsuranceData();
   const router = useRouter();
-  const uploadMutation = useMutation({ mutationFn: uploadPolicyDocument });
-  const readinessMutation = useMutation({
-    mutationFn: (signal?: AbortSignal) => prepareServer(signal),
-  });
-  const sessionMutation = useMutation({
-    mutationFn: (signal?: AbortSignal) => createSession(signal),
-  });
   const activeUploadController = useRef<AbortController | null>(null);
   const activeSelectionController = useRef<AbortController | null>(null);
   const isMountedRef = useRef(false);
@@ -246,9 +238,9 @@ export function usePolicyUpload({
           signal: uploadController.signal,
         },
         services: {
-          prepareServer: readinessMutation.mutateAsync,
-          createSession: sessionMutation.mutateAsync,
-          uploadPolicyDocument: uploadMutation.mutateAsync,
+          prepareServer,
+          createSession,
+          uploadPolicyDocument,
           resolvePendingCleanup,
           rollbackSessionDocuments,
         },

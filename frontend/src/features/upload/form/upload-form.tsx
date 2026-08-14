@@ -9,7 +9,7 @@ import {
   createPortfolioSession,
   deletePortfolioSessionDocuments,
   type PortfolioSessionResult,
-} from "../../analysis/session-api";
+} from "../../analysis/session/api";
 import { waitForBackendReady } from "@/shared/api/readiness";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";

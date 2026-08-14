@@ -28,7 +28,7 @@ describe("BrandHomeLink", () => {
   });
 
   it("guards the home link when analysis data would be lost", async () => {
-    navigation.pathname = "/analysis";
+    navigation.pathname = "/analysis/coverage";
     const user = userEvent.setup();
     renderWithProviders(<BrandHomeLink />, {
       initialAnalysis: {

@@ -252,7 +252,6 @@ describe("PolicyUploadForm failures and upload lifecycle", () => {
           password: "900101",
           portfolioSessionToken: "test-portfolio-token",
         }),
-        expect.anything(),
       );
     });
     await waitFor(() => {

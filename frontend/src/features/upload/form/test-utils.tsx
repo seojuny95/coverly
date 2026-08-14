@@ -7,7 +7,7 @@ import type {
   AnalyzedInsurance,
   InsuranceAnalysis,
 } from "../../analysis/types";
-import { useInsuranceData } from "../../analysis/store";
+import { useInsuranceData } from "../../analysis/session/store";
 import { renderWithProviders } from "../../../test/render-with-providers";
 
 function InsuranceDataProbe() {

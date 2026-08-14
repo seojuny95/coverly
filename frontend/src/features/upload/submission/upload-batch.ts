@@ -2,7 +2,7 @@ import type {
   InsuranceAnalysis,
   PolicyAnalysisResult,
 } from "../../analysis/types";
-import type { PortfolioSessionResult } from "../../analysis/session-api";
+import type { PortfolioSessionResult } from "../../analysis/session/api";
 import { PolicyUploadError } from "../api";
 import type { SelectedPolicyFile, UploadPolicyDocument } from "../types";
 import {

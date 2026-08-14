@@ -8,7 +8,7 @@ Next.js App Router + TypeScript 프론트엔드. 전체 프로젝트 가이드: 
 
 ## 프로젝트 소개
 
-Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 분석(`/analysis`) 흐름으로, 보험증권 PDF를 올리면 AI가 정리한 보험 종류별 정리·보장금 합계·상담 전 검토·근거 기반 상담을 보여준다. "보험을 팔지 않는 내 편 AI 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
+Coverly의 사용자 인터페이스를 담당한다. 랜딩(`/`) → 업로드(`/upload`) → 내 보험(`/analysis`)·보험 분석(`/analysis/coverage`)·AI 상담(`/analysis/chat`) 흐름으로, 보험증권 PDF를 올리면 AI가 정리한 보험 종류별 정리·보장금 합계·상담 전 검토·근거 기반 상담을 보여준다. "보험을 팔지 않는 내 편 AI 상담사" 인상을 카피와 화면으로 지키는 게 목표다(제품 방향 → [../AGENTS.md](../AGENTS.md), 카피 기준 → [UX_COPY.md](UX_COPY.md)).
 
 ## Development Commands
 
@@ -23,22 +23,31 @@ pnpm format
 ## Project Structure
 
 라우트 파일은 얇게 유지한다. 루트 레이아웃과 랜딩 전용 UI는
-`app/_components/`에 함께 두고, 업로드·분석처럼 상태와 API 호출을 포함하는 제품
-기능은 `features/`로 분리한다.
+`app/_components/`에 함께 두고, 상태 제공자가 필요한 업로드·분석 라우트는 URL에
+영향을 주지 않는 `app/(workflow)/` 그룹에서 공통 레이아웃을 사용한다. 상태와 API
+호출을 포함하는 제품 기능은 `features/`로 분리한다.
 
 ```text
 src/
 ├── app/                         # App Router 라우트와 루트 전용 코드
 │   ├── _components/             # 루트 레이아웃·랜딩 전용 UI와 인접 테스트
+│   ├── (workflow)/              # 업로드·분석 공통 Provider와 브랜드 링크
+│   │   ├── upload/page.tsx      # 업로드 진입점
+│   │   └── analysis/            # 분석 공통 레이아웃과 하위 라우트
+│   │       ├── _components/     # 분석 라우트 전용 레이아웃 UI
+│   │       ├── page.tsx         # 내 보험
+│   │       ├── coverage/page.tsx # 보험 분석
+│   │       └── chat/page.tsx    # AI 상담
 │   ├── page.tsx                 # 랜딩 조립
-│   ├── upload/page.tsx          # 업로드 진입점
-│   ├── analysis/page.tsx        # 분석 결과 진입점
 │   ├── layout.tsx / globals.css # 전역 레이아웃과 스타일
 │   └── error.tsx / global-error.tsx / not-found.tsx
 ├── features/
 │   ├── upload/                  # 업로드 폼, 진행 화면, 업로드 API
-│   └── analysis/                # 분석 화면, 세션, 인메모리 상태, 이탈 경고
-│       └── portfolio/           # 보장 합계, 상담 전 검토, 상담 대화
+│   └── analysis/                # 분석 라우트가 공유하는 계약과 경계
+│       ├── policies/            # 업로드한 증권 목록과 상세
+│       ├── coverage/            # 보장 합계와 상담 전 검토
+│       ├── chat/                # 근거 기반 상담 UI와 스트림
+│       └── session/             # 인메모리 상태, 세션 갱신, 이탈 경고
 ├── shared/
 │   ├── api/                     # 생성 계약, 오류, timeout, 재시도, 서버 준비 확인
 │   ├── components/              # 앱 전역 공용 UI
@@ -47,7 +56,7 @@ src/
 └── test/                         # 전역 테스트 설정과 공용 테스트 helper
 ```
 
-- 증권·분석 데이터와 세션 토큰은 인메모리 상태로만 관리한다. localStorage, sessionStorage, IndexedDB나 persisted query cache에 저장하지 않으며, 새로고침·화면 이탈 시 사라지기 전에 경고한다.
+- 증권·분석 데이터와 세션 토큰은 인메모리 상태로만 관리한다. localStorage, sessionStorage, IndexedDB나 persisted query cache에 저장하지 않는다. 새로고침·창 닫기와 홈 링크 이탈에는 경고하고, 분석 경로 밖으로 이동하면 상태와 분석 query cache를 제거한다. 브라우저 뒤로 가기는 Next.js의 안정적인 차단 API가 없어 경고를 보장하지 않는다.
 - 업로드에서 만든 포트폴리오 세션 토큰을 분석·상담에 재사용하고, 요청에는 전체 증권 대신 토큰과 필요한 문서 ID만 보낸다. 서버의 임시 저장·마스킹·만료 규칙은 [../backend/REFERENCE_DATA.md](../backend/REFERENCE_DATA.md)를 따른다.
 - 캐시되는 서버 상태는 **react-query**로 관리한다(조회는 `useQuery`, 생성·전송은 `useMutation`). 스트림과 세션 갱신·삭제처럼 컴포넌트 수명 주기와 취소에 묶인 작업은 기능 전용 hook에서 직접 관리할 수 있다. QueryClient와 캐시는 인메모리 전용으로 둔다.
 - 백엔드 OpenAPI를 API 계약의 단일 정보원으로 삼는다. `scripts/generate-api-types.mjs`가 생성한 타입과 런타임 상수는 직접 수정하지 않는다. 공통 API 경계는 `shared/api/`에 둔다.
@@ -84,9 +93,9 @@ src/
 - **가독성을 기능과 동등한 완료 조건으로 본다**: 동작하더라도 이름과 파일 구조만으로 의도가 드러나지 않으면 완료된 코드로 보지 않는다.
 - **주석은 이유와 제약만 남긴다**: 코드를 그대로 풀어쓴 설명, 임시 작업 과정, 작성자만 이해할 메모, 실제로 유지보수자가 읽지 않을 서술형 주석은 작성하지 않는다. 이런 주석이나 코드와 맞지 않는 낡은 주석을 발견하면 제거한다. 코드만으로 드러나지 않는 의사결정·안전 제약·프레임워크 우회 이유만 짧게 영어로 남긴다.
 - 파일명은 kebab-case, 컴포넌트는 PascalCase를 사용한다.
-- 기능 폴더가 문맥을 제공하므로 하위 파일명에 같은 기능명을 prefix로 반복하지 않는다. 예: `features/upload/form/upload-form.tsx`, `features/analysis/store.tsx`, `features/analysis/portfolio/total-table.tsx`.
-- 파일명은 폴더 안에서 간결하게 유지하되 export 이름은 import 문맥과 React DevTools에서 의미가 드러나게 짓는다. 예: `form/upload-form.tsx`의 `PolicyUploadForm`, `total-table.tsx`의 `CoverageTotalTable`.
-- 하나의 컴포넌트 파일이 여러 하위 컴포넌트로 커지면 같은 이름의 폴더로 나누고 `index.tsx`에서 공개 export를 유지한다(import 경로는 그대로). 예: `portfolio/panel/`, `portfolio/recommendation-cards/`.
+- 기능 폴더가 문맥을 제공하므로 하위 파일명에 같은 기능명을 prefix로 반복하지 않는다. 예: `features/upload/form/upload-form.tsx`, `features/analysis/session/store.tsx`, `features/analysis/coverage/total-table.tsx`.
+- 파일명은 폴더 안에서 간결하게 유지하되 export 이름은 import 문맥과 React DevTools에서 의미가 드러나게 짓는다. 예: `form/upload-form.tsx`의 `PolicyUploadForm`, `coverage/total-table.tsx`의 `CoverageTotalTable`.
+- 하나의 컴포넌트 파일이 여러 하위 컴포넌트로 커지면 같은 이름의 폴더로 나누고 `index.tsx`에서 공개 export를 유지한다(import 경로는 그대로). 예: `coverage/panel/`, `coverage/recommendation-cards/`.
 - shadcn/ui 컴포넌트는 `components.json`의 alias에 따라 `shared/components/ui/`에 두고, 공용 class 병합에는 `shared/lib/utils.ts`의 `cn`을 사용한다.
 - 마크다운은 한국어, 코드 코멘트와 사용자 대상 UI 카피는 각각 영어와 한국어로 쓴다.
 

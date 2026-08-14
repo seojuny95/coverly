@@ -3,7 +3,7 @@ import type {
   AnalyzedInsurance,
   InsuranceAnalysis,
 } from "../../analysis/types";
-import type { PortfolioSessionResult } from "../../analysis/session-api";
+import type { PortfolioSessionResult } from "../../analysis/session/api";
 import type { PolicyUploadError } from "../api";
 import { isAbortError, isExpiredUploadSessionError } from "../errors";
 import type { SelectedPolicyFile, UploadPolicyDocument } from "../types";
