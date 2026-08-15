@@ -9,6 +9,7 @@ import {
 
 const analysis = {
   generatedAt: "2030-01-01T00:00:00.000Z",
+  portfolioKind: "uploaded" as const,
   portfolioSessionToken: "portfolio-token",
   portfolioSessionExpiresAt: "2030-01-02T00:00:00.000Z",
   counselTurnsRemaining: 10,

@@ -13,6 +13,7 @@ import {
 function makeAnalysis(id: string): InsuranceAnalysis {
   return {
     generatedAt: "2026-07-12T00:00:00.000Z",
+    portfolioKind: "uploaded" as const,
     portfolioSessionToken: "test-portfolio-token",
     portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
     counselTurnsRemaining: 10,
@@ -49,6 +50,7 @@ describe("InsuranceDataProvider", () => {
   it("does not add another document with the same policy identity", () => {
     const current: InsuranceAnalysis = {
       generatedAt: "2026-07-12T00:00:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -71,6 +73,7 @@ describe("InsuranceDataProvider", () => {
     };
     const next: InsuranceAnalysis = {
       generatedAt: "2026-07-12T01:00:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -100,6 +103,7 @@ describe("InsuranceDataProvider", () => {
   it("does not add another document with the same file fingerprint", () => {
     const current: InsuranceAnalysis = {
       generatedAt: "2026-07-12T00:00:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -122,6 +126,7 @@ describe("InsuranceDataProvider", () => {
     };
     const next: InsuranceAnalysis = {
       generatedAt: "2026-07-12T01:00:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -152,6 +157,7 @@ describe("InsuranceDataProvider", () => {
     const current = makeAnalysis("a");
     const next: InsuranceAnalysis = {
       generatedAt: "2026-07-12T01:00:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -260,6 +266,7 @@ describe("InsuranceDataProvider", () => {
     act(() =>
       result.current.setAnalysis({
         generatedAt: "2026-07-12T00:00:00.000Z",
+        portfolioKind: "uploaded" as const,
         portfolioSessionToken: "old-token",
         portfolioSessionExpiresAt: "invalid",
         counselTurnsRemaining: 10,
@@ -272,6 +279,7 @@ describe("InsuranceDataProvider", () => {
         portfolioSessionToken: "new-token",
         expiresAt: "2030-01-01T00:15:00.000Z",
         counselTurnsRemaining: 10,
+        portfolioKind: "uploaded",
       }),
     );
 

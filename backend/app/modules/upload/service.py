@@ -19,6 +19,7 @@ from app.modules.portfolio.session.service import (
     PortfolioSessionDocumentCancelled,
     PortfolioSessionDocumentInProgress,
     PortfolioSessionDocumentLimitExceeded,
+    PortfolioSessionReadOnly,
     PortfolioSessionService,
     PortfolioSessionUnavailable,
     RegisteredPolicyDocument,
@@ -36,6 +37,7 @@ type PortfolioUploadSessionError = (
     | PortfolioSessionDocumentCancelled
     | PortfolioSessionDocumentInProgress
     | PortfolioSessionDocumentAlreadyCompleted
+    | PortfolioSessionReadOnly
 )
 
 
@@ -83,6 +85,7 @@ class PolicyUploadService:
             PortfolioSessionDocumentCancelled,
             PortfolioSessionDocumentInProgress,
             PortfolioSessionDocumentAlreadyCompleted,
+            PortfolioSessionReadOnly,
         ) as exc:
             raise _portfolio_session_error(exc) from None
         except PortfolioSessionUnavailable as exc:
@@ -146,6 +149,7 @@ class PolicyUploadService:
             PortfolioSessionDocumentCancelled,
             PortfolioSessionDocumentInProgress,
             PortfolioSessionDocumentAlreadyCompleted,
+            PortfolioSessionReadOnly,
         ) as exc:
             raise _portfolio_session_error(exc) from None
         except PortfolioSessionUnavailable as exc:
@@ -176,6 +180,12 @@ def _portfolio_session_error(error: PortfolioUploadSessionError) -> ApiError:
             status_code=409,
             code="POLICY_UPLOAD_ALREADY_COMPLETED",
             message="이 PDF는 이미 분석을 마쳤어요.",
+        )
+    if isinstance(error, PortfolioSessionReadOnly):
+        return ApiError(
+            status_code=409,
+            code="sample_portfolio_read_only",
+            message="샘플 보험에는 증권을 추가할 수 없어요.",
         )
     return ApiError(
         status_code=409,

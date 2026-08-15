@@ -26,6 +26,7 @@ vi.mock("./chatbot", () => ({
 
 const initialAnalysis = {
   generatedAt: "2026-08-14T00:00:00.000Z",
+  portfolioKind: "uploaded" as const,
   portfolioSessionToken: "test-portfolio-token",
   portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
   counselTurnsRemaining: 10,

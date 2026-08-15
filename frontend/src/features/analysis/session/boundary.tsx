@@ -25,6 +25,7 @@ export function AnalysisSessionBoundary({ children }: { children: ReactNode }) {
             portfolioSessionToken: analysis.portfolioSessionToken,
             expiresAt: analysis.portfolioSessionExpiresAt,
             counselTurnsRemaining: analysis.counselTurnsRemaining,
+            portfolioKind: analysis.portfolioKind,
           }
         : undefined,
     [analysis],

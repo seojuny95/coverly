@@ -1207,60 +1207,65 @@
       ]
     },
     {
-      "id": "suggestion_overlap",
-      "intent": "시작 화면 추천 질문",
+      "id": "suggestion_policy_list",
+      "intent": "시작 화면 추천 질문 — 가입 보험 목록",
       "tags": [
         "suggestion"
       ],
       "turns": [
         {
-          "question": "겹치는 보장이 있는지 봐줄래요?",
+          "question": "내가 가입한 보험은 뭐가 있어?",
           "expect_in_scope": true,
           "include_any": [
-            "실손",
-            "암진단비"
+            "NH농협손해보험",
+            "삼성화재",
+            "현대해상"
           ],
+          "expect_source": true,
           "judge": [
-            "advice",
+            "counselor_tone",
             "evidence_grade"
           ]
         }
       ]
     },
     {
-      "id": "suggestion_gaps",
-      "intent": "시작 화면 추천 질문 — 조언이 나와야 함",
+      "id": "suggestion_monthly_premium",
+      "intent": "시작 화면 추천 질문 — 월 보험료 합계",
       "tags": [
         "suggestion"
       ],
       "turns": [
         {
-          "question": "내 보험에서 비어 있는 보장이 있나요?",
+          "question": "월 보험료는 총 얼마야?",
+          "expect_in_scope": true,
+          "include_any": [
+            "119,700",
+            "11만"
+          ],
+          "judge": [
+            "no_fabrication",
+            "counselor_tone",
+            "evidence_grade"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "suggestion_portfolio_review",
+      "intent": "시작 화면 추천 질문 — 우선 점검 항목",
+      "tags": [
+        "suggestion"
+      ],
+      "turns": [
+        {
+          "question": "내 보험에서 먼저 확인해야 할 부분은 뭐야?",
           "expect_in_scope": true,
           "judge": [
             "advice",
             "no_product_sales",
             "evidence_grade"
           ]
-        }
-      ]
-    },
-    {
-      "id": "suggestion_claim_where",
-      "intent": "시작 화면 추천 질문",
-      "tags": [
-        "suggestion"
-      ],
-      "turns": [
-        {
-          "question": "실손의료비는 어디로 청구해요?",
-          "expect_in_scope": true,
-          "include_any": [
-            "실손24",
-            "삼성화재",
-            "한화손해보험"
-          ],
-          "expect_source": true
         }
       ]
     },

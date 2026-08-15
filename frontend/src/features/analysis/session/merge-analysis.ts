@@ -54,6 +54,7 @@ export function mergeInsuranceAnalysis(
     selectedName: next.selectedName ?? current.selectedName,
     portfolioSessionToken: next.portfolioSessionToken,
     portfolioSessionExpiresAt: next.portfolioSessionExpiresAt,
+    portfolioKind: current.portfolioKind,
     // Merging in another upload must never hand back spent question turns.
     counselTurnsRemaining: Math.min(
       current.counselTurnsRemaining,

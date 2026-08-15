@@ -19,6 +19,8 @@ export type PortfolioSessionRequest = Schemas["PortfolioSessionRequest"];
 export type PortfolioSessionDocumentsDeleteRequest =
   Schemas["PortfolioSessionDocumentsDeleteRequest"];
 export type PortfolioSessionResponse = Schemas["PortfolioSessionResponse"];
+export type SamplePortfolioSessionResponse =
+  Schemas["SamplePortfolioSessionResponse"];
 export type CoverageTotal = Schemas["CoverageTotalItem"];
 export type PortfolioCoverageSummary = Schemas["PortfolioCoverageSummary"];
 export type PortfolioOverview = Schemas["PortfolioOverview"];

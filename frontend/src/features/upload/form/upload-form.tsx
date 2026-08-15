@@ -29,7 +29,8 @@ type PolicyUploadFormProps = {
   requiredInsuredPersonName?: string;
   existingDocuments?: AnalyzedInsurance[];
   surface?: UploadSurface;
-  onUploadInFlightChange?: (isUploadInFlight: boolean) => void;
+  onInteractionLockedChange?: (isInteractionLocked: boolean) => void;
+  disabled?: boolean;
   prepareServer?: (signal?: AbortSignal) => Promise<void>;
   createSession?: (signal?: AbortSignal) => Promise<PortfolioSessionResult>;
   deleteSessionDocuments?: (
@@ -48,7 +49,8 @@ export function PolicyUploadForm({
   requiredInsuredPersonName,
   existingDocuments = [],
   surface = "page",
-  onUploadInFlightChange,
+  onInteractionLockedChange,
+  disabled = false,
   prepareServer = prepareUploadServer,
   createSession = createPortfolioSession,
   deleteSessionDocuments = deletePortfolioSessionDocuments,
@@ -63,10 +65,13 @@ export function PolicyUploadForm({
     deleteSessionDocuments,
   });
 
-  // A dismissible surface must stay mounted until upload and completion finish.
+  const interactionLocked =
+    upload.processingPhase !== null || Boolean(upload.pendingAnalysis);
+
+  // A dismissible surface must stay mounted until every upload decision is complete.
   useEffect(() => {
-    onUploadInFlightChange?.(Boolean(upload.processingPhase));
-  }, [upload.processingPhase, onUploadInFlightChange]);
+    onInteractionLockedChange?.(interactionLocked);
+  }, [interactionLocked, onInteractionLockedChange]);
 
   if (upload.processingPhase) {
     return (
@@ -91,6 +96,7 @@ export function PolicyUploadForm({
     isPdfPasswordError(selectedFile.errorCode),
   );
   const submitDisabled =
+    disabled ||
     upload.selectedFiles.length === 0 ||
     Boolean(upload.pendingAnalysis) ||
     (passwordRetryFiles.length > 0 &&
@@ -110,7 +116,7 @@ export function PolicyUploadForm({
         existingDocumentCount={existingDocuments.length}
         requiredInsuredPersonName={requiredInsuredPersonName}
         surface={surface}
-        disabled={Boolean(upload.pendingAnalysis)}
+        disabled={disabled || Boolean(upload.pendingAnalysis)}
         inputRef={upload.inputRef}
         onSelectFiles={upload.selectFiles}
       />
@@ -128,7 +134,7 @@ export function PolicyUploadForm({
           surface={surface}
           onRemove={upload.removeSelectedFile}
           onPasswordChange={upload.updateSelectedFilePassword}
-          disableRemove={Boolean(upload.pendingAnalysis)}
+          disableRemove={disabled || Boolean(upload.pendingAnalysis)}
         />
         <Button
           type="submit"

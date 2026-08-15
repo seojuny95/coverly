@@ -6,7 +6,7 @@ FastAPI + uv 백엔드. 전체 프로젝트 가이드: [../AGENTS.md](../AGENTS.
 
 ## 프로젝트 소개
 
-Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 근거 기반 상담을 담당하는 백엔드 앱이다. 분류·상담·답변 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 증권 파싱·세션 추가(`POST /policies/parse`), 결정적 포트폴리오 요약(`POST /portfolio/summary`), LLM 총평 생성·재시도(`POST /portfolio/overview`), 근거 기반 상담(`POST /qa/stream`)이다. 상담은 도구를 가진 단일 agent가 처리하며, Official/Policy RAG 도구는 완성된 답변이 아니라 검색 근거·출처·한계를 반환한다. 최종 자연어 답변은 agent가 한 번만 생성한다. 총평 문장과 결정적 요약은 별도 API·상태로 관리하며, 총평 실패가 기존 분석 결과를 지우지 않는다. 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
+Coverly AI의 보험 증권 처리, 보장 구조화, 진단, 근거 기반 상담을 담당하는 백엔드 앱이다. 분류·상담·답변 생성은 결정적 규칙과 LLM(AI)을 함께 써서 근거 기반으로 답한다. 현재 핵심 흐름은 포트폴리오 세션 생성(`POST /portfolio/sessions`), 샘플 포트폴리오 세션 생성(`POST /portfolio/sessions/sample`), 증권 파싱·세션 추가(`POST /policies/parse`), 결정적 포트폴리오 요약(`POST /portfolio/summary`), LLM 총평 생성·재시도(`POST /portfolio/overview`), 근거 기반 상담(`POST /qa/stream`)이다. 상담은 도구를 가진 단일 agent가 처리하며, Official/Policy RAG 도구는 완성된 답변이 아니라 검색 근거·출처·한계를 반환한다. 최종 자연어 답변은 agent가 한 번만 생성한다. 총평 문장과 결정적 요약은 별도 API·상태로 관리하며, 총평 실패가 기존 분석 결과를 지우지 않는다. 프론트엔드는 synthetic fallback을 만들지 않는다. 참조 데이터와 임시 세션의 소유권·운영 경계는 [REFERENCE_DATA.md](REFERENCE_DATA.md)에 정의한다.
 
 ## Development Commands
 
@@ -29,6 +29,7 @@ app/
 │   ├── upload/              # 증권 업로드 HTTP 경계와 파싱·세션 조합
 │   ├── policy/              # 증권 파싱·분류·요약·담보 해설
 │   ├── portfolio/           # 다건 증권 집계, 총평 생성, 단일 토큰 세션
+│   │   ├── sample/          # 미리 생성된 샘플 포트폴리오 fixture와 세션 생성
 │   │   └── session/         # 세션 토큰, 구조화 증권 저장, 분석 캐시
 │   ├── qa/                  # 근거 기반 상담 (POST /qa/stream) — 단일 agent
 │   │   ├── agent.py         # agent 정의·스트리밍. 지시문은 instructions.md

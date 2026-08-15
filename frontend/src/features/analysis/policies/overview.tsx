@@ -35,10 +35,11 @@ export function PolicyOverview({
     [documents],
   );
   const uploadLimitReached = documents.length >= PORTFOLIO_MAX_DOCUMENTS;
+  const allowDocumentUpload = analysis?.portfolioKind === "uploaded";
   if (!analysis) return null;
 
   const openUploadModal = () => {
-    if (!uploadLimitReached) setUploadModalOpen(true);
+    if (allowDocumentUpload && !uploadLimitReached) setUploadModalOpen(true);
   };
 
   const mergeAdditionalDocuments = (nextAnalysis: InsuranceAnalysis) => {
@@ -52,6 +53,7 @@ export function PolicyOverview({
         generatedAt={analysis.generatedAt}
         onOpenUploadModal={openUploadModal}
         uploadLimitReached={uploadLimitReached}
+        allowDocumentUpload={allowDocumentUpload}
       />
       <PolicyClassificationSummary groupedDocuments={groupedDocuments} />
       <PolicySummarySection
@@ -66,7 +68,7 @@ export function PolicyOverview({
         onToggle={toggle}
       />
 
-      {uploadModalOpen ? (
+      {allowDocumentUpload && uploadModalOpen ? (
         <UploadPolicyDocumentModal
           selectedName={analysis.selectedName}
           existingDocuments={documents}

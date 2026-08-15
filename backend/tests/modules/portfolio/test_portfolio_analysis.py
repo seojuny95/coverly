@@ -1,5 +1,6 @@
 from typing import cast
 
+import pytest
 from pytest import MonkeyPatch
 
 from app.modules.portfolio.schemas import (
@@ -26,7 +27,7 @@ def test_analysis_cache_hash_changes_with_implementation_version(
             "policyIds": ["00000000-0000-0000-0000-000000000001"],
         }
     )
-    current_hash = analysis._analysis_context_hash(request)
+    current_hash = analysis.analysis_context_hash(request)
 
     monkeypatch.setattr(
         analysis,
@@ -34,7 +35,7 @@ def test_analysis_cache_hash_changes_with_implementation_version(
         analysis.PORTFOLIO_ANALYSIS_CACHE_VERSION + 1,
     )
 
-    assert analysis._analysis_context_hash(request) != current_hash
+    assert analysis.analysis_context_hash(request) != current_hash
 
 
 def test_cached_analysis_round_trips_and_replaces_invalid_payloads() -> None:
@@ -132,3 +133,42 @@ def test_cached_analysis_round_trips_and_replaces_invalid_payloads() -> None:
     assert recovered == expected
     assert calculate_calls == 2
     assert sessions.cached.result == expected.model_dump(mode="json")
+
+
+def test_sample_analysis_never_falls_back_to_live_calculation() -> None:
+    request = PortfolioSummaryRequest.model_validate(
+        {
+            "portfolioSessionToken": "sample-token",
+            "policyIds": ["00000000-0000-0000-0000-000000000001"],
+        }
+    )
+    snapshot = PortfolioSessionSnapshot(
+        session_id="sample-1",
+        version=1,
+        policies=(),
+        rag_session_ids=(),
+        kind="sample",
+    )
+
+    class Sessions:
+        def load_cached_analysis(
+            self,
+            _snapshot: PortfolioSessionSnapshot,
+            *,
+            context_hash: str,
+        ) -> None:
+            return None
+
+    def calculate(
+        _policies: list[PolicyInput],
+        _context: DeathBenefitGuideInput,
+    ) -> PortfolioCoverageSummary:
+        raise AssertionError("sample cache misses must not calculate live")
+
+    with pytest.raises(analysis.SamplePortfolioFixtureUnavailable):
+        analysis.analyze_portfolio_snapshot(
+            cast(PortfolioSessionService, Sessions()),
+            snapshot,
+            request,
+            calculate,
+        )

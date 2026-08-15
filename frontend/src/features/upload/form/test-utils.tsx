@@ -55,6 +55,7 @@ export const createSession = vi.fn(async () => ({
   portfolioSessionToken: "test-portfolio-token",
   expiresAt: "2030-01-01T00:00:00.000Z",
   counselTurnsRemaining: 10,
+  portfolioKind: "uploaded" as const,
 }));
 export const prepareServer = vi.fn(async () => undefined);
 
@@ -65,6 +66,7 @@ export function renderForm({
   existingDocuments = [],
   prepareServer: prepareServerOverride = prepareServer,
   deleteSessionDocuments = vi.fn().mockResolvedValue(undefined),
+  onInteractionLockedChange,
   initialAnalysis = null,
 }: {
   uploadPolicyDocument?: UploadPolicyDocument;
@@ -77,6 +79,7 @@ export function renderForm({
     documentIds: string[],
     signal?: AbortSignal,
   ) => Promise<void>;
+  onInteractionLockedChange?: (isInteractionLocked: boolean) => void;
   initialAnalysis?: InsuranceAnalysis | null;
 } = {}) {
   const rendered = renderWithProviders(
@@ -89,6 +92,7 @@ export function renderForm({
         prepareServer={prepareServerOverride}
         createSession={createSession}
         deleteSessionDocuments={deleteSessionDocuments}
+        onInteractionLockedChange={onInteractionLockedChange}
       />
       <InsuranceDataProbe />
     </>,

@@ -31,6 +31,7 @@ function InsuranceDataProbe() {
         onClick={() =>
           setAnalysis({
             generatedAt: "2026-07-12T00:00:00.000Z",
+            portfolioKind: "uploaded" as const,
             portfolioSessionToken: "test-portfolio-token",
             portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
             counselTurnsRemaining: 10,

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
         ge=MAX_PORTFOLIO_DOCUMENTS,
         le=MAX_PORTFOLIO_DOCUMENTS,
     )
+    sample_portfolio_max_active_sessions: int = Field(default=100, ge=1, le=10_000)
     pdf_parsing_max_concurrency: int = Field(default=2, ge=1, le=32)
     pdf_parsing_max_queue_size: int = Field(default=8, ge=0, le=128)
     pdf_parsing_queue_timeout_seconds: float = Field(default=60.0, gt=0, le=300)

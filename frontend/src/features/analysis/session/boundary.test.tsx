@@ -11,6 +11,7 @@ import { renderWithProviders } from "@/test/render-with-providers";
 function analysisWithSession(token: string): InsuranceAnalysis {
   return {
     generatedAt: "2026-07-09T07:30:00.000Z",
+    portfolioKind: "uploaded" as const,
     portfolioSessionToken: token,
     portfolioSessionExpiresAt: "invalid",
     counselTurnsRemaining: 10,

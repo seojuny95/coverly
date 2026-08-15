@@ -32,6 +32,8 @@ type ApiErrorCode = Literal[
     "POLICY_UPLOAD_ALREADY_COMPLETED",
     "POLICY_UPLOAD_CANCELLED",
     "portfolio_session_unavailable",
+    "sample_portfolio_unavailable",
+    "sample_portfolio_read_only",
     "INVALID_POLICY_SELECTION",
     "REQUEST_VALIDATION_ERROR",
     "INVALID_MULTIPART_REQUEST",

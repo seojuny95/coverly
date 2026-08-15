@@ -55,6 +55,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/portfolio/sessions/sample": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create Sample Portfolio Session */
+    post: operations["create_sample_portfolio_session_portfolio_sessions_sample_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/portfolio/sessions/refresh": {
     parameters: {
       query?: never;
@@ -265,6 +282,8 @@ export interface components {
       | "POLICY_UPLOAD_ALREADY_COMPLETED"
       | "POLICY_UPLOAD_CANCELLED"
       | "portfolio_session_unavailable"
+      | "sample_portfolio_unavailable"
+      | "sample_portfolio_read_only"
       | "INVALID_POLICY_SELECTION"
       | "REQUEST_VALIDATION_ERROR"
       | "INVALID_MULTIPART_REQUEST"
@@ -678,6 +697,11 @@ export interface components {
       expiresAt: string;
       /** Counselturnsremaining */
       counselTurnsRemaining: number;
+      /**
+       * Portfoliokind
+       * @enum {string}
+       */
+      portfolioKind: "uploaded" | "sample";
     };
     /** PortfolioSummaryRequest */
     PortfolioSummaryRequest: {
@@ -841,6 +865,28 @@ export interface components {
         | "private_guidance";
       /** Caveat */
       caveat: string;
+    };
+    /** SamplePortfolioDocument */
+    SamplePortfolioDocument: {
+      /** Filename */
+      fileName: string;
+      result: components["schemas"]["PolicyParseResponse"];
+    };
+    /** SamplePortfolioSessionResponse */
+    SamplePortfolioSessionResponse: {
+      /** Portfoliosessiontoken */
+      portfolioSessionToken: string;
+      /** Expiresat */
+      expiresAt: string;
+      /** Counselturnsremaining */
+      counselTurnsRemaining: number;
+      /**
+       * Portfoliokind
+       * @enum {string}
+       */
+      portfolioKind: "uploaded" | "sample";
+      /** Insurancedocuments */
+      insuranceDocuments: components["schemas"]["SamplePortfolioDocument"][];
     };
     /** SpecialCoverageCheck */
     SpecialCoverageCheck: {
@@ -1172,6 +1218,81 @@ export interface operations {
       };
     };
   };
+  create_sample_portfolio_session_portfolio_sessions_sample_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SamplePortfolioSessionResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      404: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      405: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      422: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      500: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      503: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+    };
+  };
   refresh_portfolio_session_portfolio_sessions_refresh_post: {
     parameters: {
       query?: never;
@@ -1398,6 +1519,17 @@ export interface operations {
       };
       /** @description Coverly API error */
       405: {
+        headers: {
+          /** @description Server-generated identifier for safe error correlation. */
+          "X-Request-ID"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiErrorResponse"];
+        };
+      };
+      /** @description Coverly API error */
+      409: {
         headers: {
           /** @description Server-generated identifier for safe error correlation. */
           "X-Request-ID"?: string;

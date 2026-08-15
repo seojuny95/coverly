@@ -34,4 +34,17 @@ Coverly의 업로드·보험 분석·보장 합계·중복 확인·AI 상담을 
 
 ## 생성 기준
 
-이 샘플 PDF는 로컬 검증용 고정 fixture로 관리한다. 생성 스크립트는 현재 저장소에 포함하지 않는다.
+이 샘플 PDF는 포트폴리오 데모와 로컬 검증용 고정 fixture로 관리한다. 업로드 화면의 샘플 분석은 매번 PDF를 다시 파싱하지 않고, 백엔드에 포함된 미리 생성된 fixture를 사용한다.
+
+- fixture 위치: `backend/app/modules/portfolio/sample/sample-portfolio.json`
+- 생성 스크립트: `backend/scripts/generate_sample_portfolio.py`
+- 재생성 명령:
+
+```bash
+cd backend
+uv run python -m scripts.generate_sample_portfolio
+```
+
+fixture에는 샘플 증권 4개의 파싱 결과, Policy RAG 청크와 embedding, 사망보장 조건별 보장 합계·총평 결과가 들어간다. AI 상담은 샘플 세션에서도 실제 상담 API를 사용한다.
+
+샘플 PDF와 fixture는 실제 고객 정보나 실제 보험상품 정보를 포함하지 않아야 한다. 재생성 후에는 개인정보 패턴, 테스트, 타입 검사, 프론트엔드 계약 검사를 함께 확인한다.

@@ -87,6 +87,7 @@ export function InsuranceDataProvider({
               portfolioSessionToken: session.portfolioSessionToken,
               portfolioSessionExpiresAt: session.expiresAt,
               counselTurnsRemaining: session.counselTurnsRemaining,
+              portfolioKind: session.portfolioKind,
             }
           : current,
       );

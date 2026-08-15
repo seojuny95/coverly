@@ -15,12 +15,14 @@ import type {
   PortfolioSessionDocumentsDeleteRequest,
   PortfolioSessionRequest,
   PortfolioSessionResponse,
+  SamplePortfolioSessionResponse,
 } from "@/shared/api/contracts";
 
 export type PortfolioSessionResult = PortfolioSessionResponse;
 
 type SessionPath =
   | "/portfolio/sessions"
+  | "/portfolio/sessions/sample"
   | "/portfolio/sessions/refresh"
   | "/portfolio/sessions/delete"
   | "/portfolio/sessions/documents/delete";
@@ -50,6 +52,18 @@ export async function createPortfolioSession(
   signal?: AbortSignal,
 ): Promise<PortfolioSessionResult> {
   return requestSession("/portfolio/sessions", undefined, signal);
+}
+
+export async function createSamplePortfolioSession(
+  signal?: AbortSignal,
+): Promise<SamplePortfolioSessionResponse> {
+  const response = await request(
+    "/portfolio/sessions/sample",
+    undefined,
+    undefined,
+    signal,
+  );
+  return (await response.json()) as SamplePortfolioSessionResponse;
 }
 
 export async function refreshPortfolioSession(

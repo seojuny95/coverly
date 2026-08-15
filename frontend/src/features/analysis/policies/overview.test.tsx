@@ -57,6 +57,7 @@ describe("PolicyOverview", () => {
   test("shows insurance counts by classification", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -126,10 +127,37 @@ describe("PolicyOverview", () => {
     expect(screen.getByText("자동차보험")).toBeInTheDocument();
   });
 
+  test("does not offer document changes for a sample portfolio", async () => {
+    const initialAnalysis: InsuranceAnalysis = {
+      generatedAt: "2026-08-14T00:00:00.000Z",
+      portfolioKind: "sample",
+      portfolioSessionToken: "sample-token",
+      portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
+      counselTurnsRemaining: 10,
+      insuranceDocuments: [
+        {
+          id: "00000000-0000-0000-0000-000000000001",
+          fileName: "sample.pdf",
+          result: POLICY_RESULT_DEFAULTS,
+        },
+      ],
+    };
+
+    renderWithProviders(<PolicyOverview />, { initialAnalysis });
+
+    expect(
+      await screen.findByText("내 보험을 종류별로 정리했어요"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "보험증권 더 올리기" }),
+    ).not.toBeInTheDocument();
+  });
+
   test("disables additional uploads with an explanation at the document limit", async () => {
     const user = userEvent.setup();
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -175,6 +203,7 @@ describe("PolicyOverview", () => {
   test("expands a insurance row to show detail fields", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -238,6 +267,7 @@ describe("PolicyOverview", () => {
   test("renders every display field and insurer logo when an insurance document has full data", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -313,6 +343,7 @@ describe("PolicyOverview", () => {
   test("shows vehicle info and separates rider rows for an auto policy", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -384,6 +415,7 @@ describe("PolicyOverview", () => {
   test("renders DB insurer name and logo for a parsed driver insurance document", async () => {
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -463,6 +495,7 @@ describe("PolicyOverview", () => {
 
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,
@@ -549,6 +582,7 @@ describe("PolicyOverview", () => {
 
     const initialAnalysis: InsuranceAnalysis = {
       generatedAt: "2026-07-09T07:30:00.000Z",
+      portfolioKind: "uploaded" as const,
       portfolioSessionToken: "test-portfolio-token",
       portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
       counselTurnsRemaining: 10,

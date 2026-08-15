@@ -6,7 +6,7 @@ import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from psycopg import Connection, InterfaceError, OperationalError
 from psycopg.rows import dict_row
@@ -15,16 +15,20 @@ from psycopg_pool import ConnectionPool, PoolTimeout
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
+    ExtendedPortfolioSession,
     NewPortfolioSession,
     PolicyDocumentReservation,
+    PortfolioKind,
     PortfolioSessionSnapshot,
     StoredPolicyDocument,
 )
 from app.modules.portfolio.session.repository import (
     CompleteDocumentResult,
+    DeleteDocumentsResult,
     PortfolioPolicySelectionNotFound,
     PortfolioSessionRepositoryUnavailable,
     ReserveDocumentResult,
+    SamplePortfolioCapacityExceeded,
 )
 
 
@@ -59,20 +63,86 @@ class PgPortfolioSessionRepository:
 
     def create(self, session: NewPortfolioSession) -> None:
         with self._connection() as connection:
-            connection.execute(
-                "DELETE FROM private.portfolio_sessions WHERE max_expires_at <= now()"
-            )
+            connection.execute("DELETE FROM private.portfolio_sessions WHERE expires_at <= now()")
             connection.execute(
                 """INSERT INTO private.portfolio_sessions (
-                       id, created_at, expires_at, max_expires_at
-                   ) VALUES (%s, %s, %s, %s)""",
+                       id, created_at, expires_at, max_expires_at, portfolio_kind, version
+                   ) VALUES (%s, %s, %s, %s, %s, %s)""",
                 (
                     session.id,
                     session.created_at,
                     session.expires_at,
                     session.max_expires_at,
+                    session.kind,
+                    session.version,
                 ),
             )
+
+    def create_seeded(
+        self,
+        session: NewPortfolioSession,
+        documents: tuple[StoredPolicyDocument, ...],
+        analyses: tuple[CachedPortfolioAnalysis, ...],
+        *,
+        max_active_sample_sessions: int,
+    ) -> None:
+        with self._connection() as connection:
+            connection.execute(
+                "SELECT pg_advisory_xact_lock(hashtext(%s))",
+                ("coverly_sample_portfolio_capacity",),
+            )
+            connection.execute("DELETE FROM private.portfolio_sessions WHERE expires_at <= now()")
+            active_samples = connection.execute(
+                """SELECT count(*) AS count
+                   FROM private.portfolio_sessions
+                   WHERE portfolio_kind = 'sample' AND expires_at > now()"""
+            ).fetchone()
+            if (
+                active_samples is not None
+                and int(active_samples["count"]) >= max_active_sample_sessions
+            ):
+                raise SamplePortfolioCapacityExceeded
+            connection.execute(
+                """INSERT INTO private.portfolio_sessions (
+                       id, created_at, expires_at, max_expires_at, portfolio_kind, version
+                   ) VALUES (%s, %s, %s, %s, %s, %s)""",
+                (
+                    session.id,
+                    session.created_at,
+                    session.expires_at,
+                    session.max_expires_at,
+                    session.kind,
+                    session.version,
+                ),
+            )
+            for document in documents:
+                connection.execute(
+                    """INSERT INTO private.policy_documents (
+                           id, portfolio_session_id, structured_policy, rag_session_id
+                       ) VALUES (%s, %s, %s::jsonb, %s)""",
+                    (
+                        document.id,
+                        session.id,
+                        json.dumps(
+                            document.policy.model_dump(mode="json", exclude_none=True),
+                            ensure_ascii=False,
+                        ),
+                        document.rag_session_id,
+                    ),
+                )
+            for analysis in analyses:
+                connection.execute(
+                    """INSERT INTO private.portfolio_analysis_cache (
+                           portfolio_session_id, portfolio_version, context_hash,
+                           analysis_result
+                       ) VALUES (%s, %s, %s, %s::jsonb)""",
+                    (
+                        session.id,
+                        analysis.version,
+                        analysis.context_hash,
+                        json.dumps(analysis.result, ensure_ascii=False),
+                    ),
+                )
 
     def consume_counsel_turn(
         self,
@@ -151,13 +221,15 @@ class PgPortfolioSessionRepository:
     ) -> ReserveDocumentResult:
         with self._connection() as connection:
             session = connection.execute(
-                """SELECT id FROM private.portfolio_sessions
+                """SELECT id, portfolio_kind FROM private.portfolio_sessions
                    WHERE id = %s AND expires_at > %s
                    FOR UPDATE""",
                 (session_id, now),
             ).fetchone()
             if session is None:
                 return "missing"
+            if session["portfolio_kind"] == "sample":
+                return "read_only"
             cancelled = connection.execute(
                 """SELECT 1 FROM private.policy_document_tombstones
                    WHERE portfolio_session_id = %s AND document_id = %s""",
@@ -260,10 +332,7 @@ class PgPortfolioSessionRepository:
             )
             connection.execute(
                 """UPDATE private.portfolio_sessions
-                   SET version = version + 1,
-                       analysis_context_hash = null,
-                       analysis_version = null,
-                       analysis_result = null
+                   SET version = version + 1
                    WHERE id = %s""",
                 (reservation.session_id,),
             )
@@ -291,7 +360,7 @@ class PgPortfolioSessionRepository:
     ) -> PortfolioSessionSnapshot | None:
         with self._connection() as connection:
             session = connection.execute(
-                """SELECT version FROM private.portfolio_sessions
+                """SELECT version, portfolio_kind FROM private.portfolio_sessions
                    WHERE id = %s AND expires_at > %s""",
                 (session_id, now),
             ).fetchone()
@@ -319,6 +388,7 @@ class PgPortfolioSessionRepository:
         )
         return PortfolioSessionSnapshot(
             session_id=session_id,
+            kind=cast(PortfolioKind, session["portfolio_kind"]),
             version=int(session["version"]),
             policies=policies,
             rag_session_ids=rag_session_ids,
@@ -330,13 +400,13 @@ class PgPortfolioSessionRepository:
         expires_at: datetime,
         *,
         now: datetime,
-    ) -> tuple[str, ...] | None:
+    ) -> ExtendedPortfolioSession | None:
         with self._connection() as connection:
             updated = connection.execute(
                 """UPDATE private.portfolio_sessions
                    SET expires_at = %s
                    WHERE id = %s AND expires_at > %s
-                   RETURNING id""",
+                   RETURNING portfolio_kind""",
                 (expires_at, session_id, now),
             ).fetchone()
             if updated is None:
@@ -346,7 +416,10 @@ class PgPortfolioSessionRepository:
                    WHERE portfolio_session_id = %s AND rag_session_id IS NOT NULL""",
                 (session_id,),
             ).fetchall()
-        return tuple(str(row["rag_session_id"]) for row in rows)
+        return ExtendedPortfolioSession(
+            kind=cast(PortfolioKind, updated["portfolio_kind"]),
+            rag_session_ids=tuple(str(row["rag_session_id"]) for row in rows),
+        )
 
     def delete(self, session_id: str) -> tuple[str, ...] | None:
         with self._connection() as connection:
@@ -377,16 +450,18 @@ class PgPortfolioSessionRepository:
         document_ids: tuple[str, ...],
         *,
         now: datetime,
-    ) -> tuple[str, ...] | None:
+    ) -> DeleteDocumentsResult:
         with self._connection() as connection:
             session = connection.execute(
-                """SELECT id FROM private.portfolio_sessions
+                """SELECT id, portfolio_kind FROM private.portfolio_sessions
                    WHERE id = %s AND expires_at > %s
                    FOR UPDATE""",
                 (session_id, now),
             ).fetchone()
             if session is None:
                 return None
+            if session["portfolio_kind"] == "sample":
+                return "read_only"
             connection.execute(
                 """INSERT INTO private.policy_document_tombstones (
                        portfolio_session_id, document_id
@@ -410,10 +485,7 @@ class PgPortfolioSessionRepository:
             if rows:
                 connection.execute(
                     """UPDATE private.portfolio_sessions
-                       SET version = version + 1,
-                           analysis_context_hash = null,
-                           analysis_version = null,
-                           analysis_result = null
+                       SET version = version + 1
                        WHERE id = %s""",
                     (session_id,),
                 )
@@ -430,17 +502,17 @@ class PgPortfolioSessionRepository:
     ) -> CachedPortfolioAnalysis | None:
         with self._connection() as connection:
             row = connection.execute(
-                """SELECT analysis_version, analysis_context_hash, analysis_result
-                   FROM private.portfolio_sessions
-                   WHERE id = %s AND analysis_version = %s
-                     AND analysis_context_hash = %s AND analysis_result IS NOT NULL""",
+                """SELECT portfolio_version, context_hash, analysis_result
+                   FROM private.portfolio_analysis_cache
+                   WHERE portfolio_session_id = %s AND portfolio_version = %s
+                     AND context_hash = %s""",
                 (session_id, version, context_hash),
             ).fetchone()
         if row is None:
             return None
         return CachedPortfolioAnalysis(
-            version=int(row["analysis_version"]),
-            context_hash=str(row["analysis_context_hash"]),
+            version=int(row["portfolio_version"]),
+            context_hash=str(row["context_hash"]),
             result=dict(row["analysis_result"]),
         )
 
@@ -451,11 +523,14 @@ class PgPortfolioSessionRepository:
     ) -> None:
         with self._connection() as connection:
             connection.execute(
-                """UPDATE private.portfolio_sessions
-                   SET analysis_version = %s,
-                       analysis_context_hash = %s,
-                       analysis_result = %s::jsonb
-                   WHERE id = %s AND version = %s""",
+                """INSERT INTO private.portfolio_analysis_cache (
+                       portfolio_session_id, portfolio_version, context_hash, analysis_result
+                   )
+                   SELECT id, %s, %s, %s::jsonb
+                   FROM private.portfolio_sessions
+                   WHERE id = %s AND version = %s
+                   ON CONFLICT (portfolio_session_id, portfolio_version, context_hash)
+                   DO UPDATE SET analysis_result = EXCLUDED.analysis_result""",
                 (
                     analysis.version,
                     analysis.context_hash,

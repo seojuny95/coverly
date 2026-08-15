@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createPortfolioSession,
+  createSamplePortfolioSession,
   deletePortfolioSessionDocuments,
   deletePortfolioSession,
   refreshPortfolioSession,
@@ -24,6 +25,8 @@ describe("portfolio session API", () => {
         JSON.stringify({
           portfolioSessionToken: "portfolio-token",
           expiresAt: "2026-07-18T10:00:00Z",
+          counselTurnsRemaining: 10,
+          portfolioKind: "uploaded",
         }),
         { status: 200 },
       ),
@@ -38,6 +41,30 @@ describe("portfolio session API", () => {
     );
   });
 
+  it("creates a distinct sample session without uploading a PDF", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          portfolioSessionToken: "sample-token",
+          expiresAt: "2026-07-18T10:00:00Z",
+          counselTurnsRemaining: 10,
+          portfolioKind: "sample",
+          insuranceDocuments: [],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(createSamplePortfolioSession()).resolves.toMatchObject({
+      portfolioKind: "sample",
+      portfolioSessionToken: "sample-token",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/portfolio/sessions/sample",
+      expect.objectContaining({ method: "POST", body: undefined }),
+    );
+  });
+
   it("accepts a caller cancellation signal for session requests", async () => {
     const caller = new AbortController();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -45,6 +72,8 @@ describe("portfolio session API", () => {
         JSON.stringify({
           portfolioSessionToken: "portfolio-token",
           expiresAt: "2026-07-18T10:00:00Z",
+          counselTurnsRemaining: 10,
+          portfolioKind: "uploaded",
         }),
         { status: 200 },
       ),
@@ -88,6 +117,8 @@ describe("portfolio session API", () => {
           JSON.stringify({
             portfolioSessionToken: "next-token",
             expiresAt: "2026-07-18T10:00:00Z",
+            counselTurnsRemaining: 10,
+            portfolioKind: "uploaded",
           }),
           { status: 200 },
         ),
@@ -117,6 +148,8 @@ describe("portfolio session API", () => {
           JSON.stringify({
             portfolioSessionToken: "next-token",
             expiresAt: "2026-07-18T10:00:00Z",
+            counselTurnsRemaining: 10,
+            portfolioKind: "uploaded",
           }),
           { status: 200 },
         ),

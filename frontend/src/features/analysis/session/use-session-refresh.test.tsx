@@ -29,6 +29,7 @@ describe("usePortfolioSessionRefresh", () => {
       portfolioSessionToken: "next-portfolio-token",
       expiresAt: "2026-07-14T00:15:00+00:00",
       counselTurnsRemaining: 10,
+      portfolioKind: "uploaded" as const,
     });
     const onRefreshed = vi.fn();
 
@@ -38,6 +39,7 @@ describe("usePortfolioSessionRefresh", () => {
           portfolioSessionToken: "current-portfolio-token",
           expiresAt: "invalid",
           counselTurnsRemaining: 10,
+          portfolioKind: "uploaded" as const,
         },
         enabled: true,
         onRefreshed,
@@ -59,6 +61,7 @@ describe("usePortfolioSessionRefresh", () => {
       portfolioSessionToken: "next-portfolio-token",
       expiresAt: "2026-07-14T00:15:00+00:00",
       counselTurnsRemaining: 10,
+      portfolioKind: "uploaded" as const,
     });
   });
 
@@ -75,6 +78,7 @@ describe("usePortfolioSessionRefresh", () => {
           portfolioSessionToken: "expired-token",
           expiresAt: "invalid",
           counselTurnsRemaining: 10,
+          portfolioKind: "uploaded" as const,
         },
         enabled: true,
         onRefreshed: vi.fn(),
@@ -98,6 +102,7 @@ describe("usePortfolioSessionRefresh", () => {
         portfolioSessionToken: "next-portfolio-token",
         expiresAt: "2026-07-14T00:15:00+00:00",
         counselTurnsRemaining: 10,
+        portfolioKind: "uploaded" as const,
       });
     const onRefreshed = vi.fn();
 
@@ -107,6 +112,7 @@ describe("usePortfolioSessionRefresh", () => {
           portfolioSessionToken: "current-portfolio-token",
           expiresAt: "invalid",
           counselTurnsRemaining: 10,
+          portfolioKind: "uploaded" as const,
         },
         enabled: true,
         onRefreshed,
@@ -131,6 +137,7 @@ describe("usePortfolioSessionRefresh", () => {
       portfolioSessionToken: "next-portfolio-token",
       expiresAt: "2026-07-14T00:15:00+00:00",
       counselTurnsRemaining: 10,
+      portfolioKind: "uploaded" as const,
     });
   });
 
@@ -146,6 +153,7 @@ describe("usePortfolioSessionRefresh", () => {
           portfolioSessionToken: "current-portfolio-token",
           expiresAt: "2026-07-18T00:15:00.000Z",
           counselTurnsRemaining: 10,
+          portfolioKind: "uploaded" as const,
         },
         enabled: true,
         onRefreshed: vi.fn(),
@@ -192,6 +200,7 @@ describe("usePortfolioSessionRefresh", () => {
       portfolioSessionToken: "next-portfolio-token",
       expiresAt: "2026-07-18T00:30:00.000Z",
       counselTurnsRemaining: 10,
+      portfolioKind: "uploaded" as const,
     });
 
     renderHook(() =>
@@ -200,6 +209,7 @@ describe("usePortfolioSessionRefresh", () => {
           portfolioSessionToken: "current-portfolio-token",
           expiresAt: "2026-07-18T00:15:00.000Z",
           counselTurnsRemaining: 10,
+          portfolioKind: "uploaded" as const,
         },
         enabled: true,
         onRefreshed: vi.fn(),
@@ -222,6 +232,7 @@ describe("usePortfolioSessionRefresh", () => {
       portfolioSessionToken: "next-portfolio-token",
       expiresAt: "2026-07-18T00:30:00.000Z",
       counselTurnsRemaining: 10,
+      portfolioKind: "uploaded" as const,
     });
 
     renderHook(() =>
@@ -230,6 +241,7 @@ describe("usePortfolioSessionRefresh", () => {
           portfolioSessionToken: "current-portfolio-token",
           expiresAt: "2026-07-18T00:15:00.000Z",
           counselTurnsRemaining: 10,
+          portfolioKind: "uploaded" as const,
         },
         enabled: true,
         onRefreshed: vi.fn(),

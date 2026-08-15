@@ -110,10 +110,10 @@ create table private.portfolio_sessions (
   expires_at timestamptz not null,
   max_expires_at timestamptz not null,
   version bigint not null default 0,
-  analysis_context_hash text,
-  analysis_version bigint,
-  analysis_result jsonb,
+  portfolio_kind text not null default 'uploaded',
   counsel_turns_used bigint not null default 0,
+  constraint portfolio_sessions_kind_check
+    check (portfolio_kind in ('uploaded', 'sample')),
   constraint portfolio_session_expiry_order
     check (created_at <= expires_at and expires_at <= max_expires_at),
   constraint portfolio_session_counsel_turns_not_negative
@@ -147,6 +147,16 @@ create table private.policy_document_reservations (
   primary key (portfolio_session_id, document_id)
 );
 
+create table private.portfolio_analysis_cache (
+  portfolio_session_id uuid not null
+    references private.portfolio_sessions(id) on delete cascade,
+  portfolio_version bigint not null,
+  context_hash text not null,
+  analysis_result jsonb not null,
+  created_at timestamptz not null default now(),
+  primary key (portfolio_session_id, portfolio_version, context_hash)
+);
+
 create index policy_documents_portfolio_session_id_idx
   on private.policy_documents (portfolio_session_id, created_at, id);
 create index portfolio_sessions_max_expires_at_idx
@@ -156,6 +166,10 @@ comment on table private.portfolio_sessions is
   'Short-lived server-side portfolio sessions addressed by signed bearer tokens.';
 comment on column private.portfolio_sessions.counsel_turns_used is
   '이 세션에서 사용한 상담 질문 수. 증권을 추가해도 초기화되지 않는다.';
+comment on column private.portfolio_sessions.portfolio_kind is
+  'Whether the session contains user-uploaded policies or the immutable demo sample.';
+comment on table private.portfolio_analysis_cache is
+  'Context-specific cached portfolio analyses, including precomputed sample results.';
 comment on table private.policy_documents is
   'PII-minimized structured policy facts and internal RAG document references.';
 comment on table private.policy_document_tombstones is
@@ -167,6 +181,7 @@ alter table private.portfolio_sessions enable row level security;
 alter table private.policy_documents enable row level security;
 alter table private.policy_document_tombstones enable row level security;
 alter table private.policy_document_reservations enable row level security;
+alter table private.portfolio_analysis_cache enable row level security;
 
 revoke all on all tables in schema private from public, anon, authenticated;
 revoke all on all sequences in schema private from public, anon, authenticated;

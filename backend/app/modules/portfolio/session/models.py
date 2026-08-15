@@ -2,8 +2,11 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 from app.modules.portfolio.schemas import PolicyInput
+
+PortfolioKind = Literal["uploaded", "sample"]
 
 
 @dataclass(frozen=True)
@@ -12,6 +15,8 @@ class NewPortfolioSession:
     created_at: datetime
     expires_at: datetime
     max_expires_at: datetime
+    kind: PortfolioKind = "uploaded"
+    version: int = 0
 
 
 @dataclass(frozen=True)
@@ -34,6 +39,7 @@ class PortfolioSessionSnapshot:
     version: int
     policies: tuple[PolicyInput, ...]
     rag_session_ids: tuple[str, ...]
+    kind: PortfolioKind = "uploaded"
 
 
 @dataclass(frozen=True)
@@ -41,3 +47,9 @@ class CachedPortfolioAnalysis:
     version: int
     context_hash: str
     result: dict[str, object]
+
+
+@dataclass(frozen=True)
+class ExtendedPortfolioSession:
+    kind: PortfolioKind
+    rag_session_ids: tuple[str, ...]

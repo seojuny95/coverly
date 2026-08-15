@@ -5,6 +5,7 @@ from typing import Literal, Protocol
 
 from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
+    ExtendedPortfolioSession,
     NewPortfolioSession,
     PolicyDocumentReservation,
     PortfolioSessionSnapshot,
@@ -18,8 +19,10 @@ ReserveDocumentResult = Literal[
     "missing",
     "limit_exceeded",
     "cancelled",
+    "read_only",
 ]
 CompleteDocumentResult = Literal["stored", "missing", "cancelled"]
+DeleteDocumentsResult = tuple[str, ...] | Literal["read_only"] | None
 
 
 class PortfolioPolicySelectionNotFound(Exception):
@@ -30,12 +33,25 @@ class PortfolioSessionRepositoryUnavailable(Exception):
     """The session store is temporarily unavailable."""
 
 
+class SamplePortfolioCapacityExceeded(Exception):
+    """The bounded pool of active sample sessions is full."""
+
+
 class PortfolioSessionRepository(Protocol):
     def check_ready(self) -> None:
         """Raise when the backing session store cannot serve requests."""
         ...
 
     def create(self, session: NewPortfolioSession) -> None: ...
+
+    def create_seeded(
+        self,
+        session: NewPortfolioSession,
+        documents: tuple[StoredPolicyDocument, ...],
+        analyses: tuple[CachedPortfolioAnalysis, ...],
+        *,
+        max_active_sample_sessions: int,
+    ) -> None: ...
 
     def consume_counsel_turn(
         self,
@@ -107,7 +123,7 @@ class PortfolioSessionRepository(Protocol):
         expires_at: datetime,
         *,
         now: datetime,
-    ) -> tuple[str, ...] | None: ...
+    ) -> ExtendedPortfolioSession | None: ...
 
     def delete(self, session_id: str) -> tuple[str, ...] | None: ...
 
@@ -117,7 +133,7 @@ class PortfolioSessionRepository(Protocol):
         document_ids: tuple[str, ...],
         *,
         now: datetime,
-    ) -> tuple[str, ...] | None: ...
+    ) -> DeleteDocumentsResult: ...
 
     def load_cached_analysis(
         self,

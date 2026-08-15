@@ -4,11 +4,15 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.core.errors import ApiError, api_error_handler
+from app.modules.policy.schemas import PolicyParseResponse
+from app.modules.portfolio.sample.fixture import load_sample_portfolio_fixture
 from app.modules.portfolio.session.dependencies import get_portfolio_session_service
+from app.modules.portfolio.session.models import PortfolioKind
 from app.modules.portfolio.session.router import readiness_router, router
 from app.modules.portfolio.session.service import (
     InvalidPortfolioSessionToken,
     PortfolioSessionAccess,
+    PortfolioSessionReadOnly,
     PortfolioSessionUnavailable,
 )
 
@@ -24,6 +28,12 @@ class _Sessions:
 
     def create(self) -> PortfolioSessionAccess:
         return _access("created-token")
+
+    def create_sample(
+        self,
+    ) -> tuple[PortfolioSessionAccess, tuple[tuple[str, PolicyParseResponse], ...]]:
+        document = load_sample_portfolio_fixture().policies[0]
+        return _access("sample-token", kind="sample"), ((document.file_name, document.result),)
 
     def counsel_turns_remaining(self, token: str, **_kwargs: object) -> int:
         return 8
@@ -52,6 +62,11 @@ class _UnavailableSessions(_Sessions):
 class _NotReadySessions(_Sessions):
     def check_ready(self) -> None:
         raise PortfolioSessionUnavailable
+
+
+class _ReadOnlySessions(_Sessions):
+    def delete_documents(self, token: str, document_ids: list[str]) -> None:
+        raise PortfolioSessionReadOnly
 
 
 def test_readiness_checks_the_session_store() -> None:
@@ -96,6 +111,28 @@ def test_portfolio_session_lifecycle_uses_one_token_contract() -> None:
     assert sessions.deleted_documents == [("refreshed-token", ["00000000000000000000000000000001"])]
 
 
+def test_sample_session_response_is_explicitly_marked_and_contains_documents() -> None:
+    response = TestClient(_app_with_sessions(_Sessions())).post("/portfolio/sessions/sample")
+
+    assert response.status_code == 200
+    assert response.json()["portfolioKind"] == "sample"
+    assert response.json()["portfolioSessionToken"] == "sample-token"
+    assert len(response.json()["insuranceDocuments"]) == 1
+
+
+def test_sample_documents_cannot_be_deleted_individually() -> None:
+    response = TestClient(_app_with_sessions(_ReadOnlySessions())).post(
+        "/portfolio/sessions/documents/delete",
+        json={
+            "portfolioSessionToken": "sample-token",
+            "documentIds": ["00000000-0000-0000-0000-000000000001"],
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "sample_portfolio_read_only"
+
+
 def test_refresh_maps_turn_lookup_race_to_expired_session() -> None:
     client = TestClient(_app_with_sessions(_RefreshRaceSessions()))
 
@@ -126,8 +163,9 @@ def _app_with_sessions(sessions: _Sessions) -> FastAPI:
     return app
 
 
-def _access(token: str) -> PortfolioSessionAccess:
+def _access(token: str, *, kind: PortfolioKind = "uploaded") -> PortfolioSessionAccess:
     return PortfolioSessionAccess(
         token=token,
         expires_at=datetime(2026, 7, 18, 12, tzinfo=UTC),
+        kind=kind,
     )

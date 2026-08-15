@@ -48,3 +48,14 @@ def test_pdf_parser_capacity_is_independent_from_the_product_document_limit() ->
 
     assert settings.portfolio_session_max_documents == MAX_PORTFOLIO_DOCUMENTS
     assert settings.pdf_parsing_max_concurrency == 3
+
+
+def test_sample_portfolio_capacity_is_configurable_and_bounded() -> None:
+    assert Settings().sample_portfolio_max_active_sessions == 100
+    assert (
+        Settings(sample_portfolio_max_active_sessions=250).sample_portfolio_max_active_sessions
+        == 250
+    )
+
+    with pytest.raises(ValidationError):
+        Settings(sample_portfolio_max_active_sessions=0)

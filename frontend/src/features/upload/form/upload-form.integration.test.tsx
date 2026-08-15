@@ -324,6 +324,7 @@ describe("PolicyUploadForm failures and upload lifecycle", () => {
       deleteSessionDocuments,
       initialAnalysis: {
         generatedAt: "2026-07-23T00:00:00.000Z",
+        portfolioKind: "uploaded" as const,
         selectedName: "테스트고객",
         portfolioSessionToken: "expired-portfolio-token",
         portfolioSessionExpiresAt: "2026-07-23T00:00:00.000Z",
@@ -381,6 +382,7 @@ describe("PolicyUploadForm failures and upload lifecycle", () => {
       deleteSessionDocuments,
       initialAnalysis: {
         generatedAt: "2026-08-14T00:00:00.000Z",
+        portfolioKind: "uploaded" as const,
         portfolioSessionToken: "existing-portfolio-token",
         portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
         counselTurnsRemaining: 10,

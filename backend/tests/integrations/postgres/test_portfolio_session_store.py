@@ -1,11 +1,17 @@
 from contextlib import AbstractContextManager
+from datetime import UTC, datetime, timedelta
 from types import TracebackType
 from typing import Any, cast
 
+import pytest
 from psycopg_pool import PoolTimeout
 
 from app.integrations.postgres.portfolio_session_store import PgPortfolioSessionRepository
-from app.modules.portfolio.session.repository import PortfolioSessionRepositoryUnavailable
+from app.modules.portfolio.session.models import NewPortfolioSession
+from app.modules.portfolio.session.repository import (
+    PortfolioSessionRepositoryUnavailable,
+    SamplePortfolioCapacityExceeded,
+)
 
 
 class _Result:
@@ -73,6 +79,19 @@ class _UnavailablePool:
         raise PoolTimeout("pool unavailable")
 
 
+class _FullSampleCapacityConnection(_Connection):
+    def execute(self, query: str, params: object = None) -> _Result:
+        normalized = " ".join(query.split())
+        self.queries.append(normalized)
+        if normalized.startswith("SELECT pg_advisory_xact_lock"):
+            return _Result(one={"pg_advisory_xact_lock": None})
+        if normalized.startswith("DELETE FROM private.portfolio_sessions"):
+            return _Result()
+        if normalized.startswith("SELECT count(*) AS count"):
+            return _Result(one={"count": 2})
+        raise AssertionError(f"Unexpected query: {normalized}")
+
+
 def test_delete_locks_session_before_collecting_rag_documents() -> None:
     connection = _Connection()
     repository = object.__new__(PgPortfolioSessionRepository)
@@ -105,3 +124,26 @@ def test_readiness_runs_a_lightweight_query() -> None:
     repository.check_ready()
 
     assert connection.queries == ["SELECT 1"]
+
+
+def test_seeded_sample_creation_stops_at_the_active_session_limit() -> None:
+    now = datetime(2026, 8, 14, tzinfo=UTC)
+    connection = _FullSampleCapacityConnection()
+    repository = object.__new__(PgPortfolioSessionRepository)
+    repository._pool = cast(Any, _Pool(connection))
+
+    with pytest.raises(SamplePortfolioCapacityExceeded):
+        repository.create_seeded(
+            NewPortfolioSession(
+                id="sample-session",
+                created_at=now,
+                expires_at=now + timedelta(minutes=15),
+                max_expires_at=now + timedelta(hours=2),
+                kind="sample",
+            ),
+            (),
+            (),
+            max_active_sample_sessions=2,
+        )
+
+    assert connection.queries[-1].startswith("SELECT count(*) AS count")

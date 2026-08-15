@@ -1,4 +1,4 @@
-import { PolicyUploadForm } from "@/features/upload/form/upload-form";
+import { UploadOptions } from "@/features/upload/upload-options";
 import { SectionLabel } from "@/shared/components/section-label";
 
 export default function UploadPage() {
@@ -25,7 +25,7 @@ export default function UploadPage() {
         </section>
 
         <div className="mx-auto mt-10 w-full max-w-2xl">
-          <PolicyUploadForm />
+          <UploadOptions />
         </div>
       </div>
     </main>

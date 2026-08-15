@@ -311,4 +311,6 @@ pnpm dev
 
 ### 샘플 증권으로 확인
 
-`http://localhost:3000`에서 [`sample_policy/`](sample_policy/)의 PDF를 업로드하면 보장 합계·중복 분석과 AI 상담을 확인할 수 있습니다. 네 파일의 구성과 추천 질문은 [샘플 증권 안내](sample_policy/README.md)에 정리되어 있습니다.
+`http://localhost:3000/upload`에서 **샘플 증권으로 분석 보기**를 선택하면 미리 준비된 샘플 포트폴리오로 보장 합계·중복 분석과 AI 상담을 확인할 수 있습니다. 샘플은 실제 업로드와 별도 세션으로 구분되며, 보장 합계와 총평은 미리 생성된 결과를 사용하고 AI 상담만 실시간으로 답변합니다.
+
+샘플 PDF를 직접 확인하거나 fixture를 다시 생성해야 할 때는 [`sample_policy/`](sample_policy/)와 [샘플 증권 안내](sample_policy/README.md)를 참고합니다.

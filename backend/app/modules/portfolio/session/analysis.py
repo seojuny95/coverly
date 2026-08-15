@@ -1,9 +1,12 @@
 """Cached portfolio analysis orchestration for stored sessions."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
@@ -17,7 +20,9 @@ from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
     PortfolioSessionSnapshot,
 )
-from app.modules.portfolio.session.service import PortfolioSessionService
+
+if TYPE_CHECKING:
+    from app.modules.portfolio.session.service import PortfolioSessionService
 
 PortfolioSummaryCalculator = Callable[
     [list[PolicyInput], DeathBenefitGuideInput],
@@ -28,19 +33,26 @@ PORTFOLIO_ANALYSIS_CACHE_VERSION = 3
 logger = logging.getLogger(__name__)
 
 
+class SamplePortfolioFixtureUnavailable(RuntimeError):
+    """The immutable sample is missing a valid precomputed analysis."""
+
+
 def analyze_portfolio_snapshot(
     sessions: PortfolioSessionService,
     snapshot: PortfolioSessionSnapshot,
     request: PortfolioSummaryRequest,
     calculate: PortfolioSummaryCalculator,
 ) -> PortfolioCoverageSummary:
-    context_hash = _analysis_context_hash(request)
+    context_hash = analysis_context_hash(request)
     cached = sessions.load_cached_analysis(snapshot, context_hash=context_hash)
     if cached is not None:
         try:
             return PortfolioCoverageSummary.model_validate(cached.result)
         except ValidationError:
             logger.warning("portfolio_analysis_cache_invalid")
+
+    if snapshot.kind == "sample":
+        raise SamplePortfolioFixtureUnavailable
 
     result = calculate(list(snapshot.policies), request.death_benefit_context)
     sessions.save_cached_analysis(
@@ -54,7 +66,7 @@ def analyze_portfolio_snapshot(
     return result
 
 
-def _analysis_context_hash(request: PortfolioSummaryRequest) -> str:
+def analysis_context_hash(request: PortfolioSummaryRequest) -> str:
     payload = {
         "analysis_version": PORTFOLIO_ANALYSIS_CACHE_VERSION,
         "policy_ids": request.policy_id_strings(),

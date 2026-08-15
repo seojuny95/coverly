@@ -22,6 +22,7 @@ export type AnalyzedInsurance = {
 export type InsuranceAnalysis = {
   generatedAt: string;
   selectedName?: string;
+  portfolioKind: "uploaded" | "sample";
   portfolioSessionToken: string;
   portfolioSessionExpiresAt: string;
   counselTurnsRemaining: number;

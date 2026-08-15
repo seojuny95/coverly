@@ -12,6 +12,7 @@ import { POLICY_RESULT_DEFAULTS } from "@/test/api-fixtures";
 function fixture(): InsuranceAnalysis {
   return {
     generatedAt: "2026-07-11T00:00:00.000Z",
+    portfolioKind: "uploaded" as const,
     portfolioSessionToken: "test-portfolio-token",
     portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
     counselTurnsRemaining: 10,

@@ -33,6 +33,7 @@ describe("BrandHomeLink", () => {
     renderWithProviders(<BrandHomeLink />, {
       initialAnalysis: {
         generatedAt: "2026-07-19T00:00:00.000Z",
+        portfolioKind: "uploaded" as const,
         portfolioSessionToken: "test-token",
         portfolioSessionExpiresAt: "2030-01-01T00:00:00.000Z",
         counselTurnsRemaining: 10,

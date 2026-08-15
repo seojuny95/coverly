@@ -9,11 +9,13 @@ export function PolicyOverviewHeader({
   selectedName,
   generatedAt,
   uploadLimitReached,
+  allowDocumentUpload,
   onOpenUploadModal,
 }: {
   selectedName?: string | null;
   generatedAt: string;
   uploadLimitReached: boolean;
+  allowDocumentUpload: boolean;
   onOpenUploadModal: () => void;
 }) {
   const classificationCount = POLICY_CLASSIFICATIONS.length;
@@ -34,17 +36,19 @@ export function PolicyOverviewHeader({
         </p>
       </div>
       <div className="flex flex-col items-start gap-3 sm:items-end">
-        <Button
-          type="button"
-          onClick={onOpenUploadModal}
-          disabled={uploadLimitReached}
-          aria-describedby={
-            uploadLimitReached ? "portfolio-upload-limit-notice" : undefined
-          }
-        >
-          보험증권 더 올리기
-        </Button>
-        {uploadLimitReached ? (
+        {allowDocumentUpload ? (
+          <Button
+            type="button"
+            onClick={onOpenUploadModal}
+            disabled={uploadLimitReached}
+            aria-describedby={
+              uploadLimitReached ? "portfolio-upload-limit-notice" : undefined
+            }
+          >
+            보험증권 더 올리기
+          </Button>
+        ) : null}
+        {allowDocumentUpload && uploadLimitReached ? (
           <p
             id="portfolio-upload-limit-notice"
             role="status"

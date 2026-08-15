@@ -374,6 +374,63 @@ def test_summary_overview_route_returns_only_generated_overview(
     }
 
 
+def test_summary_overview_route_reuses_a_precomputed_sample_overview(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    cached_summary = PortfolioCoverageSummary(
+        totals=[],
+        actual_loss_coverages=[],
+        excluded_coverages=[],
+        excluded_auto_policy_count=0,
+        overview=PortfolioOverview(
+            generation="llm",
+            title="미리 만든 샘플 총평",
+            paragraphs=["샘플에서 확인된 보장 정보를 정리했어요."],
+        ),
+    )
+
+    class Sessions:
+        def snapshot(
+            self,
+            token: str,
+            *,
+            policy_ids: list[str] | None = None,
+        ) -> PortfolioSessionSnapshot:
+            return PortfolioSessionSnapshot(
+                session_id="sample-1",
+                version=1,
+                policies=(),
+                rag_session_ids=(),
+                kind="sample",
+            )
+
+        def load_cached_analysis(
+            self,
+            snapshot: PortfolioSessionSnapshot,
+            *,
+            context_hash: str,
+        ) -> CachedPortfolioAnalysis:
+            return CachedPortfolioAnalysis(
+                version=1,
+                context_hash=context_hash,
+                result=cached_summary.model_dump(mode="json"),
+            )
+
+    def fail(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("a precomputed sample overview must not call the LLM")
+
+    monkeypatch.setattr(portfolio, "attach_summary_overview", fail)
+    app = FastAPI()
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.include_router(portfolio.router)
+    app.dependency_overrides[get_portfolio_session_service] = lambda: Sessions()
+
+    response = TestClient(app).post("/portfolio/overview", json=_request())
+
+    assert response.status_code == 200
+    assert response.json()["title"] == "미리 만든 샘플 총평"
+
+
 def test_summary_overview_route_returns_retryable_error_when_generation_fails(
     monkeypatch: MonkeyPatch,
 ) -> None:

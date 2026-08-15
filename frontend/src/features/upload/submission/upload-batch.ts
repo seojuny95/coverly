@@ -109,6 +109,7 @@ export async function uploadPolicyBatch({
           expiresAt: currentAnalysis.portfolioSessionExpiresAt,
           // Adding a policy must not hand back question turns already spent.
           counselTurnsRemaining: currentAnalysis.counselTurnsRemaining,
+          portfolioKind: currentAnalysis.portfolioKind,
         }
       : await createSession(signal);
     portfolioSessionToken = portfolioSession.portfolioSessionToken;
@@ -212,6 +213,7 @@ export async function uploadPolicyBatch({
         portfolioSessionToken: portfolioSession.portfolioSessionToken,
         portfolioSessionExpiresAt: portfolioSession.expiresAt,
         counselTurnsRemaining: portfolioSession.counselTurnsRemaining,
+        portfolioKind: portfolioSession.portfolioKind,
         insuranceDocuments,
       },
       selectedFileIdsByDocumentId,

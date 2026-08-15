@@ -95,7 +95,7 @@ describe("InsuranceChatbot", () => {
 
     expect(
       await screen.findByRole("button", {
-        name: "겹치는 보장이 있는지 봐줄래요?",
+        name: "내가 가입한 보험은 뭐가 있어?",
       }),
     ).toBeInTheDocument();
   });

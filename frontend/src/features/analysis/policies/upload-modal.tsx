@@ -26,13 +26,13 @@ export function UploadPolicyDocumentModal({
   onClose: () => void;
   onAnalysisComplete: (analysis: InsuranceAnalysis) => void;
 }) {
-  const [isUploadInFlight, setIsUploadInFlight] = useState(false);
+  const [isInteractionLocked, setIsInteractionLocked] = useState(false);
 
   return (
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open && !isUploadInFlight) onClose();
+        if (!open && !isInteractionLocked) onClose();
       }}
     >
       <DialogContent
@@ -40,7 +40,7 @@ export function UploadPolicyDocumentModal({
         onInteractOutside={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => {
-          if (isUploadInFlight) e.preventDefault();
+          if (isInteractionLocked) e.preventDefault();
         }}
         className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-[12px_12px_0_rgba(232,237,255,0.45)] sm:p-6"
       >
@@ -49,7 +49,11 @@ export function UploadPolicyDocumentModal({
             보험증권 더 올리기
           </DialogTitle>
           <DialogClose asChild>
-            <Button type="button" variant="ghost" disabled={isUploadInFlight}>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={isInteractionLocked}
+            >
               닫기
             </Button>
           </DialogClose>
@@ -65,7 +69,7 @@ export function UploadPolicyDocumentModal({
               onClose();
             }}
             surface="modal"
-            onUploadInFlightChange={setIsUploadInFlight}
+            onInteractionLockedChange={setIsInteractionLocked}
           />
         </div>
       </DialogContent>

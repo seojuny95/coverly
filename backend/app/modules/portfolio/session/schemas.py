@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.limits import MAX_PORTFOLIO_DOCUMENTS
+from app.modules.policy.schemas import PolicyParseResponse
 
 
 class ReadinessResponse(BaseModel):
@@ -26,6 +27,18 @@ class PortfolioSessionResponse(BaseModel):
     portfolio_session_token: str = Field(serialization_alias="portfolioSessionToken")
     expires_at: str = Field(serialization_alias="expiresAt")
     counsel_turns_remaining: int = Field(serialization_alias="counselTurnsRemaining")
+    portfolio_kind: Literal["uploaded", "sample"] = Field(serialization_alias="portfolioKind")
+
+
+class SamplePortfolioDocument(BaseModel):
+    file_name: str = Field(serialization_alias="fileName")
+    result: PolicyParseResponse
+
+
+class SamplePortfolioSessionResponse(PortfolioSessionResponse):
+    insurance_documents: list[SamplePortfolioDocument] = Field(
+        serialization_alias="insuranceDocuments"
+    )
 
 
 class PortfolioSessionDeleteResponse(BaseModel):

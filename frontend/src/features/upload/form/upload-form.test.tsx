@@ -466,6 +466,7 @@ describe("PolicyUploadForm selection and completion", () => {
       expect(onAnalysisComplete).toHaveBeenCalledWith(
         expect.objectContaining({
           generatedAt: expect.any(String),
+          portfolioKind: "uploaded" as const,
           insuranceDocuments: [
             expect.objectContaining({
               fileName: "insurance.pdf",
@@ -687,9 +688,11 @@ describe("PolicyUploadForm selection and completion", () => {
         },
       });
     const onAnalysisComplete = vi.fn();
+    const onInteractionLockedChange = vi.fn();
     const { deleteSessionDocuments } = renderForm({
       uploadPolicyDocument,
       onAnalysisComplete,
+      onInteractionLockedChange,
     });
 
     await user.upload(screen.getByLabelText("PDF 파일 선택"), [
@@ -704,6 +707,7 @@ describe("PolicyUploadForm selection and completion", () => {
     expect(screen.getByText("테스트고객")).toBeInTheDocument();
     expect(screen.getByText("테스트고객B")).toBeInTheDocument();
     expect(onAnalysisComplete).not.toHaveBeenCalled();
+    expect(onInteractionLockedChange).toHaveBeenLastCalledWith(true);
     expect(screen.getByLabelText("PDF 파일 선택")).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "내 보험 분석하기" }),

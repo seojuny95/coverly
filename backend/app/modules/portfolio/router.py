@@ -16,11 +16,19 @@ from app.modules.portfolio.schemas import (
     PortfolioOverview,
     PortfolioSummaryRequest,
 )
-from app.modules.portfolio.session.analysis import analyze_portfolio_snapshot
+from app.modules.portfolio.session.analysis import (
+    SamplePortfolioFixtureUnavailable,
+    analysis_context_hash,
+    analyze_portfolio_snapshot,
+)
 from app.modules.portfolio.session.dependencies import PortfolioSessionServiceDep
 from app.modules.portfolio.session.http import (
     portfolio_session_unavailable_error,
     resolve_portfolio_snapshot,
+)
+from app.modules.portfolio.session.models import (
+    CachedPortfolioAnalysis,
+    PortfolioSessionSnapshot,
 )
 from app.modules.portfolio.session.service import PortfolioSessionUnavailable
 from app.modules.portfolio.summary import summarize_portfolio_coverages
@@ -58,9 +66,8 @@ def coverage_summary(
     summarize: PortfolioSummaryServiceDep,
     sessions: PortfolioSessionServiceDep,
 ) -> PortfolioCoverageSummary:
-    return _portfolio_coverage_summary(request, summarize, sessions).model_copy(
-        update={"overview": None}
-    )
+    summary, _, _ = _portfolio_analysis(request, summarize, sessions)
+    return summary.model_copy(update={"overview": None})
 
 
 @router.post(
@@ -73,9 +80,12 @@ def summary_overview(
     summarize: PortfolioSummaryServiceDep,
     sessions: PortfolioSessionServiceDep,
 ) -> PortfolioOverview:
-    summary = _portfolio_coverage_summary(request, summarize, sessions)
+    summary, snapshot, context_hash = _portfolio_analysis(request, summarize, sessions)
+    if summary.overview is not None:
+        return summary.overview
     try:
-        overview = attach_summary_overview(summary).overview
+        summary_with_overview = attach_summary_overview(summary)
+        overview = summary_with_overview.overview
     except SummaryOverviewUnavailableError as exc:
         raise ApiError(
             status_code=503,
@@ -94,22 +104,31 @@ def summary_overview(
                 "잠시 후 다시 시도해주세요."
             ),
         )
+    sessions.save_cached_analysis(
+        snapshot,
+        CachedPortfolioAnalysis(
+            version=snapshot.version,
+            context_hash=context_hash,
+            result=summary_with_overview.model_dump(mode="json"),
+        ),
+    )
     return overview
 
 
-def _portfolio_coverage_summary(
+def _portfolio_analysis(
     request: PortfolioSummaryRequest,
     summarize: PortfolioSummaryService,
     sessions: PortfolioSessionServiceDep,
-) -> PortfolioCoverageSummary:
+) -> tuple[PortfolioCoverageSummary, PortfolioSessionSnapshot, str]:
     try:
         snapshot = resolve_portfolio_snapshot(sessions, request)
-        return analyze_portfolio_snapshot(
+        summary = analyze_portfolio_snapshot(
             sessions,
             snapshot,
             request,
             summarize,
         )
+        return summary, snapshot, analysis_context_hash(request)
     except ReferenceDataUnavailableError as exc:
         raise ApiError(
             status_code=503,
@@ -118,3 +137,9 @@ def _portfolio_coverage_summary(
         ) from exc
     except PortfolioSessionUnavailable:
         raise portfolio_session_unavailable_error() from None
+    except SamplePortfolioFixtureUnavailable:
+        raise ApiError(
+            status_code=503,
+            code="sample_portfolio_unavailable",
+            message="샘플 분석을 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
+        ) from None

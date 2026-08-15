@@ -4,9 +4,9 @@ import type { ChatHistoryItem } from "../coverage/types";
 // Keep these aligned with the backend suggestion evals: the product should
 // only offer questions that the grounded QA flow is expected to answer.
 const INITIAL_SUGGESTIONS = [
-  "겹치는 보장이 있는지 봐줄래요?",
-  "내 보험에서 비어 있는 보장이 있나요?",
-  "실손의료비는 어디로 청구해요?",
+  "내가 가입한 보험은 뭐가 있어?",
+  "월 보험료는 총 얼마야?",
+  "내 보험에서 먼저 확인해야 할 부분은 뭐야?",
 ];
 
 export type ChatConversationState = {

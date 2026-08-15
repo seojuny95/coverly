@@ -14,10 +14,13 @@ from app.core.config import get_settings
 from app.integrations.postgres.policy_rag_store import shared_policy_store
 from app.integrations.postgres.portfolio_session_store import PgPortfolioSessionRepository
 from app.modules.policy.pipeline import PipelineResult
+from app.modules.policy.schemas import PolicyParseResponse
+from app.modules.portfolio.sample.creation import create_sample_portfolio
 from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
     NewPortfolioSession,
     PolicyDocumentReservation,
+    PortfolioKind,
     PortfolioSessionSnapshot,
     StoredPolicyDocument,
 )
@@ -65,6 +68,10 @@ class PortfolioSessionDocumentAlreadyCompleted(Exception):
     """The document id is already stored in the portfolio."""
 
 
+class PortfolioSessionReadOnly(Exception):
+    """Sample portfolios cannot be changed document by document."""
+
+
 class PortfolioSessionUnavailable(Exception):
     """The portfolio session store is temporarily unavailable."""
 
@@ -73,6 +80,7 @@ class PortfolioSessionUnavailable(Exception):
 class PortfolioSessionAccess:
     token: str
     expires_at: datetime
+    kind: PortfolioKind = "uploaded"
 
 
 @dataclass(frozen=True)
@@ -96,7 +104,11 @@ class PortfolioSessionService:
         with self._translate_repository_errors():
             self._repository.check_ready()
 
-    def create(self, *, now: datetime | None = None) -> PortfolioSessionAccess:
+    def create(
+        self,
+        *,
+        now: datetime | None = None,
+    ) -> PortfolioSessionAccess:
         ensure_policy_session_secret_configured()
         created_at = now or datetime.now(UTC)
         settings = get_settings()
@@ -117,6 +129,7 @@ class PortfolioSessionService:
                     created_at=created_at,
                     expires_at=expires_at,
                     max_expires_at=max_expires_at,
+                    kind="uploaded",
                 )
             )
         return PortfolioSessionAccess(
@@ -126,7 +139,24 @@ class PortfolioSessionService:
                 max_expires_at=max_expires_at,
             ),
             expires_at=expires_at,
+            kind="uploaded",
         )
+
+    def create_sample(
+        self,
+        *,
+        now: datetime | None = None,
+    ) -> tuple[PortfolioSessionAccess, tuple[tuple[str, PolicyParseResponse], ...]]:
+        created = create_sample_portfolio(
+            self._repository,
+            self._rag_store,
+            now=now,
+        )
+        return PortfolioSessionAccess(
+            token=created.token,
+            expires_at=created.expires_at,
+            kind="sample",
+        ), created.documents
 
     def add_pipeline_result(
         self,
@@ -184,6 +214,8 @@ class PortfolioSessionService:
             raise PortfolioSessionDocumentAlreadyCompleted
         if reserved == "missing":
             raise InvalidPortfolioSessionToken
+        if reserved == "read_only":
+            raise PortfolioSessionReadOnly
         return PolicyDocumentReservation(
             session_id=claims.session_id,
             document_id=resolved_document_id,
@@ -336,14 +368,14 @@ class PortfolioSessionService:
         if next_expires_at <= current:
             raise InvalidPortfolioSessionToken
         with self._translate_repository_errors():
-            rag_session_ids = self._repository.extend(
+            extension = self._repository.extend(
                 claims.session_id,
                 next_expires_at,
                 now=current,
             )
-        if rag_session_ids is None:
+        if extension is None:
             raise InvalidPortfolioSessionToken
-        for rag_session_id in rag_session_ids:
+        for rag_session_id in extension.rag_session_ids:
             try:
                 self._rag_store.extend(rag_session_id, next_expires_at)
             except Exception as exc:
@@ -358,6 +390,7 @@ class PortfolioSessionService:
                 max_expires_at=claims.max_expires_at,
             ),
             expires_at=next_expires_at,
+            kind=extension.kind,
         )
 
     def delete(self, token: str, *, now: datetime | None = None) -> None:
@@ -380,14 +413,16 @@ class PortfolioSessionService:
         claims = self._verify(token, now=current)
         selected_ids = tuple(dict.fromkeys(document_ids))
         with self._translate_repository_errors():
-            rag_session_ids = self._repository.delete_documents(
+            result = self._repository.delete_documents(
                 claims.session_id,
                 selected_ids,
                 now=current,
             )
-        if rag_session_ids is None:
+        if result is None:
             raise InvalidPortfolioSessionToken
-        for rag_session_id in rag_session_ids:
+        if result == "read_only":
+            raise PortfolioSessionReadOnly
+        for rag_session_id in result:
             self._delete_rag_session(rag_session_id)
 
     def close(self) -> None:

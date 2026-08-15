@@ -7,9 +7,11 @@ import pytest
 from pydantic import SecretStr
 
 from app.modules.policy.pipeline import PipelineResult
+from app.modules.portfolio.sample.creation import SamplePortfolioUnavailable
 from app.modules.portfolio.schemas import PolicyInput
 from app.modules.portfolio.session.models import (
     CachedPortfolioAnalysis,
+    ExtendedPortfolioSession,
     NewPortfolioSession,
     PolicyDocumentReservation,
     PortfolioSessionSnapshot,
@@ -17,7 +19,10 @@ from app.modules.portfolio.session.models import (
 )
 from app.modules.portfolio.session.repository import (
     CompleteDocumentResult,
+    DeleteDocumentsResult,
+    PortfolioSessionRepositoryUnavailable,
     ReserveDocumentResult,
+    SamplePortfolioCapacityExceeded,
 )
 from app.modules.portfolio.session.service import (
     CounselTurnLimitReached,
@@ -26,6 +31,7 @@ from app.modules.portfolio.session.service import (
     PortfolioSessionDocumentCancelled,
     PortfolioSessionDocumentInProgress,
     PortfolioSessionDocumentLimitExceeded,
+    PortfolioSessionReadOnly,
     PortfolioSessionService,
 )
 from app.rag.policy.models import PolicyRetrievalHit, PolicyVectorRecord
@@ -41,6 +47,7 @@ class _Repository:
         self.cancelled_document_ids: set[str] = set()
         self.reservations: dict[str, tuple[str, datetime]] = {}
         self.counsel_turns_used = 0
+        self.seeded_analyses: tuple[CachedPortfolioAnalysis, ...] = ()
 
     def check_ready(self) -> None:
         return None
@@ -87,6 +94,21 @@ class _Repository:
     def create(self, session: NewPortfolioSession) -> None:
         self.session = session
 
+    def create_seeded(
+        self,
+        session: NewPortfolioSession,
+        documents: tuple[StoredPolicyDocument, ...],
+        analyses: tuple[CachedPortfolioAnalysis, ...],
+        *,
+        max_active_sample_sessions: int,
+    ) -> None:
+        assert max_active_sample_sessions > 0
+        self.session = session
+        self.documents = {document.id: document for document in documents}
+        self.version = session.version
+        self.cache = analyses[0] if analyses else None
+        self.seeded_analyses = analyses
+
     def reserve_document(
         self,
         session_id: str,
@@ -99,6 +121,8 @@ class _Repository:
     ) -> ReserveDocumentResult:
         if self.session is None or self.session.id != session_id:
             return "missing"
+        if self.session.kind == "sample":
+            return "read_only"
         if document_id in self.cancelled_document_ids:
             return "cancelled"
         self.reservations = {
@@ -164,6 +188,7 @@ class _Repository:
                 for document in documents
                 if document.rag_session_id is not None
             ),
+            kind=self.session.kind,
         )
 
     def extend(
@@ -172,9 +197,14 @@ class _Repository:
         expires_at: datetime,
         *,
         now: datetime,
-    ) -> tuple[str, ...] | None:
+    ) -> ExtendedPortfolioSession | None:
         snapshot = self.snapshot(session_id, policy_ids=None, now=now)
-        return snapshot.rag_session_ids if snapshot else None
+        if snapshot is None:
+            return None
+        return ExtendedPortfolioSession(
+            kind=snapshot.kind,
+            rag_session_ids=snapshot.rag_session_ids,
+        )
 
     def delete(self, session_id: str) -> tuple[str, ...] | None:
         snapshot = self.snapshot(session_id, policy_ids=None, now=datetime.now(UTC))
@@ -190,9 +220,11 @@ class _Repository:
         document_ids: tuple[str, ...],
         *,
         now: datetime,
-    ) -> tuple[str, ...] | None:
+    ) -> DeleteDocumentsResult:
         if self.session is None or self.session.id != session_id:
             return None
+        if self.session.kind == "sample":
+            return "read_only"
         self.cancelled_document_ids.update(document_ids)
         for document_id in document_ids:
             self.reservations.pop(document_id, None)
@@ -234,9 +266,10 @@ class _RagStore:
         self.extended: list[str] = []
         self.deleted: list[str] = []
         self.expired_cleanup_calls = 0
+        self.records: list[PolicyVectorRecord] = []
 
     def add(self, records: Sequence[PolicyVectorRecord]) -> None:
-        raise AssertionError("not used")
+        self.records.extend(records)
 
     def query(
         self,
@@ -261,6 +294,7 @@ class _RagStore:
 
 @pytest.fixture(autouse=True)
 def _settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.portfolio.sample import creation
     from app.modules.portfolio.session import service
     from app.rag.policy import session_tokens
 
@@ -271,9 +305,127 @@ def _settings(monkeypatch: pytest.MonkeyPatch) -> None:
         database_url = SecretStr("postgresql://example/test")
         portfolio_session_max_documents = 50
         policy_upload_reservation_ttl_seconds = 300
+        openai_embedding_model = "text-embedding-3-small"
+        openai_embedding_dimensions = 1536
+        sample_portfolio_max_active_sessions = 100
 
+    monkeypatch.setattr(creation, "get_settings", lambda: _Settings())
     monkeypatch.setattr(service, "get_settings", lambda: _Settings())
     monkeypatch.setattr(session_tokens, "get_settings", lambda: _Settings())
+
+
+def test_sample_session_is_precomputed_isolated_and_read_only() -> None:
+    now = datetime(2026, 8, 14, tzinfo=UTC)
+    repository = _Repository()
+    rag_store = _RagStore()
+    sessions = PortfolioSessionService(repository, rag_store=rag_store)
+
+    access, public_documents = sessions.create_sample(now=now)
+
+    assert access.kind == "sample"
+    assert len(public_documents) == 4
+    assert len(repository.documents) == 4
+    assert len(repository.seeded_analyses) == 4
+    assert len(rag_store.records) == 20
+    assert all(record.chunk.expires_at == access.expires_at for record in rag_store.records)
+
+    with pytest.raises(PortfolioSessionReadOnly):
+        sessions.begin_upload(access.token, now=now)
+    with pytest.raises(PortfolioSessionReadOnly):
+        sessions.delete_documents(
+            access.token,
+            [public_documents[0][1].document_id.hex],
+            now=now,
+        )
+
+    sessions.delete(access.token, now=now)
+    assert len(rag_store.deleted) == 4
+
+
+def test_sample_sessions_receive_independent_runtime_identifiers() -> None:
+    now = datetime(2026, 8, 14, tzinfo=UTC)
+    first_repository = _Repository()
+    second_repository = _Repository()
+
+    first_access, _ = PortfolioSessionService(
+        first_repository,
+        rag_store=_RagStore(),
+    ).create_sample(now=now)
+    second_access, _ = PortfolioSessionService(
+        second_repository,
+        rag_store=_RagStore(),
+    ).create_sample(now=now)
+
+    assert first_access.token != second_access.token
+    assert set(first_repository.documents).isdisjoint(second_repository.documents)
+
+
+def test_failed_sample_session_seed_skips_rag_writes_and_logs_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class FailingRepository(_Repository):
+        def create_seeded(
+            self,
+            session: NewPortfolioSession,
+            documents: tuple[StoredPolicyDocument, ...],
+            analyses: tuple[CachedPortfolioAnalysis, ...],
+            *,
+            max_active_sample_sessions: int,
+        ) -> None:
+            raise PortfolioSessionRepositoryUnavailable
+
+    rag_store = _RagStore()
+    sessions = PortfolioSessionService(FailingRepository(), rag_store=rag_store)
+
+    with pytest.raises(SamplePortfolioUnavailable):
+        sessions.create_sample(now=datetime(2026, 8, 14, tzinfo=UTC))
+
+    assert len(rag_store.records) == 0
+    assert len(rag_store.deleted) == 0
+    assert any(
+        record.message == "sample_portfolio_creation_failed"
+        and getattr(record, "error_type", None) == "PortfolioSessionRepositoryUnavailable"
+        for record in caplog.records
+    )
+
+
+def test_full_sample_capacity_skips_rag_writes() -> None:
+    class FullRepository(_Repository):
+        def create_seeded(
+            self,
+            session: NewPortfolioSession,
+            documents: tuple[StoredPolicyDocument, ...],
+            analyses: tuple[CachedPortfolioAnalysis, ...],
+            *,
+            max_active_sample_sessions: int,
+        ) -> None:
+            raise SamplePortfolioCapacityExceeded
+
+    rag_store = _RagStore()
+    sessions = PortfolioSessionService(FullRepository(), rag_store=rag_store)
+
+    with pytest.raises(SamplePortfolioUnavailable):
+        sessions.create_sample(now=datetime(2026, 8, 14, tzinfo=UTC))
+
+    assert len(rag_store.records) == 0
+    assert len(rag_store.deleted) == 0
+
+
+def test_failed_sample_rag_seed_removes_the_created_session() -> None:
+    class FailingRagStore(_RagStore):
+        def add(self, records: Sequence[PolicyVectorRecord]) -> None:
+            self.records.extend(records[:1])
+            raise RuntimeError("rag unavailable")
+
+    repository = _Repository()
+    rag_store = FailingRagStore()
+    sessions = PortfolioSessionService(repository, rag_store=rag_store)
+
+    with pytest.raises(SamplePortfolioUnavailable):
+        sessions.create_sample(now=datetime(2026, 8, 14, tzinfo=UTC))
+
+    assert repository.session is None
+    assert len(rag_store.deleted) == 4
 
 
 def test_session_stores_only_qa_safe_policy_facts_and_selects_documents() -> None:
