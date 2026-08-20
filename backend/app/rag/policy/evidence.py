@@ -90,7 +90,7 @@ def search_policy_evidence(
     }
     evidence: list[PolicyTermEvidence] = []
     for hit, fact in safe_hits:
-        document_ref = document_refs[hit.chunk.session_id]
+        document_ref = hit.document_ref or document_refs[hit.chunk.session_id]
         evidence.append(_evidence_from_hit(hit, fact, document_ref=document_ref))
 
     return PolicyEvidenceResult(

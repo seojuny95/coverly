@@ -16,5 +16,7 @@ class QaContext:
     policies: list[PolicyInput]
     current_question: str = ""
     policy_rag_session_ids: tuple[str, ...] = ()
+    trace_thread_id: str | None = None
+    trace_request_id: str = ""
     official_evidence_retriever: OfficialEvidenceRetriever | None = None
     policy_evidence_retriever: PolicyEvidenceRetriever | None = None

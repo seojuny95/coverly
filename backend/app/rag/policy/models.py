@@ -31,3 +31,4 @@ class PolicyVectorRecord:
 class PolicyRetrievalHit:
     chunk: PolicyChunk
     score: float
+    document_ref: str | None = None

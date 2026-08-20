@@ -6,7 +6,16 @@ import math
 import re
 from collections import Counter
 
+from langsmith import traceable
+
 from app.integrations.postgres.policy_rag_store import shared_policy_store
+from app.observability.rag_tracing import (
+    trace_embedding_output,
+    trace_hit_summary,
+    trace_policy_documents,
+    trace_rag_stage,
+    trace_rerank_stage,
+)
 from app.rag.embeddings import Embedder, openai_embedder_from_settings
 from app.rag.lexical import tokenize as _tokens
 from app.rag.policy.models import PolicyRetrievalHit
@@ -43,6 +52,14 @@ def retrieve_policy_context(
     )
 
 
+@traceable(
+    name="coverly.policy_rag.retrieve",
+    run_type="retriever",
+    tags=["rag", "policy-rag"],
+    metadata={"corpus": "policy", "tool_name": "retrieve_policy_terms"},
+    process_inputs=trace_rag_stage,
+    process_outputs=trace_policy_documents,
+)
 def retrieve_policy_context_by_session_ids(
     session_ids: list[str],
     query: str,
@@ -58,14 +75,73 @@ def retrieve_policy_context_by_session_ids(
     if not session_ids or not normalized or top_k <= 0:
         return []
     active_embedder = embedder or openai_embedder_from_settings()
-    query_embedding = active_embedder.embed_texts([normalized])[0]
-    hits = (store or shared_policy_store()).query(
+    query_embedding = _embed_policy_query(normalized, active_embedder)
+    hits = _search_policy_store(
+        normalized,
         session_ids,
         query_embedding,
         top_k=max(top_k, candidate_k),
+        store=store,
     )
-    deduped = _dedupe_hits(hits)
-    return _rerank_with_rrf(normalized, deduped)[:top_k]
+    ranked = _rank_policy_hits(normalized, hits, top_k=top_k)
+    document_refs = {
+        session_id: f"document-{index}" for index, session_id in enumerate(session_ids, start=1)
+    }
+    return [
+        PolicyRetrievalHit(
+            chunk=hit.chunk,
+            score=hit.score,
+            document_ref=document_refs[hit.chunk.session_id],
+        )
+        for hit in ranked
+    ]
+
+
+@traceable(
+    name="coverly.policy_rag.embed_query",
+    run_type="embedding",
+    tags=["embedding"],
+    process_inputs=trace_rag_stage,
+    process_outputs=trace_embedding_output,
+)
+def _embed_policy_query(query: str, embedder: Embedder) -> tuple[float, ...]:
+    return embedder.embed_texts([query])[0]
+
+
+@traceable(
+    name="coverly.policy_rag.pgvector_search",
+    tags=["pgvector"],
+    process_inputs=trace_rag_stage,
+    process_outputs=trace_hit_summary,
+)
+def _search_policy_store(
+    query: str,
+    session_ids: list[str],
+    query_embedding: tuple[float, ...],
+    *,
+    top_k: int,
+    store: PolicyRagStore | None,
+) -> list[PolicyRetrievalHit]:
+    return (store or shared_policy_store()).query(
+        session_ids,
+        query_embedding,
+        top_k=top_k,
+    )
+
+
+@traceable(
+    name="coverly.policy_rag.dedupe_and_rerank",
+    tags=["rerank"],
+    process_inputs=trace_rerank_stage,
+    process_outputs=trace_hit_summary,
+)
+def _rank_policy_hits(
+    query: str,
+    hits: list[PolicyRetrievalHit],
+    *,
+    top_k: int,
+) -> list[PolicyRetrievalHit]:
+    return _rerank_with_rrf(query, _dedupe_hits(hits))[:top_k]
 
 
 def _normalize_query(query: str) -> str:
@@ -120,6 +196,7 @@ def _rerank_with_rrf(query: str, hits: list[PolicyRetrievalHit]) -> list[PolicyR
         PolicyRetrievalHit(
             chunk=hit.chunk,
             score=_rrf_score(vector_ranks[hit.chunk.id], keyword_ranks[hit.chunk.id]),
+            document_ref=hit.document_ref,
         )
         for hit in ranked
     ]

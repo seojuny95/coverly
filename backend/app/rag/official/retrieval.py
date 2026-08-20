@@ -18,9 +18,18 @@ from __future__ import annotations
 import math
 from collections import Counter
 
+from langsmith import traceable
+
 from app.core.config import get_settings
 from app.integrations.openai import JsonCompleter
 from app.integrations.postgres.official_rag_store import shared_pgvector_store
+from app.observability.rag_tracing import (
+    trace_embedding_output,
+    trace_hit_summary,
+    trace_official_documents,
+    trace_rag_stage,
+    trace_rerank_stage,
+)
 from app.rag.embeddings import Embedder, openai_embedder_from_settings
 from app.rag.lexical import tokenize as _tokens
 from app.rag.official.models import (
@@ -43,6 +52,14 @@ from app.rag.scoring import (
 )
 
 
+@traceable(
+    name="coverly.official_rag.retrieve",
+    run_type="retriever",
+    tags=["rag", "official-rag"],
+    metadata={"corpus": "official", "tool_name": "retrieve_official_guidance"},
+    process_inputs=trace_rag_stage,
+    process_outputs=trace_official_documents,
+)
 def retrieve(
     query: str,
     *,
@@ -118,21 +135,86 @@ def _retrieve_from_pgvector(
     if not get_settings().database_url.get_secret_value():
         raise RuntimeError("DATABASE_URL is required for RAG retrieval")
 
-    query_embedding = openai_embedder_from_settings().embed_query(plan.search_query)
-    hits = (store or shared_pgvector_store()).query(
-        query_embedding=query_embedding,
-        query_text=plan.search_query,
+    query_embedding = _embed_official_query(plan.search_query)
+    hits = _search_official_store(
+        plan.search_query,
+        query_embedding,
         top_k=max(candidate_k, final_k),
+        store=store,
     )
-    ranked = _rerank_with_rrf(plan, hits, top_k=candidate_k)
+    ranked = _rank_official_hits(plan.search_query, plan, hits, top_k=candidate_k)
     if rerank_complete is None and not get_settings().openai_api_key.get_secret_value():
         return ranked[:final_k]
-    return semantic_rerank(
+    return _semantic_rank_official_hits(
         plan.original_query,
         ranked,
         final_k=final_k,
         complete=rerank_complete,
     )
+
+
+@traceable(
+    name="coverly.official_rag.embed_query",
+    run_type="embedding",
+    tags=["embedding"],
+    process_inputs=trace_rag_stage,
+    process_outputs=trace_embedding_output,
+)
+def _embed_official_query(query: str) -> tuple[float, ...]:
+    return openai_embedder_from_settings().embed_query(query)
+
+
+@traceable(
+    name="coverly.official_rag.pgvector_hybrid_search",
+    tags=["pgvector"],
+    process_inputs=trace_rag_stage,
+    process_outputs=trace_hit_summary,
+)
+def _search_official_store(
+    query: str,
+    query_embedding: tuple[float, ...],
+    *,
+    top_k: int,
+    store: OfficialRagStore | None,
+) -> list[RetrievalHit]:
+    return (store or shared_pgvector_store()).query(
+        query_embedding=query_embedding,
+        query_text=query,
+        top_k=top_k,
+    )
+
+
+@traceable(
+    name="coverly.official_rag.rrf_rerank",
+    tags=["rerank"],
+    process_inputs=trace_rerank_stage,
+    process_outputs=trace_hit_summary,
+)
+def _rank_official_hits(
+    query: str,
+    plan: QueryPlan,
+    hits: list[RetrievalHit],
+    *,
+    top_k: int,
+) -> list[RetrievalHit]:
+    return _rerank_with_rrf(plan, hits, top_k=top_k)
+
+
+@traceable(
+    name="coverly.official_rag.semantic_rerank",
+    run_type="llm",
+    tags=["rerank", "llm"],
+    process_inputs=trace_rerank_stage,
+    process_outputs=trace_hit_summary,
+)
+def _semantic_rank_official_hits(
+    query: str,
+    hits: list[RetrievalHit],
+    *,
+    final_k: int,
+    complete: JsonCompleter | None,
+) -> list[RetrievalHit]:
+    return semantic_rerank(query, hits, final_k=final_k, complete=complete)
 
 
 def _retrieve_from_records(

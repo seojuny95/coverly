@@ -11,7 +11,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, cast
 
-from agents import set_default_openai_key, set_tracing_disabled
+from agents import set_default_openai_key
 from openai import OpenAI
 from openai.types.responses import EasyInputMessageParam
 from pydantic import BaseModel
@@ -103,20 +103,16 @@ def dump_prompt_json(payload: object) -> str:
 
 
 def configure_agent_sdk_credentials() -> None:
-    """Hand the configured key to the agents SDK and switch its tracing off.
+    """Hand the configured key to the agents SDK.
 
     pydantic-settings loads .env into Settings, not into os.environ, so the SDK
     would otherwise build its client without a key. Passing it through the SDK's
     own entry point avoids exporting a secret process-wide, where child
     processes and environment dumps would pick it up.
 
-    Tracing is disabled because it ships the conversation -- the user's question
-    and the policy facts the tools returned -- to OpenAI's trace store. That is
-    an export of personal data the product never asked for, and it is on by
-    default in this SDK.
+    Tracing processors are configured separately by app.observability so the
+    OpenAI exporter is never enabled implicitly.
     """
-
-    set_tracing_disabled(True)
 
     api_key = get_settings().openai_api_key.get_secret_value()
     if api_key:

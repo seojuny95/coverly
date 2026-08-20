@@ -39,6 +39,7 @@ from app.core.config import get_settings
 from app.integrations.openai import ConversationMessage
 from app.modules.qa.context import QaContext
 from app.modules.qa.tools import ALL_TOOLS
+from app.observability.agent_tracing import agent_run_config
 
 # The instructions live next to this module as markdown because they carry the
 # product position, banned phrases, and evidence-grading rules a person needs
@@ -86,6 +87,10 @@ async def run_agent_streamed(
         input=list(conversation),
         context=context,
         max_turns=get_settings().counsel_agent_max_turns,
+        run_config=agent_run_config(
+            thread_id=context.trace_thread_id,
+            request_id=context.trace_request_id,
+        ),
     )
     try:
         async for event in result.stream_events():

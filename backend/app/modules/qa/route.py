@@ -47,6 +47,7 @@ from app.modules.qa.events import (
 from app.modules.qa.history import recent_turns
 from app.modules.qa.pii import mask_qa_pii, masked_history
 from app.modules.qa.schemas import QaMessage, QaRequest
+from app.observability.agent_tracing import pseudonymous_thread_id
 
 router = APIRouter(prefix="/qa", tags=["qa"])
 logger = logging.getLogger(__name__)
@@ -128,6 +129,7 @@ async def stream_qa_answer(
     events = _build_event_stream(
         request_id=getattr(http_request.state, REQUEST_ID_STATE_KEY),
         session_id=request.session_id,
+        trace_session_id=snapshot.session_id,
         sessions=sessions,
         turns_remaining=turns_remaining,
         question=question,
@@ -145,6 +147,7 @@ async def _build_event_stream(
     *,
     request_id: str,
     session_id: str,
+    trace_session_id: str,
     sessions: PortfolioSessionService,
     turns_remaining: int,
     question: str,
@@ -171,6 +174,8 @@ async def _build_event_stream(
             policies=policies,
             current_question=question,
             policy_rag_session_ids=policy_rag_session_ids,
+            trace_thread_id=pseudonymous_thread_id(trace_session_id),
+            trace_request_id=request_id,
         )
         agent = create_agent(model)
         conversation: list[ConversationMessage] = [

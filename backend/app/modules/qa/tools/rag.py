@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.modules.qa.context import QaContext
 from app.modules.qa.facts import disclosure as disclosure_facts
+from app.observability.agent_tracing import agent_tool_trace_context
 from app.rag.official.evidence import OfficialEvidence, search_official_evidence
 from app.rag.policy.evidence import PolicyTermEvidence, search_policy_evidence
 
@@ -49,7 +50,8 @@ def retrieve_official_guidance(
     """
 
     retriever = wrapper.context.official_evidence_retriever or search_official_evidence
-    result = retriever(query)
+    with agent_tool_trace_context():
+        result = retriever(query)
     return OfficialGuidanceResult(
         matched=result.matched,
         evidence=result.evidence,
@@ -99,18 +101,19 @@ def retrieve_policy_terms(
     """
 
     context = wrapper.context
-    if context.policy_evidence_retriever is not None:
-        result = context.policy_evidence_retriever(
-            context.policy_rag_session_ids,
-            query,
-            context.current_question,
-        )
-    else:
-        result = search_policy_evidence(
-            context.policy_rag_session_ids,
-            query,
-            scope_question=context.current_question,
-        )
+    with agent_tool_trace_context():
+        if context.policy_evidence_retriever is not None:
+            result = context.policy_evidence_retriever(
+                context.policy_rag_session_ids,
+                query,
+                context.current_question,
+            )
+        else:
+            result = search_policy_evidence(
+                context.policy_rag_session_ids,
+                query,
+                scope_question=context.current_question,
+            )
     return PolicyTermsResult(
         has_retrieved_evidence=result.has_retrieved_evidence,
         supports_exhaustive_answer=result.supports_exhaustive_answer,

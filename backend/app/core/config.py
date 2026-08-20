@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     counsel_history_turns: int = 5
     policy_upload_reservation_ttl_seconds: int = 15 * 60
     backend_cors_origins: str = ",".join(DEFAULT_BACKEND_CORS_ORIGINS)
+    langsmith_tracing: bool = False
+    langsmith_api_key: SecretStr = Field(default=SecretStr(""), repr=False)
+    langsmith_endpoint: str = Field(default="", repr=False)
+    langsmith_project: str = Field(default="", repr=False)
+    langsmith_environment: str = Field(default="local", repr=False)
+    langsmith_release: str = Field(default="dev", repr=False)
+    langsmith_tracing_sampling_rate: float = Field(default=0.1, ge=0.0, le=1.0)
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",

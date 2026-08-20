@@ -7,6 +7,7 @@ dependencies = [
     "anyio>=4.14.1",
     "defusedxml>=0.7.1",
     "fastapi>=0.139.0",
+    "langsmith>=0.4.0",
     "llama-index-core>=0.14.23",
     "llama-index-embeddings-openai>=0.6.0",
     "llama-index-vector-stores-postgres>=0.8.1",

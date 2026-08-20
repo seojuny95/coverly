@@ -340,6 +340,7 @@ def test_closing_after_meta_refunds_the_consumed_turn() -> None:
         events = _build_event_stream(
             request_id="request-1",
             session_id=_SESSION_ID,
+            trace_session_id=_SESSION_ID,
             sessions=sessions,  # type: ignore[arg-type]
             turns_remaining=9,
             question="질문",
@@ -372,6 +373,7 @@ def test_a_disconnect_during_the_failure_refund_does_not_refund_twice() -> None:
         events = _build_event_stream(
             request_id="request-1",
             session_id=_SESSION_ID,
+            trace_session_id=_SESSION_ID,
             sessions=sessions,  # type: ignore[arg-type]
             turns_remaining=9,
             question="질문",

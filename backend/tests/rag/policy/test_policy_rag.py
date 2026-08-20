@@ -225,6 +225,28 @@ def test_policy_pii_keeps_large_amounts() -> None:
     assert mask_policy_pii(text) == text
 
 
+def test_policy_pii_masks_unlabeled_table_address_and_partial_identifier() -> None:
+    text = (
+        "| 계약자 | [개인정보](950524-*******) | 보험기간 | 2026-06-27 |\n"
+        "| | | 16836 경기 용인시 수지구 풍덕천로 91 ****** | |"
+    )
+
+    masked = mask_policy_pii(text)
+
+    assert "950524" not in masked
+    assert "16836" not in masked
+    assert "풍덕천로 91" not in masked
+    assert "[주민등록번호]" in masked
+    assert "[주소]" in masked
+
+
+def test_policy_pii_masks_unlabeled_road_address_without_postal_code() -> None:
+    masked = mask_policy_pii("연락처는 서울시 강남구 테헤란로 123입니다.")
+
+    assert "서울시 강남구 테헤란로 123" not in masked
+    assert "[주소]" in masked
+
+
 def test_policy_index_returns_signed_session_token() -> None:
     now = datetime(2026, 1, 1, tzinfo=UTC)
     store = _MemoryStore(())

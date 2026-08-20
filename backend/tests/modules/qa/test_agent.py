@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from agents import Runner
+from agents import RunConfig, Runner
 
 from app.core.config import get_settings
 from app.integrations.openai import ConversationMessage
@@ -32,13 +32,19 @@ def _fake_run_streamed_returning(result: object, captured: dict[str, object] | N
     """
 
     def fake_run_streamed(
-        agent: object, *, input: list[Any], context: object, max_turns: object = None
+        agent: object,
+        *,
+        input: list[Any],
+        context: object,
+        max_turns: object = None,
+        run_config: RunConfig | None = None,
     ) -> object:
         if captured is not None:
             captured["agent"] = agent
             captured["input"] = input
             captured["context"] = context
             captured["max_turns"] = max_turns
+            captured["run_config"] = run_config
         return result
 
     return cast(Any, fake_run_streamed)
@@ -128,6 +134,9 @@ def test_run_agent_streamed_yields_only_text_deltas_and_forwards_input(
     # without this assertion, removing the argument from agent.py would
     # leave this test green.
     assert captured["max_turns"] == get_settings().counsel_agent_max_turns
+    run_config = captured["run_config"]
+    assert isinstance(run_config, RunConfig)
+    assert run_config.workflow_name == "Coverly QA workflow"
 
 
 class _UnboundedEventStreamingResult:

@@ -22,9 +22,6 @@ def test_agent_sdk_gets_the_key_without_touching_the_environment(
         "set_default_openai_key",
         lambda key, use_for_tracing: recorded.update(key=key, use_for_tracing=use_for_tracing),
     )
-    monkeypatch.setattr(
-        client, "set_tracing_disabled", lambda disabled: recorded.update(tracing_disabled=disabled)
-    )
     _settings(monkeypatch, "test-key")
 
     client.configure_agent_sdk_credentials()
@@ -34,32 +31,13 @@ def test_agent_sdk_gets_the_key_without_touching_the_environment(
     assert "OPENAI_API_KEY" not in __import__("os").environ
 
 
-def test_tracing_is_disabled_so_conversations_are_not_exported(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    recorded: dict[str, object] = {}
-    monkeypatch.setattr(client, "set_default_openai_key", lambda key, use_for_tracing: None)
-    monkeypatch.setattr(
-        client, "set_tracing_disabled", lambda disabled: recorded.update(disabled=disabled)
-    )
-    _settings(monkeypatch, "test-key")
-
-    client.configure_agent_sdk_credentials()
-
-    assert recorded["disabled"] is True
-
-
-def test_a_missing_key_still_disables_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_missing_key_does_not_configure_the_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
     recorded: dict[str, object] = {}
     monkeypatch.setattr(
         client, "set_default_openai_key", lambda key, use_for_tracing: recorded.update(called=True)
-    )
-    monkeypatch.setattr(
-        client, "set_tracing_disabled", lambda disabled: recorded.update(disabled=disabled)
     )
     _settings(monkeypatch, "")
 
     client.configure_agent_sdk_credentials()
 
     assert recorded.get("called") is None
-    assert recorded["disabled"] is True
