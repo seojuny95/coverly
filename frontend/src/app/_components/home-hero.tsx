@@ -8,7 +8,7 @@ import { InsuranceConnectionFlow } from "./insurance-connection-flow";
 export function HomeHero() {
   return (
     <section className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center px-6 pt-24 pb-10 text-center sm:pt-28 sm:pb-14 lg:px-8">
-      <div className="animate-enter-overlay flex flex-col items-center">
+      <div className="flex flex-col items-center">
         <div className="mb-6">
           <SectionLabel>보험을 팔지 않는 AI 보험 분석</SectionLabel>
         </div>
