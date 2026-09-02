@@ -86,7 +86,6 @@
   /* Shared motion tokens. Every enter animation in the app resolves to one of
      these so the rule lives in one place instead of in class strings. */
   --animate-enter: coverly-enter 200ms ease-out both;
-  --animate-enter-overlay: coverly-enter-overlay 300ms ease-out both;
 
   /* Screen-specific animations. Their keyframes cannot be expressed as
      utility combinations (step timing, many keyframes), so only the entry
@@ -364,15 +363,6 @@
   }
 }
 
-@keyframes coverly-enter-overlay {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .analysis-pixel-loader span,
   .animate-amount-range-fill,
@@ -382,7 +372,6 @@
   .animate-evidence-result-row,
   .animate-evidence-complete,
   .animate-enter,
-  .animate-enter-overlay,
   .animate-pulse,
   .animate-bounce {
     animation: none;
