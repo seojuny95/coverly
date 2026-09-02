@@ -529,7 +529,7 @@ describe("PolicyOverview", () => {
       await screen.findByRole("button", { name: "보험증권 더 올리기" }),
     );
 
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "보험증권 더 올리기" }),
     ).toBeInTheDocument();
@@ -616,7 +616,10 @@ describe("PolicyOverview", () => {
     await user.click(
       await screen.findByRole("button", { name: "보험증권 더 올리기" }),
     );
-    await user.upload(screen.getByLabelText("PDF 파일 선택"), insuranceFile);
+    await user.upload(
+      await screen.findByLabelText("PDF 파일 선택"),
+      insuranceFile,
+    );
     await user.click(screen.getByRole("button", { name: "분석에 추가하기" }));
 
     expect(

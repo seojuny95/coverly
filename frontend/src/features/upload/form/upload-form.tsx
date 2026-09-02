@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import type {
   AnalyzedInsurance,
@@ -16,7 +17,10 @@ import { Card } from "@/shared/components/ui/card";
 import { uploadPolicyDocument as uploadPolicyDocumentRequest } from "../api";
 import { isPdfPasswordError } from "../errors";
 import type { UploadPolicyDocument, UploadSurface } from "../types";
-import { InsuredPersonSelection } from "./insured-person-selection";
+import {
+  loadInsuredPersonSelection,
+  preloadInsuredPersonSelection,
+} from "./load-insured-person-selection";
 import { PdfDropzone } from "./pdf-dropzone";
 import { PolicyAnalysisProgress } from "./policy-analysis-progress";
 import { PolicyDocumentGuide } from "./policy-document-guide";
@@ -42,6 +46,10 @@ type PolicyUploadFormProps = {
 
 const prepareUploadServer = (signal?: AbortSignal) =>
   waitForBackendReady({ signal });
+
+const LazyInsuredPersonSelection = dynamic(() =>
+  loadInsuredPersonSelection().then((module) => module.InsuredPersonSelection),
+);
 
 export function PolicyUploadForm({
   uploadPolicyDocument,
@@ -72,6 +80,10 @@ export function PolicyUploadForm({
   useEffect(() => {
     onInteractionLockedChange?.(interactionLocked);
   }, [interactionLocked, onInteractionLockedChange]);
+
+  useEffect(() => {
+    if (upload.processingPhase) preloadInsuredPersonSelection();
+  }, [upload.processingPhase]);
 
   if (upload.processingPhase) {
     return (
@@ -146,7 +158,7 @@ export function PolicyUploadForm({
       </div>
 
       {upload.pendingAnalysis ? (
-        <InsuredPersonSelection
+        <LazyInsuredPersonSelection
           documents={upload.pendingAnalysis.insuranceDocuments}
           selectedName={upload.selectedName}
           onSelectedNameChange={upload.setSelectedName}

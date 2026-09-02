@@ -1,12 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 
 import { PolicyClassificationSummary } from "./classification-summary";
 import { groupPolicyDocuments } from "./group-documents";
 import { PolicyGroupList } from "./group-list";
 import { PolicyOverviewHeader } from "./header";
-import { UploadPolicyDocumentModal } from "./upload-modal";
+import {
+  loadUploadPolicyDocumentModal,
+  preloadUploadPolicyDocumentModal,
+} from "./load-upload-modal";
 import { useExpandedPolicies } from "./use-expanded-policies";
 import { PolicySummarySection } from "./summary-section";
 import {
@@ -18,6 +22,12 @@ import type { UploadPolicyDocument } from "@/features/upload/types";
 import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 
 const EMPTY_DOCUMENTS: AnalyzedInsurance[] = [];
+
+const LazyUploadPolicyDocumentModal = dynamic(() =>
+  loadUploadPolicyDocumentModal().then(
+    (module) => module.UploadPolicyDocumentModal,
+  ),
+);
 
 export function PolicyOverview({
   uploadPolicyDocument,
@@ -42,6 +52,12 @@ export function PolicyOverview({
     if (allowDocumentUpload && !uploadLimitReached) setUploadModalOpen(true);
   };
 
+  const preloadUploadModal = () => {
+    if (allowDocumentUpload && !uploadLimitReached) {
+      preloadUploadPolicyDocumentModal();
+    }
+  };
+
   const mergeAdditionalDocuments = (nextAnalysis: InsuranceAnalysis) => {
     mergeDocuments(nextAnalysis);
   };
@@ -52,6 +68,7 @@ export function PolicyOverview({
         selectedName={analysis.selectedName}
         generatedAt={analysis.generatedAt}
         onOpenUploadModal={openUploadModal}
+        onPreloadUploadModal={preloadUploadModal}
         uploadLimitReached={uploadLimitReached}
         allowDocumentUpload={allowDocumentUpload}
       />
@@ -69,7 +86,7 @@ export function PolicyOverview({
       />
 
       {allowDocumentUpload && uploadModalOpen ? (
-        <UploadPolicyDocumentModal
+        <LazyUploadPolicyDocumentModal
           selectedName={analysis.selectedName}
           existingDocuments={documents}
           uploadPolicyDocument={uploadPolicyDocument}

@@ -11,12 +11,14 @@ export function PolicyOverviewHeader({
   uploadLimitReached,
   allowDocumentUpload,
   onOpenUploadModal,
+  onPreloadUploadModal,
 }: {
   selectedName?: string | null;
   generatedAt: string;
   uploadLimitReached: boolean;
   allowDocumentUpload: boolean;
   onOpenUploadModal: () => void;
+  onPreloadUploadModal: () => void;
 }) {
   const classificationCount = POLICY_CLASSIFICATIONS.length;
 
@@ -40,6 +42,8 @@ export function PolicyOverviewHeader({
           <Button
             type="button"
             onClick={onOpenUploadModal}
+            onFocus={onPreloadUploadModal}
+            onMouseEnter={onPreloadUploadModal}
             disabled={uploadLimitReached}
             aria-describedby={
               uploadLimitReached ? "portfolio-upload-limit-notice" : undefined
