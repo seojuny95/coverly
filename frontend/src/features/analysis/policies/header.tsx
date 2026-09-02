@@ -44,6 +44,7 @@ export function PolicyOverviewHeader({
             onClick={onOpenUploadModal}
             onFocus={onPreloadUploadModal}
             onMouseEnter={onPreloadUploadModal}
+            onPointerDown={onPreloadUploadModal}
             disabled={uploadLimitReached}
             aria-describedby={
               uploadLimitReached ? "portfolio-upload-limit-notice" : undefined

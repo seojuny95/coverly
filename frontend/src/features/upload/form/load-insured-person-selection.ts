@@ -3,5 +3,5 @@ export function loadInsuredPersonSelection() {
 }
 
 export function preloadInsuredPersonSelection() {
-  void loadInsuredPersonSelection();
+  void loadInsuredPersonSelection().catch(() => undefined);
 }

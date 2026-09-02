@@ -47,8 +47,12 @@ type PolicyUploadFormProps = {
 const prepareUploadServer = (signal?: AbortSignal) =>
   waitForBackendReady({ signal });
 
-const LazyInsuredPersonSelection = dynamic(() =>
-  loadInsuredPersonSelection().then((module) => module.InsuredPersonSelection),
+const LazyInsuredPersonSelection = dynamic(
+  () =>
+    loadInsuredPersonSelection().then(
+      (module) => module.InsuredPersonSelection,
+    ),
+  { loading: InsuredPersonSelectionLoading },
 );
 
 export function PolicyUploadForm({
@@ -191,6 +195,18 @@ function UploadPrivacyNotice() {
         가입 권유 전화가 가지 않아요
       </span>
     </div>
+  );
+}
+
+function InsuredPersonSelectionLoading() {
+  return (
+    <Card
+      role="status"
+      aria-live="polite"
+      className="mt-4 rounded-xl px-4 py-4 text-sm text-zinc-500"
+    >
+      피보험자 선택 화면을 준비하고 있어요…
+    </Card>
   );
 }
 

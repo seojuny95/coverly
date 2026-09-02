@@ -23,10 +23,12 @@ import { PORTFOLIO_MAX_DOCUMENTS } from "@/shared/api/generated-runtime";
 
 const EMPTY_DOCUMENTS: AnalyzedInsurance[] = [];
 
-const LazyUploadPolicyDocumentModal = dynamic(() =>
-  loadUploadPolicyDocumentModal().then(
-    (module) => module.UploadPolicyDocumentModal,
-  ),
+const LazyUploadPolicyDocumentModal = dynamic(
+  () =>
+    loadUploadPolicyDocumentModal().then(
+      (module) => module.UploadPolicyDocumentModal,
+    ),
+  { loading: UploadPolicyDocumentModalLoading },
 );
 
 export function PolicyOverview({
@@ -95,5 +97,19 @@ export function PolicyOverview({
         />
       ) : null}
     </>
+  );
+}
+
+function UploadPolicyDocumentModalLoading() {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4 supports-backdrop-filter:backdrop-blur-sm">
+      <div
+        role="status"
+        aria-live="polite"
+        className="w-full max-w-sm rounded-2xl bg-white px-6 py-8 text-center text-sm text-zinc-600 shadow-2xl"
+      >
+        보험증권 추가 화면을 준비하고 있어요…
+      </div>
+    </div>
   );
 }

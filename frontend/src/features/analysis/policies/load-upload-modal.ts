@@ -3,5 +3,5 @@ export function loadUploadPolicyDocumentModal() {
 }
 
 export function preloadUploadPolicyDocumentModal() {
-  void loadUploadPolicyDocumentModal();
+  void loadUploadPolicyDocumentModal().catch(() => undefined);
 }
